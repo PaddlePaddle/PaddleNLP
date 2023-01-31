@@ -23,10 +23,10 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 ```bash
 
 # 在GPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-python infer_demo.py --device gpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+python infer_demo.py --device gpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slot_label.txt --intent_label_path ../../data/intent_label.txt
 
 # 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-python infer_demo.py --device cpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+python infer_demo.py --device cpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slot_label.txt --intent_label_path ../../data/intent_label.txt
 
 ```
 
@@ -50,11 +50,11 @@ No. 2 text = 到信阳市汽车配件城
 
 ```bash
 
-# 在GPU上使用paddle_tensorrt后端，模型目录可按照实际模型路径设置
-python infer_demo.py --device gpu --backend paddle --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+# 在 GPU 上使用 tensorrt 后端，模型目录可按照实际模型路径设置
+python infer_demo.py --device gpu --backend tensorrt --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slot_label.txt --intent_label_path ../../data/intent_label.txt
 
-# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+# 在 CPU 上使用 paddle_inference 后端，模型目录可按照实际模型路径设置
+python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path ../../data/slot_label.txt --intent_label_path ../../data/intent_label.txt
 
 ```
 
@@ -62,7 +62,7 @@ python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_d
 
 ```bash
 
-[INFO] fastdeploy/runtime.cc(517)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+[INFO] fastdeploy/runtime.cc(517)::Init    Runtime initialized with Backend::TRT in Device::GPU.
 No. 0 text = 来一首周华健的花心
 {'intent': 'music.play', 'confidence': 0.99706995, 'slot': [{'slot': 'singer', 'entity': '周华健', 'pos': [3, 5]}, {'slot': 'song', 'entity': '花心', 'pos': [7, 8]}]}
 No. 1 text = 播放我们都一样

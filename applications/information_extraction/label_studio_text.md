@@ -56,10 +56,10 @@ label-studio start
     <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
 </div>
 
-- **文本分类、句子级情感倾向分类**任务选择``Relation Extraction`。
+- **文本分类、句子级情感倾向分类**任务选择``Text Classification``。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/212617773-34534e68-4544-4b24-8f39-ae7f9573d397.png height=420 width=1200 />
 </div>
 
 - 添加标签(也可跳过后续在Setting/Labeling Interface中配置)

@@ -232,7 +232,15 @@ class BertPretrainedModel(PretrainedModel):
 
         # downstream mappings
         if "BertForQuestionAnswering" in config.architectures:
-            model_mappings.extend([["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]])
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+        if (
+            "BertForMultipleChoice" in config.architectures
+            or "BertForSequenceClassification" in config.architectures
+            or "BertForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings

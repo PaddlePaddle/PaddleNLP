@@ -240,7 +240,7 @@ Parameters:
 * `device`: Evaluation device, one of 'cpu', 'gpu' can be selected; the default is GPU evaluation.
 * `model_path`: The path of the model folder for evaluation, which must contain the model weight file `model_state.pdparams` and the configuration file `model_config.json`.
 * `test_path`: The test set file for evaluation.
-* `label_names`: the name of the training data label label, UIE-X is set to 'start_positions' 'end_positions'; the default value is None.
+* `label_names`: the name of the training data label, UIE-X is set to 'start_positions' 'end_positions'; the default value is None.
 * `batch_size`: batch size, please adjust according to the machine situation, the default is 16.
 * `max_seq_len`: The maximum segmentation length of the text. When the input exceeds the maximum length, the input text will be automatically segmented. The default is 512.
 * `per_device_eval_batch_size`: Batch size per GPU core/CPU for evaluation, default is 8.

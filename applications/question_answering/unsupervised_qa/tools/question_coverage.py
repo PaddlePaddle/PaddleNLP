@@ -28,7 +28,7 @@ from paddlenlp.transformers import BasicTokenizer
 # yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--true_file_path', type=str, default=None, help='the souce json file path')
+    parser.add_argument('--true_file_path', type=str, default=None, help='the source json file path')
     parser.add_argument('--generate_file_path', type=str, default=None, help='the target json file path')
     parser.add_argument('--num_return_sequences', type=int, default=3, help='the number of return sequences for each input sample, it should be less than num_beams')
     parser.add_argument('--all_sample_num', type=int, default=None, help='the number of valid sample')

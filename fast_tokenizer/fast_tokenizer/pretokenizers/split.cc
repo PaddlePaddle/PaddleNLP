@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/split.h"
+
 #include "fast_tokenizer/core/base.h"
 #include "fast_tokenizer/normalizers/normalizer.h"
 #include "fast_tokenizer/utils/unique_ptr.h"

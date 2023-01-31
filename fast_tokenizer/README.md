@@ -14,33 +14,38 @@
     <a href="https://github.com/PaddlePaddle/PaddleNLP/issues"><img src="https://img.shields.io/github/issues/PaddlePaddle/PaddleNLP?color=9cc"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
 </p>
-FastTokenizer是一款简单易用、功能强大的跨平台高性能文本预处理库，集成业界多个常用的Tokenizer实现，支持不同NLP场景下的文本预处理功能，如文本分类、阅读理解，序列标注等。结合PaddleNLP Tokenizer模块，为用户在训练、推理阶段提供高效通用的文本预处理能力。
+
+
+FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预处理库，集成业界多个常用的 Tokenizer 实现，支持不同 NLP 场景下的文本预处理功能，如文本分类、阅读理解，序列标注等。在 Python 端结合 PaddleNLP Tokenizer 模块，为用户在训练、推理阶段提供高效通用的文本预处理能力。
+
+![fast-tokenizer-framework](https://user-images.githubusercontent.com/10826371/215277623-1fcd84e5-1cc7-43a8-a33c-890103cf1cc8.png)
 
 ## 特性
 
-- 高性能。由于底层采用C++实现，所以其性能远高于目前常规Python实现的Tokenizer。在文本分类任务上，FastTokenizer对比Python版本Tokenizer加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
-- 跨平台。FastTokenizer可在不同的系统平台上使用，目前已支持Windows x64，Linux x64以及MacOS 10.14+平台上使用。
-- 多编程语言支持。FastTokenizer提供在[C++](./docs/cpp/README.md)、[Python](./docs/python/README.md)语言上开发的能力。
-- 灵活性强。用户可以通过指定不同的FastTokenizer组件定制满足需求的Tokenizer。
+- 高性能。底层采用 C++ 实现，并且集成高性能分词算法 `FastWordPiece` [1]，其性能远高于常规 Python 实现的 Tokenizer。在文本分类任务上，FastTokenizer 对比 Python 版本 Tokenizer 加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
+- 可拓展性强。用户可以通过指定不同的 `Normalizer`, `PreTokenizer`, `Model` 以及 `PostProcessor` 组件自定义 Tokenizer。可在 [FastTokenizer Pipeline](docs/pipeline/README.md) 文档了解更多关于组件的介绍以及使用方式。
+- 跨平台。FastTokenizer 可在不同的系统平台上使用，目前已支持 Windows x64，Linux x64 以及 MacOS 10.14+ 平台上使用。
+- 支持多编程语言。FastTokenizer 提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
+- 包含所有预处理。覆盖绝大部分 Transformer 模型的 Tokenizer 所需要的功能，包括特殊 Tokens 的拼接、截断等。输入的原始文本经过 FastTokenizer 处理后得到的结果可直接输入到 Transformer 类模型。
 
 ## 快速开始
 
-下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)。
+下面将介绍 Python 版本 FastTokenizer 的使用方式，C++ 版本的使用方式可参考 [FastTokenizer C++ 库使用教程](./docs/cpp/README.md)。
 
 ### 环境依赖
 
 - Windows 64位系统
 - Linux x64系统
-- MacOS 10.14+系统（m1芯片的MacOS，需要使用x86_64版本的Anaconda作为python环境方可安装使用）
+- MacOS 10.14+系统（ m1 芯片的 MacOS，需要使用 x86_64 版本的 Anaconda 作为 python 环境方可安装使用）
 - Python 3.6 ~ 3.10
 
-### 安装FastTokenizer
+### 安装 FastTokenizer
 
 ```python
 pip install fast-tokenizer-python
 ```
 
-### FastTokenizer使用示例
+### FastTokenizer 使用示例
 
 - 准备词表
 
@@ -51,7 +56,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt
 
 - 切词示例
 
-FastTokenizer库内置NLP任务常用的Tokenizer，如ErnieFastTokenizer。下面将展示FastTokenizer的简单用法。
+FastTokenizer 库内置 NLP 任务常用的 Tokenizer，如 ErnieFastTokenizer。下面将展示 FastTokenizer 的简单用法。
 
 ```python
 import fast_tokenizer
@@ -61,7 +66,7 @@ from fast_tokenizer import ErnieFastTokenizer, models
 fast_tokenizer.set_thread_num(1)
 # 1. 加载词表
 vocab = models.WordPiece.read_file("ernie_vocab.txt")
-# 2. 实例化ErnieFastTokenizer对象
+# 2. 实例化 ErnieFastTokenizer 对象
 fast_tokenizer = ErnieFastTokenizer(vocab)
 # 3. 切词
 output = fast_tokenizer.encode("我爱中国")
@@ -80,9 +85,9 @@ print("attention_mask: ", output.attention_mask)
 # attention_mask:  [1, 1, 1, 1, 1, 1]
 ```
 
-### FastTokenizer在PaddleNLP Tokenizer模块加速示例
+### FastTokenizer 在 PaddleNLP Tokenizer 模块加速示例
 
-PaddleNLP Tokenizer模块可简单地应用在模型训练以及推理部署的文本预处理阶段，并通过`AutoTokenizer.from_pretrained`方式实例化相应的Tokenizer。其中`AutoTokenizer`默认加载得到的Tokenizer是常规Python实现的Tokenizer，其性能会低于C++实现的FastTokenizer。为了提升PaddleNLP Tokenizer模块性能，目前PaddleNLP Tokenizer模块已经支持使用FastTokenizer作为Tokenizer的后端加速切词阶段。在现有的Tokenizer加载接口中，仅需添加`use_fast=True`这一关键词参数，其余代码保持不变，即可加载Fast版本的Tokenizer，代码示例如下：
+PaddleNLP Tokenizer 模块可简单地应用在模型训练以及推理部署的文本预处理阶段，并通过 `AutoTokenizer.from_pretrained` 方式实例化相应的 Tokenizer 。其中 `AutoTokenizer` 默认加载得到的 Tokenizer 是常规 Python 实现的 Tokenizer，其性能会低于 C++ 实现的 FastTokenizer。为了提升 PaddleNLP Tokenizer 模块性能，目前 PaddleNLP Tokenizer 模块已经支持使用 FastTokenizer 作为 Tokenizer 的后端加速切词阶段。在现有的 Tokenizer 加载接口中，仅需添加 `use_fast=True` 这一关键词参数，其余代码保持不变，即可加载 Fast 版本的 Tokenizer，代码示例如下：
 
 ```python
 from paddlenlp.transformers import AutoTokenizer
@@ -104,18 +109,18 @@ print(text2)
 
 ```
 
-目前PaddleNLP已支持BERT、ERNIE、TinyBERT以及ERNIE-M 4种Tokenizer的Fast版本，其余模型的Tokenizer暂不支持Fast版本。
+目前 PaddleNLP 已支持 BERT、ERNIE、TinyBERT 以及 ERNIE-M 4种 Tokenizer 的 Fast 版本，其余模型的 Tokenizer 暂不支持 Fast 版本。
 
 ## FAQ
 
-Q：我在AutoTokenizer.from_pretrained接口上已经打开`use_fast=True`开关，为什么文本预处理阶段性能上好像没有任何变化？
+Q：我在 AutoTokenizer.from_pretrained 接口上已经打开 `use_fast=True` 开关，为什么文本预处理阶段性能上好像没有任何变化？
 
-A：在有三种情况下，打开`use_fast=True`开关可能无法提升性能：
-  1. 没有安装fast_tokenizer。若在没有安装fast_tokenizer库的情况下打开`use_fast`开关，PaddleNLP会给出以下warning："Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. "。
+A：在有三种情况下，打开 `use_fast=True` 开关可能无法提升性能：
+  1. 没有安装 fast_tokenizer 。若在没有安装 fast_tokenizer 库的情况下打开 `use_fast` 开关，PaddleNLP 会给出以下warning："Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. "。
 
-  2. 加载的Tokenizer类型暂不支持Fast版本。目前支持4种Tokenizer的Fast版本，分别是BERT、ERNIE、TinyBERT以及ERNIE-M Tokenizer。若加载不支持Fast版本的Tokenizer情况下打开`use_fast`开关，PaddleNLP会给出以下warning："The tokenizer XXX doesn't have the fast version. Please check the map paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES to see which fast tokenizers are currently supported."
+  2. 加载的 Tokenizer 类型暂不支持 Fast 版本。目前支持4种 Tokenizer 的 Fast 版本，分别是 BERT、ERNIE、TinyBERT 以及 ERNIE-M Tokenizer。若加载不支持 Fast 版本的 Tokenizer 情况下打开 `use_fast` 开关，PaddleNLP 会给出以下warning："The tokenizer XXX doesn't have the fast version. Please check the map paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES to see which fast tokenizers are currently supported."
 
-  3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用FastTokenizer后仍无法提升整体性能。
+  3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用 FastTokenizer 后仍无法提升整体性能。
 
 Q：如何使用多线程加速分词？
 
@@ -126,9 +131,15 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 
   3. 文本长度较长。若文本长度较短，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议文本平均长度大于16的时候再考虑开启多线程分词。
 
+## 参考文献
+
+- [1] Xinying Song, Alex Salcianuet al. "Fast WordPiece Tokenization", EMNLP, 2021
+
 ## 相关文档
 
-[FastTokenizer编译指南](docs/compile/README.md)
+[FastTokenizer Pipeline](docs/pipeline/README.md)
+
+[FastTokenizer 编译指南](docs/compile/README.md)
 
 [FastTokenizer C++ 库使用教程](./docs/cpp/README.md)
 

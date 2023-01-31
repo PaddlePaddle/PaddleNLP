@@ -46,6 +46,12 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
 
+```
+# 下载pipelines源代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines
+```
+
 【注意】
 
 - Windows的安装复杂一点，教程请参考：[Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)

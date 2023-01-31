@@ -41,15 +41,15 @@ schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就�
 
 ```python
 # Default task_path
-utc = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/", schema=schema)
+utc = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
 ```
 
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码
 
 ```python
-utc1 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/", schema=schema)
-utc2 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/", schema=schema)
+utc1 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
+utc2 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
 service.register_taskflow("taskflow/utc", [utc1, utc2])
 ```
 
