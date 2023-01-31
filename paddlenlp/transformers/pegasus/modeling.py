@@ -318,7 +318,6 @@ class PegasusDecoder(PegasusPretrainedModel):
         else:
             new_cache = None
         decoder_output = self.decoder_layernorm(decoder_output)
-
         return decoder_output, new_cache
 
 
@@ -568,11 +567,9 @@ class PegasusModel(PegasusPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
-
         decoder_output, new_cache = self.decoder(
             decoder_input_ids, decoder_attention_mask, encoder_output, attention_mask, cache
         )
-
         return decoder_output, new_cache, encoder_output, attention_mask
 
 
@@ -624,7 +621,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
-            enable_faster_encoder=enable_fast_encoder,
+            enable_fast_encoder=enable_fast_encoder,
         ).forward
         return self._fast_entry
 
