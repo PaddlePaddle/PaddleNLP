@@ -14,12 +14,17 @@
 
 import argparse
 
-from ernie_m_predictor import ErnieMPredictor
+from psutil import cpu_count
+
+from .ernie_m_predictor import ErnieMPredictor
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
+    parser.add_argument(
+        "--device", default="cpu", type=str, choices=["gpu", "cpu"], help="Device selected for inference."
+    )
     parser.add_argument(
         "--task_name",
         default="seq_cls",
@@ -69,6 +74,12 @@ def parse_args():
         choices=["fp32", "fp16", "int8"],
         help="Inference precision.",
     )
+    parser.add_argument(
+        "--num_threads",
+        default=cpu_count(logical=False),
+        type=int,
+        help="num_threads for cpu.",
+    )
     args = parser.parse_args()
     return args
 
@@ -76,7 +87,6 @@ def parse_args():
 def main():
     args = parse_args()
     args.task_name = args.task_name.lower()
-    args.device = "gpu"
     predictor = ErnieMPredictor(args)
 
     if args.task_name == "seq_cls":

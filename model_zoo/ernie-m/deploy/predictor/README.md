@@ -28,8 +28,8 @@ pip install -r requirements_gpu.txt
 
 ### 2.2 CPU端推理样例
 在 CPU 端，请使用如下命令进行部署
-```
-python infer_cpu.py --task_name seq_cls --model_path ../../finetuned_models/export/model
+```sh
+python inference.py --device cpu --task_name seq_cls --model_path ../../finetuned_models/export/model
 ```
 输出打印如下:
 ```
@@ -58,8 +58,8 @@ infer_cpu.py 脚本中的参数说明：
 
 ### 2.3 GPU端推理样例
 在 GPU 端，请使用如下命令进行部署
-```
-python infer_gpu.py --task_name seq_cls --model_path ../../finetuned_models/export/model
+```sh
+python inference.py --device gpu --task_name seq_cls --model_path ../../finetuned_models/export/model
 ```
 输出打印如下:
 ```
@@ -77,8 +77,8 @@ label: neutral   confidence: 0.9880901575088501
 -----------------------------
 ```
 如果需要 FP16 进行加速，可以设置 precision_mode 为 fp16，具体命令为
-```
-python infer_gpu.py --task_name seq_cls --model_path ../../finetuned_models/export/model --precision_mode fp16
+```sh
+python inference.py --device gpu --task_name seq_cls --model_path ../../finetuned_models/export/model --precision_mode fp16
 ```
 infer_gpu.py 脚本中的参数说明：
 | 参数 |参数说明 |
