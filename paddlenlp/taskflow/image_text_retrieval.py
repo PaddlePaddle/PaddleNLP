@@ -15,11 +15,11 @@
 import paddle
 from PIL import Image
 
-from ..transformers import ErnieViLModel, ErnieViLProcessor
+from ..transformers import AutoModel, AutoProcessor
 from .task import Task
 
 
-class VisionLanguageTask(Task):
+class ImageTextRetrievalTask(Task):
     """
     The text_to_image generation model to generate the image.
     Args:
@@ -33,21 +33,21 @@ class VisionLanguageTask(Task):
         self._seed = None
         # we do not use batch
         self._batch_size = 1
-        self._construct_tokenizer(image_model=model, text_model="ernie_vil-2.0-base-zh")
+        self._construct_tokenizer(model_name=model)
         self._construct_model(model)
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        self._model = ErnieViLModel.from_pretrained(model)
+        self._model = AutoModel.from_pretrained(model)
         self._model.eval()
 
-    def _construct_tokenizer(self, image_model, text_model):
+    def _construct_tokenizer(self, model_name):
         """
         Construct the tokenizer for the predictor.
         """
-        self._processor = ErnieViLProcessor.from_pretrained(image_model)
+        self._processor = AutoProcessor.from_pretrained(model_name)
 
     def _batchify(self, data, batch_size):
         """
@@ -55,26 +55,48 @@ class VisionLanguageTask(Task):
         """
 
         def _parse_batch(batch_examples):
-            batch_texts = batch_examples["texts"]
-            batch_images = [Image.open(item) for item in batch_examples["images"]]
+            if isinstance(batch_examples[0], str):
+                batch_texts = batch_examples
+                batch_images = None
+            else:
+                batch_texts = None
+                batch_images = batch_examples
 
-            tokenizerd_inputs = self._processor(
+            tokenized_inputs = self._processor(
                 text=batch_texts, images=batch_images, return_tensors="pd", padding="max_length", truncation=True
             )
-
-            return tokenizerd_inputs
+            return tokenized_inputs
 
         # Seperates data into some batches.
-        # breakpoint()
-        yield _parse_batch(data[0])
-        # one_batch = []
-        # for example in data:
-        #     one_batch.append(example)
-        #     if len(one_batch) == batch_size:
-        #         yield _parse_batch(one_batch)
-        #         one_batch = []
-        # if one_batch:
-        #     yield _parse_batch(one_batch)
+        one_batch = []
+        for example in data:
+            one_batch.append(example)
+            if len(one_batch) == batch_size:
+                yield _parse_batch(one_batch)
+                one_batch = []
+        if one_batch:
+            yield _parse_batch(one_batch)
+
+    def _check_input_text(self, inputs):
+        """
+        Check whether the input text meet the requirement.
+        """
+        inputs = inputs[0]
+        if isinstance(inputs, (str, Image.Image)):
+            if len(inputs) == 0:
+                raise ValueError("Invalid inputs, input text/image should not be empty, please check your input.")
+            inputs = [inputs]
+        elif isinstance(inputs, list):
+            # and len(inputs[0].strip()) > 0
+            if not (isinstance(inputs[0], (str, Image.Image))):
+                raise TypeError(
+                    "Invalid inputs, input text/image should be list of str/PIL.image, and first element of list should not be empty."
+                )
+        else:
+            raise TypeError(
+                "Invalid inputs, input text should be str or list of str, but type of {} found!".format(type(inputs))
+            )
+        return inputs
 
     def _preprocess(self, inputs):
         """
@@ -82,7 +104,7 @@ class VisionLanguageTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        # inputs = self._check_input_text(inputs)
+        inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
         outputs = {"batches": batches, "text": inputs}
         return outputs
@@ -91,20 +113,19 @@ class VisionLanguageTask(Task):
         """
         Run the task model from the outputs of the `_preprocess` function.
         """
-        all_texts = []
-        all_images = []
+        all_feats = []
         for batch_inputs in inputs["batches"]:
-            if len(batch_inputs["input_ids"]) > 0:
+            if "input_ids" in batch_inputs:
                 text_features = self._model.get_text_features(input_ids=batch_inputs["input_ids"])
-                all_texts.append(text_features)
-            if len(batch_inputs["pixel_values"]) > 0:
+                all_feats.append(text_features)
+            if "pixel_values" in batch_inputs:
                 image_features = self._model.get_image_features(pixel_values=batch_inputs["pixel_values"])
-                all_images.append(image_features)
-        inputs.update({"text_features": all_texts})
-        inputs.update({"image_features": all_images})
+                all_feats.append(image_features)
+        inputs.update({"features": all_feats})
         return inputs
 
     def _postprocess(self, inputs):
+        inputs["features"] = paddle.concat(inputs["features"], axis=0)
         return inputs
 
     def _construct_input_spec(self):
