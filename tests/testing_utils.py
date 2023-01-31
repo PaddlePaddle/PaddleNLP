@@ -13,15 +13,15 @@
 # limitations under the License.
 from __future__ import annotations
 
-import sys
 import copy
 import gc
 import inspect
 import os
+import sys
 import unittest
 from collections.abc import Mapping
-from distutils.util import strtobool
 from contextlib import contextmanager
+from distutils.util import strtobool
 
 import numpy as np
 import paddle

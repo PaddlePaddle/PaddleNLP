@@ -13,11 +13,11 @@
 # limitations under the License.
 from __future__ import annotations
 
-import sys
 import os
+import sys
 from unittest import TestCase
 
-from tests.testing_utils import load_test_config, argv_context_guard
+from tests.testing_utils import argv_context_guard, load_test_config
 
 
 class GPTTest(TestCase):
