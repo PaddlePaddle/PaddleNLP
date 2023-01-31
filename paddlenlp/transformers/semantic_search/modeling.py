@@ -18,10 +18,22 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from paddlenlp.transformers import PretrainedModel
+
 from ..ernie.configuration import ErnieConfig
 from ..ernie.modeling import ErnieModel, ErniePretrainedModel
 
 __all__ = ["ErnieDualEncoder", "ErnieCrossEncoder"]
+
+
+def _get_hidden_size(model: PretrainedModel) -> int:
+    """get hidden size of pretrained model
+
+    Returns:
+        int: the dim of hidden state
+    """
+    # TODO(wj-Mcat): to support more pretarined model
+    return model.config["hidden_size"]
 
 
 class ErnieEncoder(ErniePretrainedModel):
