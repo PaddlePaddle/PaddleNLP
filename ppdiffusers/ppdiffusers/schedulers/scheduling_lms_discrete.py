@@ -126,6 +126,10 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sample = sample / ((sigma**2 + 1) ** 0.5)
         self.is_scale_input_called = True
         return sample
+    def scale_model_input_preconfigured(
+            self, sample: paddle.Tensor,
+            idx) -> paddle.Tensor:
+        return sample*self.latent_scales[idx]
 
     def get_lms_coefficient(self, order, t, current_order):
         """
@@ -149,8 +153,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         return integrated_coeff
 
-    def configure(self,         
-                  order: int = 4):
+    def configure(self, order: int = 4):
         self.order = order
         self.lms_coeffs = []
         self.latent_scales = [1./((sigma**2 + 1) ** 0.5) for sigma in self.sigmas]
@@ -300,7 +303,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             if return_pred_original_sample == False:
                 return (prev_sample,)
             else:
-                return (prev_sample,return_pred_original_sample)
+                return (prev_sample,pred_original_sample)
         return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
 
 
