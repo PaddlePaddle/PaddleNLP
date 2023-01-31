@@ -20,18 +20,15 @@ import paddle
 import paddle.nn.functional as F
 from functools import partial
 
-from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from base_model import SemanticIndexBase
 from batch_negative.model import SemanticIndexBatchNeg, SemanticIndexCacheNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file
 from ann_util import build_index
 
-# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str,
                     help="The output directory where the model checkpoints will be written.")
@@ -50,7 +47,7 @@ parser.add_argument("--weight_decay", default=0.0, type=float,
 parser.add_argument("--epochs", default=10, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float,
-                    help="Linear warmup proption over the training process.")
+                    help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None,
                     help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000,
@@ -58,9 +55,9 @@ parser.add_argument("--seed", type=int, default=1000,
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000,
-                    help="Inteval steps to save checkpoint")
+                    help="Interval steps to save checkpoint")
 parser.add_argument('--log_steps', type=int, default=10,
-                    help="Inteval steps to print log")
+                    help="Interval steps to print log")
 parser.add_argument("--train_set_file", type=str,
                     default='./recall/train.csv',
                     help="The full path of train_set_file.")
@@ -68,7 +65,7 @@ parser.add_argument("--dev_set_file", type=str,
                     default='./recall/dev.csv',
                     help="The full path of dev_set_file.")
 parser.add_argument("--margin", default=0.2, type=float,
-                    help="Margin beteween pos_sample and neg_samples")
+                    help="Margin between pos_sample and neg_samples")
 parser.add_argument("--scale", default=30, type=int,
                     help="Scale for pair-wise margin_rank_loss")
 parser.add_argument("--corpus_file", type=str, default='./recall/corpus.csv',
@@ -93,16 +90,11 @@ parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt'
 parser.add_argument('--evaluate', action='store_true',
                     help='whether evaluate while training')
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
-parser.add_argument("--amp_loss_scale", default=32768, type=float,help="The value of scale_loss for fp16. This is only used for AMP training.")
-parser.add_argument("--use_recompute",
-                        action='store_true',
-                        help="Using the recompute to scale up the batch size and save the memory.")
-parser.add_argument("--use_gradient_cache",
-                        action='store_true',
-                        help="Using the gradient cache to scale up the batch size and save the memory.")
-parser.add_argument("--chunk_numbers",type=int,default=50,help="The number of the chunks for model")
+parser.add_argument("--amp_loss_scale", default=32768, type=float, help="The value of scale_loss for fp16. This is only used for AMP training.")
+parser.add_argument("--use_recompute", action='store_true', help="Using the recompute to scale up the batch size and save the memory.")
+parser.add_argument("--use_gradient_cache", action='store_true', help="Using the gradient cache to scale up the batch size and save the memory.")
+parser.add_argument("--chunk_numbers", type=int, default=50, help="The number of the chunks for model")
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -316,7 +308,7 @@ def gradient_cache_train(train_data_loader, model, optimizer, lr_scheduler, rank
                     sub_title_token_type_ids,
                 ) = sub_batch
                 paddle.framework.random.set_cuda_rng_state(CUDA_state)
-                # Recompute the forward propogation
+                # Recompute the forward propagation
                 sub_cosine_sim, sub_label, query_embedding, title_embedding = model(
                     query_input_ids=sub_query_input_ids,
                     title_input_ids=sub_title_input_ids,
@@ -325,7 +317,7 @@ def gradient_cache_train(train_data_loader, model, optimizer, lr_scheduler, rank
                 )
                 # Chain rule
                 surrogate = paddle.dot(sub_cosine_sim, grad)
-                # Backward propogation
+                # Backward propagation
                 if args.use_amp:
                     scaled = scaler.scale(surrogate)
                     scaled.backward()
@@ -373,11 +365,11 @@ def do_train():
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # title_segment
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
@@ -399,14 +391,14 @@ def do_train():
 
     model = paddle.DataParallel(model)
 
-    batchify_fn_dev = lambda samples, fn=Tuple(
+    batchify_fn_dev = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # text_segment
     ): [data for data in fn(samples)]
 
     id2corpus = gen_id2corpus(args.corpus_file)
 
-    # conver_example function's input must be dict
+    # convert_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 

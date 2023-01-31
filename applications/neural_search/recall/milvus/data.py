@@ -84,7 +84,7 @@ def read_text_triplet(data_path):
 # ANN - active learning ------------------------------------------------------
 def get_latest_checkpoint(args):
     """
-    Return: (latest_checkpint_path, global_step)
+    Return: (latest_checkpoint_path, global_step)
     """
     if not os.path.exists(args.save_dir):
         return args.init_from_ckpt, 0
@@ -114,7 +114,7 @@ def get_latest_ann_data(ann_data_dir):
 
     def valid_checkpoint(step):
         ann_data_file = os.path.join(ann_data_dir, step, "new_ann_data")
-        # succed_flag_file is an empty file that indicates ann data has been generated
+        # succeed_flag_file is an empty file that indicates ann data has been generated
         succeed_flag_file = os.path.join(ann_data_dir, step, "succeed_flag_file")
         return os.path.exists(succeed_flag_file) and os.path.exists(ann_data_file)
 
@@ -122,7 +122,7 @@ def get_latest_ann_data(ann_data_dir):
 
     if len(ann_data_steps) > 0:
         latest_ann_data_file = os.path.join(ann_data_dir, str(max(ann_data_steps)), "new_ann_data")
-        logger.info("Using lateset ann_data_file:{}".format(latest_ann_data_file))
+        logger.info("Using latest ann_data_file:{}".format(latest_ann_data_file))
         return latest_ann_data_file, max(ann_data_steps)
 
     logger.info("no new ann_data, return (None, -1)")

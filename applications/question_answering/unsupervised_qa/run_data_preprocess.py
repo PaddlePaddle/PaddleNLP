@@ -20,7 +20,7 @@ import os
 # yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--source_file_path', type=str, default=None, help='the souce json file path')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the source json file path')
     parser.add_argument('--target_dir', type=str, default='data', help='the target file path')
     parser.add_argument('--do_answer_prompt', action="store_true", help="is use answer prompt")
     parser.add_argument('--do_len_prompt', action="store_true", help="is use length prompt")
