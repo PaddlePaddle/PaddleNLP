@@ -50,7 +50,7 @@ null:null
 null:null
 null:null
 ===========================to_static_train_benchmark_params===========================
-to_static_train:--to_static True
+to_static_train:--to_static
 ===========================train_benchmark_params==========================
 batch_size:32|64|96
 fp_items:fp32|fp16
