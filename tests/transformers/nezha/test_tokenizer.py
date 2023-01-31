@@ -16,12 +16,7 @@
 import os
 import unittest
 
-from paddlenlp.transformers.ernie.fast_tokenizer import ErnieFastTokenizer
-from paddlenlp.transformers.ernie.tokenizer import (
-    BasicTokenizer,
-    ErnieTokenizer,
-    WordpieceTokenizer,
-)
+from paddlenlp.transformers import BasicTokenizer, NeZhaTokenizer, WordpieceTokenizer
 
 from ...testing_utils import slow
 from ...transformers.test_tokenizer_common import (
@@ -30,10 +25,9 @@ from ...transformers.test_tokenizer_common import (
 )
 
 
-class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+class NeZhaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
-    tokenizer_class = ErnieTokenizer
-    fast_tokenizer_class = ErnieFastTokenizer
+    tokenizer_class = NeZhaTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -59,7 +53,7 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "lowest",
         ]
 
-        self.vocab_file = os.path.join(self.tmpdirname, ErnieTokenizer.resource_files_names["vocab_file"])
+        self.vocab_file = os.path.join(self.tmpdirname, NeZhaTokenizer.resource_files_names["vocab_file"])
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
@@ -206,6 +200,7 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
+        print(encoded_sentence)
         assert encoded_sentence == [1] + text + [2]
         assert encoded_pair == [1] + text + [2] + text_2 + [2]
 
