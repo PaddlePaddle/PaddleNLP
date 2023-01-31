@@ -15,6 +15,7 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     NeZhaConfig,
@@ -28,11 +29,7 @@ from paddlenlp.transformers import (
 )
 
 from ...testing_utils import slow
-from ..test_modeling_common import (
-    ModelTesterMixin,
-    ids_tensor,
-    random_attention_mask,
-)
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class NeZhaModelTester:
@@ -143,9 +140,11 @@ class NeZhaModelTester:
     ):
         model = NeZhaModel(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
@@ -168,8 +167,12 @@ class NeZhaModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             token_type_ids=multiple_choice_token_type_ids,
+            labels=choice_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if choice_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
@@ -190,8 +193,14 @@ class NeZhaModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.parent.return_dict,
         )
-        start_logits, end_logits = result[0], result[1]
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
 
         self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
@@ -212,8 +221,12 @@ class NeZhaModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            labels=sequence_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
@@ -234,8 +247,12 @@ class NeZhaModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
@@ -255,11 +272,19 @@ class NeZhaModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class NeZhaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = NeZhaModel
     return_dict: bool = False
     use_labels: bool = False
-    test_resize_embeddings: bool = False
 
     all_model_classes = (
         NeZhaModel,
