@@ -14,36 +14,24 @@
 from __future__ import annotations
 
 import io
-import os
 import pickle
 from functools import lru_cache
+from typing import Union
+from zipfile import ZipFile
 
 import numpy as np
-from _io import BufferedReader
-
-MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
 
-class TensorMeta:
-    """
-    metadata of tensor
-    """
-
-    def __init__(self, key: str, n_bytes: int, dtype: str):
-        self.key = key
-        self.nbytes = n_bytes
-        self.dtype = dtype
-        self.size = None
-        self.stride = None
-
-    def __repr__(self):
-        return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}, stride: {self.stride}"
-
-
-class SerializationError(Exception):
-    """Exception for serialization"""
-
-    pass
+def _maybe_decode_ascii(bytes_str: Union[bytes, str]) -> str:
+    # When using encoding='bytes' in Py3, some **internal** keys stored as
+    # strings in Py2 are loaded as bytes. This function decodes them with
+    # ascii encoding, one that Py3 uses by default.
+    #
+    # NOTE: This should only be used on internal keys (e.g., `typename` and
+    #       `location` in `persistent_load` below!
+    if isinstance(bytes_str, bytes):
+        return bytes_str.decode("ascii")
+    return bytes_str
 
 
 @lru_cache(maxsize=None)
@@ -58,7 +46,7 @@ def _storage_type_to_dtype_to_map():
         "ShortStorage": np.int16,
         "CharStorage": np.int8,
         "ByteStorage": np.uint8,
-        "BoolStorage": np.bool8,
+        "BoolStorage": np.bool_,
         "ComplexDoubleStorage": np.cdouble,
         "ComplexFloatStorage": np.cfloat,
     }
@@ -80,7 +68,7 @@ def _element_size(dtype: str) -> int:
     """
     if dtype in [np.float16, np.float32, np.float64]:
         return np.finfo(dtype).bits >> 3
-    elif dtype == np.bool8:
+    elif dtype == np.bool_:
         return 1
     else:
         return np.iinfo(dtype).bits >> 3
@@ -104,165 +92,62 @@ class UnpicklerWrapperStage(pickle.Unpickler):
         return super().find_class(mod_name, name)
 
 
-def get_data_iostream(file: str, file_name="data.pkl"):
-    FILENAME = f"archive/{file_name}".encode("latin")
-    padding_size_plus_fbxx = 4 + 14
-    data_iostream = []
-    offset = MZ_ZIP_LOCAL_DIR_HEADER_SIZE + len(FILENAME) + padding_size_plus_fbxx
-    with open(file, "rb") as r:
-        r.seek(offset)
-        for bytes_data in io.BytesIO(r.read()):
-            if b".PK" in bytes_data:
-                data_iostream.append(bytes_data.split(b".PK")[0])
-                data_iostream.append(b".")
-                break
-            data_iostream.append(bytes_data)
-    out = b"".join(data_iostream)
-    return out, offset + len(out)
-
-
 def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, backward_hooks):
-    if isinstance(storage, TensorMeta):
-        storage.size = size
-        storage.stride = stride
-    return storage
+    # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
+    # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
+    # defautls to C-style
+    if stride is not None and len(stride) > 1 and stride[0] == 1 and stride[1] > 1:
+        order = "F"
+    else:
+        order = "C"
+
+    return storage.reshape(size, order=order)
 
 
 def dumpy(*args, **kwarsg):
     return None
 
 
-def seek_by_string(file_handler: BufferedReader, string: str, file_size: int) -> int:
-    """seek the index of file-handler with target words
-
-    Args:
-        file_handler (BufferedReader): file handler
-        string (str): the specific string in the file
-        file_size (int): size of file
-
-    Returns:
-        int: end index of target string
-    """
-    word_index = 0
-    word_bytes = string.encode("latin")
-    empty_byte = "".encode("latin")
-
-    while word_index < len(string) and file_handler.tell() < file_size:
-        content = file_handler.read(1)
-        if content == empty_byte:
-            break
-
-        if word_bytes[word_index] == content[0]:
-            word_index += 1
-        else:
-            word_index = 0
-
-    if file_handler.tell() >= file_size - 1:
-        raise SerializationError(f"can't find the find the target string<{string}> in the file")
-    return file_handler.tell()
-
-
-def read_prefix_key(file_handler: BufferedReader, file_size: int):
-    """read the prefix key in model weight file, eg: archive/pytorch_model
-
-    Args:
-        file_handler (BufferedReader): file handler
-        fiel_size (_type_): size of file
-
-    Returns:
-        _type_: _description_
-    """
-    end_index = seek_by_string(file_handler, "data.pkl", file_size)
-    file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE)
-    prefix_key = file_handler.read(end_index - MZ_ZIP_LOCAL_DIR_HEADER_SIZE - len("/data.pkl"))
-    return prefix_key
-
-
 def load_torch(path: str, **pickle_load_args):
     """
     load torch weight file with the following steps:
-
     1. load the structure of pytorch weight file
     2. read the tensor data and re-construct the state-dict
-
     Args:
         path: the path of pytorch weight file
         **pickle_load_args: args of pickle module
-
     Returns:
-
     """
     pickle_load_args.update({"encoding": "utf-8"})
+    torch_zip = ZipFile(path, "r")
+    loaded_storages = {}
 
-    # 1. load the structure of pytorch weight file
-    def persistent_load_stage1(saved_id):
+    def load_tensor(dtype, numel, key, location):
+        name = f"archive/data/{key}"
+        typed_storage = np.frombuffer(torch_zip.open(name).read()[:numel], dtype=dtype)
+        return typed_storage
+
+    def persistent_load(saved_id):
         assert isinstance(saved_id, tuple)
+        typename = _maybe_decode_ascii(saved_id[0])
         data = saved_id[1:]
-        storage_type, key, _, numel = data
+
+        assert typename == "storage", f"Unknown typename for persistent_load, expected 'storage' but got '{typename}'"
+        storage_type, key, location, numel = data
         dtype = storage_type.dtype
-        n_bytes = numel * _element_size(dtype)
-        return TensorMeta(key, n_bytes, dtype)
 
-    data_iostream, pre_offset = get_data_iostream(path, file_name="data.pkl")
-    # 1. read the structure of storage
-    unpickler_stage1 = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
-    unpickler_stage1.persistent_load = persistent_load_stage1
-    result_stage1 = unpickler_stage1.load()
+        if key in loaded_storages:
+            typed_storage = loaded_storages[key]
+        else:
+            nbytes = numel * _element_size(dtype)
+            typed_storage = load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
+            loaded_storages[key] = typed_storage
 
-    # 2. get the metadata of weight file
-    metadata = {}
+        return typed_storage
 
-    def extract_maybe_dict(result):
-        if isinstance(result, dict):
-            for k, v in result.items():
-                extract_maybe_dict(v)
-        elif isinstance(result, (list, tuple)):
-            for res in result:
-                extract_maybe_dict(res)
-        elif isinstance(result, TensorMeta):
-            metadata[result.key] = result
-
-    extract_maybe_dict(result_stage1)
-    metadata = list(metadata.values())
-    metadata = sorted(metadata, key=lambda x: x.key)
-
-    # 3. parse the tensor of pytorch weight file
-    stage1_key_to_tensor = {}
-    content_size = os.stat(path).st_size
-    with open(path, "rb") as file_handler:
-        file_handler.seek(pre_offset)
-        for tensor_meta in metadata:
-            key = tensor_meta.key
-            seek_by_string(file_handler, "FB", content_size)
-
-            padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
-            file_handler.seek(padding_offset, 1)
-
-            # save the tensor info in result to re-use memory
-            np_buffer = np.frombuffer(file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype)
-
-            # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
-            # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
-            # defautls to C-style
-            if (
-                tensor_meta.stride is not None
-                and len(tensor_meta.stride) > 1
-                and tensor_meta.stride[0] == 1
-                and tensor_meta.stride[1] > 1
-            ):
-                order = "F"
-            else:
-                order = "C"
-            stage1_key_to_tensor[key] = np_buffer.reshape(tensor_meta.size, order=order)
-
-    def persistent_load_stage2(saved_id):
-        assert isinstance(saved_id, tuple)
-        key = saved_id[2]
-        return stage1_key_to_tensor[key]
-
-    # 4. read the structure of storage
-    unpickler_stage2 = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
-    unpickler_stage2.persistent_load = persistent_load_stage2
-    result_stage2 = unpickler_stage2.load()
-
-    return result_stage2
+    data_iostream = torch_zip.open("archive/data.pkl").read()
+    unpickler_stage = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
+    unpickler_stage.persistent_load = persistent_load
+    result = unpickler_stage.load()
+    torch_zip.close()
+    return result
