@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.nn as nn
-import paddle
-import paddle.nn.functional as F
-
-from .. import PretrainedModel, register_base_model
-from ...transformers.roberta.modeling import RobertaEmbeddings
-
 import math
+
+import paddle
+import paddle.nn as nn
+
+from ...transformers.roberta.modeling import RobertaEmbeddings
+from .. import PretrainedModel, register_base_model
+from ..activations import get_activation
 
 __all__ = [
     "LukeModel",
@@ -53,44 +53,6 @@ def paddle_gather(x, dim, index):
     paddle_out = paddle.gather_nd(x, ind2).reshape(index_shape)
     return paddle_out
 
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-def gelu_new(x):
-    """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return F.gelu(x, approximate=True)
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "gelu_new": gelu_new,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
 
 layer_norm_eps = 1e-6
 
