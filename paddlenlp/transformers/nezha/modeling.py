@@ -457,13 +457,14 @@ class NeZhaModel(NeZhaPretrainedModel):
 
         embedding_output = self.embeddings(input_ids, token_type_ids)
 
-        encoder_hidden_outputs, encoder_att_outputs = self.encoder(embedding_output, extended_attention_mask)
+        encoder_outputs = self.encoder(embedding_output, extended_attention_mask)
+        encoder_hidden_outputs, encoder_att_outputs = encoder_outputs
 
         sequence_output = encoder_hidden_outputs[-1]
         pooled_output = self.pooler(sequence_output)
 
         if not return_dict:
-            return (sequence_output, pooled_output, encoder_att_outputs)
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
