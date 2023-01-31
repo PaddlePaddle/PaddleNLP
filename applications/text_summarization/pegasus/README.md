@@ -215,15 +215,16 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
 - `max_target_length` 模型训练时标签的最大长度。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
-除此之外，我们提供了一种可选的解码端输入增强策略。该策略在解码过程中，基于标准摘要和模型输出构造了新的解码输入数据，以此实现解码端的数据增强。具体详情可以参考[SSTIA论文](https://openreview.net/pdf?id=pz1euXohm4H)。如果想使用该策略，可以设置参数：
+  除此之外，我们提供了一种可选的解码端输入增强策略。该策略在解码过程中，基于标准摘要和模型输出构造了新的解码输入数据，以此实现解码端的数据增强。具体详情可以参考[SSTIA论文](https://openreview.net/pdf?id=pz1euXohm4H)。如果想使用该策略，可以设置参数：
 - `use_SSTIA` 表示使用该策略。以及，
 - `mix_ratio` 表示构造输入和原始输入的权重。
 
-该策略在Pegasus-238M和Pegasus-523M模型上均有大幅度提升，具体效果见后文实验结果表格。
+  该策略在Pegasus-238M和Pegasus-523M模型上均有大幅度提升，具体效果见后文实验结果表格。
 
-PaddleNLP提供了训练好的SSTIA模型，可以修改`model_name_or_path`直接使用：
+  PaddleNLP提供了训练好的SSTIA模型，可以修改`model_name_or_path`直接使用：
+
   | PaddleNLP提供的SSTIA模型        |
-     |---------------------------------|
+  |---------------------------------|
   | PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA      |
   | PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA      |
 
