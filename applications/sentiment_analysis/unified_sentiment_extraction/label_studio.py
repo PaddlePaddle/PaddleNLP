@@ -252,7 +252,7 @@ class Convertor(object):
                     entity_cls_examples.append(implicit_example)
 
             # generate examples for relation extraction
-            # Golden entity inputs, intializing with implicit subject and it's synonyms
+            # Golden entity inputs, initializing with implicit subject and it's synonyms
             for implicit_subject in implict_example_map.keys():
                 subject_golden.append(implicit_subject)
                 if synonyms and implicit_subject in synonyms:
