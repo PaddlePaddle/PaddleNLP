@@ -32,18 +32,17 @@ class GPTTest(TestCase):
     def test_pretrain(self):
 
         # 1. run pretrain
-        config = load_test_config(self.config_path, "pretrain")
-        device = config["device"]
-        with argv_context_guard(config):
+        pretrain_config = load_test_config(self.config_path, "pretrain")
+        with argv_context_guard(pretrain_config):
             from run_pretrain import do_train
 
             do_train()
 
         # 2. export model
         export_config = {
-            "model_type": config["model_type"],
-            "model_path": config["output_dir"],
-            "output_path": os.path.join(config["output_dir"], "export_model"),
+            "model_type": pretrain_config["model_type"],
+            "model_path": pretrain_config["output_dir"],
+            "output_path": os.path.join(pretrain_config["output_dir"], "export_model"),
         }
         with argv_context_guard(export_config):
             from export_model import main
@@ -51,7 +50,11 @@ class GPTTest(TestCase):
             main()
 
         # 3. infer model
-        infer_config = {"model_type": export_config["model_type"], "model_path": export_config["output_path"], "select_device": device}
+        infer_config = {
+            "model_type": export_config["model_type"],
+            "model_path": export_config["output_path"],
+            "select_device": pretrain_config["device"],
+        }
         with argv_context_guard(infer_config):
             from deploy.python.inference import main
 
