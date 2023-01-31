@@ -40,19 +40,19 @@ class GPTTest(TestCase):
             do_train()
 
         # 2. export model
-        config = {
+        export_config = {
             "model_type": config["model_type"],
             "model_path": config["output_dir"],
             "output_path": os.path.join(config["output_dir"], "export_model"),
         }
-        with argv_context_guard(config):
+        with argv_context_guard(export_config):
             from export_model import main
 
             main()
 
         # 3. infer model
-        config = {"model_type": config["model_type"], "model_path": config["output_path"], "select_device": device}
-        with argv_context_guard(config):
+        infer_config = {"model_type": export_config["model_type"], "model_path": export_config["output_path"], "select_device": device}
+        with argv_context_guard(infer_config):
             from deploy.python.inference import main
 
             main()
