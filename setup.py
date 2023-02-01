@@ -25,9 +25,9 @@ def read_requirements_file(filepath):
     return requirements
 
 
-__version__ = "2.5.0.dev"
+__version__ = "2.5.0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
-    __version__ = __version__.replace(".dev", "")
+    __version__ = __version__.replace(".post", "")
 
 
 extras = {}
