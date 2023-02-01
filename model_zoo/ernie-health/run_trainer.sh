@@ -39,7 +39,7 @@ python -u -m paddle.distributed.launch \
     --fp16  \
     --fp16_opt_level "O1"  \
     --do_train \
-    --disable_tqdm \
+    --disable_tqdm True\
     --save_total_limit 10 
 
 # WARNING: fp16_opt_level O2 may cause ehealth pretraing fail !

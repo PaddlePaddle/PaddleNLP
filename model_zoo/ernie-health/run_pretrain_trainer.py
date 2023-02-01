@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import paddle
-from args import parse_config_file
 from dataset import DataCollatorForErnieHealth, MedicalCorpus
 
 from paddlenlp.trainer import (
@@ -33,6 +32,7 @@ from paddlenlp.transformers import (
     ErnieHealthForTotalPretraining,
     ErnieHealthPretrainingCriterion,
 )
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -81,6 +81,21 @@ class ModelArguments:
     )
 
 
+def download_corpus(args: DataArguments):
+    os.makedirs(args.input_dir, exist_ok=True)
+    files = [
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_ids.npy",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_idx.npz",
+    ]
+
+    for file in files:
+        file_name = file.split("/")[-1]
+        file_path = os.path.join(args.input_dir, file_name)
+        if not os.path.exists(file_path):
+            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
+            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
+
+
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -120,6 +135,7 @@ def main():
 
     # Loads or initialize a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
+    pretrained_models.append("__internal_testing__/ernie-health-chinese")
 
     if model_args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
@@ -128,6 +144,7 @@ def main():
         raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
     # Loads dataset.
+    # download_corpus(data_args)
     tic_load_data = time.time()
     logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
@@ -198,10 +215,4 @@ def main():
 
 
 if __name__ == "__main__":
-    config_file = parse_config_file()
-    if config_file is not None:
-        from args import init_argv
-
-        init_argv("pretrain", config_file)
-
     main()
