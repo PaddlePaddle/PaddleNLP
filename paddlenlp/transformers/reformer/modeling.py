@@ -21,15 +21,14 @@ from functools import reduce
 from operator import mul
 
 import numpy as np
+import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.autograd import PyLayer
-from .. import PretrainedModel, register_base_model
-from ..nezha.modeling import ACT2FN
-
-import paddle
 
 from ...utils.log import logger
+from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 
 __all__ = [
     "ReformerModel",

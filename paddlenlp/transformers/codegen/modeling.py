@@ -24,11 +24,11 @@ from paddle.nn import Layer
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from ..nezha.modeling import ACT2FN
 from .configuration import (
     CODEGEN_PRETRAINED_INIT_CONFIGURATION,
     CODEGEN_PRETRAINED_RESOURCE_FILES_MAP,

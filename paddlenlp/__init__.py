@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 
-__version__ = "2.5.0"
+PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
+
+
+__version__ = "2.5.0.dev"
+if os.getenv(PADDLENLP_STABLE_VERSION):
+    __version__ = __version__.replace(".dev", "")
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger

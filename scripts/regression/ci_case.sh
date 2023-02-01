@@ -279,6 +279,8 @@ print_info $? gpt_deploy_C_FT
 }
 # 8 gpt
 gpt(){
+# TODO(wj-Mcat): remove the following scripts later.
+echo 'skip gpt testing in paddle-ci, for details you can see: https://github.com/PaddlePaddle/PaddleNLP/pull/4398'
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
     # data process

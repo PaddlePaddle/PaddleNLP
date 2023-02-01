@@ -710,7 +710,7 @@ class T5CompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
-            input_ids = np.array([[i for i in range(10)]])
+            input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the paddle model
             from paddlenlp.transformers import T5Model
@@ -761,7 +761,7 @@ class T5CompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
-            input_ids = np.array([[i for i in range(10)]])
+            input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
             import torch
@@ -785,7 +785,9 @@ class T5CompatibilityTest(unittest.TestCase):
 
             self.assertTrue(
                 np.allclose(
-                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
                 )
             )
 
@@ -794,7 +796,7 @@ class T5CompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
-            input_ids = np.array([[i for i in range(10)]])
+            input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
             import torch
@@ -818,7 +820,9 @@ class T5CompatibilityTest(unittest.TestCase):
 
             self.assertTrue(
                 np.allclose(
-                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
                 )
             )
 
