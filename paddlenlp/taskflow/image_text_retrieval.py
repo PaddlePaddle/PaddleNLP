@@ -28,11 +28,11 @@ class ImageTextRetrievalTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    def __init__(self, task, model, **kwargs):
+    def __init__(self, task, model, batch_size=1, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
-        self._batch_size = 1
+        self._batch_size = batch_size
         self._construct_tokenizer(model_name=model)
         self._construct_model(model)
 
