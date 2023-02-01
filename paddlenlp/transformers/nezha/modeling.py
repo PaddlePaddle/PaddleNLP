@@ -482,7 +482,12 @@ class NeZhaModel(NeZhaPretrainedModel):
         pooled_output = self.pooler(sequence_output)
 
         if not return_dict:
-            return (sequence_output, pooled_output) + encoder_outputs[1:]
+            outputs = (sequence_output, pooled_output)
+            if output_hidden_states:
+                outputs += (encoder_hidden_outputs,)
+            if output_attentions:
+                outputs += (encoder_att_outputs,)
+            return outputs
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
