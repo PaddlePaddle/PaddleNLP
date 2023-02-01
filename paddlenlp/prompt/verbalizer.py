@@ -132,7 +132,7 @@ class Verbalizer(nn.Layer):
         assert isinstance(index, int)
         return self.labels[index]
 
-    def project(self, outputs):
+    def project(self, outputs: Tensor):
         """
         Fetch label word predictions from outputs over vocabulary.
         """
@@ -144,7 +144,7 @@ class Verbalizer(nn.Layer):
         label_word_outputs -= 1e4 * (1 - self.word_mask)
         return label_word_outputs
 
-    def process_outputs(self, outputs, masked_positions: Tensor = None):
+    def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
         """
         Process outputs of `PretrainedModelForMaskedLM` over vocabulary.
         """
@@ -199,7 +199,7 @@ class Verbalizer(nn.Layer):
 
         return label_word_outputs
 
-    def save(self, save_path):
+    def save(self, save_path: str):
         if not os.path.exists(save_path):
             os.makedirs(save_path, exist_ok=True)
         verb_config_file = os.path.join(save_path, VERBALIZER_CONFIG_FILE)
@@ -326,9 +326,6 @@ class SoftVerbalizer(Verbalizer):
             An instance of PretrainedModel with class name ends with `ForMaskedLM`
     """
 
-    LAST_WEIGHT = ["ErnieForMaskedLM", "BertForMaskedLM"]
-    LAST_LINEAR = ["AlbertForMaskedLM", "RobertaForMaskedLM"]
-
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer, model: PretrainedModel, **kwargs):
         super(SoftVerbalizer, self).__init__(label_words=label_words, tokenizer=tokenizer, model=model, **kwargs)
         del self.model
@@ -349,63 +346,69 @@ class SoftVerbalizer(Verbalizer):
         return self.head(outputs).squeeze(1)
 
     def head_parameters(self):
-        if isinstance(self.head, nn.Linear):
-            return [(n, p) for n, p in self.head.named_parameters()]
-        else:
-            return [(n, p) for n, p in self.head.named_parameters() if self.head_name[1] in n]
+        return [(n, p) for n, p in self.head.named_parameters() if self.weight_name in n or self.bias_name in n]
 
     def non_head_parameters(self):
-        if isinstance(self.head, nn.Linear):
-            return []
-        else:
-            return [(n, p) for n, p in self.head.named_parameters() if self.head_name[1] not in n]
+        return [(n, p) for n, p in self.head.named_parameters() if not (self.weight_name in n or self.bias_name in n)]
 
-    def _extract_head(self, model):
-        model_type = model.__class__.__name__
-        if model_type in self.LAST_LINEAR:
-            # LMHead
-            last_name = [n for n, p in model.named_children()][-1]
-            self.head = copy.deepcopy(getattr(model, last_name))
-            self.head_name = [last_name]
-            head_names = [n for n, p in self.head.named_children()][::-1]
-            for name in head_names:
-                module = getattr(self.head, name)
-                if isinstance(module, nn.Linear):
-                    setattr(self.head, name, nn.Linear(module.weight.shape[0], len(self.labels), bias_attr=False))
-                    getattr(self.head, name).weight.set_value(self._create_init_weight(module.weight))
-                    self.head_name.append(name)
+    def _get_vocab_size(self, model: PretrainedModel):
+        try:
+            vocab_size = model.config.vocab_size
+        except AttributeError:
+            model_name = None
+            for name in model.state_dict():
+                if "layers" in name:
+                    model_name = name.split(".")[0]
                     break
-        elif model_type in self.LAST_WEIGHT:
-            last_name = [n for n, p in model.named_children()][-1]
-            head = getattr(model, last_name)
-            self.head_name = [last_name]
-            # OnlyMLMHead
-            if model_type in ["ErnieForMaskedLM", "BertForMaskedLM"]:
-                last_name = [n for n, p in head.named_children()][-1]
-                self.head = copy.deepcopy(getattr(head, last_name))
-                self.head_name.append("decoder")
-            else:
-                self.head = copy.deepcopy(head)
+            vocab_size = getattr(model, model_name).config["vocab_size"]
+        return vocab_size
 
-            # LMPredictionHead
-            module = paddle.to_tensor(getattr(self.head, "decoder_weight"))
+    def _extract_head(self, model: PretrainedModel):
+        # Find all parameters shaped with [..., vocab_size].
+        weight_name, bias_name, is_linear = None, None, False
+        vocab_size = self._get_vocab_size(model)
+        for name in model.state_dict():
+            if vocab_size in model.state_dict()[name].shape and "embeddings" not in name:
+                if "bias" in name and (bias_name is None or len(name.split(".")) > len(bias_name)):
+                    bias_name = name.split(".")
+                elif "weight" in name:
+                    weight_name = name.split(".")
+                    if ".weight" in name:
+                        is_linear = True
+        if weight_name is None:
+            raise ValueError("Can not find output layer, make sure type of the input model is AutoModelForMaskedLM.")
+
+        # Reconstruct found parameters according to label words.
+        end_index = len(weight_name) - int(is_linear)
+        self.head_name = weight_name[:end_index]
+        self.head = copy.deepcopy(getattr(model, weight_name[0]))
+        module = self.head
+        for name in self.head_name[1:-1]:
+            module = getattr(module, name)
+        self.head = copy.deepcopy(module)
+
+        self.weight_name = weight_name[end_index - 1]
+        self.bias_name = bias_name[end_index - 1] if bias_name is not None else None
+        if is_linear:
+            module = getattr(self.head, self.weight_name)
+            setattr(self.head, self.weight_name, nn.Linear(module.weight.shape[0], len(self.labels), bias_attr=False))
+            getattr(self.head, self.weight_name).weight.set_value(self._create_init_weight(module.weight))
+        else:
+            module = paddle.to_tensor(getattr(self.head, self.weight_name))
             new_head = nn.Linear(len(self.labels), module.shape[1], bias_attr=False)
             new_head.weight.set_value(self._create_init_weight(module.T).T)
-            setattr(self.head, "decoder_weight", new_head.weight)
-            getattr(self.head, "decoder_weight").stop_gradient = False
-            if hasattr(self.head, "decoder_bias"):
+
+            setattr(self.head, self.weight_name, new_head.weight)
+            getattr(self.head, self.weight_name).stop_gradient = False
+            if self.bias_name is not None:
                 setattr(
                     self.head,
-                    "decoder_bias",
+                    self.bias_name,
                     self.head.create_parameter(shape=[len(self.labels)], dtype=new_head.weight.dtype, is_bias=True),
                 )
-                getattr(self.head, "decoder_bias").stop_gradient = False
-        else:
-            raise NotImplementedError(
-                f"Please open an issue to request for support of {model_type} or contribute to PaddleNLP."
-            )
+                getattr(self.head, self.bias_name).stop_gradient = False
 
-    def _create_init_weight(self, weight, is_bias=False):
+    def _create_init_weight(self, weight: Tensor, is_bias: bool = False):
         token_ids = self.token_ids.squeeze(1)
         token_mask = self.token_mask.squeeze(1)
         aggr_type = self.token_aggregate_type
@@ -434,10 +437,26 @@ class MaskedLMVerbalizer(Verbalizer):
     """
 
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer, **kwargs):
+        label_words = self.check_label_words_constraint(label_words)
         super(MaskedLMVerbalizer, self).__init__(label_words=label_words, tokenizer=tokenizer, **kwargs)
 
     def create_parameters(self):
         return None
+
+    def check_label_words_constraint(self, label_words: Dict):
+        assert isinstance(label_words, dict), "`label_words` mapping should be a dictionary."
+        std_label_words = {}
+        for label, word in label_words.items():
+            if isinstance(word, str):
+                word = [word]
+            if len(word) > 1:
+                word = word[:1]
+                logger.info(f"More than one word for label `{label}`, only `{word[0]}` used.")
+            std_label_words[label] = word
+        word_length = [len(w[0]) for l, w in std_label_words.items()]
+        if len(set(word_length)) > 1:
+            raise ValueError(f"Length of all words for labels should be equal, but received {std_label_words}.")
+        return std_label_words
 
     def aggregate_multiple_mask(self, outputs: Tensor, atype: str = "product"):
         assert outputs.ndim == 3
@@ -457,17 +476,7 @@ class MaskedLMVerbalizer(Verbalizer):
                 results = paddle.stack([results, sub_results], axis=-1)
                 results = results.max(axis=-1)
             else:
-                raise ValueError("Strategy {} is not supported to aggregate multiple " "tokens.".format(atype))
+                raise ValueError("Strategy {} is not supported to aggregate multiple tokens.".format(atype))
         if atype == "mean":
             results = results / num_token
         return results
-
-    def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
-        if masked_positions is None:
-            return outputs
-
-        batch_size, _, num_pred = outputs.shape
-        outputs = outputs.reshape([-1, num_pred])
-        outputs = paddle.gather(outputs, masked_positions)
-        outputs = outputs.reshape([batch_size, -1, num_pred])
-        return outputs
