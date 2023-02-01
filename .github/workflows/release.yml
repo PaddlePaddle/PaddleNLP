@@ -45,6 +45,7 @@ jobs:
           TWINE_USERNAME: paddle-dev
           TWINE_PASSWORD: ${{ secrets.paddlenlp }}
           PACKAGE: ${{ inputs.package }}
+          PADDLENLP_STABLE_VERSION: "true"
         run: |
           make deploy-$PACKAGE
 
