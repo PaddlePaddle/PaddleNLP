@@ -53,6 +53,9 @@ MODEL_CLASSES = {
 class TrainingArguments(TrainingArguments):
     min_lr: float = field(default=1e-5, metadata={"help": "The initial min learning rate for Adam."})
     micro_batch_size: int = field(default=4, metadata={"help": "the batch-size of trainin"})
+    dp_degree: int = field(default=128, metadata={"help": "Data Parallelism degree."})
+    profiler_options: str = field(default="gpt", metadata={"help": "key1=value1;key2=value2;key3=value3"})
+    use_amp: bool = field(default=False, metadata={"help": "Enable mixed precision training."})
 
     @property
     def eval_freq(self):
