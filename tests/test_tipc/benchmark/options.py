@@ -17,6 +17,9 @@ import distutils.util
 
 from .modules.bert_for_question_answering import BertForQuestionAnsweringBenchmark
 from .modules.bigru_crf import BiGruCrfBenchmark
+from .modules.ernie3_for_sequence_classification import (
+    Ernie3ForSequenceClassificationBenchmark,
+)
 from .modules.ernie_tiny import ErnieTinyBenchmark
 from .modules.gpt_for_sequence_classification import (
     GPTForSequenceClassificationBenchmark,
@@ -42,7 +45,7 @@ MODEL_REGISTRY = {
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
     "ernie_tiny": ErnieTinyBenchmark,
-    "ernie-3.0_for_sequence_classification": ErnieTinyBenchmark,
+    "ernie-3.0_for_sequence_classification": Ernie3ForSequenceClassificationBenchmark,
     "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
     "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
     "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
