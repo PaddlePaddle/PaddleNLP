@@ -230,8 +230,7 @@ for batch_size in ${batch_size_list[*]}; do
                 num_gpu_devices=`get_world_size $device_num`
                 sed_norm_train=$norm_train
 
-                global_batch_size=$(($batch_size*$num_gpu_devices))
-                extra_params="--global_batch_size=$global_batch_size --dp_degree=$num_gpu_devices"
+                extra_params="--micro_batch_size=$batch_size --dp_degree=$num_gpu_devices"
                 sed_norm_train="$sed_norm_train $extra_params"
 
                 file_1=`head -n $[${line_norm_train}-1] $FILENAME`
