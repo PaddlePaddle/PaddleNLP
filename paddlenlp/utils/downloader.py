@@ -26,7 +26,7 @@ from collections import OrderedDict
 from typing import Optional, Union
 
 import requests
-from file_lock import FileLock
+from filelock import FileLock
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
 
