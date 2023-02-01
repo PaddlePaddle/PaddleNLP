@@ -394,71 +394,67 @@ class NeZhaModel(NeZhaPretrainedModel):
         return_dict: Optional[bool] = None,
     ):
         r"""
-                The NeZhaModel forward method, overrides the `__call__()` special method.
+        The NeZhaModel forward method, overrides the `__call__()` special method.
 
-                Args:
-                    input_ids (Tensor):
-                        Indices of input sequence tokens in the vocabulary. They are
-                        numerical representations of tokens that build the input sequence.
-                        Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                    token_type_ids (Tensor, optional):
-                        Segment token indices to indicate different portions of the inputs.
-                        Selected in the range ``[0, type_vocab_size - 1]``.
-                        If `type_vocab_size` is 2, which means the inputs have two portions.
-                        Indices can either be 0 or 1:
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
 
-                        - 0 corresponds to a *sentence A* token,
-                        - 1 corresponds to a *sentence B* token.
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
 
-                        Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                        Defaults to `None`, which means we don't add segment embeddings.
-                    attention_mask (Tensor, optional):
-                        Mask used in multi-head attention to avoid performing attention to some unwanted positions,
-                        usually the paddings or the subsequent positions.
-                        Its data type can be int, float and bool.
-                        When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                        When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                        When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                        It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                        For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
-                        [batch_size, num_attention_heads, sequence_length, sequence_length].
-                        We use whole-word-mask in NeZha, so the whole word will have the same value. For example, "使用" as a word,
-                        "使" and "用" will have the same value.
-                        Defaults to `None`, which means nothing needed to be prevented attention to.
-        <<<<<<< HEAD
-                    inputs_embeds (Tensor, optional):
-                        If you want to control how to convert `inputs_ids` indices into associated vectors, you can
-                        pass an embedded representation directly instead of passing `inputs_ids`.
-        =======
-        >>>>>>> a8a8338111c0c104cd981a7cf69dcbdaf573f968
-                    output_hidden_states (bool, optional):
-                        Whether to return the hidden states of all layers.
-                        Defaults to `False`.
-                    output_attentions (bool, optional):
-                        Whether to return the attentions tensors of all attention layers.
-                        Defaults to `False`.
-                    return_dict (bool, optional):
-                        Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
-                        will be a tuple of tensors. Defaults to `False`.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                We use whole-word-mask in NeZha, so the whole word will have the same value. For example, "使用" as a word,
+                "使" and "用" will have the same value.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
-                Returns:
-                    An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
-                    `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
-                    to ordered and not None (depending on the input arguments) fields of
-                    :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
+        Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
-                Example:
-                    .. code-block::
+        Example:
+            .. code-block::
 
-                        import paddle
-                        from paddlenlp.transformers import NeZhaModel, NeZhaTokenizer
+                import paddle
+                from paddlenlp.transformers import NeZhaModel, NeZhaTokenizer
 
-                        tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
-                        model = NeZhaModel.from_pretrained('nezha-base-chinese')
+                tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+                model = NeZhaModel.from_pretrained('nezha-base-chinese')
 
-                        inputs = tokenizer("欢迎使用百度飞浆!")
-                        inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                        output = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
         """
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
@@ -796,8 +792,7 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForQuestionAnswering.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
@@ -922,9 +917,8 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForSequenceClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
                 logits = outputs[0]
 
@@ -1037,9 +1031,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForTokenClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
                 logits = outputs[0]
         """
