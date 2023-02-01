@@ -16,7 +16,7 @@ import os
 import sys
 from functools import partial
 
-import paddle.nn as nn
+import paddle
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 
 from paddlenlp.data import DataCollatorWithPadding
@@ -39,7 +39,6 @@ from utils import seq_convert_example  # noqa: E402
 
 class ErnieTinyBenchmark(BenchmarkBase):
     def __init__(self):
-        self.label_list = None
         super().__init__()
 
     @staticmethod
@@ -55,6 +54,12 @@ class ErnieTinyBenchmark(BenchmarkBase):
         )
         parser.add_argument("--max_seq_length", type=int, default=args.max_seq_len, help="Maximum sequence length. ")
 
+    def create_input_specs(self):
+        input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, -1], dtype="int64")
+        token_type_ids = paddle.static.InputSpec(name="token_type_ids", shape=[-1, -1], dtype="int64")
+        labels = paddle.static.InputSpec(name="labels", shape=[-1], dtype="int64")
+        return [input_ids, token_type_ids, None, None, None, labels]
+
     def create_data_loader(self, args, **kwargs):
         args.task_name = args.task_name.lower()
 
@@ -65,10 +70,12 @@ class ErnieTinyBenchmark(BenchmarkBase):
         )
 
         train_ds = train_ds.map(trans_func, lazy=True)
-        train_batch_sampler = DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
+        train_batch_sampler = DistributedBatchSampler(
+            train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True
+        )
 
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+        dev_batch_sampler = BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False, drop_last=True)
 
         batchify_fn = DataCollatorWithPadding(tokenizer)
 
@@ -76,30 +83,24 @@ class ErnieTinyBenchmark(BenchmarkBase):
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
             collate_fn=batchify_fn,
-            num_workers=0,
+            num_workers=4,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
             return_list=True,
         )
         dev_loader = DataLoader(
-            dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+            dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=4, return_list=True
         )
         self.num_batch = len(train_loader)
-        self.label_list = train_ds.label_list
 
         return train_loader, dev_loader
 
     def build_model(self, args, **kwargs):
-        num_classes = 1 if self.label_list is None else len(self.label_list)
-        model = ErnieForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
-
-        self.loss_fct = nn.CrossEntropyLoss() if self.label_list else nn.MSELoss()
-
+        train_ds = load_dataset("clue", args.task_name, splits="train")
+        num_labels = 1 if train_ds.label_list is None else len(train_ds.label_list)
+        model = ErnieForSequenceClassification.from_pretrained(args.model_name_or_path, num_labels=num_labels)
         return model
 
     def forward(self, model, args, input_data=None, **kwargs):
-        labels = input_data.pop("labels")
-        logits = model(**input_data)
-        loss = self.loss_fct(logits, labels)
-
+        loss = model(**input_data)[0]
         return loss, args.batch_size
 
     def logger(

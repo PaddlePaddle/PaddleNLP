@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import distutils.util
 
 from .modules.bert_for_question_answering import BertForQuestionAnsweringBenchmark
 from .modules.bigru_crf import BiGruCrfBenchmark
@@ -41,6 +42,7 @@ MODEL_REGISTRY = {
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
     "ernie_tiny": ErnieTinyBenchmark,
+    "ernie-3.0_for_sequence_classification": ErnieTinyBenchmark,
     "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
     "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
     "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
@@ -110,7 +112,9 @@ def get_parser():
     parser.add_argument("--logging_steps", type=int, default=10, help="Print logs after N steps. ")
     parser.add_argument("--seed", type=int, default=None, help="Random generator seed. ")
 
-    parser.add_argument("--use_amp", action="store_true", help="Enable AMP. ")
+    parser.add_argument(
+        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
+    )
     parser.add_argument("--scale_loss", type=float, default=128, help="Loss scale. ")
     parser.add_argument("--amp_level", type=str, default="O1", help="AMP LEVEL. O1 or O2. ")
     parser.add_argument("--custom_black_list", type=str, nargs="+", default=None, help="Custom black list for AMP. ")

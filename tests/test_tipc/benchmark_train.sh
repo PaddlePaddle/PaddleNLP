@@ -319,7 +319,7 @@ for batch_size in ${batch_size_list[*]}; do
                         --keyword ips: \
                         --skip_steps 2 \
                         --device_num ${device_num} \
-                        --speed_unit images/s \
+                        --speed_unit samples/s \
                         --convergence_key loss: "
                 echo $cmd
                 eval $cmd
