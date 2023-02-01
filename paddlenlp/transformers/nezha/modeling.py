@@ -225,16 +225,26 @@ class NeZhaEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None):
-        seq_length = input_ids.shape[1]
-        position_ids = paddle.arange(seq_length, dtype="int64")
-        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+
+        ones = paddle.ones(input_shape, dtype="int64")
+        seq_length = paddle.cumsum(ones, axis=1)
+        position_ids = seq_length - ones
+        position_ids.stop_gradient = True
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        words_embeddings = self.word_embeddings(input_ids)
-        embeddings = words_embeddings
+        embeddings = inputs_embeds
 
         if not self.use_relative_position:
             position_embeddings = self.position_embeddings(position_ids)
@@ -375,9 +385,10 @@ class NeZhaModel(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -414,6 +425,9 @@ class NeZhaModel(NeZhaPretrainedModel):
                 We use whole-word-mask in NeZha, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -439,10 +453,12 @@ class NeZhaModel(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaModel.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞浆!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
                 output = model(**inputs)
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
+
         output_attentions = output_attentions if output_attentions is not None else False
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
         return_dict = return_dict if return_dict is not None else False
@@ -455,7 +471,9 @@ class NeZhaModel(NeZhaPretrainedModel):
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
-        embedding_output = self.embeddings(input_ids, token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
+        )
 
         encoder_outputs = self.encoder(embedding_output, extended_attention_mask)
         encoder_hidden_outputs, encoder_att_outputs = encoder_outputs
@@ -464,7 +482,12 @@ class NeZhaModel(NeZhaPretrainedModel):
         pooled_output = self.pooler(sequence_output)
 
         if not return_dict:
-            return (sequence_output, pooled_output) + encoder_outputs[1:]
+            outputs = (sequence_output, pooled_output)
+            if output_hidden_states:
+                outputs += (encoder_hidden_outputs,)
+            if output_attentions:
+                outputs += (encoder_att_outputs,)
+            return outputs
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
@@ -611,11 +634,12 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
-        masked_lm_labels=None,
-        next_sentence_label=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        masked_lm_labels: Optional[Tensor] = None,
+        next_sentence_label: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -628,6 +652,8 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
+                See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`NeZhaModel`.
             masked_lm_labels (Tensor, optional):
                 The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
@@ -651,9 +677,10 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.nezha.NeZhaForPreTrainingOutput`.
         """
         outputs = self.nezha(
-            input_ids,
-            token_type_ids,
-            attention_mask,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -707,9 +734,10 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         start_positions: Optional[Tensor] = None,
         end_positions: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
@@ -725,6 +753,8 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
+                See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`NeZhaModel`.
             start_positions (Tensor of shape `(batch_size,)`, optional):
                 Labels for position (index) of the start of the labelled span for computing the token classification loss.
@@ -767,17 +797,17 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForQuestionAnswering.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
         outputs = self.nezha(
-            input_ids,
-            token_type_ids,
-            attention_mask,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -842,9 +872,10 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -859,6 +890,8 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
+                See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`NeZhaModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
@@ -889,17 +922,17 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForSequenceClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
                 logits = outputs[0]
 
         """
         outputs = self.nezha(
-            input_ids,
-            token_type_ids,
-            attention_mask,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -955,9 +988,10 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -972,6 +1006,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (list, optional):
+                See :class:`NeZhaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`NeZhaModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
@@ -1000,16 +1036,16 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForTokenClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
                 logits = outputs[0]
         """
         outputs = self.nezha(
-            input_ids,
-            token_type_ids,
-            attention_mask,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1058,9 +1094,10 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1075,6 +1112,8 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (list, optional):
+                See :class:`NeZhaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`NeZhaModel`.
             labels (Tensor of shape `(batch_size, )`, optional):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
@@ -1096,17 +1135,21 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         """
 
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        if input_ids is not None:
+            input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1]))
         if attention_mask is not None:
             attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1]))
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
 
         outputs = self.nezha(
-            input_ids,
-            token_type_ids,
-            attention_mask,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
