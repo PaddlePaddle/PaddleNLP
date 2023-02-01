@@ -4,16 +4,16 @@ python:python3.7
 gpu_list:0|0,1
 null:null
 --use_amp:null
+--max_steps:null
 null:null
-null:null
---micro_batch_size:2
+--micro_batch_size:null
 null:null
 null:null
 null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../examples/language_model/gpt/run_pretrain.py --model_type="gpt" --model_name_or_path="gpt2-en"  --output_dir=./output/ --input_dir=./data/ --warmup_steps=320000 --warmup_ratio=0.01 --per_device_train_batch_size=4 --device=cpu --eval_steps=100 --do_train=true --do_predict=true --device=gpu
+norm_train:../examples/language_model/gpt/run_pretrain.py --model_type="gpt" --model_name_or_path="gpt2-en"  --warmup_steps=320000 --warmup_ratio=0.01 --eval_steps=1000 --do_train=true --do_predict=true --device=gpu --max_seq_len=1024 --max_grad_norm=1.0 --output_dir=./output/ --input_dir=./data/ --save_steps=10000 --weight_decay=0.01
 pact_train:null
 fpgm_train:null
 distill_train:null
