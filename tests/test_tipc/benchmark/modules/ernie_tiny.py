@@ -101,7 +101,7 @@ class ErnieTinyBenchmark(BenchmarkBase):
 
     def forward(self, model, args, input_data=None, **kwargs):
         loss = model(**input_data)[0]
-        return loss, args.batch_size
+        return loss, paddle.sum((input_data["input_ids"] != model.config.pad_token_id)).numpy().astype("int64").item()
 
     def logger(
         self,
@@ -117,6 +117,6 @@ class ErnieTinyBenchmark(BenchmarkBase):
         **kwargs
     ):
         logger.info(
-            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
+            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f words/sec"
             % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips)
         )
