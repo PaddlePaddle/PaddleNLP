@@ -239,14 +239,7 @@ class NeZhaEmbeddings(nn.Layer):
         ones = paddle.ones(input_shape, dtype="int64")
         seq_length = paddle.cumsum(ones, axis=1)
         position_ids = seq_length - ones
-
-        # if past_key_values_length > 0:
-        #     position_ids = position_ids + past_key_values_length
-
         position_ids.stop_gradient = True
-        # seq_length = inputs_embeds.shape[1]
-        # position_ids = paddle.arange(seq_length, dtype="int64")
-        # position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
