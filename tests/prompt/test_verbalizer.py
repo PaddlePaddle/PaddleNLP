@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-import os
+import tempfile
 import unittest
 
 import paddle
@@ -42,7 +42,6 @@ class VerbalizerTest(unittest.TestCase):
             "mask_aggregate_type": "first",
             "post_log_softmax": False,
         }
-        cls.save_path = "_tmp_test_saved_verbalizer"
         cls.default_verb = ManualVerbalizer(label_words=cls.default_label_words, tokenizer=cls.tokenizer)
 
     @parameterized.expand(
@@ -113,11 +112,10 @@ class VerbalizerTest(unittest.TestCase):
         self.assertAlmostEqual(self.default_verb.normalize(outputs)[1].sum().tolist()[0], 1, 6)
 
     def test_save_and_load(self):
-        self.default_verb.save(save_path=self.save_path)
-        verb = ManualVerbalizer.load_from(self.save_path, tokenizer=self.tokenizer)
-        self.assertEqual(verb.label_words, self.default_verb.label_words)
-        os.remove(os.path.join(self.save_path, "verbalizer_config.json"))
-        os.rmdir(self.save_path)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.default_verb.save(save_path=tmpdirname)
+            verb = ManualVerbalizer.load_from(tmpdirname, tokenizer=self.tokenizer)
+            self.assertEqual(verb.label_words, self.default_verb.label_words)
 
     def test_encode_and_decode(self):
         label_words = {"负向": "不喜欢", "正向": "非常推荐"}
@@ -131,27 +129,25 @@ class VerbalizerTest(unittest.TestCase):
                 {"0": "负向", "1": "正向"},
                 ["0", "1"],
                 {"0": ["负向"], "1": ["正向"]},
-                paddle.to_tensor([[[383, 253]], [[243, 253]]], dtype="int64"),
-                paddle.to_tensor([[1], [1]], dtype="int64"),
-                paddle.to_tensor([[[1, 1]], [[1, 1]]], dtype="int64"),
+                [[[383, 253]], [[243, 253]]],
+                [[1], [1]],
+                [[[1, 1]], [[1, 1]]],
             ),
             (
                 {0: ["差评", "不喜欢"], 1: ["好评", "不错"]},
                 [0, 1],
                 {0: ["差评", "不喜欢"], 1: ["好评", "不错"]},
-                paddle.to_tensor([[[859, 480, 0], [16, 692, 811]], [[170, 480, 0], [16, 990, 0]]], dtype="int64"),
-                paddle.to_tensor([[1, 1], [1, 1]], dtype="int64"),
-                paddle.to_tensor([[[1, 1, 0], [1, 1, 1]], [[1, 1, 0], [1, 1, 0]]], dtype="int64"),
+                [[[859, 480, 0], [16, 692, 811]], [[170, 480, 0], [16, 990, 0]]],
+                [[1, 1], [1, 1]],
+                [[[1, 1, 0], [1, 1, 1]], [[1, 1, 0], [1, 1, 0]]],
             ),
             (
                 {1: ["很满意", "非常推荐"], 0: "避雷"},
                 [0, 1],
                 {0: ["避雷"], 1: ["很满意", "非常推荐"]},
-                paddle.to_tensor(
-                    [[[1166, 1048, 0, 0], [0, 0, 0, 0]], [[321, 596, 221, 0], [465, 223, 426, 1645]]], dtype="int64"
-                ),
-                paddle.to_tensor([[1, 0], [1, 1]], dtype="int64"),
-                paddle.to_tensor([[[1, 1, 0, 0], [0, 0, 0, 0]], [[1, 1, 1, 0], [1, 1, 1, 1]]], dtype="int64"),
+                [[[1166, 1048, 0, 0], [0, 0, 0, 0]], [[321, 596, 221, 0], [465, 223, 426, 1645]]],
+                [[1, 0], [1, 1]],
+                [[[1, 1, 0, 0], [0, 0, 0, 0]], [[1, 1, 1, 0], [1, 1, 1, 1]]],
             ),
         ]
     )
@@ -161,9 +157,9 @@ class VerbalizerTest(unittest.TestCase):
         verb = ManualVerbalizer(label_words=label_words, tokenizer=self.tokenizer)
         self.assertEqual(verb.labels, labels)
         self.assertEqual(verb.label_words, expected_words)
-        self.assertTrue(paddle.equal_all(verb.token_ids, expected_token_ids))
-        self.assertTrue(paddle.equal_all(verb.word_mask, expected_word_mask))
-        self.assertTrue(paddle.equal_all(verb.token_mask, expected_token_mask))
+        self.assertTrue(paddle.equal_all(verb.token_ids, paddle.to_tensor(expected_token_ids, dtype="int64")))
+        self.assertTrue(paddle.equal_all(verb.word_mask, paddle.to_tensor(expected_word_mask, dtype="int64")))
+        self.assertTrue(paddle.equal_all(verb.token_mask, paddle.to_tensor(expected_token_mask, dtype="int64")))
 
     @parameterized.expand(
         [
