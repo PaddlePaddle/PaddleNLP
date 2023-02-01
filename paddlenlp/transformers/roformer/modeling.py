@@ -14,23 +14,24 @@
 # limitations under the License.
 
 from typing import Optional, Tuple
-from paddle import Tensor
+
 import paddle
 import paddle.nn as nn
+from paddle import Tensor
+from paddle.common_ops_import import convert_dtype
 
 from .. import PretrainedModel, register_base_model
-from ..albert.modeling import get_activation
+from ..activations import get_activation
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
     tuple_output,
 )
-from paddle.common_ops_import import convert_dtype
 
 __all__ = [
     "RoFormerModel",
@@ -711,18 +712,6 @@ class RoFormerModel(RoFormerPretrainedModel):
                 hidden_states=encoder_outputs.hidden_states,
                 attentions=encoder_outputs.attentions,
             )
-
-    def get_input_embeddings(self) -> nn.Embedding:
-        return self.embeddings.word_embeddings
-
-    def set_input_embeddings(self, embedding: nn.Embedding):
-        self.embeddings.word_embeddings = embedding
-
-    def get_input_embeddings(self) -> nn.Embedding:
-        return self.embeddings.word_embeddings
-
-    def set_input_embeddings(self, embedding: nn.Embedding):
-        self.embeddings.word_embeddings = embedding
 
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
