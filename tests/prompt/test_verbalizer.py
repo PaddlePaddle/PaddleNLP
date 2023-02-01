@@ -19,7 +19,7 @@ import unittest
 import paddle
 from parameterized import parameterized
 
-from paddlenlp.prompt import ManualVerbalizer, SoftVerbalizer, MaskedLMVerbalizer
+from paddlenlp.prompt import ManualVerbalizer, MaskedLMVerbalizer, SoftVerbalizer
 from paddlenlp.prompt.verbalizer import MaskedLMIdentity
 from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
 from paddlenlp.transformers.albert.modeling import AlbertMLMHead
