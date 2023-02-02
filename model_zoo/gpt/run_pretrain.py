@@ -52,10 +52,9 @@ MODEL_CLASSES = {
 @dataclass
 class TrainingArguments(TrainingArguments):
     min_lr: float = field(default=1e-5, metadata={"help": "The initial min learning rate for Adam."})
-    micro_batch_size: int = field(default=4, metadata={"help": "the batch-size of trainin"})
-    dp_degree: int = field(default=128, metadata={"help": "Data Parallelism degree."})
+    dp_degree: int = field(default=None, metadata={"help": "Data Parallelism degree."})
     profiler_options: str = field(default="gpt", metadata={"help": "key1=value1;key2=value2;key3=value3"})
-    use_amp: bool = field(default=False, metadata={"help": "Enable mixed precision training."})
+    fp16: bool = field(default=False, metadata={"help": "Enable mixed precision training."})
 
     @property
     def eval_freq(self):
@@ -349,7 +348,7 @@ def do_train():
     ).parse_args_into_dataclasses()
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
-    # training_args.per_device_train_batch_size = 2
+    training_args.micro_batch_size = training_args.per_device_train_batch_size
 
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -357,6 +356,8 @@ def do_train():
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
+    if training_args.dp_degree is None:
+        training_args.dp_degree = worker_num
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     set_seed(training_args)
 
@@ -371,7 +372,7 @@ def do_train():
             )
 
     # Now, we only support data parallel in dygraph mode for now.
-    topo = Topology(device_rank=worker_index, world_size=worker_num, dp_degree=worker_num)
+    topo = Topology(device_rank=worker_index, world_size=worker_num, dp_degree=training_args.dp_degree)
 
     model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
