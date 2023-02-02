@@ -247,7 +247,14 @@ class PegasusDecoder(PegasusPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-        self, decoder_input_ids=None, decoder_attention_mask=None, encoder_output=None, memory_mask=None, cache=None
+        self,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        memory_mask=None,
+        cache=None,
+        x=None,
+        mix_ratio=0,
     ):
         """
         The PegasusDecoder forward method, overrides the `__call__()` special method.
@@ -263,6 +270,15 @@ class PegasusDecoder(PegasusPretrainedModel):
                 See :class:`PegasusModel`.
             cache (Tensor, optional):
                 See :class:`PegasusModel`.
+            x (Tensor, optional):
+                The synthetic decoder input embedding of SSTIA strategy.
+                Its data type should be `float32` and it has a shape of [batch_size, sequence_length, hidden_size].
+                Defaults to `None`, which means don't use SSTIA strategy.
+            mix_ratio (float, optional):
+                The mixing ratio of synthetic decoder embedding and general deocder input embedding.
+                If SSTIA strategy is used, this arg should be set in (0,1).
+                Defaults to `0`, which means don't use synthetic decoder embedding.
+
 
         Returns:
             Tensor: Returns tensor `decoder_output`, which is the output at the last layer of the model.
@@ -275,7 +291,13 @@ class PegasusDecoder(PegasusPretrainedModel):
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
 
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
+        if x is None:
+            decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
+        else:
+            decoder_inputs_embeds = self.embed_tokens(
+                decoder_input_ids
+            ) * self.embed_scale * mix_ratio + self.embed_scale * x * (1 - mix_ratio)
+
         past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
             paddle.shape(decoder_input_ids), past_key_values_length
@@ -548,7 +570,7 @@ class PegasusModel(PegasusPretrainedModel):
         decoder_output, new_cache = self.decoder(
             decoder_input_ids, decoder_attention_mask, encoder_output, attention_mask, cache
         )
-        return decoder_output, new_cache
+        return decoder_output, new_cache, encoder_output, attention_mask
 
 
 class PegasusForConditionalGeneration(PegasusPretrainedModel):
@@ -569,6 +591,8 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             is_bias=False,
         )
         self.register_buffer("final_logits_bias", paddle.zeros((1, self.pegasus.config["vocab_size"])))
+        self.use_SSTIA = False
+        self.mix_ratio = 0
 
         self.apply(self.init_weights)
 
@@ -657,19 +681,61 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 outputs = model(**inputs)
 
         """
-        output, new_cache = self.pegasus(
+        output, new_cache, encoder_output, attention_mask = self.pegasus(
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, encoder_output, use_cache, cache
         )
         lm_logits = paddle.tensor.matmul(output, self.lm_head_weight, transpose_y=True) + self.final_logits_bias
 
-        masked_lm_loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            masked_lm_loss = loss_fct(
-                lm_logits.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
+        if self.use_SSTIA:
+            assert 0 < self.mix_ratio < 1
+            x = lm_logits.clone()
+            length = len(x[0])
+            for idx in range(length - 1, -1, -1):
+                x[:, idx] = x[:, idx - 1]
+            x[:, 0, 0] = 2 * paddle.max(x[:, 0])
+            x = paddle.nn.functional.softmax(x, axis=2)
+
+            with paddle.no_grad():
+                embed_matrix = self.pegasus.decoder.embed_tokens.weight.clone()
+                decoder_in = paddle.einsum("blv,ve->ble", x, embed_matrix)
+
+            output_new, _ = self.pegasus.decoder(
+                decoder_input_ids,
+                decoder_attention_mask,
+                encoder_output,
+                attention_mask,
+                cache,
+                x=decoder_in,
+                mix_ratio=self.mix_ratio,
+            )
+            lm_logits_new = (
+                paddle.tensor.matmul(output_new, self.lm_head_weight, transpose_y=True) + self.final_logits_bias
             )
 
-        return lm_logits, new_cache, masked_lm_loss
+            masked_lm_loss = None
+            if labels is not None:
+                loss_fct = nn.CrossEntropyLoss()
+                masked_lm_loss = (1 - self.mix_ratio) * loss_fct(
+                    lm_logits.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
+                )
+                masked_lm_loss += self.mix_ratio * loss_fct(
+                    lm_logits_new.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
+                )
+                p = paddle.nn.functional.log_softmax(lm_logits_new, axis=2)
+                q = paddle.nn.functional.softmax(lm_logits, axis=2)
+                loss_kl = paddle.nn.functional.kl_div(p, q, reduction="mean")
+                masked_lm_loss += loss_kl
+            return lm_logits, new_cache, masked_lm_loss
+
+        else:
+            masked_lm_loss = None
+            if labels is not None:
+                loss_fct = nn.CrossEntropyLoss()
+                masked_lm_loss = loss_fct(
+                    lm_logits.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
+                )
+
+            return lm_logits, new_cache, masked_lm_loss
 
     def prepare_decoder_input_ids_from_labels(self, labels):
         return shift_tokens_right(labels, self.pegasus.pad_token_id, self.pegasus.config["decoder_start_token_id"])

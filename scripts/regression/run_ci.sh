@@ -98,26 +98,27 @@ upload (){
         build_dev_path=/workspace/PaddleNLP_dev
         nlp_build ${build_dev_path}
         nlp_version=$(python -c "from paddlenlp import __version__; print(__version__)")
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-latest-py3-none-any.whl
+        # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/ 
+        # for ci pr test
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-ci-py3-none-any.whl
         echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
         build_pr_path=${nlp_dir}
         nlp_build ${build_pr_path}
-        cd $build_pr_path/dist
-        cp $build_pr_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-${GIT_PR_ID}-py3-none-any.whl
     elif [ $1 == "pipelines" ];then
         echo -e "\033[35m ---- build latest pipelines  \033[0m"
         python -m pip install --force-reinstall paddlenlp
         build_dev_path=/workspace/PaddleNLP_dev/$1
         nlp_build ${build_dev_path}
         pipe_version=$(python -c "from pipelines import __version__; print(__version__)")
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/pipelines-latest-py3-none-any.whl
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/
     elif [ $1 == "ppdiffusers" ];then
         echo -e "\033[35m ---- build latest ppdiffusers  \033[0m"
         python -m pip install --force-reinstall paddlenlp
         build_dev_path=/workspace/PaddleNLP_dev/$1
         nlp_build ${build_dev_path}
         pipe_version=$(python -c "from ppdiffusers import __version__; print(__version__)")
-        cp $build_dev_path/dist/pa****.whl ${PPNLP_HOME}/upload/ppdiffusers-latest-py3-none-any.whl
+        cp $build_dev_path/dist/pa****.whl ${PPNLP_HOME}/upload/
     fi
 }
 ####################################
@@ -220,7 +221,8 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
-        python -m pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+        wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
+        python -m pip install paddlenlp-ci-py3-none-any.whl
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
