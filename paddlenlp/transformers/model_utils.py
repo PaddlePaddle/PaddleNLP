@@ -146,17 +146,18 @@ def _find_weight_file_path(
     )
 
 
-def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool):
+def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
     """find the suitable weight file name
 
     Args:
         repo_id (str): repo name of huggingface hub
         cache_dir (str): cache dir for hf
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
+        subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-    if hf_file_exists(repo_id, "model_state.pdparams"):
+    if hf_file_exists(repo_id, "model_state.pdparams", subfolder=subfolder):
         file_name = "model_state.pdparams"
-    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME):
+    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME, subfolder=subfolder):
         if not support_conversion:
             raise EntryNotFoundError(
                 f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
@@ -164,12 +165,16 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
             )
         file_name = PYTORCH_WEIGHT_FILE_NAME
     else:
-        raise EntryNotFoundError(f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}")
+        raise EntryNotFoundError(
+            message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
+            response=None,
+        )
 
     return hf_hub_download(
         repo_id=repo_id,
         filename=file_name,
         cache_dir=cache_dir,
+        subfolder=subfolder,
         library_name="PaddleNLP",
         library_version=__version__,
     )
@@ -425,7 +430,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return cls.config_class is not None and issubclass(cls.config_class, PretrainedConfig)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -441,6 +446,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
             from_hf_hub (bool): whether to load from Huggingface Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from Huggingface Hub.
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -475,7 +482,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
         if cls.constructed_from_pretrained_config():
-            return cls.from_pretrained_v2(pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *args, **kwargs)
+            return cls.from_pretrained_v2(
+                pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
+            )
 
         resource_files = {}
         init_configuration = {}
@@ -523,6 +532,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 resolved_resource_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
+                    subfolder=subfolder,
                     cache_dir=HF_CACHE_HOME,
                     library_name="PaddleNLP",
                     library_version=__version__,
@@ -951,6 +961,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
         cache_dir: str | None = None,
+        subfolder: str | None = None,
         support_conversion: bool = False,
     ) -> str:
         """resolve model target file path from `` and `cache_dir`
@@ -1033,7 +1044,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # 4. when it's from HF
         if from_hf_hub:
             return resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
+                pretrained_model_name_or_path,
+                cache_dir=HF_CACHE_HOME,
+                support_conversion=support_conversion,
+                subfolder=subfolder,
             )
 
         # 5. download from community or hf-hub
@@ -1225,7 +1239,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained_v2(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
+    def from_pretrained_v2(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -1241,6 +1257,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
             from_hf_hub (bool): load model from huggingface hub. Default to `False`.
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from Huggingface Hub.
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -1308,6 +1326,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_weight_file = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
+            subfolder=subfolder,
             from_hf_hub=from_hf_hub,
             support_conversion=support_conversion,
         )

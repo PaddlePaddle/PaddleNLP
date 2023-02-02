@@ -205,7 +205,7 @@ class AutoTokenizer:
             return tokenizer_class
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, *model_args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, subfolder=None, *model_args, **kwargs):
         """
         Creates an instance of `AutoTokenizer`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -219,6 +219,9 @@ class AutoTokenizer:
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
+            from_hf_hub (bool, optional) Whether to load from HuggingFace Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from HuggingFace Hub.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -263,6 +266,7 @@ class AutoTokenizer:
             config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.tokenizer_config_file,
+                subfolder=subfolder,
                 cache_dir=HF_CACHE_HOME,
                 library_name="PaddleNLP",
                 library_version=__version__,

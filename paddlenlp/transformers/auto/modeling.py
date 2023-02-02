@@ -233,7 +233,9 @@ class _BaseAutoModelClass:
             )
 
     @classmethod
-    def _from_pretrained(cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, *model_args, **kwargs):
+    def _from_pretrained(
+        cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, subfolder=None, *model_args, **kwargs
+    ):
         if task:
             if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
@@ -251,6 +253,7 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.model_config_file,
+                    subfolder=subfolder,
                     cache_dir=HF_CACHE_HOME,
                     library_name="PaddleNLP",
                     library_version=__version__,
@@ -260,6 +263,7 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.legacy_model_config_file,
+                    subfolder=subfolder,
                     cache_dir=HF_CACHE_HOME,
                     library_name="PaddleNLP",
                     library_version=__version__,
