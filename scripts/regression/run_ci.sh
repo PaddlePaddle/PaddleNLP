@@ -222,7 +222,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         install_paddle
         echo "install_nlp_develop"
         wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
-        python -m pip install paddlenlp-latest-py3-none-any.whl
+        python -m pip install paddlenlp-ci-py3-none-any.whl
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
