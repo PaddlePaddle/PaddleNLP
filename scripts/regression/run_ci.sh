@@ -69,8 +69,8 @@ echo "python="${python}
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
-    python -m pip install --ignore-installed --upgrade pip
     python -m pip install -r scripts/regression/requirements_ci.txt
+    python -m pip uninstall paddlepaddle -y
     python -m pip install ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
     python -c 'from visualdl import LogWriter'
