@@ -171,6 +171,7 @@ def convert_weights(model_dir: str, output_dir: str | None = None):
 
 
 if __name__ == "__main__":
+    # update your `model_dir` and `output_dir` here to your pytorch model dir
     model_dir = "your pytorch path"
     output_dir = None
 
