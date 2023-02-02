@@ -561,6 +561,12 @@ class PegasusModel(PegasusPretrainedModel):
             attention_mask.stop_gradient = True
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
+        if decoder_attention_mask is not None and decoder_attention_mask.ndim == 2:
+            decoder_attention_mask = paddle.unsqueeze(decoder_attention_mask, axis=[1, 2]).astype(
+                paddle.get_default_dtype()
+            )
+            decoder_attention_mask = (1.0 - decoder_attention_mask) * -1e4
+            decoder_attention_mask.stop_gradient = True
 
         if use_cache:
             if cache is None:
