@@ -248,7 +248,6 @@ class ModelMixin(nn.Layer):
                 subfolder=subfolder,
                 from_hf_hub=from_hf_hub,
             )
-            print("model_file", model_file)
 
         config, unused_kwargs = cls.load_config(
             config_path,

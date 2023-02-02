@@ -292,7 +292,7 @@ class ConfigMixin:
             config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.config_name,
-                cache_dir=cache_dir,
+                cache_dir=HF_CACHE,
                 subfolder=subfolder,
                 library_name="PPDiffusers",
                 library_version=__version__,
@@ -303,7 +303,7 @@ class ConfigMixin:
                     pretrained_model_name_or_path,
                     filename=cls.config_name,
                     subfolder=subfolder,
-                    cache_dir=HF_CACHE,
+                    cache_dir=cache_dir,
                 )
             except HTTPError as err:
                 raise EnvironmentError(
