@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('--answer_generation_model_path', type=str, default=None, help='the model path to be loaded for answer extraction')
     parser.add_argument('--question_generation_model_path', type=str, default=None, help='the model path to be loaded for question generation')
     parser.add_argument('--filtration_model_path', type=str, default=None, help='the model path to be loaded for filtration')
-    parser.add_argument('--source_file_path', type=str, default=None, help='the souce file path')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the source file path')
     parser.add_argument('--target_file_path', type=str, default=None, help='the target json file path')
     parser.add_argument('--batch_size', type=int, default=1, help='the batch size when using taskflow')
     parser.add_argument("--do_debug", action='store_true', help="Whether to do debug")
@@ -155,17 +155,17 @@ def create_fake_question(
                     true_question_buffer_temp,
                     result_one_two_buffer,
                 ):
-                    fake_quesitons_tokens = [result[0]]
-                    fake_quesitons_scores = [result[1]]
-                    for fake_quesitons_token, fake_quesitons_score in zip(
-                        fake_quesitons_tokens, fake_quesitons_scores
+                    fake_questions_tokens = [result[0]]
+                    fake_questions_scores = [result[1]]
+                    for fake_questions_token, fake_questions_score in zip(
+                        fake_questions_tokens, fake_questions_scores
                     ):
                         out_dict = {
                             "context": context,
                             "synthetic_answer": answer,
                             "synthetic_answer_probability": answer_probability,
-                            "synthetic_question": fake_quesitons_token,
-                            "synthetic_question_probability": fake_quesitons_score,
+                            "synthetic_question": fake_questions_token,
+                            "synthetic_question_probability": fake_questions_score,
                             "true_question": true_question,
                         }
                         if out_json:
@@ -239,7 +239,7 @@ def filtration(paragraphs, batch_size=16, model=None, schema=None, wf=None, wf_d
                     invalid_num += 1
         i += 1
     print("valid synthetic question-answer pairs number:", valid_num)
-    print("invalid sythetic question-answer pairs numbewr:", invalid_num)
+    print("invalid synthetic question-answer pairs number:", invalid_num)
     return result
 
 

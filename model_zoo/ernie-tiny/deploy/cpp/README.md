@@ -30,10 +30,10 @@ cmake .. -DFASTDEPLOY_INSTALL_DIR=/path/to/fastdeploy-linux-x64-gpu-x.x.x
 make -j
 
 # 在GPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-./infer_demo --device gpu --backend paddle --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../../data/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+./infer_demo --device gpu --backend paddle --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../../data/slot_label.txt --intent_label_path ../../../data/intent_label.txt
 
 # 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-./infer_demo --device cpu --backend paddle --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path /path/to/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+./infer_demo --device cpu --backend paddle --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path /path/to/slot_label.txt --intent_label_path ../../../data/intent_label.txt
 
 ```
 
@@ -67,18 +67,18 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 
 ```bash
 
-# 在GPU上使用paddle_tensorrt后端运行量化模型，模型目录可按照实际模型路径设置
-./infer_demo --device gpu --backend paddle_tensorrt --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path ../../../data/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+# 在 GPU 上使用 tensorrt 后端运行量化模型，模型目录可按照实际模型路径设置
+./infer_demo --device gpu --backend tensorrt --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path ../../../data/slot_label.txt --intent_label_path ../../../data/intent_label.txt
 
-# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-./infer_demo --device cpu --backend paddle --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path /path/to/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+# 在 CPU 上使用 paddle_inference 后端，模型目录可按照实际模型路径设置
+./infer_demo --device cpu --backend paddle --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path /path/to/slot_label.txt --intent_label_path ../../../data/intent_label.txt
 
 ```
 
 运行完成后返回的结果如下：
 
 ```bash
-[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::TRT in Device::GPU.
 No.0 text = 来一首周华健的花心
 intent result: label = music.play, confidence = 0.997125
 slot result:
@@ -156,7 +156,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td rowspan=4 align=center> GPU </td>
-        <td rowspan=4 align=center> use_gpu() </td>
+        <td rowspan=4 align=center> UseGpu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center>  ✅ </td>
@@ -186,7 +186,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> 昆仑芯 XPU </td>
-        <td align=center> use_kunlunxin() </td>
+        <td align=center> UseKunlunXin() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
         <td align=center>  ✅ </td>
@@ -195,7 +195,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> 华为 昇腾 </td>
-        <td align=center> use_ascend() </td>
+        <td align=center> UseAscend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
         <td align=center> ✅ </td>
@@ -204,7 +204,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> Graphcore IPU </td>
-        <td align=center> use_ipu() </td>
+        <td align=center> UseIpu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center> ❔ </td>

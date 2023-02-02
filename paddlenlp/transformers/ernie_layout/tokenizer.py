@@ -104,7 +104,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
 
         self.tokens_to_ids["[MASK]"] = len(self.sp_model) + self.offset
         self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
-
         self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):

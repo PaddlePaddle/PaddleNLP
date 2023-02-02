@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Tuple, List, Dict
+from typing import Tuple, Union, List, Dict
 from abc import ABC
 
 from .. import C
@@ -112,6 +112,7 @@ class FastWordPiece(Model):
         unk_token: str = "[UNK]",
         max_input_chars_per_word: int = 100,
         continuing_subword_prefix: str = "continuing_subword_prefix",
+        with_pretokenization: bool = False,
     ):
         """Load a FastWordPiece instance from vocab file.
 
@@ -119,11 +120,13 @@ class FastWordPiece(Model):
         :param unk_token: (str) The unknown token
         :param max_input_chars_per_word: (int) The max number of char when tokenize a word
         :param continuing_subword_prefix: (str) The latter subword prefix.
+        :param with_pretokenization: (bool) Whether to pretokenize sequence during the wordpiece tokenization.
+            If it's true, the end to end tokenization would be faster.
         :return: An instance of FastWordPiece.
         """
         wp = FastWordPiece(None)
         wp._model = C.models.FastWordPiece.from_file(
-            vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix
+            vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix, with_pretokenization
         )
         return wp
 

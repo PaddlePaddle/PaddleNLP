@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import argparse
 import distutils.util
 import math
@@ -126,6 +127,8 @@ def parse_args():
         "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
     )
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
+    parser.add_argument("--use_SSTIA", action="store_true", type=bool, help="Whether to use SSTIA.")
+    parser.add_argument("--mix_ratio", default=0, type=float, help="Mixture ratio for TSDASG synthetic input.")
     args = parser.parse_args()
     return args
 
@@ -141,11 +144,13 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length):
+def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length, use_SSTIA):
     model.eval()
     all_preds = []
     all_labels = []
     model = model._layers if isinstance(model, paddle.DataParallel) else model
+    if use_SSTIA:
+        model.use_SSTIA = False
     for batch in tqdm(data_loader, total=len(data_loader), desc="Eval step"):
         labels = batch.pop("labels").numpy()
         preds = model.generate(
@@ -162,6 +167,8 @@ def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
     rougel = compute_metrics(all_preds, all_labels)
     model.train()
+    if use_SSTIA:
+        model.use_SSTIA = True
     return rougel
 
 
@@ -190,6 +197,9 @@ def do_train(args):
         dev_set = dev_set.map(trans_func, batched=True, load_from_cache_file=True, remove_columns=remove_columns)
 
     model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path)
+    if args.use_SSTIA:
+        model.use_SSTIA = True
+        model.mix_ratio = args.mix_ratio
     batchify_fn = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
     train_batch_sampler = DistributedBatchSampler(train_set, batch_size=args.train_batch_size, shuffle=True)
@@ -265,7 +275,9 @@ def do_train(args):
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
-                rougel = evaluate(model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length)
+                rougel = evaluate(
+                    model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length, args.use_SSTIA
+                )
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0 and best_rougel < rougel:
                     best_rougel = rougel

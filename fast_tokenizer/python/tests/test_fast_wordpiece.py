@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
 import unittest
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer
+
+from fast_tokenizer import ErnieFastTokenizer
+from fast_tokenizer.models import WordPiece, FastWordPiece
 from paddlenlp.datasets import load_dataset
-from fast_tokenizer import ErnieFastTokenizer, models
+from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.log import logger
 
 logger.logger.setLevel("ERROR")
 
@@ -30,8 +30,8 @@ class TestWordpiece(unittest.TestCase):
 
     def setUp(self):
         self.max_seq_length = 128
-        self.wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
-        ernie_vocab = self.wordpiece_tokenizer.vocab.token_to_idx
+        self.wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0", use_fast=True)
+        ernie_vocab = self.wordpiece_tokenizer.vocab
         self.set_flag()
         self.fast_wordpiece_tokenizer = ErnieFastTokenizer(
             ernie_vocab,
@@ -75,6 +75,17 @@ class TestFastWordpieceWithPretokenization(TestWordpiece):
     def set_flag(self):
         self.use_fast_wordpiece = True
         self.use_fast_wordpiece_with_pretokenization = True
+
+
+class TestFromfile(unittest.TestCase):
+    def setUp(self):
+        self.max_seq_length = 128
+        t = AutoTokenizer.from_pretrained("ernie-1.0", use_fast=True)
+        self.vocab_file = t.init_kwargs["vocab_file"]
+
+    def test(self):
+        WordPiece.from_file(self.vocab_file)
+        FastWordPiece.from_file(self.vocab_file)
 
 
 if __name__ == "__main__":

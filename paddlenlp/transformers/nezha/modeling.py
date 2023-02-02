@@ -17,96 +17,66 @@
 
 import copy
 import math
-import numpy as np
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
+from paddle import Tensor
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
+
+from ...utils.env import CONFIG_NAME
+from ..activations import ACT2FN
+from ..model_outputs import (
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    ModelOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+)
+from .configuration import (
+    NEZHA_PRETRAINED_INIT_CONFIGURATION,
+    NEZHA_PRETRAINED_RESOURCE_FILES_MAP,
+    NeZhaConfig,
+)
 
 __all__ = [
     "NeZhaModel",
     "NeZhaPretrainedModel",
     "NeZhaForPretraining",
     "NeZhaForSequenceClassification",
-    "NeZhaPretrainingHeads",
     "NeZhaForTokenClassification",
     "NeZhaForQuestionAnswering",
     "NeZhaForMultipleChoice",
 ]
 
 
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-def gelu_new(x):
-    """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "gelu_new": gelu_new,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
-
-
 class NeZhaAttention(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_attention_heads=12,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaAttention, self).__init__()
-        if hidden_size % num_attention_heads != 0:
+        if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
-                "The hidden size (%d) is not a multiple of the number of attention "
-                "heads (%d)" % (hidden_size, num_attention_heads)
+                "The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                "heads ({config.num_attention_heads})"
             )
-        self.num_attention_heads = num_attention_heads
-        self.attention_head_size = int(hidden_size / num_attention_heads)
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(hidden_size, self.all_head_size)
-        self.key = nn.Linear(hidden_size, self.all_head_size)
-        self.value = nn.Linear(hidden_size, self.all_head_size)
+        self.query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        self.value = nn.Linear(config.hidden_size, self.all_head_size)
         self.relative_positions_embeddings = self.generate_relative_positions_embeddings(
-            length=512, depth=self.attention_head_size, max_relative_position=max_relative_position
+            length=512, depth=self.attention_head_size, max_relative_position=config.max_relative_position
         )
-        self.attention_dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.attention_dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.output_dropout = nn.Dropout(hidden_dropout_prob)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.output_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def generate_relative_positions_embeddings(self, length, depth, max_relative_position=127):
         vocab_size = max_relative_position * 2 + 1
@@ -201,32 +171,15 @@ class NeZhaAttention(nn.Layer):
 
 
 class NeZhaLayer(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaLayer, self).__init__()
         self.seq_len_dim = 1
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.attention = NeZhaAttention(
-            hidden_size=hidden_size,
-            num_attention_heads=num_attention_heads,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
-        self.ffn = nn.Linear(hidden_size, intermediate_size)
-        self.ffn_output = nn.Linear(intermediate_size, hidden_size)
-        self.activation = ACT2FN[hidden_act]
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.attention = NeZhaAttention(config)
+        self.ffn = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.ffn_output = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.activation = ACT2FN[config.hidden_act]
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, attention_mask=None):
         attention_output, layer_att = self.attention(hidden_states, attention_mask)
@@ -242,30 +195,10 @@ class NeZhaLayer(nn.Layer):
 
 
 class NeZhaEncoder(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps="1e-12",
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaEncoder, self).__init__()
-        layer = NeZhaLayer(
-            hidden_size=hidden_size,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            hidden_act=hidden_act,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
-        self.layer = nn.LayerList([copy.deepcopy(layer) for _ in range(num_hidden_layers)])
+        layer = NeZhaLayer(config)
+        self.layer = nn.LayerList([copy.deepcopy(layer) for _ in range(config.num_hidden_layers)])
 
     def forward(self, hidden_states, attention_mask):
         all_encoder_layers = []
@@ -279,37 +212,39 @@ class NeZhaEncoder(nn.Layer):
 
 
 class NeZhaEmbeddings(nn.Layer):
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        use_relative_position=True,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaEmbeddings, self).__init__()
-        self.use_relative_position = use_relative_position
+        self.use_relative_position = config.use_relative_position
 
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
 
-        if not use_relative_position:
-            self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        if not self.use_relative_position:
+            self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None):
-        seq_length = input_ids.shape[1]
-        position_ids = paddle.arange(seq_length, dtype="int64")
-        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+
+        ones = paddle.ones(input_shape, dtype="int64")
+        seq_length = paddle.cumsum(ones, axis=1)
+        position_ids = seq_length - ones
+        position_ids.stop_gradient = True
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        words_embeddings = self.word_embeddings(input_ids)
-        embeddings = words_embeddings
+        embeddings = inputs_embeds
 
         if not self.use_relative_position:
             position_embeddings = self.position_embeddings(position_ids)
@@ -325,9 +260,9 @@ class NeZhaEmbeddings(nn.Layer):
 
 
 class NeZhaPooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -348,77 +283,13 @@ class NeZhaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "nezha-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-large-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-base-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-large-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "nezha-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-chinese.pdparams",
-            "nezha-large-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-chinese.pdparams",
-            "nezha-base-wwm-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
-            "nezha-large-wwm-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = NeZhaConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "nezha"
+
+    pretrained_init_configuration = NEZHA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = NEZHA_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -429,9 +300,7 @@ class NeZhaPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.nezha.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -503,51 +372,27 @@ class NeZhaModel(NeZhaPretrainedModel):
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-        use_relative_position=True,
-    ):
-        super(NeZhaModel, self).__init__()
-        self.initializer_range = initializer_range
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaModel, self).__init__(config)
+        self.initializer_range = config.initializer_range
 
-        self.embeddings = NeZhaEmbeddings(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            use_relative_position=use_relative_position,
-        )
+        self.embeddings = NeZhaEmbeddings(config)
 
-        self.encoder = NeZhaEncoder(
-            hidden_size=hidden_size,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            hidden_act=hidden_act,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
+        self.encoder = NeZhaEncoder(config)
 
-        self.pooler = NeZhaPooler(hidden_size)
+        self.pooler = NeZhaPooler(config)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The NeZhaModel forward method, overrides the `__call__()` special method.
 
@@ -580,20 +425,24 @@ class NeZhaModel(NeZhaPretrainedModel):
                 We use whole-word-mask in NeZha, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`).
-
-            With the fields:
-
-            - `sequence_output` (Tensor):
-                Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
-
-            - `pooled_output` (Tensor):
-                The output of first token (`[CLS]`) in sequence.
-                We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and its shape is [batch_size, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -604,10 +453,16 @@ class NeZhaModel(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaModel.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞浆!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
                 output = model(**inputs)
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
+
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
         if token_type_ids is None:
@@ -616,25 +471,48 @@ class NeZhaModel(NeZhaPretrainedModel):
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
-        embedding_output = self.embeddings(input_ids, token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
+        )
 
-        encoder_outputs, _ = self.encoder(embedding_output, extended_attention_mask)
+        encoder_outputs = self.encoder(embedding_output, extended_attention_mask)
+        encoder_hidden_outputs, encoder_att_outputs = encoder_outputs
 
-        sequence_output = encoder_outputs[-1]
+        sequence_output = encoder_hidden_outputs[-1]
         pooled_output = self.pooler(sequence_output)
 
-        return sequence_output, pooled_output
+        if not return_dict:
+            outputs = (sequence_output, pooled_output)
+            if output_hidden_states:
+                outputs += (encoder_hidden_outputs,)
+            if output_attentions:
+                outputs += (encoder_att_outputs,)
+            return outputs
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_hidden_outputs if output_hidden_states else None,
+            attentions=encoder_att_outputs if output_attentions else None,
+        )
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
 
 class NeZhaLMPredictionHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, hidden_act, embedding_weights=None, layer_norm_eps=1e-12):
+    def __init__(self, config: NeZhaConfig, embedding_weights=None):
         super(NeZhaLMPredictionHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.activation = ACT2FN[hidden_act]
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = ACT2FN[config.hidden_act]
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
         self.decoder_weight = embedding_weights
-        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.decoder_bias = self.create_parameter(
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -664,10 +542,10 @@ class NeZhaPretrainingHeads(nn.Layer):
 
     """
 
-    def __init__(self, hidden_size, vocab_size, hidden_act, embedding_weights=None):
+    def __init__(self, config: NeZhaConfig, embedding_weights=None):
         super(NeZhaPretrainingHeads, self).__init__()
-        self.predictions = NeZhaLMPredictionHead(hidden_size, vocab_size, hidden_act, embedding_weights)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = NeZhaLMPredictionHead(config=config, embedding_weights=embedding_weights)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
         """
@@ -700,6 +578,40 @@ class NeZhaPretrainingHeads(nn.Layer):
         return prediction_scores, seq_relationship_score
 
 
+@dataclass
+class NeZhaForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`NeZhaForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+            (classification) loss.
+        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
+            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    prediction_logits: paddle.Tensor = None
+    seq_relationship_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
 class NeZhaForPretraining(NeZhaPretrainedModel):
     """
     NeZha Model with pretraining tasks on top.
@@ -710,20 +622,27 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
     """
 
-    def __init__(self, nezha):
-        super(NeZhaForPretraining, self).__init__()
-        self.nezha = nezha
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForPretraining, self).__init__(config)
+        self.nezha = NeZhaModel(config)
         self.cls = NeZhaPretrainingHeads(
-            self.nezha.config["hidden_size"],
-            self.nezha.config["vocab_size"],
-            self.nezha.config["hidden_act"],
+            config,
             self.nezha.embeddings.word_embeddings.weight,
         )
 
         self.apply(self.init_weights)
 
     def forward(
-        self, input_ids, token_type_ids=None, attention_mask=None, masked_lm_labels=None, next_sentence_label=None
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        masked_lm_labels: Optional[Tensor] = None,
+        next_sentence_label: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
 
@@ -734,52 +653,67 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
                 See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
+                See :class:`NeZhaModel`.
             masked_lm_labels (Tensor, optional):
                 The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
                 Its data type should be int64 and its shape is [batch_size, sequence_length, 1].
             next_sentence_label (Tensor, optional):
                 The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
                 is equal to `seq_relation_labels`. Its data type should be int64 and its shape is [batch_size, 1].
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.nezha.NeZhaForPreTrainingOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: Returns Tensor ``total_loss`` if `masked_lm_labels` is not None.
-            Returns tuple (``prediction_scores``, ``seq_relationship_score``) if `masked_lm_labels` is None.
-
-            With the fields:
-
-            - `total_loss` (Tensor):
-
-
-            - `prediction_scores` (Tensor):
-                The scores of masked token prediction. Its data type should be float32.
-                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
-                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
-
-            - `seq_relationship_score` (Tensor):
-                The scores of next sentence prediction.
-                Its data type should be float32 and its shape is [batch_size, 2].
-
+            An instance of :class:`~paddlenlp.transformers.nezha.NeZhaForPreTrainingOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.nezha.NeZhaForPreTrainingOutput`.
         """
-        sequence_output, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
+        outputs = self.nezha(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output, pooled_output = outputs[0], outputs[1]
         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
 
+        total_loss = None
         if masked_lm_labels is not None and next_sentence_label is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, self.nezha.config["vocab_size"])), masked_lm_labels.reshape((-1,))
+                prediction_scores.reshape((-1, self.nezha.config.vocab_size)), masked_lm_labels.reshape((-1,))
             )
             next_sentence_loss = loss_fct(seq_relationship_score.reshape((-1, 2)), next_sentence_label.reshape((-1,)))
             total_loss = masked_lm_loss + next_sentence_loss
-            return total_loss
         elif masked_lm_labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, self.nezha.config["vocab_size"])), masked_lm_labels.reshape((-1,))
+                prediction_scores.reshape((-1, self.nezha.config.vocab_size)), masked_lm_labels.reshape((-1,))
             )
             total_loss = masked_lm_loss
-            return total_loss
-        else:
-            return prediction_scores, seq_relationship_score
+
+        if not return_dict:
+            output = (prediction_scores, seq_relationship_score) + outputs[2:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return NeZhaForPreTrainingOutput(
+            loss=total_loss,
+            prediction_logits=prediction_scores,
+            seq_relationship_logits=seq_relationship_score,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
@@ -788,21 +722,28 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForQuestionAnswering.
     """
 
-    def __init__(self, nezha, dropout=None):
-        super(NeZhaForQuestionAnswering, self).__init__()
-        self.nezha = nezha
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], 2)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForQuestionAnswering, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The NeZhaForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -813,6 +754,25 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
                 See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
+                See :class:`NeZhaModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
@@ -837,21 +797,57 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForQuestionAnswering.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
-        sequence_output, _ = self.nezha(input_ids, token_type_ids, attention_mask)
+        outputs = self.nezha(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
 
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        output = (start_logits, end_logits)
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class NeZhaForSequenceClassification(NeZhaPretrainedModel):
@@ -860,25 +856,31 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
     sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to None.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForSequenceClassification.
     """
 
-    def __init__(self, nezha, num_classes=2, dropout=None):
-        super(NeZhaForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], num_classes)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForSequenceClassification, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The NeZhaForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -889,6 +891,22 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
                 See :class:`NeZhaModel`.
+            inputs_embeds(Tensor, optional):
+                See :class:`NeZhaModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
@@ -904,19 +922,48 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForSequenceClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
-                logits  =outputs[0]
+                logits = outputs[0]
 
         """
-        _, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
+        outputs = self.nezha(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)
 
-        return logits
+        loss = None
+        if labels is not None:
+            if self.num_labels == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class NeZhaForTokenClassification(NeZhaPretrainedModel):
@@ -925,25 +972,31 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForSequenceClassification.
     """
 
-    def __init__(self, nezha, num_classes=2, dropout=None):
-        super(NeZhaForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], num_classes)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForTokenClassification, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The NeZhaForTokenClassification forward method, overrides the __call__() special method.
 
@@ -954,10 +1007,24 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
             attention_mask (list, optional):
                 See :class:`NeZhaModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
 
         Example:
             .. code-block::
@@ -969,18 +1036,40 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
                 model = NeZhaForTokenClassification.from_pretrained('nezha-base-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨！")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                inputs = tokenizer("欢迎使用百度飞浆!", return_tensors='pt')
+                output = model(**inputs)
 
                 logits = outputs[0]
         """
-        sequence_output, _ = self.nezha(input_ids, token_type_ids, attention_mask)
+        outputs = self.nezha(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
 
         logits = self.classifier(sequence_output)
 
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class NeZhaForMultipleChoice(NeZhaPretrainedModel):
@@ -989,25 +1078,31 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMultipleChoice.
     """
 
-    def __init__(self, nezha, num_choices=2, dropout=None):
-        super(NeZhaForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], 1)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForMultipleChoice, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The NeZhaForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1018,6 +1113,21 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
             attention_mask (list, optional):
                 See :class:`NeZhaModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the input multiple choice classification logits.
@@ -1025,17 +1135,42 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         """
 
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        if input_ids is not None:
+            input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
-        if token_type_ids:
+        if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1]))
-        if attention_mask:
+        if attention_mask is not None:
             attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1]))
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
 
-        _, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
+        outputs = self.nezha(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape((-1, self.num_choices))  # logits: (bs, num_choice)
 
-        return reshaped_logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+        if not return_dict:
+            output = (reshaped_logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

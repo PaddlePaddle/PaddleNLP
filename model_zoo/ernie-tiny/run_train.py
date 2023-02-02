@@ -279,6 +279,7 @@ def main():
         )
         # save converted static graph model
         paddle.jit.save(model, os.path.join(compression_args.output_dir, "infer_model"))
+        tokenizer.save_pretrained(compression_args.output_dir)
 
 
 if __name__ == "__main__":

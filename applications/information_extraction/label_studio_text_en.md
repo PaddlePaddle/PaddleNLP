@@ -57,10 +57,10 @@ Click Create to start creating a new project, fill in the project name, descript
      <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
 </div>
 
-- For **Text classification, Sentence-level sentiment classification** tasks please select ``Relation Extraction`.
+- For **Text classification, Sentence-level sentiment classification** tasks please select ``Text Classification``.
 
 <div align="center">
-     <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
+     <img src=https://user-images.githubusercontent.com/40840292/212617773-34534e68-4544-4b24-8f39-ae7f9573d397.png height=420 width=1200 />
 </div>
 
 - Define labels

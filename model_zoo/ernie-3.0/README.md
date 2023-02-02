@@ -19,7 +19,9 @@
                * [GPU 性能](#CPU性能)
    * [使用 FastTokenizer 加速](#使用FastTokenizer加速)
    * [部署](#部署)
-       * [Python 部署](#Python部署)
+       * [FastDeploy 部署](#FastDeploy部署)
+           * [Python 部署](#Python部署)
+           * [C++ 部署](#C++部署)
        * [服务化部署](#服务化部署)
    * [Notebook教程](#Notebook教程)
    * [参考文献](#参考文献)
@@ -1368,6 +1370,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+# --device 选择训练模型的硬件，可选 cpu/gpu/xpu/npu，默认为 gpu。xpu 为昆仑芯片，npu 为昇腾芯片。
 python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
 
 # 序列标注任务
@@ -1383,6 +1386,7 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+# --device 选择训练模型的硬件，可选 cpu/gpu/xpu/npu，默认为 gpu。xpu 为昆仑芯片，npu 为昇腾芯片。
 python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml
 
 # 序列标注任务
@@ -1565,23 +1569,41 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 <a name="部署"></a>
 
 ## 部署
-我们为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
-<p align="center">
-        <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
-</p>
+
+我们基于 FastDeploy 为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
+
+<a name="FastDeploy部署"></a>
+
+### FastDeploy 部署
+
+⚡️[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
+
+<div align="center">
+
+<img src="https://user-images.githubusercontent.com/54695910/213087724-7175953a-0e07-4af8-a4a1-5304163da2e0.png" >
+
+</div>
+
+目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
 
 <a name="Python部署"></a>
 
-### Python 部署
+#### Python 部署
 
-Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
+Python 部署请参考：[Python 部署指南](./deploy/python/README.md)
+
+<a name="C++部署"></a>
+
+#### C++ 部署
+
+C++ 部署请参考：[C++ 部署指南](./deploy/cpp/README.md)
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
 - [Triton Inference Server 服务化部署指南](./deploy/triton_serving/README.md)
-- [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
+- [PaddleNLP SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
 
 
 <a name="参考文献"></a>

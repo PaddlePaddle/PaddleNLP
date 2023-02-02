@@ -13,23 +13,22 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
-import sys
-from functools import partial
 import distutils.util
-import numpy as np
-import onnxruntime as ort
+import time
+from functools import partial
 from multiprocessing import cpu_count
 
+import numpy as np
+import onnxruntime as ort
 import paddle
+from datasets import load_dataset
 from paddle import inference
 from paddle.metric import Accuracy
-from datasets import load_dataset
+
+from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
-from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithPadding
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import AutoTokenizer
 
 METRIC_CLASSES = {
@@ -58,7 +57,7 @@ def parse_args():
     )
     parser.add_argument("--model_path", type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument(
-        "--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference."
+        "--device", default="gpu", choices=["gpu", "cpu", "xpu", "npu"], help="Device selected for inference."
     )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size for predict.")
     parser.add_argument(
@@ -80,6 +79,7 @@ def parse_args():
     )
     parser.add_argument("--shape_file", default="shape_info.txt", type=str, help="Shape info filename.")
     parser.add_argument("--use_trt", action="store_true", help="Whether to use inference engin TensorRT.")
+    parser.add_argument("--use_lite", action="store_true", help="Whether to use inference engin PaddleLite.")
     parser.add_argument("--perf", action="store_true", help="Whether to test performance.")
     parser.add_argument("--collect_shape", action="store_true", help="Whether to collect shape info.")
 
@@ -115,6 +115,12 @@ def parse_args():
         type=str,
         help="Onnx ExecutionProvider with DNNL or without DNNL",
     )
+    parser.add_argument(
+        "--lazy_data_processing",
+        default=True,
+        type=bool,
+        help="Whether use lazy data processing",
+    )
 
     args = parser.parse_args()
     return args
@@ -124,7 +130,6 @@ def convert_example(example, tokenizer, label_list, is_test=False, max_seq_lengt
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
         # Get the label
         label = np.array(example["label"], dtype="int64")
     # Convert raw text to feature
@@ -187,7 +192,7 @@ class Predictor(object):
                 )
             dynamic_quantize_model = onnx_model
             if args.enable_quantize:
-                from onnxruntime.quantization import QuantizationMode, quantize_dynamic
+                from onnxruntime.quantization import quantize_dynamic
 
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -229,6 +234,12 @@ class Predictor(object):
         elif args.device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
+        elif args.device == "npu":
+            if args.use_lite:
+                config.enable_lite_engine(paddle.inference.PrecisionType(0), True)
+                config.nnadapter().enable().set_device_names(["huawei_ascend_npu"])
+            else:
+                config.enable_custom_device("npu")
         if args.use_trt:
             precision_map = {
                 "int8": inference.PrecisionType.Int8,
@@ -338,7 +349,6 @@ class Predictor(object):
                 metric = ChunkEvaluator(label_list=args.label_list)
                 metric.reset()
                 all_predictions = []
-                batch_num = len(dataset["input_ids"])
                 for batch in batches:
                     batch = batchify_fn(batch)
                     input_ids, segment_ids = batch["input_ids"].numpy(), batch["token_type_ids"].numpy()
@@ -471,8 +481,14 @@ def main():
 
         column_names = dev_ds.column_names
         dev_ds = dev_ds.map(trans_fn, remove_columns=column_names)
-        batchify_fn = DataCollatorForTokenClassification(tokenizer)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+        if args.device == "npu":
+            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+            batchify_fn = DataCollatorForTokenClassification(
+                tokenizer, padding="max_length", max_length=args.max_seq_length
+            )
+        else:
+            batchify_fn = DataCollatorForTokenClassification(tokenizer)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     elif args.task_name == "cmrc2018":
         dev_example = load_dataset("cmrc2018", split="validation")
         column_names = dev_example.column_names
@@ -487,8 +503,12 @@ def main():
             desc="Running tokenizer on validation dataset",
         )
 
-        batchify_fn = DataCollatorWithPadding(tokenizer)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args, dev_example)
+        if args.device == "npu":
+            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+            batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+        else:
+            batchify_fn = DataCollatorWithPadding(tokenizer)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args, dev_example)
     else:
         dev_ds = ppnlp_load_dataset("clue", args.task_name, splits="dev")
 
@@ -499,10 +519,14 @@ def main():
             max_seq_length=args.max_seq_length,
             is_test=False,
         )
-        dev_ds = dev_ds.map(trans_func, lazy=False)
-        batchify_fn = DataCollatorWithPadding(tokenizer)
+        dev_ds = dev_ds.map(trans_func, lazy=args.lazy_data_processing)
+        if args.device == "npu":
+            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+            batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+        else:
+            batchify_fn = DataCollatorWithPadding(tokenizer)
 
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
 if __name__ == "__main__":
