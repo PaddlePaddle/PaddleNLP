@@ -285,6 +285,7 @@ class NeZhaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = NeZhaModel
     return_dict: bool = False
     use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     all_model_classes = (
         NeZhaModel,

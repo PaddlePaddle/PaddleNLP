@@ -25,12 +25,12 @@ from collections import OrderedDict
 from typing import Optional, Union
 
 import requests
+from filelock import FileLock
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
 from tqdm.auto import tqdm
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
-from .file_lock import FileLock
 from .log import logger
 
 __all__ = ["get_weights_path_from_url"]
