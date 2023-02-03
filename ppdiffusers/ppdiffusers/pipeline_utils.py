@@ -449,7 +449,6 @@ class DiffusionPipeline(ConfigMixin):
 
                 if issubclass(class_obj, ModelMixin):
                     loading_kwargs["cache_dir"] = cache_dir
-                    # loading_kwargs["from_hf_hub"] = from_hf_hub
 
                 if os.path.isdir(pretrained_model_name_or_path):
                     model_path_dir = os.path.join(pretrained_model_name_or_path, name)

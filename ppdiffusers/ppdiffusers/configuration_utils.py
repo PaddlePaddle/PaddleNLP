@@ -262,9 +262,12 @@ class ConfigMixin:
             from_hf_hub (bool, *optional*):
                 Whether to load from Hugging Face Hub. Defaults to False
         """
-        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
-        subfolder = kwargs.pop("subfolder", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
+        if from_hf_hub:
+            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
+        else:
+            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        subfolder = kwargs.pop("subfolder", None)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -292,7 +295,7 @@ class ConfigMixin:
             config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.config_name,
-                cache_dir=HF_CACHE,
+                cache_dir=cache_dir,
                 subfolder=subfolder,
                 library_name="PPDiffusers",
                 library_version=__version__,
