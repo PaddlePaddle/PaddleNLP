@@ -94,7 +94,7 @@ dont_transpose = [
 paddle_state_dict = OrderedDict()
 
 # Convert parameters
-for k, v in hf_model.items() if use_torch else hf_model.items():
+for k, v in hf_model.items():
     transpose = False
     if k in skip_weights:
         continue
@@ -118,7 +118,7 @@ for k, v in hf_model.items() if use_torch else hf_model.items():
     if oldk == "lm_head.weight":
         k = "lm_head_weight"
 
-    print(f"Converting: {oldk} => {k} | is_transpose {transpose}")
+    logger.info(f"Converting: {oldk} => {k} | is_transpose {transpose}")
 
     paddle_state_dict[k] = v.data.numpy() if use_torch else v
 
