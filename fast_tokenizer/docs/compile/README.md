@@ -1,9 +1,10 @@
 # FastTokenizer 编译指南
 
-本文档说明编译 FastTokenizer C++ 库、Python 库两种编译过程，根据编译的平台参考如下文档
+本文档说明编译 FastTokenizer C++ 库、Python 库以及 Android 库三种编译过程，根据编译的平台参考如下文档
 
 - [Linux & Mac 编译](./how_to_build_linux_and_mac.md)
 - [Windows 编译](./how_to_build_windows.md)
+- [Android 编译](./how_to_build_android.md)
 
 FastTokenizer 使用 CMake 编译，其中编译过程中，各平台上编译选项如下表所示
 
