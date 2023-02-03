@@ -45,8 +45,10 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+
+from .utils import resolve_cache_dir
 
 
 @dataclass(frozen=True, eq=True)
@@ -1441,6 +1443,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         """
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         vocab_files = {}
         init_configuration = {}
 
@@ -1479,7 +1483,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -1490,7 +1494,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
                     subfolder=subfolder,
-                    cache_dir=HF_CACHE_HOME,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )

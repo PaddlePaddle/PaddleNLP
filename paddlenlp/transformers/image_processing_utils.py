@@ -25,9 +25,10 @@ from huggingface_hub import hf_hub_download
 from paddlenlp import __version__
 
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
-from ..utils.env import HF_CACHE_HOME, MODEL_HOME
+from ..utils.env import MODEL_HOME
 from ..utils.log import logger
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
+from .utils import resolve_cache_dir
 
 IMAGE_PROCESSOR_NAME = "preprocessor_config.json"
 
@@ -199,6 +200,7 @@ class ImageProcessingMixin(object):
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         subfolder = kwargs.pop("subfolder", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
@@ -212,7 +214,7 @@ class ImageProcessingMixin(object):
             resolved_image_processor_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=image_processor_file,
-                cache_dir=HF_CACHE_HOME,
+                cache_dir=cache_dir,
                 subfolder=subfolder,
                 library_name="PaddleNLP",
                 library_version=__version__,

@@ -54,7 +54,6 @@ from paddlenlp.utils.downloader import (
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     ENABLE_TORCH_CHECKPOINT,
-    HF_CACHE_HOME,
     LEGACY_CONFIG_NAME,
     MODEL_HOME,
     PADDLE_WEIGHT_FILE_NAME,
@@ -445,7 +444,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
-            from_hf_hub (bool): whether to load from Huggingface Hub
+            from_hf_hub (bool, optional): whether to load from Huggingface Hub
             subfolder (str, optional) An optional value corresponding to a folder inside the repo.
                 Only works when loading from Huggingface Hub.
             *args (tuple): Position arguments for model `__init__`. If provided,
@@ -489,6 +488,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
+        cache_dir = kwargs.get("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
         track_download = True
 
         # From HF Hub
@@ -521,7 +523,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -533,7 +535,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
                     subfolder=subfolder,
-                    cache_dir=HF_CACHE_HOME,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -974,7 +976,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
 
         2. when it is url:
-            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-mame`)
+            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-mame` or `HF_CACHE_HOME` + `model-mame`)
 
         3. when it is local dir:
             check whether the file<local_dir + weight_file> exist
@@ -988,6 +990,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             str: the model weight file path
         """
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         # 0. when it is local file
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
@@ -1045,7 +1048,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if from_hf_hub:
             return resolve_weight_file_from_hf_hub(
                 pretrained_model_name_or_path,
-                cache_dir=HF_CACHE_HOME,
+                cache_dir=cache_dir,
                 support_conversion=support_conversion,
                 subfolder=subfolder,
             )
