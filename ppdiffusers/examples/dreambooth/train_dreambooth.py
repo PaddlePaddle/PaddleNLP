@@ -205,6 +205,14 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
+    parser.add_argument(
+        "--teacher_pretrained_model_name_or_path",
+        type=str,
+        default="CompVis/stable-diffusion-v1-4",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument("--distill_coeff", type=float, default=0, help="coeff for distillation loss")
+    parser.add_argument("--qat_mode", choices=[0, 1], type=int, default=0, help="use PACT in QAT")
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -411,6 +419,36 @@ def main(args):
         freeze_params(text_encoder.parameters())
     unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
 
+    if not args.qat_mode == 0:
+        from paddleslim import QAT
+
+        quant_config = {
+            # It defauts to None, which means that no preprocessing is performed
+            # on the active value."
+            "activation_preprocess_type": "PACT" if args.qat_mode == 1 else None,
+            # It defauts to None, which means that no preprocessing is performed
+            # on weights.
+            "weight_preprocess_type": "PACT" if args.qat_mode == 1 else None,
+            "weight_quantize_type": "channel_wise_abs_max",
+            "activation_quantize_type": "moving_average_abs_max",
+            "weight_bits": 8,
+            "activation_bits": 8,
+            "dtype": "int8",
+            # window size for 'range_abs_max' quantization. defaulf is 10000
+            "window_size": 10000,
+            "quantizable_layer_type": ["Linear", "Conv2D"],
+            "moving_rate": 0.9,
+            "onnx_format": True,
+        }
+        quanter = QAT(config=quant_config)
+        quanter.quantize(unet)
+        if args.distill_coeff > 0:
+            teacher_unet = UNet2DConditionModel.from_pretrained(
+                args.teacher_pretrained_model_name_or_path, subfolder="unet"
+            )
+            freeze_params(teacher_unet.parameters())
+            teacher_unet.eval()
+
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
 
@@ -588,13 +626,30 @@ def main(args):
                         # Compute prior loss
                         prior_loss = F.mse_loss(noise_pred_prior, noise_prior, reduction="none").mean([1, 2, 3]).mean()
 
+                        if not args.qat_mode == 0 and args.distill_coeff > 0:
+                            teacher_noise_pred = teacher_unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                            teacher_noise_pred, teacher_noise_pred_prior = noise_pred.chunk(2, axis=0)
+                            loss = (1 - args.distill_coeff) * loss + args.distill_coeff * F.mse_loss(
+                                noise_pred, teacher_noise_pred, reduction="mean"
+                            )
+                            prior_loss = (1 - args.distill_coeff) * prior_loss + args.distill_coeff * F.mse_loss(
+                                noise_pred_prior, teacher_noise_pred_prior, reduction="mean"
+                            )
+
                         # Add the prior loss to the instance loss.
                         loss = loss + args.prior_loss_weight * prior_loss
+
                     else:
                         loss = F.mse_loss(noise_pred, noise, reduction="none").mean([1, 2, 3]).mean()
+                        if not args.qat_mode == 0 and args.distill_coeff > 0:
+                            teacher_noise_pred = teacher_unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                            loss = (1 - args.distill_coeff) * loss + args.distill_coeff * F.mse_loss(
+                                noise_pred, teacher_noise_pred, reduction="mean"
+                            )
 
                     if args.gradient_accumulation_steps > 1:
                         loss = loss / args.gradient_accumulation_steps
+
                     loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
@@ -626,7 +681,26 @@ def main(args):
                             safety_checker=None,
                             tokenizer=tokenizer,
                         )
-                        pipeline.save_pretrained(args.output_dir)
+                        pipeline.save_pretrained(os.path.join(args.output_dir, f"step_{global_step}"))
+                        if not args.qat_mode == 0:
+                            quanter.save_quantized_model(
+                                unwrap_model(unet),
+                                os.path.join(args.output_dir, f"step_{global_step}"),
+                                input_spec=[
+                                    paddle.static.InputSpec(
+                                        shape=[None, 4, None, None],
+                                        dtype="float32",
+                                    ),  # latent
+                                    paddle.static.InputSpec(
+                                        shape=[1],
+                                        dtype="int64",
+                                    ),  # timesteps
+                                    paddle.static.InputSpec(
+                                        shape=[None, None, 768],
+                                        dtype="float32",
+                                    ),  # encoder_embedding
+                                ],
+                            )
 
             if global_step >= args.max_train_steps:
                 break
@@ -641,7 +715,26 @@ def main(args):
             safety_checker=None,
             tokenizer=tokenizer,
         )
-        pipeline.save_pretrained(args.output_dir)
+        pipeline.save_pretrained(os.path.join(args.output_dir, "final"))
+        if not args.qat_mode == 0:
+            quanter.save_quantized_model(
+                unwrap_model(unet),
+                os.path.join(args.output_dir, "final", "unet_qat", "inference"),
+                input_spec=[
+                    paddle.static.InputSpec(
+                        shape=[None, 4, None, None],
+                        dtype="float32",
+                    ),  # latent
+                    paddle.static.InputSpec(
+                        shape=[1],
+                        dtype="int64",
+                    ),  # timesteps
+                    paddle.static.InputSpec(
+                        shape=[None, None, 768],
+                        dtype="float32",
+                    ),  # encoder_embedding
+                ],
+            )
 
 
 if __name__ == "__main__":

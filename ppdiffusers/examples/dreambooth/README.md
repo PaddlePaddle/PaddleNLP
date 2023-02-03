@@ -26,6 +26,44 @@ pip install -U ppdiffusers visualdl
 当我们开启`gradient_checkpointing`功能后（Tips：该功能可以在一定程度上减少显存消耗），我们可以在24GB显存的GPU上微调模型。如果想要使用更大的`batch_size`进行更快的训练，建议用户使用具有30GB+显存的显卡。
 
 #### 1.2.2 单机单卡训练
+
+**量化训练**
+
+```bash
+export MODEL_NAME="runwayml/stable-diffusion-v1-5"
+export INSTANCE_DIR="./cat_toy_image"
+export CLASS_DIR="./cat_toy_class_image"
+export OUTPUT_DIR="./cat_toy_dream_outputs_bs4_lr2_qat_linear_distil05"
+export INSTANCE_PROMPT="<cat-toy> toy"
+export CLASS_PROMPT="a photo of a cat clay toy"
+export TEACHER_MODEL_NAME="./cat_toy_dream_outputs_bs4_lr2/"
+
+python -u train_dreambooth.py \
+  --pretrained_model_name_or_path=$MODEL_NAME \
+  --instance_data_dir=$INSTANCE_DIR \
+  --output_dir=$OUTPUT_DIR \
+  --instance_prompt="$INSTANCE_PROMPT" \
+  --class_prompt="$CLASS_PROMPT" \
+  --class_data_dir=$CLASS_DIR \
+  --num_class_images=12 \
+  --height=512 \
+  --width=512 \
+  --train_batch_size=2 \
+  --gradient_accumulation_steps=2 \
+  --learning_rate=2e-6 \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=0 \
+  --max_train_steps=400 \
+  --qat_mode=2 \
+  --teacher_pretrained_model_name_or_path=$TEACHER_MODEL_NAME \
+  --distill_coeff 0.5
+```
+
+`qat_mode`为0则不使用QAT训练，1使用PACT，2不使用PACT。
+如设置大于0的`distill_coeff`则将使用`teacher_pretrained_model_name_or_path`提供的FP32教师模型进行蒸馏训练。`gradient_checkpointing ` 和 `gradient_accumulation_steps` 可以根据显存情况按需设置。
+训练图片数据已贴PR的comment中，在在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`目录下的是QAT导出的UNet预测模型。更多参数释义见下面解释。
+
+
 ```bash
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
 export INSTANCE_DIR="./dream_image"
