@@ -40,6 +40,7 @@ from utils import seq_convert_example  # noqa: E402
 class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
     def __init__(self):
         super().__init__()
+        self.pad_token_id = 0
 
     @staticmethod
     def add_args(args, parser):
@@ -97,11 +98,12 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         train_ds = load_dataset("clue", args.task_name, splits="train")
         num_labels = 1 if train_ds.label_list is None else len(train_ds.label_list)
         model = ErnieForSequenceClassification.from_pretrained(args.model_name_or_path, num_labels=num_labels)
+        self.pad_token_id = model.config.pad_token_id
         return model
 
     def forward(self, model, args, input_data=None, **kwargs):
         loss = model(**input_data)[0]
-        return loss, paddle.sum((input_data["input_ids"] != model.config.pad_token_id)).numpy().astype("int64").item()
+        return loss, paddle.sum((input_data["input_ids"] != self.pad_token_id)).numpy().astype("int64").item()
 
     def logger(
         self,
