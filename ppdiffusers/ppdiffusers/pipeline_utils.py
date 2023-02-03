@@ -364,7 +364,7 @@ class DiffusionPipeline(ConfigMixin):
                 f"Keyword arguments {unused_kwargs} are not expected by {pipeline_class.__name__} and will be ignored."
             )
         # import it here to avoid circular import
-        from . import ModelMixin, pipelines
+        from . import pipelines
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
@@ -436,7 +436,10 @@ class DiffusionPipeline(ConfigMixin):
                     )
 
                 load_method = getattr(class_obj, load_method_name)
-                loading_kwargs = {"from_hf_hub": from_hf_hub}
+                loading_kwargs = {
+                    "from_hf_hub": from_hf_hub,
+                    "cache_dir": cache_dir,
+                }
 
                 if issubclass(class_obj, FastDeployRuntimeModel):
                     if isinstance(runtime_options, dict):
@@ -444,10 +447,6 @@ class DiffusionPipeline(ConfigMixin):
                     else:
                         options = runtime_options
                     loading_kwargs["runtime_options"] = options
-                    loading_kwargs["cache_dir"] = cache_dir
-
-                if issubclass(class_obj, ModelMixin):
-                    loading_kwargs["cache_dir"] = cache_dir
 
                 if os.path.isdir(pretrained_model_name_or_path):
                     model_path_dir = os.path.join(pretrained_model_name_or_path, name)
