@@ -837,7 +837,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             logger.info("README.md not found, adding the default README.md")
             if not has_readme:
                 with open(os.path.join(tmp_dir, "README.md"), "w") as f:
-                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
 
             # Upload model and return
             logger.info(f"Pushing to the {repo_id}. This might take a while")
