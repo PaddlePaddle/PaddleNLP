@@ -354,8 +354,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dtype",
-        str="float32",
-        help=("Dtype of model weights."),
+        default="float32",
+        type=str,
+        help="Dtype of model weights.",
     )
     parser.add_argument("--dump_path", default=None, type=str, required=True, help="Path to the output model.")
 
@@ -363,6 +364,7 @@ if __name__ == "__main__":
 
     original_config = OmegaConf.load(args.original_config_file)
     checkpoint = torch.load(args.checkpoint_path, map_location="cpu")
+    checkpoint = checkpoint.get("state_dict", checkpoint)
     vae_config = create_vae_diffusers_config(original_config)
 
     # 1. convert vae encoder and decoder

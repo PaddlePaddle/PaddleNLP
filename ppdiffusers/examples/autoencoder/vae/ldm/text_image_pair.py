@@ -32,99 +32,21 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = 2300000000
 
-EXIT_SIGNAL_FILE = "/root/paddlejob/workspace/env_run/.temp/stop_task"
+EXIT_SIGNAL_FILE = "xxxxxxx"
 
 
 def parse_line(line, filename):
     def parse_src(filename):
-        if "ofa_laion_aes" in filename:
-            return "ofa_laion_aes"
-        elif "laion_2b_en_improve_aes" in filename:
-            return "laion_2b_en_improve_aes"
-        elif "ofa_" in filename:
-            return "ofa_alt_aesthetic"
-        if "alt_aesthetic" in filename:
-            return "alt_aesthetic"
-        elif "laion_aesthetic" in filename:
-            return "laion_aesthetic"
-        elif "cc_15m_tag_watermark_1024" in filename or "laion400m_1024" in filename:
-            return "img1024_cc15m_laion400m"
-        elif "cc_tag_watermark" in filename or "cc_12m_tag_watermark" in filename:
-            return "cc"
-        elif "alt-text2image_gen_filted_data_shuffle_watermark" in filename:
-            return "alt"
-        elif "image_search_key_201810" in filename:
-            return "click"
-        elif "laion400m" in filename:
+        if "laion400m" in filename:
             return "laion400m"
-        elif "yfcc_en_zh" in filename:
-            return "yfcc"
-        elif "vc" in filename:
-            if "box" in filename:
-                return "vc_box"
-            return "vc"
-        elif "wikiart" in filename:
-            return "wikiart"
-        elif "sac" in filename:
-            return "sac"
-        elif "ava" in filename:
-            return "ava"
-        elif "open_images" in filename:
-            return "open_images"
-        elif "aahq" in filename:
-            return "aahq"
-        elif "artstation" in filename:
-            return "artstation"
-        elif "tusou_new" in filename:
-            return "tusou_new"
         else:
             raise NotImplementedError(f"Unkown data source, {filename}")
 
     try:
         vec = line.strip().split("\t")
         data_source = parse_src(filename)
-        if data_source == "ofa_laion_aes":
-            caption, img_b64 = vec[10], vec[12]
-        elif data_source == "laion_2b_en_improve_aes":
-            _, caption, _, img_b64 = vec[-4:]
-        elif data_source == "ofa_alt_aesthetic":
-            caption, img_b64 = vec[1], vec[4]
-        elif data_source == "alt_aesthetic":
-            caption, img_b64 = vec[1], vec[4]
-        elif data_source == "laion_aesthetic":
-            caption, img_b64 = vec[10], vec[12]
-        elif data_source == "cc":
-            caption, _, _, _, img_b64 = vec[:5]
-            caption = caption.replace("<mark>", "")
-        elif data_source == "alt":
-            img_b64, caption = vec[:2]
-        elif data_source == "laion400m":
+        if data_source == "laion400m":
             _, caption, _, img_b64 = vec[:4]
-            # caption, _, img_b64 = vec[:3]
-        elif data_source == "yfcc":
-            caption, _, _, _, img_b64 = vec[:5]
-        elif data_source == "img1024_cc15m_laion400m":
-            caption, _, _, _, img_b64 = vec[:5]
-        elif data_source == "vc":
-            _, _, _, img_b64, _, _, caption = vec[:7]
-        elif data_source == "vc_box":
-            _, _, _, img_b64, _, _, caption = vec[:7]
-        elif data_source == "wikiart":
-            img_b64, caption = vec[5], vec[7]
-        elif data_source == "sac":
-            _, _, _, _, img_b64, caption = vec[:6]
-        elif data_source == "ava":
-            img_b64, caption = vec[18], vec[19]
-        elif data_source == "open_images":
-            _, img_b64, _, _, caption = vec[:5]
-        elif data_source == "aahq":
-            img_b64 = vec[1]
-            caption = vec[3]
-        elif data_source == "artstation":
-            img_b64 = vec[3]
-            caption = vec[7]
-        elif data_source == "tusou_new":
-            _, img_b64, caption = vec[:3]
         else:
             _, captions, _, _, _, img_b64 = vec[:6]
             caption = random.sample(captions.split("|"), 1)[0].replace("\1", "")
