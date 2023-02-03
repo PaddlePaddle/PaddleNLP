@@ -15,9 +15,12 @@
 # limitations under the License.
 
 import math
+
 import paddle
 from paddle import nn
+
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 
 __all__ = [
     "SqueezeBertModel",
@@ -25,8 +28,6 @@ __all__ = [
     "SqueezeBertForTokenClassification",
     "SqueezeBertForQuestionAnswering",
 ]
-
-ACT2FN = {"gelu": nn.GELU()}
 
 
 def _convert_attention_mask(attention_mask, inputs):
