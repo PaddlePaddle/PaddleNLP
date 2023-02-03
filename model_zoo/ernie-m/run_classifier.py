@@ -74,6 +74,10 @@ class ModelArguments:
         default="./best_models",
         metadata={"help": "Path to directory to store the exported inference model."},
     )
+    use_test_data: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use a tiny dataset for CI test."}
+    )
+    test_data_path: Optional[str] = field(default=None, metadata={"help": "Path to tiny dataset."})
 
 
 def set_seed(seed):
@@ -100,6 +104,21 @@ def convert_example(example, tokenizer, max_seq_length=256):
         return_token_type_ids=False,
     )
     return tokenized_example
+
+
+def load_xnli_dataset(args, path, lang, split=None):
+    """load dataset for specificed language"""
+    if args.use_test_data:
+        if args.test_data_path is None:
+            raise ValueError("Should specified `test_data_path` for test datasets when `use_test_data` is True.")
+        data_files = {
+            "train": args.test_data_path,
+            "validation": args.test_data_path,
+            "test": args.test_data_path,
+        }
+        return load_dataset("json", data_files=data_files, split=split)
+    else:
+        return load_dataset(path, lang, split=split)
 
 
 class XnliDataset(Dataset):
@@ -159,12 +178,12 @@ def do_train():
     def collect_all_languages_dataset(split):
         all_ds = []
         for language in all_languages:
-            ds = load_dataset("xnli", language, split=split)
+            ds = load_xnli_dataset(model_args, "xnli", language, split=split)
             all_ds.append(ds.map(trans_func, batched=True, remove_columns=remove_columns))
         return XnliDataset(all_ds)
 
     if model_args.task_type == "cross-lingual-transfer":
-        raw_datasets = load_dataset("xnli", "en")
+        raw_datasets = load_xnli_dataset(model_args, "xnli", "en")
         if training_args.do_train:
             train_ds = raw_datasets["train"].map(trans_func, batched=True, remove_columns=remove_columns)
         if training_args.do_eval:
@@ -274,7 +293,7 @@ def do_train():
     if training_args.do_eval:
         combined = {}
         for language in all_languages:
-            eval_ds = load_dataset("xnli", language, split="validation")
+            eval_ds = load_xnli_dataset(model_args, "xnli", language, split="validation")
             eval_ds = eval_ds.map(trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=True)
             metrics = trainer.evaluate(eval_dataset=eval_ds)
             metrics = {k + f"_{language}": v for k, v in metrics.items()}

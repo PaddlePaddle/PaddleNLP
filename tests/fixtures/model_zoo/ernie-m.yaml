@@ -3,6 +3,8 @@ classifier:
     do_train: True
     do_eval: True
     do_export: True
+    use_test_data: True
+    test_data_path: tests/fixtures/tests_samples/xnli/xnli.jsonl
     task_type: cross-lingual-transfer
     model_name_or_path: __internal_testing__/ernie-m
     output_dir: ./output_dir
