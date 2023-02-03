@@ -368,7 +368,6 @@ class DiffusionPipeline(ConfigMixin):
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
-            print(name, (library_name, class_name))
             # TODO (junnyu) support old model_index.json
             if library_name == "diffusers_paddle":
                 library_name = "ppdiffusers"
