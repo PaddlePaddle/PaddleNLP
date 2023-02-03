@@ -9,10 +9,8 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-# 安装cuda11.2, python 3.7, develop版本的paddle, commit号为b96a21df4e7a42b2445104426e2be407534705e6.
-wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-# 注意，当前该部分的训练需要使用最新版的paddlenlp和ppdiffusers，即 ppdiffusers>=0.11.0，paddlenlp>=2.5.0。
+# paddlepaddle-gpu>=2.4.1
+python -m pip install paddlepaddle-gpu==2.4.1.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
 pip install -r requirements.txt
 ```
 
