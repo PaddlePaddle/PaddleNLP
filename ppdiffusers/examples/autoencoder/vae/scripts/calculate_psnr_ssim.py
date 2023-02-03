@@ -14,11 +14,11 @@
 
 import glob
 
+import click
 import cv2
 import numpy as np
-import click
-from tqdm import tqdm
 from PIL import Image
+from tqdm import tqdm
 
 
 def reorder_image(img, input_order="HWC"):
@@ -180,6 +180,7 @@ def main(imgs1, imgs2):
 
     psnr = np.mean(psnr_all)
     ssim = np.mean(ssim_all)
+
     print(f"PSNR: {psnr}")
     print(f"SSIM: {ssim}")
 

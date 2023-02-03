@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import glob
+import os
 import os.path as osp
 
-import paddle
 import click
-from tqdm import tqdm
-from PIL import Image
+import paddle
 from paddle.vision import transforms
+from PIL import Image
+from tqdm import tqdm
 
 from ppdiffusers import AutoencoderKL, StableDiffusionImg2ImgPipeline
-
 
 image_processing = transforms.Compose(
     [
@@ -54,6 +53,7 @@ def main(vae_path, src_size, tgt_size, imgs, outdir):
         for img_path in tqdm(imgs):
             img = Image.open(img_path).convert("RGB")
             w, h = img.size
+
             assert w == tgt_size and h == tgt_size
             img = img.resize([src_size, src_size])
 
