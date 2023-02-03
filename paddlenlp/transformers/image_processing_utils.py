@@ -24,16 +24,19 @@ import numpy as np
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
+    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
 from huggingface_hub.utils import EntryNotFoundError
 
+from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.env import MODEL_HOME
 from ..utils.log import logger
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
+from .utils import resolve_cache_dir
 
 IMAGE_PROCESSOR_NAME = "preprocessor_config.json"
 
@@ -251,11 +254,17 @@ class ImageProcessingMixin(object):
         Parameters:
             pretrained_model_name_or_path (`str` or `os.PathLike`):
                 The identifier of the pre-trained checkpoint from which we want the dictionary of parameters.
+            from_hf_hub (bool, optional): whether to load from Huggingface Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+
 
         Returns:
             `Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the image processor object.
         """
         cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        subfolder = kwargs.pop("subfolder", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
@@ -264,6 +273,16 @@ class ImageProcessingMixin(object):
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_image_processor_file = pretrained_model_name_or_path
             is_local = True
+        elif from_hf_hub:
+            image_processor_file = IMAGE_PROCESSOR_NAME
+            resolved_image_processor_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=image_processor_file,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PaddleNLP",
+                library_version=__version__,
+            )
         else:
             # Assuming from community-contributed pretrained models
             image_processor_file = COMMUNITY_MODEL_PREFIX + pretrained_model_name_or_path + "/" + IMAGE_PROCESSOR_NAME
