@@ -39,7 +39,7 @@ class BertForQuestionAnsweringBenchmark(BenchmarkBase):
         )
 
     def generate_inputs_for_model(self, args, model, **kwargs):
-        input_ids = rand_int_tensor(0, model.config.vocab_size, [args.batch_size, args.max_seq_len])
+        input_ids = rand_int_tensor(1, model.config.vocab_size, [args.batch_size, args.max_seq_len])
         start_positions = rand_int_tensor(
             0,
             args.max_seq_len,
