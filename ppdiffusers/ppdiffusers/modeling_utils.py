@@ -230,6 +230,7 @@ class ModelMixin(nn.Layer):
         output_loading_info = kwargs.pop("output_loading_info", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         subfolder = kwargs.pop("subfolder", None)
+        ignore_keys = kwargs.pop("ignore_keys", [])
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
@@ -253,6 +254,13 @@ class ModelMixin(nn.Layer):
         model = cls.from_config(config, **unused_kwargs)
 
         state_dict = load_dict(model_file, map_location="cpu")
+
+        keys = list(state_dict.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    logger.warning("Deleting key {} from state_dict.".format(k))
+                    del state_dict[k]
 
         dtype = set(v.dtype for v in state_dict.values())
 
