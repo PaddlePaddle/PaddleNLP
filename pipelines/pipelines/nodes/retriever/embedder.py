@@ -83,7 +83,7 @@ class MultiModalEmbedder:
 
         self.models = {}  # replace str with ContentTypes starting from Python3.8
         for content_type, embedding_model in embedding_models.items():
-            self.models[content_type] = Taskflow("image_text_retrieval")
+            self.models[content_type] = Taskflow("image_text_retrieval", model=embedding_model)
 
         # Check embedding sizes for models: they must all match
         if len(self.models) > 1:
