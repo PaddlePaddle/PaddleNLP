@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import paddle
+import paddle.distributed as dist
 
 from paddlenlp.transformers import GPTForSequenceClassification
 from paddlenlp.utils.log import logger
@@ -44,7 +45,7 @@ class GPTForSequenceClassificationBenchmark(BenchmarkBase):
         return [input_ids, None, None, None, labels]
 
     def generate_inputs_for_model(self, args, model, **kwargs):
-        input_ids = rand_int_tensor(0, model.config.vocab_size, [args.batch_size, args.max_seq_len])
+        input_ids = rand_int_tensor(1, model.config.vocab_size, [args.batch_size, args.max_seq_len])
         labels = rand_int_tensor(0, model.config.num_classes - 1, [args.batch_size])
 
         return {"input_ids": input_ids, "labels": labels}
@@ -55,9 +56,13 @@ class GPTForSequenceClassificationBenchmark(BenchmarkBase):
 
     def forward(self, model, args, input_data=None, **kwargs):
         res = model(**input_data)
+        if dist.get_world_size() == 1:
+            pad_token_id = model.config.pad_token_id
+        else:
+            pad_token_id = model._layers.config.pad_token_id
         return (
             res[0],
-            paddle.sum((input_data["input_ids"] != model.config.pad_token_id)).numpy().astype("int64").item(),
+            paddle.sum((input_data["input_ids"] != pad_token_id)).numpy().astype("int64").item(),
         )
 
     def logger(

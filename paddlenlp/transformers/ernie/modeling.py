@@ -271,7 +271,7 @@ class ErnieModel(ErniePretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
-             inputs_embeds (Tensor, optional):
+            inputs_embeds (Tensor, optional):
                 If you want to control how to convert `inputs_ids` indices into associated vectors, you can
                 pass an embedded representation directly instead of passing `inputs_ids`.
             past_key_values (tuple(tuple(Tensor)), optional):
@@ -1170,7 +1170,8 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
 
         """
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        if input_ids is not None:
+            input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if position_ids is not None:
             position_ids = position_ids.reshape(shape=(-1, position_ids.shape[-1]))
@@ -1222,7 +1223,7 @@ class UIE(ErniePretrainedModel):
     designed for Universal Information Extraction.
     Args:
         config (:class:`ErnieConfig`):
-            An instance of ErnieConfig used to construct ErnieForMultipleChoice
+            An instance of ErnieConfig used to construct UIE
     """
 
     def __init__(self, config: ErnieConfig):
@@ -1233,7 +1234,14 @@ class UIE(ErniePretrainedModel):
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -1259,6 +1267,7 @@ class UIE(ErniePretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
         )
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)

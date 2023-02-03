@@ -16,7 +16,6 @@ import json
 import os
 import os.path as osp
 import shutil
-import sys
 import tarfile
 import threading
 import time
@@ -26,36 +25,12 @@ from collections import OrderedDict
 from typing import Optional, Union
 
 import requests
+from filelock import FileLock
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
+from tqdm.auto import tqdm
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
-from .file_lock import FileLock
-
-try:
-    from tqdm import tqdm
-except:  # noqa: E722
-
-    class tqdm(object):
-        def __init__(self, total=None, **kwargs):
-            self.total = total
-            self.n = 0
-
-        def update(self, n):
-            self.n += n
-            if self.total is None:
-                sys.stderr.write("\r{0:.1f} bytes".format(self.n))
-            else:
-                sys.stderr.write("\r{0:.1f}%".format(100 * self.n / float(self.total)))
-            sys.stderr.flush()
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            sys.stderr.write("\n")
-
-
 from .log import logger
 
 __all__ = ["get_weights_path_from_url"]
