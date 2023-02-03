@@ -442,7 +442,9 @@ def url_file_exists(url: str) -> bool:
     return result.status_code == requests.codes.ok
 
 
-def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = None) -> bool:
+def hf_file_exists(
+    repo_id: str, filename: str, token: Union[bool, str, None] = None, subfolder: Optional[str] = None
+) -> bool:
     """Check whether the HF file exists
 
     Args:
@@ -452,11 +454,12 @@ def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = 
             - If `True`, the token is read from the HuggingFace config folder.
             - If `False` or `None`, no token is provided.
             - If a string, it's used as the authentication token.
+        subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     Returns:
         bool: whether the HF file exists
     """
 
-    url = hf_hub_url(repo_id, filename)
+    url = hf_hub_url(repo_id=repo_id, filename=filename, subfolder=subfolder)
     try:
         _ = get_hf_file_metadata(
             url=url,
