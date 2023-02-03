@@ -60,7 +60,7 @@ __all__ = [
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self, config):
+    def __init__(self, config: ElectraConfig):
         super(ElectraEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
@@ -103,7 +103,7 @@ class ElectraDiscriminatorPredictions(nn.Layer):
     """Prediction layer for the discriminator, made up of two dense layers."""
 
     def __init__(self, config: ElectraConfig):
-        super(ElectraDiscriminatorPredictions, self).__init__(config)
+        super(ElectraDiscriminatorPredictions, self).__init__()
 
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dense_prediction = nn.Linear(config.hidden_size, 1)
@@ -121,7 +121,7 @@ class ElectraGeneratorPredictions(nn.Layer):
     """Prediction layer for the generator, made up of two dense layers."""
 
     def __init__(self, config: ElectraConfig):
-        super(ElectraGeneratorPredictions, self).__init__(config)
+        super(ElectraGeneratorPredictions, self).__init__()
 
         self.layer_norm = nn.LayerNorm(config.embedding_size)
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
@@ -619,11 +619,11 @@ class ElectraClassificationHead(nn.Layer):
     """
 
     def __init__(self, config: ElectraConfig):
-        super(ElectraClassificationHead, self).__init__(config)
+        super(ElectraClassificationHead, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.out_proj = nn.Linear(config.hidden_size, config.num_classes)
-        self.act = get_activation(config.activation)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, features, **kwargs):
         r"""
@@ -1099,10 +1099,10 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 class ElectraPooler(nn.Layer):
     def __init__(self, config: ElectraConfig):
-        super(ElectraPooler, self).__init__(config)
+        super(ElectraPooler, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.activation = get_activation(config.pool_act)
-        self.pool_act = config.pool_act
+        self.activation = get_activation(config.hidden_act)
+        self.pool_act = config.hidden_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -1385,7 +1385,7 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
     """
 
     def __init__(self, config: ElectraConfig):
-        super(ElectraPretrainingCriterion, self).__init__(config)
+        super(ElectraPretrainingCriterion, self).__init__()
 
         self.vocab_size = config.vocab_size
         self.gen_weight = config.gen_weight
@@ -1471,7 +1471,7 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
     """
 
     def __init__(self, config: ElectraConfig):
-        super(ErnieHealthPretrainingCriterion, self).__init__(config)
+        super(ErnieHealthPretrainingCriterion, self).__init__()
 
         self.vocab_size = config.vocab_size
         self.gen_weight = config.gen_weight
