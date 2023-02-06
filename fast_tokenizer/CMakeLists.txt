@@ -186,7 +186,7 @@ add_custom_target(copy_third_party_headers ALL
     ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR} ${DART_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
     ${CPP_PACKAGE_DIR}/third_party/include
-    DEPENDS build_cpp_package_dir)
+    DEPENDS build_cpp_package_dir)    
 
 # copy library
 set(TOKENIZER_CORE_NAME "core_tokenizers")
@@ -203,6 +203,12 @@ elseif(APPLE)
     add_custom_target(copy_shared_library ALL
         COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
         DEPENDS build_cpp_package_dir core_tokenizers)
+elseif(ANDROID)
+        set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
+        add_custom_target(copy_shared_library ALL
+            COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+            COMMAND ${CMAKE_STRIP} --strip-all ${CPP_PACKAGE_DIR}/lib/lib${TOKENIZER_CORE_NAME}.so
+            DEPENDS build_cpp_package_dir core_tokenizers)        
 else()
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
     add_custom_target(copy_shared_library ALL
