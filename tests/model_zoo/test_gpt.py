@@ -17,6 +17,7 @@ import os
 import sys
 from unittest import TestCase
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
@@ -30,9 +31,19 @@ class GPTTest(TestCase):
         sys.path.remove(self.path)
 
     def test_pretrain(self):
-
         # 1. run pretrain
         pretrain_config = load_test_config(self.config_path, "pretrain")
+
+        # download corpus to
+        get_path_from_url_with_filelock(
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy",
+            pretrain_config["input_dir"],
+        )
+        get_path_from_url_with_filelock(
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz",
+            pretrain_config["input_dir"],
+        )
+
         with argv_context_guard(pretrain_config):
             from run_pretrain import do_train
 
