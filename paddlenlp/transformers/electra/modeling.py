@@ -13,23 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
-from dataclasses import dataclass
+from typing import Optional
+
 import paddle
-from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import TransformerEncoderLayer, TransformerEncoder
-from paddle.nn.layer.transformer import _convert_attention_mask
+from paddle import Tensor
+from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
 from .. import PretrainedModel, register_base_model
+from ..activations import get_activation
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
     tuple_output,
 )
 
@@ -51,36 +50,6 @@ __all__ = [
     "ErnieHealthPretrainingCriterion",
     "ErnieHealthDiscriminator",
 ]
-
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
 
 
 class ElectraEmbeddings(nn.Layer):

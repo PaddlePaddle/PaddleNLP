@@ -20,16 +20,19 @@ from typing import Callable, Optional, Union
 
 import paddle
 import paddle.nn as nn
+from huggingface_hub import hf_hub_download
 from requests import HTTPError
 
 from .download_utils import ppdiffusers_bos_download
 from .utils import (
     CONFIG_NAME,
     DOWNLOAD_SERVER,
+    HF_CACHE,
     PPDIFFUSERS_CACHE,
     WEIGHTS_NAME,
     logging,
 )
+from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
 
@@ -223,13 +226,19 @@ class ModelMixin(nn.Layer):
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
-
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
         """
-        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        if from_hf_hub:
+            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
+        else:
+            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         output_loading_info = kwargs.pop("output_loading_info", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         subfolder = kwargs.pop("subfolder", None)
+        ignore_keys = kwargs.pop("ignore_keys", [])
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
@@ -241,6 +250,7 @@ class ModelMixin(nn.Layer):
                 weights_name=WEIGHTS_NAME,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
+                from_hf_hub=from_hf_hub,
             )
 
         config, unused_kwargs = cls.load_config(
@@ -248,11 +258,19 @@ class ModelMixin(nn.Layer):
             cache_dir=cache_dir,
             return_unused_kwargs=True,
             subfolder=subfolder,
+            from_hf_hub=from_hf_hub,
             **kwargs,
         )
         model = cls.from_config(config, **unused_kwargs)
 
         state_dict = load_dict(model_file, map_location="cpu")
+
+        keys = list(state_dict.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    logger.warning("Deleting key {} from state_dict.".format(k))
+                    del state_dict[k]
 
         dtype = set(v.dtype for v in state_dict.values())
 
@@ -308,6 +326,7 @@ class ModelMixin(nn.Layer):
         weights_name,
         subfolder,
         cache_dir,
+        from_hf_hub,
     ):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
@@ -322,6 +341,16 @@ class ModelMixin(nn.Layer):
                 raise EnvironmentError(
                     f"Error no file named {weights_name} found in directory {pretrained_model_name_or_path}."
                 )
+            return model_file
+        elif from_hf_hub:
+            model_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=WEIGHTS_NAME,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PPDiffusers",
+                library_version=__version__,
+            )
             return model_file
         else:
             try:

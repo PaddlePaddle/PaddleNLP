@@ -13,21 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .. import register_base_model
-import math
-from dataclasses import dataclass
-from dataclasses import fields
-from collections import OrderedDict
-import numpy as np
-from paddle import nn
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss, LayerNorm
-from .. import PretrainedModel as PreTrainedModel
-import paddle
-import os
-import json
 import copy
+import json
 import logging
+import os
+from collections import OrderedDict
 from collections.abc import Iterable
+from dataclasses import dataclass, fields
+
+import numpy as np
+import paddle
+from paddle import nn
+from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
+
+from .. import PretrainedModel as PreTrainedModel
+from .. import register_base_model
+from ..activations import ACT2FN
 
 FUNNEL_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "funnel-transformer/small",  # B4-4-4H768
@@ -472,12 +473,7 @@ class PretrainedConfig(dict):
 
         """
         cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        use_auth_token = kwargs.pop("use_auth_token", None)
         local_files_only = kwargs.pop("local_files_only", False)
-        revision = kwargs.pop("revision", None)
         from_pipeline = kwargs.pop("_from_pipeline", None)
         from_auto_class = kwargs.pop("_from_auto", False)
 
@@ -849,7 +845,7 @@ class FunnelConfig(PretrainedConfig):
         self.truncate_seq = truncate_seq
         self.pool_q_only = pool_q_only
 
-        self.items()  ##strange way to initialize the dict
+        self.items()  # strange way to initialize the dict
 
     @property
     def hidden_size(self):
@@ -871,7 +867,7 @@ class FunnelConfig(PretrainedConfig):
 def expand(self, *sizes):
     if isinstance(sizes[0], Iterable):
         sizes = sizes[0]
-    ##handle -1 case
+    # handle -1 case
     if len(sizes) > len(self.shape):
         for _ in range(len(sizes) - len(self.shape)):
             self = self.unsqueeze(axis=0)
@@ -946,71 +942,6 @@ def constant_(x, val):
     temp_value = paddle.full_like(x, fill_value=val)
     x.set_value(temp_value)
     return x
-
-
-def _gelu_python(x):
-    """
-    Original Implementation of the GELU activation function in Google BERT repo when initially created. For
-    information: OpenAI GPT's GELU is slightly different (and gives slightly different results): 0.5 * x * (1 +
-    paddle.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * paddle.pow(x, 3)))) This is now written in C in nn.functional
-    Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return x * 0.5 * (1.0 + paddle.erf(x / math.sqrt(2.0)))
-
-
-def gelu_new(x):
-    """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
-
-
-gelu = nn.functional.gelu
-
-
-def gelu_fast(x):
-    return 0.5 * x * (1.0 + paddle.tanh(x * 0.7978845608 * (1.0 + 0.044715 * x * x)))
-
-
-def quick_gelu(x):
-    return x * paddle.sigmoid(1.702 * x)
-
-
-silu = nn.functional.silu
-
-
-def _mish_python(x):
-    """
-    See Mish: A Self-Regularized Non-Monotonic Activation Function (Misra., https://arxiv.org/abs/1908.08681). Also
-    visit the official repository for the paper: https://github.com/digantamisra98/Mish
-    """
-    return x * paddle.tanh(nn.functional.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-ACT2FN = {
-    "relu": nn.functional.relu,
-    "silu": silu,
-    "swish": silu,
-    "gelu": gelu,
-    "tanh": paddle.tanh,
-    "gelu_new": gelu_new,
-    "gelu_fast": gelu_fast,
-    "quick_gelu": quick_gelu,
-    "linear": linear_act,
-    "sigmoid": paddle.nn.functional.sigmoid,
-}
-
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError(f"function {activation_string} not found in ACT2FN mapping {list(ACT2FN.keys())}")
 
 
 class FunnelEmbeddings(nn.Layer):
@@ -1209,12 +1140,7 @@ class FunnelAttentionStructure(nn.Layer):
         # Deal with negative axis
         axis %= tensor.ndim
 
-        axis_slice = (
-            slice(None, -1, 2) if self.config2.separate_cls and self.config2.truncate_seq else slice(None, None, 2)
-        )
-        enc_slice = [slice(None)] * axis + [axis_slice]
         if self.config2.separate_cls:
-            cls_slice = [slice(None)] * axis + [slice(None, 1)]
             # tensor = paddle.cat([tensor[cls_slice], tensor], axis=axis)
             if axis == 1:
                 tensor = paddle.concat([tensor[:, :1], tensor], axis=axis)
