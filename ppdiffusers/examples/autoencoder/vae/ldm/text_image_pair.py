@@ -1,3 +1,6 @@
+# !/usr/bin/env python3
+# -*- coding: UTF-8 -*-
+
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +18,9 @@
 import base64
 import gzip
 import io
+import os
 import random
+import traceback
 
 import numpy as np
 import paddle
@@ -26,6 +31,8 @@ from paddle.vision.transforms.transforms import _get_image_size
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = 2300000000
+
+EXIT_SIGNAL_FILE = "xxxxxxx"
 
 
 def parse_line(line, filename):
@@ -39,18 +46,18 @@ def parse_line(line, filename):
         vec = line.strip().split("\t")
         data_source = parse_src(filename)
         if data_source == "laion400m":
-            caption, _, img_b64 = vec[:3]
+            _, caption, _, img_b64 = vec[:4]
         else:
             _, captions, _, _, _, img_b64 = vec[:6]
             caption = random.sample(captions.split("|"), 1)[0].replace("\1", "")
 
         image = Image.open(io.BytesIO(base64.b64decode(img_b64))).convert("RGB")
-        if random.random() < 0.1:
+        if random.random() < 0.075:
             caption = ""
         return dict(image=image, caption=caption)
     except Exception:
         print(f"error when parse file {filename}")
-        # traceback.print_exc()
+        traceback.print_exc()
         return None
 
 
@@ -77,7 +84,6 @@ class TextImagePair(IterableDataset):
         buffer_size=1000,
         shuffle_every_n_samples=5,
         interpolation="lanczos",
-        tokenizer=None,
     ):
         self.size = size
         if image_processing is None:
@@ -91,13 +97,6 @@ class TextImagePair(IterableDataset):
             )
         else:
             self.image_processing = image_processing
-        self.text_processing = lambda caption: tokenizer(
-            caption,
-            padding="max_length",
-            truncation=True,
-            max_length=tokenizer.model_max_length,
-            return_tensors="pd",
-        ).input_ids[0]
         self.file_list = []
         file_weights = []
         with open(file_list, "r") as f:
@@ -159,10 +158,8 @@ class TextImagePair(IterableDataset):
                             w, h = data["image"].size
                             if w < self.size or h < self.size:
                                 continue
-                            yield {
-                                "pixel_values": self.image_processing(data["image"]),
-                                "input_ids": self.text_processing(data["caption"]),
-                            }
+                            data["image"] = self.image_processing(data["image"])
+                            yield data
 
     def random_load_from_multi_dataset(self):
         print(f"lengths of self.file_ids in random_load: {[len(f) for f in self.file_ids]}")
@@ -184,6 +181,9 @@ class TextImagePair(IterableDataset):
             yield next(sample_loader)
 
     def shuffle(self, iterator):
+        if os.path.exists(EXIT_SIGNAL_FILE):
+            print("Stop Task!")
+            raise NotImplementedError
         buffer_list = []
         for _ in range(self.buffer_size):
             buffer_list.append(next(iterator))
@@ -202,6 +202,23 @@ class TextImagePair(IterableDataset):
         return self.shuffle(iter(self.random_load_from_multi_dataset()))
 
 
+def split_data_per_worker(dataset, worker_id, local_rank, world_size, num_workers):
+    worker_global_id = local_rank * num_workers + worker_id
+    dataset.rng = np.random.RandomState(worker_global_id)
+    for i in range(len(dataset.file_ids)):
+        file_ids = dataset.file_ids[i]
+        num_chunks = world_size * num_workers
+        chunk_size = len(file_ids) / num_chunks
+
+        begin_id = int(worker_global_id * chunk_size)
+        end_id = int((worker_global_id + 1) * chunk_size)
+        dataset.file_ids[i] = dataset.file_ids[i][begin_id:end_id]
+        print(
+            f"dataset {i}, local_rank: {local_rank}, worker_id: {worker_id}, worker_global_id: {worker_global_id}, file_range: ({begin_id}, {end_id})"
+        )
+    return None
+
+
 def worker_init_fn(_):
     worker_info = get_worker_info()
     dataset = worker_info.dataset
@@ -210,20 +227,8 @@ def worker_init_fn(_):
     local_rank = dist.get_rank()
     world_size = dist.get_world_size()
     num_workers = worker_info.num_workers
-    worker_id = worker_info.id
-    worker_global_id = local_rank * num_workers + worker_id
-
-    dataset.rng = np.random.RandomState(worker_global_id)
-    for i in range(len(dataset.file_ids)):
-
-        file_ids = dataset.file_ids[i]
-        num_chunks = world_size * num_workers
-        chunk_size = len(file_ids) // num_chunks
-
-        begin_id = worker_global_id * chunk_size
-        end_id = (worker_global_id + 1) * chunk_size
-        dataset.file_ids[i] = dataset.file_ids[i][begin_id:end_id]
-        print(
-            f"dataset {i}, local_rank: {local_rank}, worker_id: {worker_id}, worker_global_id: {worker_global_id}, file_range: ({begin_id}, {end_id})"
-        )
-    return np.random.seed(np.random.get_state()[1][0] + worker_id)
+    if isinstance(dataset, TextImagePair):
+        split_data_per_worker(dataset, worker_id, local_rank, world_size, num_workers)
+        return np.random.seed(np.random.get_state()[1][0] + worker_id)
+    else:
+        return np.random.seed(np.random.get_state()[1][0] + worker_id)

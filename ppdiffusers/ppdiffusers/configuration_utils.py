@@ -24,10 +24,18 @@ from collections import OrderedDict
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+from huggingface_hub import hf_hub_download
 from requests import HTTPError
 
 from .download_utils import ppdiffusers_bos_download
-from .utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE, DummyObject, deprecate, logging
+from .utils import (
+    DOWNLOAD_SERVER,
+    HF_CACHE,
+    PPDIFFUSERS_CACHE,
+    DummyObject,
+    deprecate,
+    logging,
+)
 from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
@@ -251,8 +259,14 @@ class ConfigMixin:
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
         """
-        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        if from_hf_hub:
+            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
+        else:
+            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         subfolder = kwargs.pop("subfolder", None)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -277,9 +291,17 @@ class ConfigMixin:
                 raise EnvironmentError(
                     f"Error no file named {cls.config_name} found in directory {pretrained_model_name_or_path}."
                 )
+        elif from_hf_hub:
+            config_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.config_name,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PPDiffusers",
+                library_version=__version__,
+            )
         else:
             try:
-                # Load from URL or cache if already cached
                 config_file = ppdiffusers_bos_download(
                     pretrained_model_name_or_path,
                     filename=cls.config_name,
