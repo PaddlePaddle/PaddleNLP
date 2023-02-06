@@ -17,10 +17,10 @@
 
 #include "fast_tokenizer/models/model.h"
 #include "fast_tokenizer/models/wordpiece.h"
-#include "nlohmann/json.hpp"
 #include "fast_tokenizer/utils/failure.h"
 #include "fast_tokenizer/utils/trie.h"
 #include "fast_tokenizer/utils/utils.h"
+#include "nlohmann/json.hpp"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -29,13 +29,19 @@ namespace models {
 struct FASTTOKENIZER_DECL FastWordPiece : public WordPiece {
   FastWordPiece();
   FastWordPiece(const core::Vocab& vocab,
-                  const std::string& unk_token = "[UNK]",
-                  size_t max_input_chars_per_word = 100,
-                  const std::string& continuing_subword_prefix = "##",
-                  bool with_pretokenization = false);
+                const std::string& unk_token = "[UNK]",
+                size_t max_input_chars_per_word = 100,
+                const std::string& continuing_subword_prefix = "##",
+                bool with_pretokenization = false);
 
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) override;
+  static FastWordPiece GetFastWordPieceFromFile(
+      const std::string& file,
+      const std::string& unk_token = "[UNK]",
+      size_t max_input_chars_per_word = 100,
+      const std::string& continuing_subword_prefix = "##",
+      bool with_pretokenization = false);
 
 private:
   void InitFailureAndTrie();

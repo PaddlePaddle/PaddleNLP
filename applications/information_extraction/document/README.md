@@ -39,6 +39,8 @@
 
 ```shell
 .
+├── deploy            # 部署目录
+│ └── simple_serving  # 基于PaddleNLP SimpleServing 服务化部署
 ├── utils.py          # 数据处理工具
 ├── finetune.py       # 模型微调、压缩脚本
 ├── evaluate.py       # 模型评估脚本
@@ -48,7 +50,7 @@
 <a name="数据标注"></a>
 
 ### 2.2 数据标注
-我们推荐使用 [Label Studio](https://labelstud.io/) 进行文档信息抽取数据标注，本项目打通了从数据标注到训练的通道，也即Label Studio导出数据可以通过 [label_studio.py](../label_studio.py) 脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考 [Label Studio数据标注指南](../label_studio.md)。
+我们推荐使用 [Label Studio](https://labelstud.io/) 进行文档信息抽取数据标注，本项目打通了从数据标注到训练的通道，也即Label Studio导出数据可以通过 [label_studio.py](../label_studio.py) 脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考 [Label Studio数据标注指南](../label_studio_doc.md)。
 
 这里我们提供预先标注好的`增值税发票数据集`的文件，可以运行下面的命令行下载数据集，我们将展示如何使用数据转化脚本生成训练/验证/测试集文件，并使用UIE-X模型进行微调。
 

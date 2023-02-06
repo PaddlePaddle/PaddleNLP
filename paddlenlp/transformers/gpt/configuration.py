@@ -240,7 +240,18 @@ class GPTConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "gpt"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
+    attribute_map: Dict[str, str] = {
+        "num_classes": "num_labels",
+        "dropout": "classifier_dropout",
+        "n_positions": "max_position_embeddings",
+        "n_embd": "hidden_size",
+        "n_layer": "num_hidden_layers",
+        "n_head": "num_attention_heads",
+        "n_inner": "intermediate_size",
+        "activation_function": "hidden_act",
+        "resid_pdrop": "attention_probs_dropout_prob",
+    }
+
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

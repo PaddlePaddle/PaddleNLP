@@ -17,8 +17,9 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import tensor
 from paddle.nn import Layer
-from ..electra.modeling import get_activation
+
 from .. import PretrainedModel, register_base_model
+from ..activations import get_activation
 
 __all__ = [
     "ConvBertModel",

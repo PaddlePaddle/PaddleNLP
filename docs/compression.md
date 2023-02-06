@@ -19,9 +19,9 @@
 
 ## 模型压缩 API 功能简介
 
-PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的模型进行裁剪、量化，以缩小模型体积、减少内存占用、减少计算、提升推理速度从而减少部署难度。模型压缩 API 效果好，且简洁易用。目前裁剪功能现在支持 DynaBERT 中的宽度自适应裁剪策略；量化现在支持静态离线量化方法（PTQ）和量化训练（QAT）：前者 PTQ 无需训练，只需少量校准数据，即可导出量化模型，后者 QAT 类似 FP32 模型的训练过程，也基本能够做到精度无损。
+PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的模型进行裁剪、量化，以缩小模型体积、减少内存占用、减少计算、提升推理速度从而减少部署难度。模型压缩 API 效果好，且简洁易用。目前裁剪功能现在支持 DynaBERT 中的宽度自适应裁剪策略；量化现在支持静态离线量化方法（PTQ）、量化训练（QAT）和 Embedding 量化。PTQ 无需训练，只需少量校准数据，即可导出量化模型，QAT 类似 FP32 模型的训练过程，也基本能够做到精度无损，Embedding 量化过程较为简单，不需要训练也不需要校准数据即可完成。
 
-- **效果好**：目前已经在分类（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）、序列标注、抽取式阅读理解任务上进行过验证，基本达到精度无损。例如，对于 12L768H 结构的模型，宽度保留比例为 2/3 基本可以达到精度无损，对于 6L768H 模型，宽度保留比例 2/3 基本可以达到精度无损。裁剪后推理速度能够达到原先的 1-2 倍；6L768H 结构的模型量化后推理速度能够达到量化前的 2-3 倍。
+- **效果好**：目前已经在分类（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）、序列标注、抽取式阅读理解任务上进行过验证，基本达到精度无损。例如，对于 12L768H 和 6L768H 结构的模型，进行宽度保留比例为 2/3 的裁剪基本可以达到精度无损，模型裁剪后推理速度能够达到原先的 1-2 倍；6L768H 结构的模型量化后推理速度能够达到量化前的 2-3 倍。
 
 - **简洁易用**：只需要简单几步即可开展模型压缩任务
 
@@ -96,9 +96,9 @@ python compress_qa.py \
 
 ### 环境依赖
 
-- paddlepaddle-gpu >=2.3
-- paddlenlp >= 2.4.0
-- paddleslim >= 2.3.0
+- paddlepaddle-gpu >=2.4.1
+- paddlenlp >= 2.5
+- paddleslim >= 2.4.0
 
 模型压缩 API 中的压缩功能依赖最新的 `paddleslim` 包。可运行以下命令安装：
 
@@ -323,12 +323,14 @@ python compress.py \
 
 公共参数中的参数和具体的压缩策略无关。
 
-- **--strategy** 模型压缩策略，目前支持 `'dynabert+ptq'`、 `'dynabert'` 、 `'ptq'` 和 `'qat'`。
-其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'ptq'` 表示静态离线量化， `'dynabert+ptq'` 代表先裁剪后量化。`qat` 表示量化训练。默认是 `'dynabert+ptq'`；
+- **--strategy** 模型压缩策略，目前支持 `'dynabert+qat+embeddings'`、`'dynabert+qat'`、`'dynabert+embeddings'`、`'dynabert+ptq'`、 `'dynabert'` 、 `'ptq'` 和 `'qat'`。
+其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'qat'` 表示量化训练，`'ptq'` 表示静态离线量化，`'embeddings'` 表示词表量化，并且 `--strategy` 支持选择它们之间所有合理的策略组合。默认是 `'dynabert+ptq'`；
 
 - **--output_dir** 模型压缩后模型保存目录；
 
 - **--input_infer_model_path** 待压缩的静态图模型，该参数是为了支持对静态图模型的压缩。不需使用时可忽略。默认为 `None`；
+
+- **--input_dtype** 导出模型的输入类型，一般是 `int64` 或者是 `int32`。默认为 `int64`；
 
 **DynaBERT 裁剪参数**
 
@@ -374,6 +376,9 @@ python compress.py \
 
 - **--remove_unused_columns** 是否去除 Dataset 中不用的字段数据。默认是 True；
 
+**量化公共参数**
+
+
 **PTQ 量化参数**
 
 当用户使用了 PTQ 量化策略时需要传入以下可选参数：
@@ -414,26 +419,17 @@ python compress.py \
 
 ### Python 部署
 
-服务端部署可以从这里开始。可以利用 [预测 backend 脚本](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-3.0/deploy/python/ernie_predictor.py)，并参考 [infer_cpu.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-3.0/deploy/python/infer_cpu.py) 或者 [infer_gpu.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-3.0/deploy/python/infer_gpu.py) 来编写自己的预测脚本。并根据 [Python 部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0/deploy/python) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
+服务端部署可以从这里开始。可以利用 [预测 backend 脚本](../model_zoo/ernie-3.0/deploy/predictor/ernie_predictor.py)，并参考 [infer_cpu.py](../model_zoo/ernie-3.0/deploy/predictor/infer_cpu.py) 或者 [infer_gpu.py](../model_zoo/ernie-3.0/deploy/predictor/infer_gpu.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/predictor) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
 
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
-- [Triton Inference Server 服务化部署指南](../model_zoo/ernie-3.0/deploy/triton/README.md)
-- [Paddle Serving 服务化部署指南](../model_zoo/ernie-3.0/deploy/serving/README.md)
+- [基于Triton Inference Server的服务化部署](../model_zoo/ernie-3.0/deploy/triton_serving/README.md)
+- [基于PaddleNLP SimpleServing 的服务化部署](../model_zoo/ernie-3.0/deploy/simple_serving/README.md)
 
-<a name="Paddle2ONNX部署"></a>
-
-### Paddle2ONNX 部署
-
-ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署指南](../model_zoo/ernie-3.0/deploy/paddle2onnx/README.md)
-
-
-### Paddle Lite 移动端部署
-
-即将支持，敬请期待
+### 移动端部署
 
 
 <a name="FAQ"></a>

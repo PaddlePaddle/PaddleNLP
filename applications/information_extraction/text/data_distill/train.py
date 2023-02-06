@@ -146,7 +146,7 @@ def do_train():
 
                 f1 = eval_result[criteria_map[args.task_type]]
                 if f1 > best_f1:
-                    logger.info(f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}")
+                    logger.info(f"best F1 performance has been updated: {best_f1:.5f} --> {f1:.5f}")
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
                     if not os.path.exists(save_dir):

@@ -14,6 +14,7 @@
 
 import copy
 import inspect
+import json
 import math
 import os
 import time
@@ -67,7 +68,11 @@ def compress(self, custom_evaluate=None):
             assert (
                 self.custom_evaluate is not None
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
-        _dynabert(self, self.model, args.output_dir)
+        model = copy.deepcopy(self.model)
+        self.original_model = model
+        _dynabert(self, self.model)
+
+        del self.original_model
         if "ptq" in args.strategy or "qat" in args.strategy:
             output_dir_list = []
             for width_mult in args.width_mult_list:
@@ -101,7 +106,7 @@ def compress(self, custom_evaluate=None):
             # exports model and then do 'ptq'
             # Prefix of `export_model` is 'model'
             self.args.input_filename_prefix = "model"
-            input_spec = generate_input_spec(self.model, self.train_dataset)
+            input_spec = generate_input_spec(self.model, self.train_dataset, self.args.input_dtype)
             input_dir = args.output_dir
             export_model(model=self.model, input_spec=input_spec, path=input_dir)
             output_dir_list = self.quant(input_dir, "ptq")
@@ -128,17 +133,17 @@ def quant(self, model_dir, strategy):
         _quant_embeddings(self, model_dir)
 
 
-def generate_input_spec(model, dataset):
+def generate_input_spec(model, dataset, input_dtype="int64"):
     model_para_keys = inspect.signature(model.forward).parameters.keys()
     input_num = 0
     for key in dataset[0].keys():
         if key in model_para_keys and key not in ("labels", "start_positions", "end_positions"):
             input_num += 1
-    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64") for i in range(input_num)]
+    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype=input_dtype) for i in range(input_num)]
     return input_spec
 
 
-def _dynabert(self, model, output_dir):
+def _dynabert(self, model):
     args = self.args
     model = _replace_auto_model_forward(model)
     if args.width_mult_list is None:
@@ -298,6 +303,7 @@ def _dynabert_init(self, model, eval_dataloader):
         loss_fct=self.criterion,
         num_layers=model.base_model.config["num_hidden_layers"],
         num_heads=model.base_model.config["num_attention_heads"],
+        label_names=self.args.label_names,
     )
 
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
@@ -457,10 +463,14 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
                     logits, teacher_logits = ofa_model(batch["input_ids"], attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
                 if isinstance(logits, tuple):
-                    logit_loss = 0
+                    logit_loss, num_logit = 0, 0
                     for i in range(len(logits)):
-                        logit_loss += soft_cross_entropy(logits[i], teacher_logits[i].detach())
-                    logit_loss /= len(logits)
+                        try:
+                            logit_loss += soft_cross_entropy(logits[i], teacher_logits[i].detach())
+                            num_logit += 1
+                        except RuntimeError:
+                            pass
+                    logit_loss /= num_logit
                 else:
                     logit_loss = soft_cross_entropy(logits, teacher_logits.detach())
                 loss = rep_loss + lambda_logit * logit_loss
@@ -468,12 +478,18 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
             self.optimizer.step()
             self.lr_scheduler.step()
             self.optimizer.clear_grad()
-
             if global_step % self.args.logging_steps == 0:
                 if paddle.distributed.get_rank() == 0:
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, loss, self.args.logging_steps / (time.time() - tic_train))
+                        "global step %d, epoch: %d, batch: %d, lr: %.3e, loss: %f, speed: %.2f step/s"
+                        % (
+                            global_step,
+                            epoch,
+                            step,
+                            self.optimizer.get_lr(),
+                            loss,
+                            self.args.logging_steps / (time.time() - tic_train),
+                        )
                     )
                 tic_train = time.time()
 
@@ -580,8 +596,7 @@ def _load_parameters(dynabert_model, ori_state_dict):
 def _export_dynamic_dynabert_model(self, width_mult):
     model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
     state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
-    origin_model = self.model.__class__.from_pretrained(model_dir)
-    dynabert_model = _get_dynabert_model(origin_model, width_mult)
+    dynabert_model = _get_dynabert_model(self.original_model, width_mult)
     dynabert_model = _load_parameters(dynabert_model, state_dict)
     return dynabert_model
 
@@ -591,7 +606,7 @@ def _dynabert_export(self):
         dynabert_model = _export_dynamic_dynabert_model(self, width_mult)
         self.model = dynabert_model
         if "qat" not in self.args.strategy:
-            input_spec = generate_input_spec(self.model, self.train_dataset)
+            input_spec = generate_input_spec(self.model, self.train_dataset, self.args.input_dtype)
             pruned_infer_model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
             export_model(model=dynabert_model, input_spec=input_spec, path=pruned_infer_model_dir)
             self.args.input_filename_prefix = "model"
@@ -764,14 +779,22 @@ def _quant_aware_training_dynamic(self, input_dir):
             logits = self.model(**inputs)
             loss = self.criterion(logits, labels)
             loss.backward()
+
             self.optimizer.step()
             self.lr_scheduler.step()
             self.optimizer.clear_grad()
             if global_step % self.args.logging_steps == 0:
                 if paddle.distributed.get_rank() == 0:
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, loss, args.logging_steps / (time.time() - tic_train))
+                        "global step %d, epoch: %d, batch: %d, lr: %.3e, loss: %f, speed: %.2f step/s"
+                        % (
+                            global_step,
+                            epoch,
+                            step,
+                            self.optimizer.get_lr(),
+                            loss,
+                            args.logging_steps / (time.time() - tic_train),
+                        )
                     )
                 tic_train = time.time()
 
@@ -790,7 +813,7 @@ def _quant_aware_training_dynamic(self, input_dir):
     logger.info("Best result: %.4f" % best_acc)
     self.model.set_state_dict(paddle.load(output_param_path))
 
-    input_spec = generate_input_spec(self.model, self.train_dataset)
+    input_spec = generate_input_spec(self.model, self.train_dataset, self.args.input_dtype)
 
     quanter.save_quantized_model(
         self.model, os.path.join(input_dir, args.output_filename_prefix), input_spec=input_spec
@@ -947,7 +970,7 @@ def auto_model_forward(
         past_key_values_length = past_key_values[0][0].shape[2]
 
     if attention_mask is None:
-        attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(paddle.float32), axis=[1, 2])
+        attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(paddle.float32) * -1e4, axis=[1, 2])
         if past_key_values is not None:
             batch_size = past_key_values[0][0].shape[0]
             past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
@@ -976,6 +999,44 @@ def reset_optimizer_and_scheduler(self):
     self.optimizer, self.lr_scheduler = None, None
 
 
+def cut_embeddings(model, tokenizer, config, word_emb_index, max_seq_length, max_vocab_size, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    state_dict = model.state_dict()
+
+    word_emb_name = model.base_model_prefix + ".embeddings.word_embeddings.weight"
+    word_emb_np = state_dict[word_emb_name].numpy()
+    word_emb_np_new = [word_emb_np[idx] for idx in word_emb_index]
+
+    state_dict[word_emb_name] = paddle.to_tensor(word_emb_np_new)
+    # Rewrites Position Embedding parameters
+    pos_emb_name = model.base_model_prefix + ".embeddings.position_embeddings.weight"
+    state_dict[pos_emb_name] = state_dict[pos_emb_name][:max_seq_length, :]
+
+    paddle.save(state_dict, os.path.join(output_dir, "model_state.pdparams"))
+
+    # Rewrites config
+    config["max_position_embeddings"] = max_seq_length
+    config["vocab_size"] = max_vocab_size
+    config.save_pretrained(output_dir)
+
+    # Rewrites vocab file
+    vocab_file = os.path.join(output_dir, "vocab.txt")
+    f = open(vocab_file, "w")
+    for idx in word_emb_index:
+        f.write(tokenizer.convert_ids_to_tokens(idx) + "\n")
+    f.close()
+
+    tokenizer.init_config["model_max_length"] = max_seq_length
+    if "vocab_file" in tokenizer.init_config:
+        tokenizer.init_config.pop("vocab_file")
+    f = open(os.path.join(output_dir, tokenizer.tokenizer_config_file), "w")
+
+    f.write(json.dumps(tokenizer.init_config))
+    f.close()
+
+
 Trainer.compress = compress
 Trainer.quant = quant
 Trainer.reset_optimizer_and_scheduler = reset_optimizer_and_scheduler
+Trainer.cut_embeddings = cut_embeddings

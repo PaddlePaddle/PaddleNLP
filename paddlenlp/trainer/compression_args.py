@@ -37,16 +37,25 @@ class CompressionArguments(TrainingArguments):
     Using [`PdArgumentParser`] we can turn this class into
     [argparse](https://docs.python.org/3/library/argparse#module-argparse)
     arguments that can be specified on the command line.
-
-    Parameters:
-        strategy (`str`):
-            Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
     """
 
     do_compress: bool = field(default=False, metadata={"help": "Whether to run compression after training."})
+    input_dtype: Optional[str] = field(
+        default="int64",
+        metadata={"help": "The data type of input tensor, it could be int32 or int64. Defaults to int64."},
+    )
+    # prune embeddings
+    prune_embeddings: bool = field(default=False, metadata={"help": "Whether to prune embeddings before finetuning."})
+    onnx_format: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether to export onnx format quantized model, and it defaults to True."},
+    )
     strategy: Optional[str] = field(
         default="dynabert+ptq",
-        metadata={"help": "Compression strategy. It supports 'dynabert+ptq', 'dynabert', 'ptq' and 'qat' now."},
+        metadata={
+            "help": "Compression strategy. It supports 'dynabert+qat+embeddings',"
+            "'dynabert+qat', 'dynabert+ptq', 'dynabert+embeddings', 'dynabert', 'ptq' and 'qat' now."
+        },
     )
     # dynabert
     width_mult_list: Optional[List[str]] = field(
@@ -60,6 +69,7 @@ class CompressionArguments(TrainingArguments):
     warmup_ratio: float = field(
         default=0.1, metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."}
     )
+
     # quant
     weight_quantize_type: Optional[str] = field(
         default="channel_wise_abs_max",
@@ -78,10 +88,6 @@ class CompressionArguments(TrainingArguments):
             "In strategy 'ptq', it defaults to 'range_abs_max' and in strategy "
             "'qat', it defaults to 'moving_average_abs_max'."
         },
-    )
-    onnx_format: Optional[bool] = field(
-        default=True,
-        metadata={"help": "Whether to export onnx format quantized model, and it defaults to True."},
     )
     # ptq:
     algo_list: Optional[List[str]] = field(
@@ -162,7 +168,6 @@ class CompressionArguments(TrainingArguments):
             "round_type",
             "algo_list",
             "batch_size_list",
-            "strategy",
             "weight_quantize_type",
             "activation_quantize_type",
             "input_infer_model_path",
@@ -171,6 +176,8 @@ class CompressionArguments(TrainingArguments):
             "moving_rate",
             "use_pact",
             "onnx_format",
+            "prune_embeddings",
+            "input_dtype",
         ]
         default_arg_dict = {
             "width_mult_list": ["3/4"],
@@ -186,8 +193,10 @@ class CompressionArguments(TrainingArguments):
         logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
         if key == "Compression":
             logger.info(
-                "Compression Suggestions: `Strategy` supports 'dynabert+ptq',"
-                "'dynabert' and 'ptq'. `width_mult_list` is needed in "
+                "Compression Suggestions: `Strategy` supports 'dynabert+qat+embeddings', "
+                "'dynabert+qat', 'dynabert+ptq', 'dynabert+embeddings', "
+                "'dynabert' and 'ptq'. `input_dtype`, `prune_embeddings`, "
+                "and `onnx_format` are common needed. `width_mult_list` is needed in "
                 "`dynabert`, and `algo_list`, `batch_num_list`, `batch_size_list`,"
                 " `round_type`, `bias_correction`, `weight_quantize_type`, "
                 "`input_infer_model_path` are needed in 'ptq'. `activation_preprocess_type'`, "

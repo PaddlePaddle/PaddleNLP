@@ -171,6 +171,9 @@ class Task(metaclass=abc.ABCMeta):
         if paddle.get_device() == "cpu":
             self._config.disable_gpu()
             self._config.enable_mkldnn()
+        elif paddle.get_device().split(":", 1)[0] == "npu":
+            self._config.disable_gpu()
+            self._config.enable_npu(self.kwargs["device_id"])
         else:
             self._config.enable_use_gpu(100, self.kwargs["device_id"])
             # TODO(linjieccc): enable after fixed

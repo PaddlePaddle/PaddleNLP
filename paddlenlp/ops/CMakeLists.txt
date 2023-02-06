@@ -16,6 +16,12 @@ project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif()
+
 INCLUDE(ExternalProject)
 
 set(CXX_STD "14" CACHE STRING "C++ standard")

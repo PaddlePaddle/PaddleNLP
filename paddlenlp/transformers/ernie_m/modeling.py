@@ -278,7 +278,7 @@ class ErnieMModel(ErnieMPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == 0).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
             )
             if past_key_values is not None:
                 batch_size = past_key_values[0][0].shape[0]

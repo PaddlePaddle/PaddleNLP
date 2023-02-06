@@ -12,15 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import copy
 import datetime
 import math
 import random
+import tempfile
+import unittest
 
 import numpy as np
 import paddle
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import (
     GPTConfig,
@@ -30,7 +33,7 @@ from paddlenlp.transformers import (
     GPTModel,
     GPTTokenizer,
 )
-from tests.testing_utils import PaddleNLPModelTest, slow
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -549,6 +552,84 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class GPTCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-GPT2Model"
+
+    @classmethod
+    @require_package("transformers", "torch")
+    def setUpClass(cls) -> None:
+        from transformers import GPT2Model
+
+        # when python application is done, `TemporaryDirectory` will be free
+        cls.torch_model_path = tempfile.TemporaryDirectory().name
+        model = GPT2Model.from_pretrained(cls.test_model_id)
+        model.save_pretrained(cls.torch_model_path)
+
+    @require_package("transformers", "torch")
+    def test_gpt_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import GPT2Model
+
+            torch_model = GPT2Model.from_pretrained(self.test_model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                GPTModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @parameterized.expand(
+        [
+            ("GPTModel", "GPT2Model"),
+            ("GPTForSequenceClassification", "GPT2ForSequenceClassification"),
+            ("GPTForTokenClassification", "GPT2ForTokenClassification"),
+            ("GPTLMHeadModel", "GPT2LMHeadModel"),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_gpt_classes_from_local_dir(self, paddle_class_name, pytorch_class_name: str | None = None):
+        pytorch_class_name = pytorch_class_name or paddle_class_name
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, pytorch_class_name)
+            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
+            torch_model.eval()
+
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 3. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, paddle_class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy().reshape([-1])[:9],
+                    torch_logit.detach().cpu().numpy().reshape([-1])[:9],
+                    atol=1e-3,
+                )
+            )
 
 
 class GPTModelLanguageGenerationTest(PaddleNLPModelTest):

@@ -19,7 +19,9 @@
                * [GPU 性能](#CPU性能)
    * [使用 FastTokenizer 加速](#使用FastTokenizer加速)
    * [部署](#部署)
-       * [Python 部署](#Python部署)
+       * [FastDeploy 部署](#FastDeploy部署)
+           * [Python 部署](#Python部署)
+           * [C++ 部署](#C++部署)
        * [服务化部署](#服务化部署)
    * [Notebook教程](#Notebook教程)
    * [参考文献](#参考文献)
@@ -28,7 +30,7 @@
 
 ## 模型介绍
 
-本次开源的模型是在文心大模型ERNIE 3.0, 文心大模型ERNIE 3.0 作为百亿参数知识增强的大模型，除了从海量文本数据中学习词汇、结构、语义等知识外，还从大规模知识图谱中学习。 基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与 ERNIE 2.0 保持一致，相比 ERNIE 2.0 具有更强的中文效果。
+本次开源的模型是文心大模型 ERNIE 3.0, 文心大模型 ERNIE 3.0 作为百亿参数知识增强的大模型，除了从海量文本数据中学习词汇、结构、语义等知识外，还从大规模知识图谱中学习。 基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与 ERNIE 2.0 保持一致，相比 ERNIE 2.0 具有更强的中文效果。
 
 相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9)
 
@@ -1280,6 +1282,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 
 
 <a name="代码结构"></a>
+
 ## 代码结构
 以下是本项目代码结构
 
@@ -1321,7 +1324,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 
 <a name="开始运行"></a>
 ## 开始运行
-下面提供以CLUE数据集进行模型微调相关训练、预测、部署的代码, CLUE数据集是中文语言理解测评基准数据集，包括了文本分类、文本推理、实体抽取、问答等相关数据集。
+下面提供以 CLUE 数据集进行模型微调相关训练、预测、部署的代码, CLUE 数据集是中文语言理解测评基准数据集，包括了文本分类、文本推理、实体抽取、问答等相关数据集。
 
 ### 环境要求
 - python >= 3.7
@@ -1330,7 +1333,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 - paddleslim >= 2.4
 
 ### 数据准备
-此次微调数据主要是以CLUE benchmark 数据集为主, CLUE benchmark 包括了文本分类、实体抽取、问答三大类数据集，而 CLUE benchmark 数据目前已经集成在PaddleNLP的datasets里面，可以通过下面的方式来使用数据集
+此次微调数据主要是以 CLUE benchmark 数据集为主, CLUE benchmark 包括了文本分类、实体抽取、问答三大类数据集，而 CLUE benchmark 数据目前已经集成在 PaddleNLP 的 datasets 里面，可以通过下面的方式来使用数据集
 
 ```python
 from paddlenlp.datasets import load_dataset
@@ -1367,6 +1370,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+# --device 选择训练模型的硬件，可选 cpu/gpu/xpu/npu，默认为 gpu。xpu 为昆仑芯片，npu 为昇腾芯片。
 python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
 
 # 序列标注任务
@@ -1382,6 +1386,7 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+# --device 选择训练模型的硬件，可选 cpu/gpu/xpu/npu，默认为 gpu。xpu 为昆仑芯片，npu 为昇腾芯片。
 python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml
 
 # 序列标注任务
@@ -1564,23 +1569,41 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 <a name="部署"></a>
 
 ## 部署
-我们为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
-<p align="center">
-        <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
-</p>
+
+我们基于 FastDeploy 为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
+
+<a name="FastDeploy部署"></a>
+
+### FastDeploy 部署
+
+⚡️[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
+
+<div align="center">
+
+<img src="https://user-images.githubusercontent.com/54695910/213087724-7175953a-0e07-4af8-a4a1-5304163da2e0.png" >
+
+</div>
+
+目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
 
 <a name="Python部署"></a>
 
-### Python 部署
+#### Python 部署
 
-Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
+Python 部署请参考：[Python 部署指南](./deploy/python/README.md)
+
+<a name="C++部署"></a>
+
+#### C++ 部署
+
+C++ 部署请参考：[C++ 部署指南](./deploy/cpp/README.md)
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
 - [Triton Inference Server 服务化部署指南](./deploy/triton_serving/README.md)
-- [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
+- [PaddleNLP SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
 
 
 <a name="参考文献"></a>

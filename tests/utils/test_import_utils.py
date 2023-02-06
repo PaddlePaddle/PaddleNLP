@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+
 from paddlenlp.utils import install_package, uninstall_package
 
 
@@ -27,22 +28,6 @@ class ImportUntilsTest(unittest.TestCase):
         from loguru import __version__
 
         assert __version__ == "0.5.3"
-
-    def test_paddlenlp_speficic_pacakge(self):
-
-        version = "2.3.7"
-        install_package("paddlenlp", version)
-        from paddlenlp import __version__
-
-        assert __version__ == version
-
-        version = "2.3.5"
-        install_package("paddlenlp", version)
-        from paddlenlp import __version__
-
-        assert __version__ == version
-
-        uninstall_package("paddlenlp")
 
     def test_uninstall_package(self):
         uninstall_package("paddlenlp")

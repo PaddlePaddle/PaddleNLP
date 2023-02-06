@@ -160,7 +160,7 @@ class ErnieMConfig(PretrainedConfig):
         max_position_embeddings: int = 514,
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
-        pad_token_id: int = 0,
+        pad_token_id: int = 1,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)

@@ -120,7 +120,7 @@ static bool CheckIfStringIsAlphaNum(const std::string& str) {
 }
 
 std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
-  VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence";
+  VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence '" << sequence << "'";
   std::vector<core::Token> all_tokens;
   size_t unicode_len =
       utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());

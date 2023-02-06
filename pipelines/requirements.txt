@@ -23,3 +23,4 @@ uvicorn
 markdown
 numba
 pymilvus>=2.1
+wordcloud==1.8.2.2

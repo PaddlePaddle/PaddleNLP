@@ -255,6 +255,8 @@ class DiffusionPipeline(ConfigMixin):
                 will be automatically derived from the model's weights.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
             kwargs (remaining dictionary of keyword arguments, *optional*):
                 Can be used to overwrite load - and saveable variables - *i.e.* the pipeline components - of the
                 specific pipeline class. The overwritten components are then directly passed to the pipelines
@@ -286,12 +288,14 @@ class DiffusionPipeline(ConfigMixin):
         # custom_pipeline = kwargs.pop("custom_pipeline", None)
         # for fastdeploy model
         runtime_options = kwargs.pop("runtime_options", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
 
         # 1. Download the checkpoints and configs
         if not os.path.isdir(pretrained_model_name_or_path):
             config_dict = cls.load_config(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
+                from_hf_hub=from_hf_hub,
             )
         else:
             config_dict = cls.load_config(pretrained_model_name_or_path)
@@ -360,7 +364,7 @@ class DiffusionPipeline(ConfigMixin):
                 f"Keyword arguments {unused_kwargs} are not expected by {pipeline_class.__name__} and will be ignored."
             )
         # import it here to avoid circular import
-        from . import ModelMixin, pipelines
+        from . import pipelines
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
@@ -432,7 +436,10 @@ class DiffusionPipeline(ConfigMixin):
                     )
 
                 load_method = getattr(class_obj, load_method_name)
-                loading_kwargs = {}
+                loading_kwargs = {
+                    "from_hf_hub": from_hf_hub,
+                    "cache_dir": cache_dir,
+                }
 
                 if issubclass(class_obj, FastDeployRuntimeModel):
                     if isinstance(runtime_options, dict):
@@ -440,16 +447,15 @@ class DiffusionPipeline(ConfigMixin):
                     else:
                         options = runtime_options
                     loading_kwargs["runtime_options"] = options
-                    loading_kwargs["cache_dir"] = cache_dir
 
-                if issubclass(class_obj, ModelMixin):
-                    loading_kwargs["cache_dir"] = cache_dir
-
-                model_path_dir = (
-                    os.path.join(pretrained_model_name_or_path, name)
-                    if os.path.isdir(pretrained_model_name_or_path)
-                    else pretrained_model_name_or_path + "/" + name
-                )
+                if os.path.isdir(pretrained_model_name_or_path):
+                    model_path_dir = os.path.join(pretrained_model_name_or_path, name)
+                elif from_hf_hub:
+                    model_path_dir = pretrained_model_name_or_path
+                    loading_kwargs["subfolder"] = name
+                else:
+                    # BOS does not require 'subfolder'. We simpy concat the model name with the subfolder
+                    model_path_dir = pretrained_model_name_or_path + "/" + name
 
                 loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 

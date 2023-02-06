@@ -54,6 +54,30 @@ class ZeroShotTextClassificationTask(Task):
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json",
     }
+    resource_files_urls = {
+        "utc-large": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_shot_text_classification/utc-large/model_state.pdparams",
+                "71eb9a732c743a513b84ca048dc4945b",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_shot_text_classification/utc-large/config.json",
+                "9496be2cc99f7e6adf29280320274142",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/vocab.txt",
+                "afc01b5680a53525df5afd7518b42b48",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/special_tokens_map.json",
+                "2458e2131219fc1f84a6e4843ae07008",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/tokenizer_config.json",
+                "dcb0f3257830c0eb1f2de47f2d86f89a",
+            ],
+        },
+    }
 
     def __init__(self, task: str, model: str = "utc-large", schema: list = None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
@@ -64,6 +88,7 @@ class ZeroShotTextClassificationTask(Task):
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
         self._num_workers = kwargs.get("num_workers", 0)
 
+        self._check_task_files()
         self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
@@ -102,10 +127,7 @@ class ZeroShotTextClassificationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if self.from_hf_hub:
-            model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
-        else:
-            model_instance = UTC.from_pretrained(model)
+        model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._model = model_instance
         self._model.eval()
 

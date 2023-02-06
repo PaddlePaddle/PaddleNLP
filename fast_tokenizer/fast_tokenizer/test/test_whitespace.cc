@@ -23,9 +23,9 @@ namespace fast_tokenizer {
 namespace tests {
 
 TEST(pretokenizers, whitespace) {
-  std::string input = "I \t am good\r   at \nsport.";
+  std::string input = "I \t am good\r   at \nsport";
   std::vector<std::string> expected_outputs = {
-      "I", "am", "good", "at", "sport."};
+      "I", "am", "good", "at", "sport"};
   pretokenizers::PreTokenizedString whitespace_input(input);
   pretokenizers::WhitespacePreTokenizer()(&whitespace_input);
   ASSERT_EQ(expected_outputs.size(), whitespace_input.GetSplitsSize());

@@ -12,11 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "fast_tokenizer/pretokenizers/pretokenizer.h"
+
 #include <codecvt>
 #include <exception>
 #include <locale>
 
-#include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/utils/unique_ptr.h"
 #include "fast_tokenizer/utils/utf8.h"
 #include "glog/logging.h"

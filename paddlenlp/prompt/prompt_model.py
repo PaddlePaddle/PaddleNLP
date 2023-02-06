@@ -24,7 +24,7 @@ from ..transformers.model_outputs import (
     SequenceClassifierOutput,
 )
 from .prompt_utils import signature
-from .template import Template
+from .template import PrefixTemplate, Template
 from .verbalizer import Verbalizer
 
 
@@ -55,6 +55,9 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         self.forward_keys = signature(self.plm.forward)
         self._mask_token_id = self.template.tokenizer.mask_token_id
         self._pad_token_id = self.template.tokenizer.pad_token_id
+        if isinstance(self.template, PrefixTemplate):
+            self.plm = self.template.process_model(self.plm)
+            self.forward_keys.append("past_key_values")
 
     def forward(
         self,
@@ -82,6 +85,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
             **kwargs,
         }
         input_dict = self.template.process_batch(input_dict)
+        input_dict = {**input_dict, **kwargs}
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
         if "masked_positions" in model_inputs:
             model_inputs.pop("masked_positions")

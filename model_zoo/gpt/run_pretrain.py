@@ -52,11 +52,7 @@ MODEL_CLASSES = {
 @dataclass
 class TrainingArguments(TrainingArguments):
     min_lr: float = field(default=1e-5, metadata={"help": "The initial min learning rate for Adam."})
-
-    # per_device_train_batch_size
-    @property
-    def micro_batch_size(self):
-        return self.per_device_train_batch_size
+    micro_batch_size: int = field(default=4, metadata={"help": "the batch-size of trainin"})
 
     @property
     def eval_freq(self):
@@ -65,6 +61,7 @@ class TrainingArguments(TrainingArguments):
 
 @dataclass
 class ModelArguments:
+    model_type: str = field(default="gpt", metadata={"help": "the type of model"})
     model_name_or_path: str = field(default="gpt2-en", metadata={"help": ""})
     max_seq_len: int = field(default=128, metadata={"help": "max sequence length"})
     to_static: bool = field(default=False, metadata={"help": "whether use static pretraining mode."})
@@ -349,6 +346,7 @@ def do_train():
     ).parse_args_into_dataclasses()
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
+    # training_args.per_device_train_batch_size = 2
 
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -372,9 +370,10 @@ def do_train():
     # Now, we only support data parallel in dygraph mode for now.
     topo = Topology(device_rank=worker_index, world_size=worker_num, dp_degree=worker_num)
 
-    tokenizer = GPTTokenizer.from_pretrained(model_args.model_name_or_path)
-    pretrained_models_list = list(GPTForPretraining.pretrained_init_configuration.keys())
-    model = GPTForPretraining.from_pretrained(model_args.model_name_or_path)
+    model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
+    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+    model = model_class.from_pretrained(model_args.model_name_or_path)
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
@@ -454,6 +453,9 @@ def do_train():
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
+
+        print("==============================")
+        print(f"last checkpoint : {checkpoint}")
 
         # Training
         if training_args.do_train:
