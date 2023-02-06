@@ -399,7 +399,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
                 # compute the previous noisy sample x_t -> x_t-1
                 scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
-                latents = scheduler_output.prev_sample  # .numpy()
+                latents = scheduler_output.prev_sample
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
