@@ -277,7 +277,7 @@ outputs, _ = model.generate(
 ### 环境依赖
 
 - python >= 3.7
-- paddlepaddle >= 2.2
+- paddlepaddle >= 2.3
 
 ### pip安装
 
