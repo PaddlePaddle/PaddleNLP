@@ -379,12 +379,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
                 # predict the noise residual
-                # input1 = fd.C.FDTensor()
-                # input2 = fd.C.FDTensor()
-                # input3 = fd.C.FDTensor()
-                # input1.from_numpy(latent_model_input.numpy().astype(np.float32), False)
-                # input2.from_numpy(np.array(t, dtype=np.int64), False)
-                # input3.from_numpy(text_embeddings.astype(np.float32), False)
                 dlpack1 = paddle.utils.dlpack.to_dlpack(latent_model_input)
                 dlpack2 = paddle.utils.dlpack.to_dlpack(t)
                 dlpack3 = paddle.utils.dlpack.to_dlpack(text_embeddings)
