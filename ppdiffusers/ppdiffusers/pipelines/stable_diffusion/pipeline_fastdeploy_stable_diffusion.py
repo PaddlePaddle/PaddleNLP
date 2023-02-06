@@ -16,13 +16,16 @@
 import inspect
 from typing import Callable, List, Optional, Union
 
-import fastdeploy as fd
 import numpy as np
 import paddle
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import FastDeployRuntimeModel
+from ...fastdeploy_utils import (
+    FastDeployRuntimeModel,
+    fdtensor2pdtensor,
+    pdtensor2fdtensor,
+)
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -352,7 +355,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps  # .numpy()
+        timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
         num_channels_latents = 4
@@ -379,19 +382,15 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
                 # predict the noise residual
-                dlpack1 = paddle.utils.dlpack.to_dlpack(latent_model_input)
-                dlpack2 = paddle.utils.dlpack.to_dlpack(t)
-                dlpack3 = paddle.utils.dlpack.to_dlpack(text_embeddings)
-                sample = fd.C.FDTensor.from_dlpack("sample", dlpack1)
-                timestep = fd.C.FDTensor.from_dlpack("timestep", dlpack2)
-                encoder_hidden_states = fd.C.FDTensor.from_dlpack("encoder_hidden_states", dlpack3)
+                sample = pdtensor2fdtensor(latent_model_input, "sample")
+                timestep = pdtensor2fdtensor(t, "timestep")
+                encoder_hidden_states = pdtensor2fdtensor(text_embeddings, "encoder_hidden_states")
                 unet.bind_input_tensor("sample", sample)
                 unet.bind_input_tensor("timestep", timestep)
                 unet.bind_input_tensor("encoder_hidden_states", encoder_hidden_states)
                 unet.zero_copy_infer()
                 noise_pred = unet.get_output_tensor(unet_output_name)
-                dlpack = noise_pred.to_dlpack()
-                noise_pred = paddle.utils.dlpack.from_dlpack(dlpack)
+                noise_pred = fdtensor2pdtensor(noise_pred)
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
