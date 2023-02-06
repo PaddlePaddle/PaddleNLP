@@ -258,8 +258,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         latents_shape = (batch_size, num_channels_latents, height // 8, width // 8)
         if latents is None:
-            latents = paddle.randn(latents_shape, dtype=dtype)
-            # latents = generator.randn(*latents_shape).astype(dtype)
+            latents = generator.randn(*latents_shape).astype(dtype)
         elif latents.shape != latents_shape:
             raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
 
@@ -368,6 +367,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             generator,
             latents,
         )
+        if isinstance(latents, np.ndarray):
+            latents = paddle.to_tensor(latents)
         # 6. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
