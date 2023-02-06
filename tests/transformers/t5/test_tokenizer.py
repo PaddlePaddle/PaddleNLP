@@ -293,4 +293,4 @@ class T5TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 return_offsets_mapping=True,
             )
             self.assertEqual(len(encoding["input_ids"]), 3)
-            self.assertEqual(len(encoding["offset_mapping"]), 4)
+            self.assertEqual(len(encoding["offset_mapping"]), 3)
