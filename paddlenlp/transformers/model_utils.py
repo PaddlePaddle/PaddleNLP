@@ -169,6 +169,7 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
             response=None,
         )
 
+    download_check(repo_id, file_name, addition="from_hf_hub")
     return hf_hub_download(
         repo_id=repo_id,
         filename=file_name,
@@ -1014,6 +1015,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if is_url(pretrained_model_name_or_path):
             weight_file_path = get_path_from_url_with_filelock(pretrained_model_name_or_path, cache_dir)
             # # check the downloaded weight file and registered weight file name
+            download_check(pretrained_model_name_or_path, "from_pretrained_v2")
 
             # make sure that
             new_weight_file_path = os.path.join(

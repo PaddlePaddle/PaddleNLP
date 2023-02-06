@@ -45,7 +45,10 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
     @staticmethod
     def add_args(args, parser):
         parser.add_argument(
-            "--model_name_or_path", type=str, default="ernie-tiny", help="Model name. Defaults to ernie-tiny. "
+            "--model_name_or_path",
+            type=str,
+            default="ernie-3.0-base-zh",
+            help="Model name. Defaults to ernie-3.0-base-zh. ",
         )
         parser.add_argument(
             "--task_name",

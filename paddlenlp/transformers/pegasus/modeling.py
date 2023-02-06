@@ -285,11 +285,14 @@ class PegasusDecoder(PegasusPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
-        if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
-            )
+        decoder_length = paddle.shape(decoder_input_ids)[-1]
+        casual_mask = paddle.tensor.triu(
+            (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
+        )
+        if decoder_attention_mask is not None:
+            decoder_attention_mask = decoder_attention_mask + casual_mask
+        else:
+            decoder_attention_mask = casual_mask
 
         if x is None:
             decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
