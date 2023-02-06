@@ -288,23 +288,33 @@ if [ ! -f 'test.py' ];then
     sed -i "s/python3/python/g" Makefile
     sed -i "s/python-config/python3.7m-config/g" Makefile
     cd ${nlp_dir}/model_zoo/gpt/
+
+    if [ ! -d ./data ]; then
+        mkdir data
+    fi
+
+    wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+    wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+
+    mv gpt_en_dataset_300m_ids.npy ./data
+    mv gpt_en_dataset_300m_idx.npz ./data
+
     # pretrain
     python -m paddle.distributed.launch run_pretrain.py \
-    --model_name_or_path "__internal_testing__/gpt" \
-    --input_dir "./pre_data" \
-    --output_dir "output" \
-    --weight_decay 0.01 \
-    --max_steps 2 \
-    --save_steps 2 \
-    --device gpu \
-    --warmup_steps 320000 \
-    --warmup_ratio 0.01 \
-    --micro_batch_size 8 \
-    --eval_steps 100 \
-    --overwrite_output_dir true \
-    --dataloader_drop_last true \
-    --do_train true \
-    --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
+        --model_type gpt \
+        --model_name_or_path __internal_testing__/gpt \
+        --input_dir ./data \
+        --output_dir ./output_dir/pretrain \
+        --weight_decay 0.01 \
+        --max_steps 2 \
+        --save_steps 10 \
+        --warmup_steps 10 \
+        --warmup_ratio 0.01 \
+        --per_device_train_batch_size 4 \
+        --device cpu \
+        --eval_steps 10 \
+        --do_train true \
+        --do_predict true > ${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
     print_info $? gpt_pretrain
     # export model
     python export_model.py --model_type=gpt \
