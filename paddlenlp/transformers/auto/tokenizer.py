@@ -22,9 +22,11 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.import_utils import import_module, is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
+
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoTokenizer",
@@ -205,7 +207,7 @@ class AutoTokenizer:
             return tokenizer_class
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, *model_args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, subfolder=None, *model_args, **kwargs):
         """
         Creates an instance of `AutoTokenizer`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -219,6 +221,9 @@ class AutoTokenizer:
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
+            from_hf_hub (bool, optional) Whether to load from HuggingFace Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from HuggingFace Hub.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -250,6 +255,9 @@ class AutoTokenizer:
         """
         # Default not to use fast tokenizer
         use_fast = kwargs.pop("use_fast", False)
+        cache_dir = kwargs.get("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
         if "use_faster" in kwargs:
             use_fast = kwargs.pop("use_faster", False)
             logger.warning("The keyword argument `use_faster` is deprecated in future, please use `use_fast` instead")
@@ -263,7 +271,8 @@ class AutoTokenizer:
             config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.tokenizer_config_file,
-                cache_dir=HF_CACHE_HOME,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
                 library_name="PaddleNLP",
                 library_version=__version__,
             )
@@ -328,7 +337,10 @@ class AutoTokenizer:
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            default_root = (
+                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            )
+            # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
                 resolved_vocab_file = get_path_from_url(community_config_path, default_root)
             except RuntimeError as err:

@@ -127,7 +127,7 @@ def parse_args():
         "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
     )
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
-    parser.add_argument("--use_SSTIA", action="store_true", type=bool, help="Whether to use SSTIA.")
+    parser.add_argument("--use_SSTIA", action="store_true", help="Whether to use SSTIA.")
     parser.add_argument("--mix_ratio", default=0, type=float, help="Mixture ratio for TSDASG synthetic input.")
     args = parser.parse_args()
     return args

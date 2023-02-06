@@ -45,8 +45,10 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+
+from .utils import resolve_cache_dir
 
 
 @dataclass(frozen=True, eq=True)
@@ -1399,7 +1401,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         raise NotImplementedError()
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community-contributed
@@ -1413,6 +1415,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
+            from_hf_hub (bool, optional): whether to load from Huggingface Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from Huggingface Hub.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -1438,6 +1443,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         """
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         vocab_files = {}
         init_configuration = {}
 
@@ -1476,7 +1483,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -1486,7 +1493,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=HF_CACHE_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
