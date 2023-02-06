@@ -169,7 +169,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
     def get_offset_mapping(self, text):
-        split_tokens = self._tokenize(text)
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = "", []
 
         for i, ch in enumerate(text):
