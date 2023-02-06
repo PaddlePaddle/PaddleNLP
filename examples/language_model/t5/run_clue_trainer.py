@@ -180,26 +180,6 @@ def get_dev_dataset(tokenizer, args):
     return ds
 
 
-def get_mnli_dev_dataset(tokenizer, args, matched=True):
-    if matched:
-        split = "dev_matched"
-    else:
-        split = "dev_mismatched"
-    filename = os.path.join(args.cache_dir, args.task_name + f"_{split}" + ".pkl")
-    if os.path.exists(filename):
-        ds = load_pickle(filename)
-    else:
-        ds = load_dataset("clue", args.task_name, splits=split)
-        ds.map(
-            partial(trans_func, tokenizer=tokenizer, args=args),
-            batched=False,
-            lazy=False,
-        )
-        save_pickle(ds, filename)
-
-    return ds
-
-
 @dataclass
 class DataArguments:
     """
@@ -425,6 +405,7 @@ def main():
     if training_args.do_eval:
         eval_metrics = trainer.evaluate()
         trainer.log_metrics("eval", eval_metrics)
+        trainer.save_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
