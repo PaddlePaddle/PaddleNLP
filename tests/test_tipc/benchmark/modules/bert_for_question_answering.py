@@ -24,6 +24,7 @@ from .model_base import BenchmarkBase
 class BertForQuestionAnsweringBenchmark(BenchmarkBase):
     def __init__(self):
         self.label_list = None
+        self.pad_token_id = 0
         super().__init__()
 
     @staticmethod
@@ -58,6 +59,7 @@ class BertForQuestionAnsweringBenchmark(BenchmarkBase):
 
     def build_model(self, args, **kwargs):
         model = BertForQuestionAnswering.from_pretrained(args.model_name_or_path)
+        self.pad_token_id = model.config.pad_token_id
         return model
 
     def forward(self, model, args, input_data=None, **kwargs):
@@ -84,7 +86,7 @@ class BertForQuestionAnsweringBenchmark(BenchmarkBase):
 
         return (
             total_loss,
-            paddle.sum((input_data["input_ids"] != model.config.pad_token_id)).numpy().astype("int64").item(),
+            paddle.sum((input_data["input_ids"] != self.pad_token_id)).numpy().astype("int64").item(),
         )
 
     def logger(
