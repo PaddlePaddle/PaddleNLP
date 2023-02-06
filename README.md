@@ -288,7 +288,7 @@ pip install --upgrade paddlenlp
 或者可通过以下命令安装最新 develop 分支代码：
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
