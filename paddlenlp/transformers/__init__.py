@@ -44,7 +44,6 @@ from .roberta.tokenizer import *
 from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
-from .electra.converter import *
 from .electra.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
