@@ -276,7 +276,7 @@ pip install --upgrade paddlenlp
 or you can install the latest develop branch code with the following command:
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ## Quick Start
