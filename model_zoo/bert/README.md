@@ -73,7 +73,7 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device gpu \
-    --use_amp False \
+    --fp16 False \
     --do_train
 ```
 
@@ -96,7 +96,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device xpu \
-    --use_amp False
+    --fp16 False \
     --do_train
 ```
 其中参数释义如下：
@@ -115,7 +115,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-- `use_amp` 指示是否启用自动混合精度训练。
+- `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 - `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
 
 **NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
@@ -139,7 +139,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --save_steps 500 \
     --output_dir ./tmp/ \
     --device gpu \
-    --do_train
+    --fp16 False\
+    --do_train \
     --do_eval
 ```
 
@@ -156,6 +157,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 - `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
 - `do_eval` 是否进行评估任务。同上。(`bool`, 可选, 默认为 `False`)
 

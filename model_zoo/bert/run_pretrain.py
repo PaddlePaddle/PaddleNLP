@@ -22,7 +22,6 @@ import h5py
 import numpy as np
 import paddle
 from paddle.io import Dataset
-from paddle.metric import Accuracy
 
 from paddlenlp.data import Stack
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
@@ -71,8 +70,6 @@ class ModelArguments:
         default=80, metadata={"help": "The maximum total of masked tokens in input sequence"}
     )
 
-    use_amp: distutils.util.strtobool = field(default=False, metadata={"help": "Enable mixed precision training."})
-    amp_level: str = field(default="O2", metadata={"help": "select O1 or O2 of amp level."})
     to_static: distutils.util.strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
     profiler_options: str = field(
         default=None,
@@ -351,26 +348,8 @@ def do_train():
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 
-    if model_args.use_amp:
-        model = paddle.amp.decorate(models=model, level=model_args.amp_level, save_dtype="float32")
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    # Define the metrics of tasks.
-    def compute_metrics(p):
-        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-
-        preds = paddle.to_tensor(preds)
-        label = paddle.to_tensor(p.label_ids)
-
-        metric = Accuracy()
-        metric.reset()
-        result = metric.compute(preds, label)
-        metric.update(result)
-        accu = metric.accumulate()
-        metric.reset()
-        return {"accuracy": accu}
+    if training_args.fp16:
+        model = paddle.amp.decorate(models=model, level=training_args.fp16_opt_level, save_dtype="float32")
 
     trainer = PretrainingTrainer(
         model=model,
@@ -381,7 +360,6 @@ def do_train():
         eval_dataset=None,
         tokenizer=tokenizer,
         optimizers=[optimizer, lr_scheduler],
-        compute_metrics=compute_metrics,
     )
     # training
     if training_args.do_train:
@@ -391,11 +369,6 @@ def do_train():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
-
-    if training_args.do_eval:
-        eval_metrics = trainer.evaluate()
-        trainer.log_metrics("eval", eval_metrics)
-        trainer.save_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":

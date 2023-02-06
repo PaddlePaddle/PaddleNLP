@@ -28,7 +28,6 @@ from paddlenlp.transformers import (
     BertTokenizer,
     ErnieForSequenceClassification,
     ErnieTokenizer,
-    LinearDecayWithWarmup,
 )
 
 METRIC_CLASSES = {
@@ -85,8 +84,6 @@ class ModelArguments:
             "than this will be truncated, sequences shorter will be padded."
         },
     )
-    num_train_epoches: int = field(default=3, metadata={"help": "Total number of training epochs to perform."})
-    warmup_proportion: float = field(default=0.1, metadata={"help": "Linear warmup proportion over total steps."})
 
 
 def set_seed(seed):
@@ -106,10 +103,6 @@ def do_train():
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(training_args, "Training")
-
-    paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     set_seed(training_args.seed)
 
@@ -151,35 +144,24 @@ def do_train():
         )
         dev_ds_matched = dev_ds_matched.map(preprocess_function, batched=True, remove_columns=columns)
         dev_ds_mismatched = dev_ds_mismatched.map(preprocess_function, batched=True, remove_columns=columns)
+        dev_ds = {"matched": dev_ds_matched, "mismatched": dev_ds_mismatched}
     else:
         dev_ds = load_dataset("glue", model_args.task_name, split="validation")
         dev_ds = dev_ds.map(preprocess_function, batched=True, remove_columns=columns)
 
     model = model_class.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    num_training_steps = (
-        training_args.max_steps
-        if training_args.max_steps > 0
-        else (len(train_ds) // training_args.per_device_train_batch_size * training_args.num_train_epochs)
-    )
-    warmup = training_args.warmup_steps if training_args.warmup_steps > 0 else model_args.warmup_proportion
-
-    lr_scheduler = LinearDecayWithWarmup(training_args.learning_rate, num_training_steps, warmup)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        beta1=0.9,
-        beta2=0.999,
-        epsilon=training_args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=training_args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-    )
+    # decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    # optimizer = paddle.optimizer.AdamW(
+    #     beta1=0.9,
+    #     beta2=0.999,
+    #     epsilon=training_args.adam_epsilon,
+    #     parameters=model.parameters(),
+    #     weight_decay=training_args.weight_decay,
+    #     apply_decay_param_fun=lambda x: x in decay_params,
+    # )
 
     criterion = paddle.nn.loss.CrossEntropyLoss() if not is_regression else paddle.nn.loss.MSELoss()
 
@@ -204,12 +186,9 @@ def do_train():
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_ds if training_args.do_train else None,
-        eval_dataset=dev_ds
-        if (training_args.do_eval and model_args.task_name != "mnli")
-        else (dev_ds_matched if model_args.task_name == "mnli" else None),
+        eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
-        optimizers=[optimizer, lr_scheduler],
     )
 
     # training
@@ -222,17 +201,9 @@ def do_train():
         trainer.save_state()
 
     if training_args.do_eval:
-        if model_args.task_name != "mnli":
-            eval_metrics = trainer.evaluate()
-            trainer.log_metrics("eval", eval_metrics)
-            trainer.save_metrics("eval", eval_metrics)
-        else:
-            matched_eval_metrics = trainer.evaluate(eval_dataset=dev_ds_matched)
-            trainer.log_metrics("matched_eval", matched_eval_metrics)
-            trainer.save_metrics("matched_eval", matched_eval_metrics)
-            mismatched_eval_metrics = trainer.evaluate(eval_dataset=dev_ds_mismatched)
-            trainer.log_metrics("mismatched_eval", mismatched_eval_metrics)
-            trainer.save_metrics("mismatched_eval", mismatched_eval_metrics)
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+        trainer.save_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
