@@ -27,7 +27,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
 )
 from paddlenlp.transformers import (
-    ElectraGenerator,
+    ElectraConfig,
     ElectraTokenizer,
     ErnieHealthForTotalPretraining,
     ErnieHealthPretrainingCriterion,
@@ -36,7 +36,7 @@ from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
+    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ErnieHealthPretrainingCriterion, ElectraTokenizer),
 }
 
 
@@ -102,7 +102,7 @@ def main():
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
-    training_args.recompute = True
+    # training_args.recompute = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -131,7 +131,7 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
+    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
@@ -139,12 +139,13 @@ def main():
 
     if model_args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
-        model = model_class.from_pretrained(model_args.model_name_or_path)
+        model_config = config_class()
+        model = model_class(model_config)
     else:
         raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
     # Loads dataset.
-    # download_corpus(data_args)
+    download_corpus(data_args)
     tic_load_data = time.time()
     logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
@@ -165,9 +166,8 @@ def main():
         def __init__(self):
             """CriterionWrapper"""
             super(CriterionWrapper, self).__init__()
-            self.criterion = ErnieHealthPretrainingCriterion(
-                getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"], model.gen_weight
-            )
+            model_config.gen_weight = model.gen_weight
+            self.criterion = criterion_class(model_config)
 
         def forward(self, output, labels):
             """forward function
