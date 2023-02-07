@@ -163,7 +163,11 @@ def do_train():
     )
 
     if model_args.task_name == "mnli":
-        dev_ds = load_dataset("glue", model_args.task_name, splits=["dev_matched"])
+        # TODO(wj-Mcat): support evaluate on two datasets
+        dev_ds, dev_mismatched_ds = load_dataset(
+            "glue", model_args.task_name, splits=["dev_matched", "dev_mismatched"]
+        )
+        dev_mismatched_ds = dev_mismatched_ds.map(trans_func)
     else:
         dev_ds = load_dataset("glue", model_args.task_name, splits="dev")
 
@@ -201,7 +205,13 @@ def do_train():
 
     metric = metric_class()
 
-    # TODO(wj-Mcat): use amp
+    def compute_metrics(p):
+        predictions, labels = p
+        score = metric.compute(paddle.to_tensor(predictions), paddle.to_tensor(labels))
+        metric.update(score)
+        score = metric.accumulate()
+        return {metric.name(): score}
+
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -210,7 +220,7 @@ def do_train():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=metric,
+        compute_metrics=compute_metrics,
         optimizers=[optimizer, lr_scheduler],
     )
 

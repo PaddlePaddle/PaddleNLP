@@ -96,8 +96,8 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
   --device gpu \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
-  --mirco_batch_size 4 \
-  --eval_steps 100 \
+  --per_device_train_batch_size 4 \
+  --eval_steps 3 \
   --do_train true \
   --do_predict true
 ```
@@ -110,7 +110,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 - `grad_clip` 梯度裁剪范围。
 - `max_steps` 最大训练步数
 - `save_steps` 保存模型间隔
-- `mirco_batch_size` 训练的batch大小
+- `per_device_train_batch_size` 训练的batch大小
 - `device` 训练设备
 
 #### 单机多卡
@@ -129,7 +129,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
   --device gpu \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
-  --mirco_batch_size 8 \
+  --per_device_train_batch_size 8 \
   --eval_steps 100 \
   --do_train true \
   --do_predict true
@@ -192,8 +192,8 @@ python predict.py
 默写古诗: 大漠孤烟直，长河落日圆。
 举杯邀明月，对影成三人。
 
-Question: Who is the CEO of Apple?
-Answer: Tim Cook.
+Question: Where is the capital of China? Answer: Beijing.
+Question: Where is the capital of US Answer: Washington, DC
 ```
 
 ## 模型导出预测
@@ -270,15 +270,16 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
   --model_name_or_path gpt2-medium-en \
   --task_name SST-2 \
   --max_seq_length 128 \
-  --per_device_train_batch_size 32   \
+  --per_device_train_batch_size 32 \
   --learning_rate 2e-5 \
   --num_train_epochs 3 \
   --logging_steps 1 \
+  --evaluation_strategy steps \
   --save_steps 500 \
   --output_dir ./output_dir/glue \
-  --eval_steps 1 \
   --device gpu \
-  --do_train true
+  --do_train true \
+  --fp16 false
 ```
 
 配置文件中的参数释义如下：
@@ -293,7 +294,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-- `use_amp` 指示是否启用自动混合精度训练。
+- `fp16` 指示是否启用自动混合精度训练。
 
 基于`gpt2-medium-en`在SST-2任务上Fine-tuning后，在验证集上有如下结果：
 
@@ -316,6 +317,7 @@ python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
   --num_train_epochs 3 \
   --logging_steps 25 \
   --save_steps 250 \
+  --evaluation_strategy steps \
   --output_dir ./tmp/msra_ner/ \
   --device gpu  \
   --do_train true

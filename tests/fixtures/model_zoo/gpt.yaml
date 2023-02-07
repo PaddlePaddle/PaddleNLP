@@ -36,6 +36,7 @@ msra_ner:
     num_train_epochs: 3
     logging_steps: 25
     save_steps: 250
+    evaluation_strategy: steps
     output_dir: ./output_dir/msra_ner/
     device: cpu
     do_train: true
@@ -49,6 +50,7 @@ msra_ner:
     num_train_epochs: 3
     logging_steps: 25
     save_steps: 250
+    evaluation_strategy: steps
     output_dir: ./tmp/msra_ner/
     device: gpu 
     do_train: true
@@ -62,9 +64,10 @@ glue:
     learning_rate: 2e-5
     num_train_epochs: 3
     logging_steps: 1
-    save_steps: 500
+    save_steps: 3
     output_dir: ./output_dir/glue
     max_steps: 10
+    evaluation_strategy: steps
     eval_steps: 1
     device: cpu
     do_train: true
@@ -77,8 +80,9 @@ glue:
     learning_rate: 2e-5
     num_train_epochs: 3
     logging_steps: 1
-    save_steps: 500
+    save_steps: 500 
     output_dir: ./output_dir/glue
+    evaluation_strategy: steps
     eval_steps: 1
     device: gpu
     do_train: true
