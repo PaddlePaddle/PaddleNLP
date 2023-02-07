@@ -10,6 +10,6 @@ FastTokenizer 使用 CMake 编译，其中编译过程中，各平台上编译�
 
 | 选项 | 作用 | 备注 |
 |:---- | :--- | :--- |
-| WITH_PYTHON | 是否编译为 Python 库，默认为是，否则为 C++ 库|
-| WITH_TESTING | 是否编译 C++ 单测，默认为否 |
-| WITH_ICU_LITE | 是否与 ICU Lite 依赖包联编，只能用于 Andriod 编译，打开后可减小 FastTokenizer 库体积，默认为否 |
+| WITH_PYTHON | 是否编译为 Python 库，默认为是，否则为 C++ 库||
+| WITH_TESTING | 是否编译 C++ 单测，默认为否 ||
+| WITH_ICU_LITE | 是否与 ICU Lite 依赖包联编，打开后可减小 FastTokenizer 库体积，默认为否 | 只能用于 Andriod 编译，打开后 FastTokenizer 库体积大小从 **32 M 减少到 7.4 M**，但只能对中英文进行分词。|
