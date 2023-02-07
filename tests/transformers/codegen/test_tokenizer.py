@@ -199,7 +199,7 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for weights_list_2 in weights_lists_2:
             self.assertListEqual(weights_list, weights_list_2)
 
-    def test_joined_unk_string(self):
+    def test_consecutive_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
         for tokenizer in tokenizers:
             tokens = [tokenizer.unk_token for _ in range(2)]
