@@ -112,7 +112,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.is_scale_input_called = False
         self.preconfig = preconfig
 
-    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor], **kwargs) -> paddle.Tensor:
         """
         Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the K-LMS algorithm.
 
@@ -123,11 +123,18 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             `paddle.Tensor`: scaled input sample
         """
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1) ** 0.5)
-        self.is_scale_input_called = True
-        return sample
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
+        if not self.preconfig:
+            sigma = self.sigmas[step_index]
+            sample = sample / ((sigma**2 + 1) ** 0.5)
+            self.is_scale_input_called = True
+            return sample
+        else:
+            return sample * self.latent_scales[step_index]
+
 
     def scale_model_input_preconfigured(self, sample: paddle.Tensor, idx) -> paddle.Tensor:
         return sample * self.latent_scales[idx]
