@@ -85,6 +85,8 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
     }
     padding_side = "right"
 
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+
     def __init__(
         self,
         vocab_file,
@@ -285,3 +287,8 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab.update(self.added_tokens_encoder)
+        return vocab
