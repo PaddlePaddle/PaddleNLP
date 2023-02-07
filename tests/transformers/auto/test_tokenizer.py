@@ -41,3 +41,16 @@ class AutoTokenizerTest(unittest.TestCase):
             self.assertIsInstance(tokenizer, paddlenlp.transformers.BertFastTokenizer)
         else:
             self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizer)
+
+    def test_hf_tokenizer(self):
+        t1 = AutoTokenizer.from_pretrained(
+            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=True
+        )
+        t2 = AutoTokenizer.from_pretrained(
+            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
+        )
+        if is_fast_tokenizer_available():
+            self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
+        else:
+            self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
+        self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)

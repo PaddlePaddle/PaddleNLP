@@ -248,17 +248,18 @@ def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
     return "init_class" not in config and "architectures" in config
 
 
-def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
+def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     """resolve config file from hf hub
 
     Args:
         repo_id (str): the repo name from huggingface hub
         cache_dir (str): the cachedir
+        subfolder (str, optional) An optional value corresponding to a folder inside the repo.
 
     Returns:
         str: the downloaded config file
     """
-    if hf_file_exists(repo_id, CONFIG_NAME):
+    if hf_file_exists(repo_id=repo_id, filename=CONFIG_NAME, subfolder=subfolder):
         file_name = CONFIG_NAME
     else:
         raise EntryNotFoundError(f"can not find the paddle/pytorch config file from: https://huggingface.co/{repo_id}")
@@ -267,6 +268,7 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
         repo_id=repo_id,
         filename=file_name,
         cache_dir=cache_dir,
+        subfolder=subfolder,
         library_name="PaddleNLP",
         library_version=__version__,
     )
@@ -770,6 +772,7 @@ class PretrainedConfig:
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
+        subfolder = kwargs.pop("subfolder", None)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         force_download = kwargs.pop("force_download", False)
@@ -813,8 +816,9 @@ class PretrainedConfig:
 
         # 4. get the configuration file from HF hub
         elif from_hf_hub:
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
-
+            resolved_config_file = resolve_hf_config_path(
+                repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
+            )
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
             if url_file_exists(community_url):

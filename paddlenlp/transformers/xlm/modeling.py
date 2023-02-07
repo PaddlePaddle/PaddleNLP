@@ -21,7 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from .. import PretrainedModel, register_base_model
-from ..albert.modeling import ACT2FN
+from ..activations import ACT2FN
 
 __all__ = [
     "XLMModel",
