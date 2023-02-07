@@ -98,6 +98,7 @@ MAPPING_NAMES = OrderedDict(
         ("XLNet", "xlnet"),
         ("XLM", "xlm"),
         ("GPT", "gpt"),
+        ("GLM", "glm"),
         ("T5", "t5"),
         ("Bert", "bert"),
         ("Bart", "bart"),

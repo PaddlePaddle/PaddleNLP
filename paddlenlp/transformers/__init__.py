@@ -179,6 +179,9 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .glm.configuration import *
+from .glm.modeling import *
+from .glm.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
