@@ -2164,6 +2164,19 @@ class TokenizerTesterMixin:
 
                 self.assertIsInstance(string, str)
 
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 4)
+            self.assertEqual(len(encoding["offset_mapping"]), 4)
+
 
 class TrieTest(unittest.TestCase):
     def test_trie(self):

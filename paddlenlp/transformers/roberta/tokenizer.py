@@ -14,16 +14,22 @@
 # limitations under the License.
 
 import io
-import os
 import json
+import os
 
 from paddle.utils import try_import
 
-from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer, AddedToken
-from ..gpt.tokenizer import bytes_to_unicode
-from ...utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from ...utils.env import MODEL_HOME
 from ...utils.log import logger
+from .. import (
+    AddedToken,
+    BasicTokenizer,
+    GPTTokenizer,
+    PretrainedTokenizer,
+    WordpieceTokenizer,
+)
+from ..gpt.tokenizer import bytes_to_unicode
 
 __all__ = ["RobertaTokenizer", "RobertaChineseTokenizer", "RobertaBPETokenizer"]
 
@@ -454,7 +460,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
     def get_offset_mapping(self, text):
-        tokens = self._tokenize(text)
+        tokens = self.tokenize(text)
         offset_mapping = []
         offset = 0
         for token in tokens:
