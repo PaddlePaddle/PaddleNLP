@@ -15,15 +15,15 @@
 # limitations under the License.
 
 import argparse
+
 import gradio as gr
 import paddle
 from clip_interrogator import (
-    Interrogator,
-    Config,
-    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
     BLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    Config,
+    Interrogator,
 )
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

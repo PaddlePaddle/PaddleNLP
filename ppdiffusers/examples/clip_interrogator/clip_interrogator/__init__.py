@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .clip_interrogator import Interrogator, Config
+from .clip_interrogator import Config, Interrogator
 
 __version__ = "0.3.5"
 __author__ = "pharmapsychotic"

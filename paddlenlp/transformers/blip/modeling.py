@@ -42,6 +42,15 @@ BLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/blip-itm-large-flickr",
 ]
 
+__all__ = [
+    "BlipPretrainedModel",
+    "BlipVisionModel",
+    "BlipModel",
+    "BlipForConditionalGeneration",
+    "BlipForQuestionAnswering",
+    "BlipForImageTextRetrieval",
+]
+
 
 # Copied from transformers.models.clip.modeling_clip.contrastive_loss
 def contrastive_loss(logits: paddle.Tensor) -> paddle.Tensor:

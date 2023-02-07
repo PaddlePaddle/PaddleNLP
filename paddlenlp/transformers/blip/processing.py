@@ -21,6 +21,10 @@ Processor class for Blip.
 from ..processing_utils import ProcessorMixin
 from ..tokenizer_utils_base import BatchEncoding
 
+__all__ = [
+    "BlipProcessor",
+]
+
 
 class BlipProcessor(ProcessorMixin):
     r"""

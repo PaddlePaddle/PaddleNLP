@@ -36,6 +36,12 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel
 from .configuration import BlipTextConfig
 
+__all__ = [
+    "BlipTextPretrainedModel",
+    "BlipTextModel",
+    "BlipTextLMHeadModel",
+]
+
 
 def apply_chunking_to_forward(
     forward_fn: Callable[..., paddle.Tensor], chunk_size: int, chunk_dim: int, *input_tensors

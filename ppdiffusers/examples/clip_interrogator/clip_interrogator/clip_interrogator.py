@@ -14,21 +14,21 @@
 
 import hashlib
 import math
-import numpy as np
 import os
 import pickle
-import paddle
-
 from dataclasses import dataclass
-from .blip_decoder import BLIP_Decoder
-from PIL import Image
-from paddle.vision import transforms
-
-from tqdm import tqdm
+from functools import partial
 from typing import List
 
+import numpy as np
+import paddle
+from paddle.vision import transforms
+from PIL import Image
+from tqdm import tqdm
+
 from paddlenlp.transformers import CLIPModel, CLIPProcessor
-from functools import partial
+
+from .blip_decoder import BLIP_Decoder
 
 
 @dataclass

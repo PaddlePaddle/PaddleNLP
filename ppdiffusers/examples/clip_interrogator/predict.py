@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from PIL import Image
-from cog import BasePredictor, Input, Path
-
 from clip_interrogator import (
-    Interrogator,
-    Config,
-    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
     BLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    Config,
+    Interrogator,
 )
+from cog import BasePredictor, Input, Path
+from PIL import Image
 
 
 class Predictor(BasePredictor):

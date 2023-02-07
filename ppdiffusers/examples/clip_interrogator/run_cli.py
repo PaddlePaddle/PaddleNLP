@@ -17,15 +17,16 @@
 import argparse
 import csv
 import os
-import requests
+
 import paddle
-from PIL import Image
+import requests
 from clip_interrogator import (
-    Interrogator,
-    Config,
-    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
     BLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    Config,
+    Interrogator,
 )
+from PIL import Image
 
 
 def inference(ci, image, mode):

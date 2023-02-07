@@ -7,9 +7,9 @@
 """
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import BlipForConditionalGeneration, BlipProcessor
-
 from fastcore.all import patch_to
+
+from paddlenlp.transformers import BlipForConditionalGeneration, BlipProcessor
 from paddlenlp.transformers.generation_utils import BeamHypotheses
 
 

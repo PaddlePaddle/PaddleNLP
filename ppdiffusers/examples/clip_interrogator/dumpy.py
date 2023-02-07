@@ -16,10 +16,10 @@
 
 import gradio as gr
 from clip_interrogator import (
-    Interrogator,
-    Config,
-    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
     BLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    Config,
+    Interrogator,
 )
 
 blip_pretrained_model_name_or_path = "Salesforce/blip-image-captioning-base"

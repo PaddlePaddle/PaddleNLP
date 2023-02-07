@@ -40,6 +40,10 @@ from ..image_utils import (
 )
 from ..tokenizer_utils_base import TensorType
 
+__all__ = [
+    "BlipImageProcessor",
+]
+
 
 class BlipImageProcessor(BaseImageProcessor):
     r"""
