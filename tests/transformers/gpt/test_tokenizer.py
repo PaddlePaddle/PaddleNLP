@@ -175,7 +175,7 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
 
-    def test_joined_unk_string(self):
+    def test_consecutive_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
         for tokenizer in tokenizers:
             tokens = [tokenizer.unk_token for _ in range(2)]
