@@ -222,12 +222,19 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
                     f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
                 )
             derivative = (sample - pred_original_sample) / sigma
-
+        if not self.preconfig:
+            sigma_from = self.sigmas[step_index]
+            sigma_to = self.sigmas[step_index + 1]
+            sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
+            sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
+        else:
+            sigma_up=self.sigma_up[step_index]
+            sigma_down=self.sigma_down[step_index]
         # 2. Convert to an ODE derivative
-        dt = self.sigma_down[step_index] - sigma
+        dt = sigma_down- sigma
         prev_sample = sample + derivative * dt
         noise = paddle.randn(model_output.shape, dtype=model_output.dtype, generator=generator)
-        prev_sample = prev_sample + noise * self.sigma_up[step_index]
+        prev_sample = prev_sample + noise * sigma_up
         if not return_dict:
             if not return_pred_original_sample:
                 return (prev_sample,)
