@@ -19,7 +19,7 @@ from unittest import TestCase
 
 from parameterized import parameterized_class
 
-from tests.testing_utils import argv_context_guard, load_test_config
+from tests.testing_utils import argv_context_guard, is_slow_test, load_test_config
 
 
 @parameterized_class(
@@ -58,3 +58,11 @@ class ErnieMTest(TestCase):
             from deploy.predictor.inference import main
 
             main()
+
+        # if using gpu, test infering with precision_mode 'fp16'
+        if is_slow_test():
+            infer_config.update({"infer_config": "fp16"})
+            with argv_context_guard(infer_config):
+                from deploy.predictor.inference import main
+
+                main()
