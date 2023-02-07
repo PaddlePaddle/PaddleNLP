@@ -17,13 +17,21 @@
 import copy
 import json
 import os
+import tempfile
 from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 import numpy as np
-from huggingface_hub import hf_hub_download
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 
-from paddlenlp import __version__
-
+from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.env import MODEL_HOME
 from ..utils.log import logger
@@ -178,6 +186,68 @@ class ImageProcessingMixin(object):
         logger.info(f"Image processor saved in {output_image_processor_file}")
 
         return [output_image_processor_file]
+
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this processor to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your processor in the Hub.
+            private (bool, optional): Whether theprocessor is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(save_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=root_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     @classmethod
     def get_image_processor_dict(
