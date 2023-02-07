@@ -23,7 +23,7 @@ import paddle
 from paddle.io import DataLoader
 
 from paddlenlp.data import Stack, Tuple
-from paddlenlp.transformers import GPTForPretraining, GPTModel, GPTTokenizer
+from paddlenlp.transformers import GPTConfig, GPTForPretraining, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -228,7 +228,8 @@ def do_eval(args):
     model_class, tokenizer_class = MODEL_CLASSES["gpt"]
 
     if args.init_checkpoint_path is not None:
-        model = GPTForPretraining(GPTModel(**model_class.pretrained_init_configuration[args.model_name]))
+        config = GPTConfig(**model_class.pretrained_init_configuration[args.model_name])
+        model = GPTForPretraining(config)
 
         logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)
         model_dict = paddle.load(os.path.join(args.init_checkpoint_path))

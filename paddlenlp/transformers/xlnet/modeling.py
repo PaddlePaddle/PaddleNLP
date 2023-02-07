@@ -14,15 +14,16 @@
 # limitations under the License.
 """Modeling classes for XLNet model."""
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
-from paddle.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 import paddle.nn.functional as F
-from paddle.nn import Layer
-from ..model_outputs import ModelOutput, tuple_output
+from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, Layer, MSELoss
+
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN, get_activation
+from ..model_outputs import ModelOutput, tuple_output
 
 __all__ = [
     "XLNetPretrainedModel",
@@ -36,36 +37,6 @@ __all__ = [
 ]
 
 dtype_float = paddle.get_default_dtype()
-
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
 
 
 class XLNetRelativeAttention(Layer):

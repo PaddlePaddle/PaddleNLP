@@ -87,19 +87,19 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-  --model_name_or_path gpt2-en \
-  --input_dir ./data \
-  --output_dir ./output_dir/pretrain \
-  --weight_decay 0.01 \
-  --max_steps 500000 \
-  --save_steps 100000 \
-  --device gpu \
-  --warmup_steps 320000 \
-  --warmup_ratio 0.01 \
-  --per_device_train_batch_size 4 \
-  --eval_steps 3 \
-  --do_train true \
-  --do_predict true
+    --model_name_or_path gpt2-en \
+    --input_dir ./data \
+    --output_dir ./output_dir/pretrain \
+    --weight_decay 0.01 \
+    --max_steps 500000 \
+    --save_steps 100000 \
+    --warmup_steps 320000 \
+    --warmup_ratio 0.01 \
+    --per_device_train_batch_size 4 \
+    --device gpu \
+    --eval_steps 500 \
+    --do_train true \
+    --do_predict true
 ```
 
  配置文件中参数释义如下：
@@ -107,11 +107,15 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
 - `weight_decay` 权重衰减参数。
-- `grad_clip` 梯度裁剪范围。
 - `max_steps` 最大训练步数
-- `save_steps` 保存模型间隔
-- `per_device_train_batch_size` 训练的batch大小
-- `device` 训练设备
+- `save_steps`  保存模型间隔
+- `warmup_steps` lr warmup 步数
+- `warmup_ratio` lr warmup 比例
+- `per_device_train_batch_size` 每张卡上的 batch-size
+- `device` `gpu` or `cpu`
+- `eval_steps` 模型校验的最大步数
+- `do_train` 是否要执行训练过程
+- `do_predict` 是否要执行预测过程
 
 #### 单机多卡
 
@@ -144,7 +148,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 python run_eval.py --model_name gpt2-en \
     --eval_path ./wikitext-103/wiki.valid.tokens \
     --overlapping_eval 32 \
-    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
+    --init_checkpoint_path ./output_dir/pretrain/model_100000/model_state.pdparams \
     --batch_size 8 \
     --device gpu
 ```
