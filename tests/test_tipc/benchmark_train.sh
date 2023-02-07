@@ -113,6 +113,10 @@ to_static=""
 if [[ $PARAMS =~ "dynamicTostatic" ]] ;then
    to_static="d2sT_"
    sed -i 's/trainer:norm_train/trainer:to_static_train/g' $FILENAME
+   # clear PARAM contents
+   if [ $PARAMS = "to_static" ] ;then
+    PARAMS=""
+   fi
 fi
 
 
@@ -131,7 +135,7 @@ export frame_version=${str_tmp%%.post*}
 export frame_commit=$(echo `${python} -c "import paddle;print(paddle.version.commit)"`)
 
 # 获取benchmark_params所在的行数
-line_num=`grep -n -w "train_benchmark_params" $FILENAME  | cut -d ":" -f 1`
+line_num=`grep -n "train_benchmark_params" $FILENAME  | cut -d ":" -f 1`
 # for train log parser
 batch_size=$(func_parser_value "${lines[line_num]}")
 line_num=`expr $line_num + 1`
@@ -185,13 +189,6 @@ if  [ ! -n "$PARAMS" ] ;then
     fp_items_list=(${fp_items})
     device_num_list=(N1C4)
     run_mode="DP"
-elif [[ ${PARAMS} = "dynamicTostatic" ]] ;then
-    IFS="|"
-    model_type=$PARAMS
-    batch_size_list=(${batch_size})
-    fp_items_list=(${fp_items})
-    device_num_list=(N1C4)
-    run_mode="DP"
 else
     # parser params from input: modeltype_bs${bs_item}_${fp_item}_${run_mode}_${device_num}
     IFS="_"
@@ -230,7 +227,8 @@ for batch_size in ${batch_size_list[*]}; do
                 num_gpu_devices=`get_world_size $device_num`
                 sed_norm_train=$norm_train
 
-                extra_params="--micro_batch_size=$batch_size --dp_degree=$num_gpu_devices"
+                global_batch_size=$(($batch_size*$num_gpu_devices))
+                extra_params="--global_batch_size=$global_batch_size --dp_degree=$num_gpu_devices"
                 sed_norm_train="$sed_norm_train $extra_params"
 
                 file_1=`head -n $[${line_norm_train}-1] $FILENAME`
