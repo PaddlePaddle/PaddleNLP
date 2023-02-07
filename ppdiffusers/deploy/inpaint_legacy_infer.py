@@ -18,6 +18,7 @@ import time
 from io import BytesIO
 
 import fastdeploy as fd
+import numpy as np
 import paddle
 import PIL
 import requests
@@ -364,11 +365,26 @@ if __name__ == "__main__":
     mask_image = download_image(mask_url).resize((512, 512))
 
     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
-    images = pipe(
-        prompt=prompt,
-        image=init_image,
-        mask_image=mask_image,
-        num_inference_steps=args.inference_steps,
-    ).images
+    # Warm up
+    pipe(prompt=prompt, image=init_image, mask_image=mask_image, num_inference_steps=10)
+
+    time_costs = []
+    print(f"Run the stable diffusion inpaint legacy pipeline {args.benchmark_steps} times to test the performance.")
+
+    for step in range(args.benchmark_steps):
+        start = time.time()
+        images = pipe(
+            prompt=prompt,
+            image=init_image,
+            mask_image=mask_image,
+            num_inference_steps=args.inference_steps,
+        ).images
+        latency = time.time() - start
+        time_costs += [latency]
+        print(f"No {step:3d} time cost: {latency:2f} s")
+    print(
+        f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+        f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+    )
 
     images[0].save(args.image_path)
