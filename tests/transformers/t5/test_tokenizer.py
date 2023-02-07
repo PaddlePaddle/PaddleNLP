@@ -282,7 +282,7 @@ class T5TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def test_offsets_mapping(self):
         pass
 
-    def test_joined_unk_string(self):
+    def test_consecutive_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
         for tokenizer in tokenizers:
             tokens = [tokenizer.unk_token for _ in range(2)]

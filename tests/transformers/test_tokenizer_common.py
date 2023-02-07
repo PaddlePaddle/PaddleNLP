@@ -2164,7 +2164,7 @@ class TokenizerTesterMixin:
 
                 self.assertIsInstance(string, str)
 
-    def test_joined_unk_string(self):
+    def test_consecutive_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
         for tokenizer in tokenizers:
             tokens = [tokenizer.unk_token for _ in range(2)]
