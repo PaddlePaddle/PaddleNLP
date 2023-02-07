@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,7 +73,6 @@ class ErnieViLProcessorTest(unittest.TestCase):
             json.dump(image_processor_map, fp)
 
     def get_tokenizer(self, **kwargs):
-        # breakpoint()
         return ErnieViLTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_image_processor(self, **kwargs):

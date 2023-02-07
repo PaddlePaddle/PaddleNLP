@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -124,7 +125,6 @@ class ErnieViLImageProcessingTest(ImageProcessingSavingTestMixin, unittest.TestC
 
     def test_image_processor_from_dict_with_kwargs(self):
         image_processor = self.image_processing_class.from_dict(self.image_processor_dict)
-        # self.assertEqual(image_processor.size, {"shortest_edge":[224, 224]})
         self.assertEqual(image_processor.size, {"shortest_edge": 224})
         self.assertEqual(image_processor.crop_size, {"height": 18, "width": 18})
 
