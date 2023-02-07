@@ -39,7 +39,9 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 
 #### 参数说明
 
-`text_to_img_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
+`text_to_img_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。展开可查看各命令行参数的说明。
+
+<details><summary>&emsp; 命令行参数说明 </summary>
 
 | 参数 |参数说明 |
 |----------|--------------|
@@ -55,6 +57,8 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 | --image_path | 生成图片的路径。默认为 `fd_astronaut_rides_horse.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
 | --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+
+</details>
 
 ### 文本引导的图像变换（Image-to-Image Text-Guided Generation）
 
@@ -82,7 +86,9 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "pndm"
 
 #### 参数说明
 
-`img_to_img_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
+`img_to_img_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。展开可查看各命令行参数的说明。
+
+<details><summary>&emsp; 命令行参数说明 </summary>
 
 | 参数 |参数说明 |
 |----------|--------------|
@@ -98,5 +104,8 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "pndm"
 | --image_path | 生成图片的路径。默认为 `fantasy_landscape.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
 | --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+
+</details>
+
 
 ### 文本引导的图像编辑（Text-Guided Image Inpainting）
