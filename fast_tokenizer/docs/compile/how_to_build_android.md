@@ -18,7 +18,7 @@ export NDK_ROOT=${PWD}/android-ndk-r20b
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/fast_tokenizer
 mkdir build & cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-21 -DANDROID_STL=c++_static -DWITH_TESTING=OFF -DWITH_PYTHON=OFF -DANDROID_TOOLCHAIN=clang
+cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-21 -DANDROID_STL=c++_shared -DWITH_TESTING=OFF -DWITH_PYTHON=OFF -DANDROID_TOOLCHAIN=clang -DWITH_ICU_LITE=ON
 make -j8
 ```
 编译后的 C++ 库在当前目录下的 `cpp` 目录下。可以选择使用 strip 减少库体积:
