@@ -13,8 +13,13 @@
 # limitations under the License.
 
 import unittest
-from paddlenlp.transformers import AlbertModel, AlbertForTokenClassification, BertModel
-from paddlenlp.transformers import utils
+
+from paddlenlp.transformers import (
+    AlbertForTokenClassification,
+    AlbertModel,
+    BertModel,
+    utils,
+)
 from paddlenlp.transformers.bert.modeling import BertForTokenClassification
 
 
@@ -27,3 +32,20 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(utils.find_transformer_model_type(AlbertForTokenClassification), "albert")
         self.assertEqual(utils.find_transformer_model_type(BertModel), "bert")
         self.assertEqual(utils.find_transformer_model_type(BertForTokenClassification), "bert")
+
+
+def check_json_file_has_correct_format(file_path):
+    with open(file_path, "r") as f:
+        lines = f.readlines()
+        if len(lines) == 1:
+            # length can only be 1 if dict is empty
+            assert lines[0] == "{}"
+        else:
+            # otherwise make sure json has correct format (at least 3 lines)
+            assert len(lines) >= 3
+            # each key one line, ident should be 2, min length is 3
+            assert lines[0].strip() == "{"
+            for line in lines[1:-1]:
+                left_indent = len(lines[1]) - len(lines[1].lstrip())
+                assert left_indent == 2
+            assert lines[-1].strip() == "}"
