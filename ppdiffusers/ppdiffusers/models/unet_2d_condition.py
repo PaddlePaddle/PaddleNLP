@@ -122,6 +122,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
+        resnet_pre_temb_non_linearity=True,
+        c=True,
     ):
         super().__init__()
 
@@ -158,6 +160,14 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
 
         # down
+
+        if act_fn == "swish":
+            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+        elif act_fn == "mish":
+            self.down_resnet_temb_nonlinearity = Mish()
+        elif act_fn == "silu":
+            self.down_resnet_temb_nonlinearity = nn.Silu()
+
         output_channel = block_out_channels[0]
         for i, down_block_type in enumerate(down_block_types):
             input_channel = output_channel
@@ -177,6 +187,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 cross_attention_dim=cross_attention_dim,
                 attn_num_head_channels=attention_head_dim[i],
                 downsample_padding=downsample_padding,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 only_cross_attention=only_cross_attention[i],
@@ -200,6 +211,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 upcast_attention=upcast_attention,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
         elif mid_block_type == "UNetMidBlock2DSimpleCrossAttn":
             self.mid_block = UNetMidBlock2DSimpleCrossAttn(
@@ -211,6 +223,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 cross_attention_dim=cross_attention_dim,
                 attn_num_head_channels=attention_head_dim[-1],
                 resnet_groups=norm_num_groups,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 resnet_time_scale_shift=resnet_time_scale_shift,
             )
         else:
@@ -257,6 +270,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 only_cross_attention=reversed_only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
@@ -383,7 +397,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         if any(s % default_overall_up_factor != 0 for s in sample.shape[-2:]):
             logger.info("Forward upsample size to force interpolation output size.")
             forward_upsample_size = True
-
+        print("## for debug, in unet 2d condition:")
         # prepare attention_mask
         if attention_mask is not None:
             attention_mask = (1 - attention_mask.cast(sample.dtype)) * -10000.0
@@ -394,6 +408,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             sample = 2 * sample - 1.0
 
         # 1. time
+        print("## for debug, in unet 2d condition:")
         timesteps = timestep
         if not paddle.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
@@ -428,27 +443,30 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 2. pre-process
         sample = self.conv_in(sample)
+        print("## for debug, in unet 2d condition:")
 
         # 3. down
         down_block_res_samples = (sample,)
+        down_nonlinear_temb=self.down_resnet_temb_nonlinearity(emb)
+        print("## for debug, in unet 2d condition:",self.down_resnet_temb_nonlinearity)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
         sample = self.mid_block(
             sample,
-            emb,
+            temb=down_nonlinear_temb,
             encoder_hidden_states=encoder_hidden_states,
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
@@ -468,7 +486,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     res_hidden_states_tuple=res_samples,
                     encoder_hidden_states=encoder_hidden_states,
                     cross_attention_kwargs=cross_attention_kwargs,
@@ -477,7 +495,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 )
             else:
                 sample = upsample_block(
-                    hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
+                    hidden_states=sample, temb=down_nonlinear_temb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
         # 6. post-process
         sample = self.conv_norm_out(sample)
