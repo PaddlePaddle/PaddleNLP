@@ -791,13 +791,6 @@ class BlipTextModel(BlipTextPretrainedModel):
             Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
             config.max_position_embeddings - 1]`.
 
-        token_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Segment token indices to indicate first and second portions of the inputs. Indices are selected in `[0,
-            1]`:
-
-            - 0 corresponds to a *sentence A* token,
-            - 1 corresponds to a *sentence B* token.
-
         inputs_embeds (`paddle.Tensor` of shape `(batch_size, hidden_size)`, *optional*):
             Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation. This
             is useful if you want more control over how to convert `input_ids` indices into associated vectors than the
@@ -985,13 +978,6 @@ class BlipTextLMHeadModel(BlipTextPretrainedModel):
         position_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
             Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
             config.max_position_embeddings - 1]`.
-
-        token_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Segment token indices to indicate first and second portions of the inputs. Indices are selected in `[0,
-            1]`:
-
-            - 0 corresponds to a *sentence A* token,
-            - 1 corresponds to a *sentence B* token.
 
         inputs_embeds (`paddle.Tensor` of shape `(batch_size, hidden_size)`, *optional*):
             Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation. This

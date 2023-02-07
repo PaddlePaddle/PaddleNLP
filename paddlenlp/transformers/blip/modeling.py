@@ -688,7 +688,7 @@ class BlipModel(BlipPretrainedModel):
 
     Args:
         config (:class:`BlipConfig`):
-            An instance of CLIPConfig used to construct BlipModel.
+            An instance of BlipConfig used to construct BlipModel.
     """
     config_class = BlipConfig
 
@@ -745,7 +745,7 @@ class BlipModel(BlipPretrainedModel):
             input_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
                 Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide
                 it.
-                Indices can be obtained using [`CLIPTokenizer`].
+                Indices can be obtained using [`BertTokenizer`].
             attention_mask (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
                 Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
                 - 1 for tokens that are **not masked**,
@@ -882,7 +882,7 @@ class BlipModel(BlipPretrainedModel):
                 the range ``[0, max_text_length - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention (CLIPTextTransformer) to avoid performing attention on to some unwanted positions,
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
@@ -1045,7 +1045,7 @@ class BlipForConditionalGeneration(BlipPretrainedModel):
                 the range ``[0, max_text_length - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention (CLIPTextTransformer) to avoid performing attention on to some unwanted positions,
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
@@ -1318,7 +1318,8 @@ class BlipForQuestionAnswering(BlipPretrainedModel):
         question_embeds = question_embeds[0] if not return_dict else question_embeds.last_hidden_state
 
         if decoder_input_ids is None:
-            decoder_input_ids = paddle.to_tensor([self.decoder_bos_token_id]).tile((batch_size, 1))
+            # (TODO, junnyu) [batch_size, 2]
+            decoder_input_ids = paddle.to_tensor([self.decoder_bos_token_id]).tile((batch_size, 2))
 
         if labels is None:
             labels = paddle.where(

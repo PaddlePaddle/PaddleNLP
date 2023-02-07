@@ -15,21 +15,16 @@
 # limitations under the License.
 """ Testing suite for the Paddle Blip model. """
 import unittest
-import paddle
+
 import numpy as np
+import paddle
 
-from paddlenlp.transformers import BlipTextConfig
-from ...testing_utils import slow
-
-from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import (
-    ModelTesterMixin,
-    ids_tensor,
-    random_attention_mask,
-)
-
-from paddlenlp.transformers import BlipTextModel
+from paddlenlp.transformers import BlipTextConfig, BlipTextModel
 from paddlenlp.transformers.blip.modeling import BLIP_PRETRAINED_MODEL_ARCHIVE_LIST
+
+from ...testing_utils import slow
+from ..test_configuration_common import ConfigTester
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class BlipTextModelTester:
@@ -111,8 +106,8 @@ class BlipTextModelTester:
         model.eval()
         with paddle.no_grad():
             result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.hidden_size))
-        self.parent.assertEqual(result.pooler_output.shape, (self.batch_size, self.hidden_size))
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.pooler_output.shape, [self.batch_size, self.hidden_size])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -126,6 +121,7 @@ class BlipTextModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (BlipTextModel,)
     fx_compatible = False
     test_pruning = False
+    use_test_model_name_list = False
 
     def setUp(self):
         self.model_tester = BlipTextModelTester(self)

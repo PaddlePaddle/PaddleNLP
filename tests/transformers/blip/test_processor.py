@@ -18,10 +18,14 @@ import unittest
 
 import numpy as np
 import pytest
-
 from PIL import Image
 
-from paddlenlp.transformers import BertTokenizer, BlipImageProcessor, BlipProcessor, PretrainedTokenizer
+from paddlenlp.transformers import (
+    BertTokenizer,
+    BlipImageProcessor,
+    BlipProcessor,
+    PretrainedTokenizer,
+)
 
 
 class BlipProcessorTest(unittest.TestCase):
@@ -29,7 +33,7 @@ class BlipProcessorTest(unittest.TestCase):
         self.tmpdirname = tempfile.mkdtemp()
 
         image_processor = BlipImageProcessor()
-        tokenizer = BertTokenizer.from_pretrained("hf-internal-testing/tiny-random-BertModel")
+        tokenizer = BertTokenizer.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
 
         processor = BlipProcessor(image_processor, tokenizer)
 
@@ -96,7 +100,7 @@ class BlipProcessorTest(unittest.TestCase):
 
         encoded_processor = processor(text=input_str)
 
-        encoded_tok = tokenizer(input_str, return_token_type_ids=False)
+        encoded_tok = tokenizer(input_str)
 
         for key in encoded_tok.keys():
             self.assertListEqual(encoded_tok[key], encoded_processor[key])
@@ -112,7 +116,7 @@ class BlipProcessorTest(unittest.TestCase):
 
         inputs = processor(text=input_str, images=image_input)
 
-        self.assertListEqual(list(inputs.keys()), ["pixel_values", "input_ids", "attention_mask"])
+        self.assertListEqual(list(inputs.keys()), ["input_ids", "attention_mask", "pixel_values"])
 
         # test if it raises when no input is passed
         with pytest.raises(ValueError):
@@ -143,4 +147,4 @@ class BlipProcessorTest(unittest.TestCase):
         inputs = processor(text=input_str, images=image_input)
 
         # For now the processor supports only ['pixel_values', 'input_ids', 'attention_mask']
-        self.assertListEqual(list(inputs.keys()), ["pixel_values", "input_ids", "attention_mask"])
+        self.assertListEqual(list(inputs.keys()), ["input_ids", "attention_mask", "pixel_values"])

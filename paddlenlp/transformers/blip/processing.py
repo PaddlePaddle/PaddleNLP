@@ -40,7 +40,7 @@ class BlipProcessor(ProcessorMixin):
     tokenizer_class = "BertTokenizer"
 
     def __init__(self, image_processor, tokenizer):
-        tokenizer.return_token_type_ids = False
+        tokenizer.model_input_names = ["input_ids", "attention_mask"]
         super().__init__(image_processor, tokenizer)
         self.current_processor = self.image_processor
 
