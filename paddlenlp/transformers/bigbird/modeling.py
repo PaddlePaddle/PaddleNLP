@@ -12,16 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import math
-
-import numpy as np
 import paddle
-from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
-import paddle.nn.functional as F
 import paddle.nn as nn
+import paddle.nn.functional as F
+from paddle.nn import Dropout, Layer, LayerList, LayerNorm, Linear
 
-from ..attention_utils import _convert_param_attr_to_list, MultiHeadAttention, AttentionRegistry
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
+from ..attention_utils import MultiHeadAttention, _convert_param_attr_to_list
 
 __all__ = [
     "BigBirdModel",
@@ -36,38 +34,6 @@ __all__ = [
     "BigBirdForMaskedLM",
     "BigBirdForCausalLM",
 ]
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-def gelu_new(x):
-    """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "gelu_new": gelu_new,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
 
 
 class TransformerEncoderLayer(Layer):

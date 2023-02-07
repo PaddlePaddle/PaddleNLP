@@ -28,7 +28,9 @@ from paddlenlp.transformers.t5.modeling import T5DenseGatedGeluDense, T5DenseRel
 from paddlenlp.transformers.utils import fn_args_to_dict
 from paddlenlp.utils.log import logger
 
-if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+if (getattr(paddle.fluid.framework, "_in_eager_mode_", False)) or (
+    getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
+):
     from paddle.framework import core
 
 
@@ -38,6 +40,9 @@ def run_custom(op_name, inputs_names, inputs_var, attrs_names, attrs_val, output
     if (
         getattr(paddle.fluid.framework, "_in_eager_mode_", False)
         and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
+    ) or (
+        getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
+        and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
     ):
         ctx = core.CustomOpKernelContext()
 
@@ -1905,6 +1910,9 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
         if (
             getattr(paddle.fluid.framework, "_in_eager_mode_", False)
             and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
+        ) or (
+            getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
+            and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
         ):
             param_data = p.numpy()
             new_p = paddle.create_parameter(shape=param_shape, dtype=dtype, is_bias=is_bias)

@@ -77,9 +77,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 2. **模型训练**
 
--
-数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"
-IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese"模型，还支持large模型: "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"。
+- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese"模型，还支持large模型: "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"。
 
 
 3. **模型预测**
@@ -217,7 +215,20 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
 - `max_target_length` 模型训练时标签的最大长度。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
-更多参数详情和参数的默认值请参考`run_summarization.py`。
+  除此之外，我们提供了一种可选的解码端输入增强策略。该策略在解码过程中，基于标准摘要和模型输出构造了新的解码输入数据，以此实现解码端的数据增强。具体详情可以参考[SSTIA论文](https://openreview.net/pdf?id=pz1euXohm4H)。如果想使用该策略，可以设置参数：
+- `use_SSTIA` 表示使用该策略。以及，
+- `mix_ratio` 表示构造输入和原始输入的权重。
+
+  该策略在Pegasus-238M和Pegasus-523M模型上均有大幅度提升，具体效果见后文实验结果表格。
+
+  PaddleNLP提供了训练好的SSTIA模型，可以修改`model_name_or_path`直接使用：
+
+  | PaddleNLP提供的SSTIA模型        |
+  |---------------------------------|
+  | PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA      |
+  | PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA      |
+
+更多参数详情和参数的默认值请参考`train.py`。
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`output_dir`中。
 如：
@@ -255,7 +266,9 @@ Finetuned baseline的模型在[LCSTS](https://aclanthology.org/D15-1229/)测试�
 | model_name | Rouge-1 | Rouge-2 | Rouge-L | BLEU-4 |
 | :-----------------------------: | :---: | :-----------: | :-------------------: |:-------------------: |
 | finetuned IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese | 43.30 | 30.08 | 40.12 | 24.50 |
+| IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese + SSTIA   | 45.79 | 33.20 | 42.88 | 28.07 |
 | finetuned IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese | 48.13 | 36.41 | 45.39 | 31.99 |
+| IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese + SSTIA   | 53.23 | 42.79 | 50.84 | 39.05 |
 
 ### 模型推理部署
 
@@ -300,3 +313,5 @@ inference_model/
   //International Conference on Machine Learning. PMLR, 2020: 11328-11339.
 - Wang J, Zhang Y, Zhang L, et al. Fengshenbang 1.0: Being the Foundation of Chinese Cognitive Intelligence[J]. arXiv
   preprint arXiv:2209.02970, 2022.
+- Xie S, Lv A, Xia Y, et al. Target-side input augmentation for sequence to sequence generation[C]
+  //International Conference on Learning Representations. 2022.

@@ -289,7 +289,16 @@ def require_package(*package_names):
     return decorator
 
 
-def load_test_config(config_file: str, key: str) -> dict:
+def is_slow_test() -> bool:
+    """check whether is the slow test
+
+    Returns:
+        bool: whether is the slow test
+    """
+    return os.getenv("RUN_SLOW_TEST") is not None
+
+
+def load_test_config(config_file: str, key: str) -> dict | None:
     """parse config file to argv
 
     Args:
@@ -303,11 +312,11 @@ def load_test_config(config_file: str, key: str) -> dict:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "default"
-    if os.getenv("RUN_SLOW_TEST", None):
-        sub_key = "slow"
+    sub_key = "slow" if is_slow_test() else "default"
 
-    assert sub_key in config, f"<{sub_key}> not found in {key} configuration"
+    if sub_key not in config:
+        return None
+
     config = config[sub_key]
     return config
 
