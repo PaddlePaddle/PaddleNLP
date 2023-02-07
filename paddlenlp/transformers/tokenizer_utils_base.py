@@ -1763,7 +1763,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         self,
         repo_id: str,
         private: Optional[bool] = None,
-        commit_message: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
         revision: Optional[str] = None,
         create_pr: bool = False,
     ):
@@ -1772,6 +1773,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Args:
             repo_id (str): Repository name for your model/tokenizer in the Hub.
             private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
             commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
             revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
             create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
@@ -1794,20 +1796,24 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         except EntryNotFoundError:
             has_readme = False
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
             # save model
-            self.save_pretrained(tmp_dir)
+            self.save_pretrained(save_dir)
             # Add readme if does not exist
             logger.info("README.md not found, adding the default README.md")
             if not has_readme:
-                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
                     f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
             # Upload model and return
             logger.info(f"Pushing to the {repo_id}. This might take a while")
             return upload_folder(
                 repo_id=repo_id,
                 repo_type="model",
-                folder_path=tmp_dir,
+                folder_path=root_dir,
                 commit_message=commit_message,
                 revision=revision,
                 create_pr=create_pr,

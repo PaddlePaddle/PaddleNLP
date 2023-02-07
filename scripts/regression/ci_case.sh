@@ -321,7 +321,7 @@ if [ ! -f 'test.py' ];then
     # time (python -m unittest test_accuracy.py >${log_path}/gpt_test_acc) >>${log_path}/gpt_test_acc 2>&1
     # print_info $? gpt_test_acc
 else 
-    pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
     print_info $? gpt
 fi
 fast_gpt
@@ -375,7 +375,7 @@ if [ ! -f 'test.py' ];then
         --device "gpu" >${log_path}/ernie_pretrain >>${log_path}/ernie_pretrain 2>&1
     print_info $? ernie_pretrain
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
     print_info $? ernie-1.0
 fi
 }
@@ -985,7 +985,7 @@ if [ ! -f 'test.py' ];then
         --logging_steps 1  >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
         print_info $? ernie-m
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
     print_info $? ernie-layout
 fi
 }
@@ -1081,7 +1081,7 @@ print_info $? textcnn_predict
 #33 taskflow
 taskflow (){
 cd ${nlp_dir}
-pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
+python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
 print_info $? taskflow_unittest
 python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
@@ -1094,7 +1094,7 @@ for apicase in `ls`;do
             continue
     else
         cd ${nlp_dir}
-        pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+        python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
         print_info $? tests ${apicase}_unittest
     fi
 done
@@ -1161,7 +1161,7 @@ if [ ! -f 'test.py' ];then
     python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
     print_info $? ernie-3.0_compress_qa
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
     print_info $? ernie-3.0
 fi
 }
@@ -1169,7 +1169,7 @@ ernie-health(){
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
     print_info $? ernie-health
 fi
 }
@@ -1178,7 +1178,7 @@ cd ${nlp_dir}/model_zoo/uie/
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
     print_info $? uie
 fi
 }
@@ -1187,7 +1187,7 @@ cd ${nlp_dir}/model_zoo/ernie-layout/
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
     print_info $? ernie-layout
 fi
 }
