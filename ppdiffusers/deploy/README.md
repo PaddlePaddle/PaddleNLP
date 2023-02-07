@@ -81,7 +81,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm"
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "pndm" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle --device gpu
 ```
 
 #### 参数说明
