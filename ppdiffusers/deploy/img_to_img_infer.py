@@ -73,7 +73,7 @@ def parse_arguments():
         help="The inference runtime device of models.",
     )
     parser.add_argument(
-        "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
+        "--image_path", default="fantasy_landscape.png", help="The model directory of diffusion_model."
     )
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
@@ -357,4 +357,4 @@ if __name__ == "__main__":
     prompt = "A fantasy landscape, trending on artstation"
     images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
 
-    images[0].save("fantasy_landscape.png")
+    images[0].save(args.image_path)
