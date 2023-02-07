@@ -27,7 +27,7 @@ pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdep
 python text_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle
 ```
 
-脚本的输入提示语句为 "a photo of an astronaut riding a horse on mars"， 得到的图像文件为 fd_astronaut_rides_horse.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
+脚本的输入提示语句为 **"a photo of an astronaut riding a horse on mars"**， 得到的图像文件为 fd_astronaut_rides_horse.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
 ![fd_astronaut_rides_horse.png](https://user-images.githubusercontent.com/10826371/200261112-68e53389-e0a0-42d1-8c3a-f35faa6627d7.png)
 
@@ -64,9 +64,10 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
 ```
 
-脚本输入的提示语句为 "A fantasy landscape, trending on artstation"，待变换的图像为：
+脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
 
-![sketch-mountains-input.png](https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png)
+![sketch-mountains-input.png](https://user-images.githubusercontent.com/10826371/217207485-09ee54de-4ba2-4cff-9d6c-fd426d4c1831.png)
+
 
 运行得到的图像文件为 fantasy_landscape.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
