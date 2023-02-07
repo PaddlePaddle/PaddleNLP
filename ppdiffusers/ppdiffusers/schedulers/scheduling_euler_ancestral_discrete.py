@@ -82,6 +82,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         prediction_type: str = "epsilon",
+        preconfig:bool=False
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype="float32")
@@ -108,12 +109,10 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
         self.is_scale_input_called = False
+        self.preconfig=preconfig
 
-    def config(self):
-        self.latent_scales = 1 / ((self.sigmas**2 + 1) ** 0.5)
-        pass
-
-    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor],
+    **kwargs) -> paddle.Tensor:
         """
         Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the Euler algorithm.
 
@@ -124,14 +123,22 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             `paddle.Tensor`: scaled input sample
         """
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1) ** 0.5)
         self.is_scale_input_called = True
-        return sample
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
+
+        if not self.preconfig:
+            sigma = self.sigmas[step_index]
+            sample = sample / ((sigma**2 + 1) ** 0.5)
+            return sample
+        else:
+            return sample * self.latent_scales[step_index]
+
 
     def scale_model_input_preconfigured(self, sample: paddle.Tensor, idx) -> paddle.Tensor:
-
+        self.is_scale_input_called = True
         return sample * self.latent_scales[idx]
 
     def set_timesteps(self, num_inference_steps: int):
@@ -150,6 +157,18 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
+        if self.preconfig:
+            self.sigma_up=[]
+            self.sigma_down=[]
+            for step_index_i in range(len(self.timesteps)):
+                sigma_from = self.sigmas[step_index_i]
+                sigma_to = self.sigmas[step_index_i + 1]
+                sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
+                sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
+                self.sigma_up.append(sigma_up)
+                self.sigma_down.append(sigma_down)
+
+            self.latent_scales = 1 / ((self.sigmas**2 + 1) ** 0.5)
 
     def step(
         self,
@@ -158,6 +177,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sample: paddle.Tensor,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
+        **kwargs
     ) -> Union[EulerAncestralDiscreteSchedulerOutput, Tuple]:
         """
         Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
@@ -182,37 +202,41 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example."
             )
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-
-        # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        if self.config.prediction_type == "epsilon":
-            pred_original_sample = sample - sigma * model_output
-        elif self.config.prediction_type == "v_prediction":
-            # * c_out + input * c_skip
-            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+        if kwargs.get("return_pred_original_sample") is not None:
+            return_pred_original_sample = kwargs["return_pred_original_sample"]
         else:
-            raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
-            )
-        sigma_from = self.sigmas[step_index]
-        sigma_to = self.sigmas[step_index + 1]
-        sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
-        sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
+            return_pred_original_sample = True
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
+        sigma = self.sigmas[step_index]
+        if self.config.prediction_type == "epsilon" and return_pred_original_sample == False:
+            derivative = model_output
+            pred_original_sample=None
+        else:
+            # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
+            if self.config.prediction_type == "epsilon":
+                pred_original_sample = sample - sigma * model_output
+            elif self.config.prediction_type == "v_prediction":
+                # * c_out + input * c_skip
+                pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+            else:
+                raise ValueError(
+                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+                )
+            derivative = (sample - pred_original_sample) / sigma
 
         # 2. Convert to an ODE derivative
-        derivative = (sample - pred_original_sample) / sigma
-
-        dt = sigma_down - sigma
-
+        dt = self.sigma_down[step_index] - sigma
         prev_sample = sample + derivative * dt
-
         noise = paddle.randn(model_output.shape, dtype=model_output.dtype, generator=generator)
-
-        prev_sample = prev_sample + noise * sigma_up
-
+        prev_sample = prev_sample + noise * self.sigma_up[step_index]
         if not return_dict:
-            return (prev_sample,)
+            if not return_pred_original_sample:
+                return (prev_sample,)
+            else:
+                return (prev_sample, pred_original_sample)
 
         return EulerAncestralDiscreteSchedulerOutput(
             prev_sample=prev_sample, pred_original_sample=pred_original_sample
