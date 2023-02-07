@@ -82,6 +82,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         prediction_type: str = "epsilon",
+        preconfig=False,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype="float32")
@@ -109,6 +110,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
         self.derivatives = []
         self.is_scale_input_called = False
+        self.preconfig = preconfig
 
     def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
         """
@@ -126,10 +128,9 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sample = sample / ((sigma**2 + 1) ** 0.5)
         self.is_scale_input_called = True
         return sample
-    def scale_model_input_preconfigured(
-            self, sample: paddle.Tensor,
-            idx) -> paddle.Tensor:
-        return sample*self.latent_scales[idx]
+
+    def scale_model_input_preconfigured(self, sample: paddle.Tensor, idx) -> paddle.Tensor:
+        return sample * self.latent_scales[idx]
 
     def get_lms_coefficient(self, order, t, current_order):
         """
@@ -153,15 +154,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         return integrated_coeff
 
-    def configure(self, order: int = 4):
-        self.order = order
-        self.lms_coeffs = []
-        self.latent_scales = [1./((sigma**2 + 1) ** 0.5) for sigma in self.sigmas]
-        for step_index in range(self.num_inference_steps):
-            order = min(step_index + 1, order)
-            self.lms_coeffs.append([self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)])
-
-    def set_timesteps(self, num_inference_steps: int):
+    def set_timesteps(self, num_inference_steps: int, preconfig_order: int = 4):
         """
         Sets the timesteps used for the diffusion chain. Supporting function to be run before inference.
 
@@ -179,6 +172,15 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
 
         self.derivatives = []
+        if self.preconfig:
+            self.order = preconfig_order
+            self.lms_coeffs = []
+            self.latent_scales = [1.0 / ((sigma**2 + 1) ** 0.5) for sigma in self.sigmas]
+            for step_index in range(self.num_inference_steps):
+                order = min(step_index + 1, preconfig_order)
+                self.lms_coeffs.append(
+                    [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
+                )
 
     def step(
         self,
@@ -187,6 +189,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sample: paddle.Tensor,
         order: int = 4,
         return_dict: bool = True,
+        **kwargs
     ) -> Union[LMSDiscreteSchedulerOutput, Tuple]:
         """
         Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
@@ -199,6 +202,9 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 current instance of sample being created by diffusion process.
             order: coefficient for multi-step inference.
             return_dict (`bool`): option for returning tuple rather than LMSDiscreteSchedulerOutput class
+            Args in kwargs:
+                step_index (`int`):
+                return_pred_original_sample (`bool`): option for return pred_original_sample
 
         Returns:
             [`~schedulers.scheduling_utils.LMSDiscreteSchedulerOutput`] or `tuple`:
@@ -211,38 +217,57 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example."
             )
-
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-
-        # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        if self.config.prediction_type == "epsilon":
-            pred_original_sample = sample - sigma * model_output
-        elif self.config.prediction_type == "v_prediction":
-            # * c_out + input * c_skip
-            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+        if kwargs.get("return_pred_original_sample") is not None:
+            return_pred_original_sample = kwargs["return_pred_original_sample"]
         else:
-            raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
-            )
+            return_pred_original_sample = True
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
+        if self.config.prediction_type == "epsilon" and return_pred_original_sample == False:
+            # if pred_original_sample is no need
+            self.derivatives.append(model_output)
+            pred_original_sample = None
+        else:
+            sigma = self.sigmas[step_index]
+            # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
+            if self.config.prediction_type == "epsilon":
+                pred_original_sample = sample - sigma * model_output
+            elif self.config.prediction_type == "v_prediction":
+                # * c_out + input * c_skip
+                pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+            else:
+                raise ValueError(
+                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+                )
+            # 2. Convert to an ODE derivative
+            derivative = (sample - pred_original_sample) / sigma
+            self.derivatives.append(derivative)
 
-        # 2. Convert to an ODE derivative
-        derivative = (sample - pred_original_sample) / sigma
-        self.derivatives.append(derivative)
         if len(self.derivatives) > order:
             self.derivatives.pop(0)
 
-        # 3. Compute linear multistep coefficients
-        order = min(step_index + 1, order)
-        lms_coeffs = [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
-
-        # 4. Compute previous sample based on the derivatives path
-        prev_sample = sample + sum(
-            coeff * derivative for coeff, derivative in zip(lms_coeffs, reversed(self.derivatives))
-        )
+        if not self.preconfig:
+            # 3. If not preconfiged, compute linear multistep coefficients.
+            order = min(step_index + 1, order)
+            lms_coeffs = [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
+            # 4. Compute previous sample based on the derivatives path
+            prev_sample = sample + sum(
+                coeff * derivative for coeff, derivative in zip(lms_coeffs, reversed(self.derivatives))
+            )
+        else:
+            # 3. If preconfiged, direct compute previous sample based on the derivatives path
+            prev_sample = sample + sum(
+                coeff * derivative
+                for coeff, derivative in zip(self.lms_coeffs[step_index], reversed(self.derivatives))
+            )
 
         if not return_dict:
-            return (prev_sample,)
+            if not return_pred_original_sample:
+                return (prev_sample,)
+            else:
+                return (prev_sample, pred_original_sample)
 
         return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
 
@@ -252,7 +277,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sample: paddle.Tensor,
         step_index,
         return_dict: bool = True,
-        return_pred_original_sample : bool = False
+        return_pred_original_sample: bool = False,
     ) -> Union[LMSDiscreteSchedulerOutput, Tuple]:
         """
         Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
@@ -276,7 +301,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
         # 2. Convert to an ODE derivative
 
-        if self.config.prediction_type == "epsilon" and return_pred_original_sample==False:
+        if self.config.prediction_type == "epsilon" and return_pred_original_sample == False:
             self.derivatives.append(model_output)
         else:
             sigma = self.sigmas[step_index]
@@ -296,16 +321,15 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             self.derivatives.pop(0)
 
         # 3. Compute previous sample based on the derivatives path
-        prev_sample = sample + sum(coeff * derivative
-                                   for coeff, derivative in zip(
-                                       self.lms_coeffs[step_index], reversed(self.derivatives)))
-        if return_dict==True:
+        prev_sample = sample + sum(
+            coeff * derivative for coeff, derivative in zip(self.lms_coeffs[step_index], reversed(self.derivatives))
+        )
+        if return_dict == True:
             if return_pred_original_sample == False:
                 return (prev_sample,)
             else:
-                return (prev_sample,pred_original_sample)
+                return (prev_sample, pred_original_sample)
         return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
-
 
     def add_noise(
         self,
