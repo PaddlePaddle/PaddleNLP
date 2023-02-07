@@ -59,6 +59,6 @@ python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion
 
 | 参数 |参数说明 |
 |----------|--------------|
-| <div style="width: 230pt"> --pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4"。更多 StableDiffusion 预训练模型可参考 [ppdiffusers 模型列表](../README.md#ppdiffusers模型支持的权重)。|
+| <span style="display:inline-block;width: 230pt"> --pretrained_model_name_or_path </span> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4"。更多 StableDiffusion 预训练模型可参考 [ppdiffusers 模型列表](../README.md#ppdiffusers模型支持的权重)。|
 | --output_path | 导出的模型目录。 |
 | --sample | vae encoder 的输出是否调整为 sample 模式，注意：sample模式会引入随机因素，默认是 False。|

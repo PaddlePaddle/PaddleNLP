@@ -109,3 +109,9 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 
 
 ### 文本引导的图像编辑（Text-Guided Image Inpainting）
+
+注意！当前有两种版本的图像编辑代码，一个是 Legacy 版本，一个是正式版本，下面将分别介绍两种版本的使用示例。
+
+#### Legacy 版本
+
+#### 正式版本
