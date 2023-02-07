@@ -45,7 +45,7 @@ class GPTTest(TestCase):
         )
 
         with argv_context_guard(pretrain_config):
-            from run_pretrain import do_train
+            from run_pretrain_trainer import do_train
 
             do_train()
 

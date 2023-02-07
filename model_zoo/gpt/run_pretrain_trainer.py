@@ -35,6 +35,7 @@ from paddlenlp.trainer import (
 )
 from paddlenlp.transformers import (
     GPTChineseTokenizer,
+    GPTConfig,
     GPTForPretraining,
     GPTPretrainingCriterion,
     GPTTokenizer,
@@ -54,6 +55,17 @@ class TrainingArguments(TrainingArguments):
     dp_degree: int = field(default=None, metadata={"help": "Data Parallelism degree."})
     profiler_options: str = field(default="gpt", metadata={"help": "key1=value1;key2=value2;key3=value3"})
     fp16: bool = field(default=False, metadata={"help": "Enable mixed precision training."})
+    decay_steps: int = field(
+        default=360000,
+        metadata={
+            "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_lr."
+        },
+    )
+    lr_decay_style: str = field(default="cosine", metadata={"help": "Learning rate decay style."})
+    grad_clip: float = field(default=0.0, metadata={"help": "Grad clip for the parameter."})
+
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention probs dropout prob."})
 
     @property
     def eval_freq(self):
@@ -220,7 +232,6 @@ class PretrainingTrainer(Trainer):
             eval_dataloader,
             description="Evaluation",
             prediction_loss_only=True if compute_metrics is None else None,
-            # TODO()
             max_eval_iters=self.args.eval_iters,
             ignore_keys=ignore_keys,
         )
@@ -363,7 +374,19 @@ def do_train():
     model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
-    model = model_class.from_pretrained(model_args.model_name_or_path)
+
+    if os.path.isdir(model_args.model_name_or_path):
+        # load model from checkpoint
+        model = model_class.from_pretrained(model_args.model_name_or_path)
+    else:
+        # init random model
+        assert (
+            model_args.model_name_or_path in model_class.pretrained_init_configuration
+        ), f"{model_args.model_name_or_path} must be one of <{','.join(model_class.pretrained_init_configuration.keys())}>"
+        config: GPTConfig = GPTConfig.from_pretrained(model_args.model_name_or_path)
+        config.hidden_dropout_prob = training_args.hidden_dropout_prob
+        config.attention_probs_dropout_prob = training_args.attention_probs_dropout_prob
+        model = model_class(config)
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
@@ -383,7 +406,10 @@ def do_train():
         lr_scheduler = None
     elif training_args.weight_decay == "cosine":
         lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=training_args.learning_rate, min_lr=training_args.min_lr, warmup_step=training_args.warmup_steps
+            max_lr=training_args.learning_rate,
+            min_lr=training_args.min_lr,
+            warmup_step=training_args.warmup_steps,
+            decay_step=training_args.decay_steps,
         )
 
     # Generate parameter names needed to perform weight decay.
@@ -396,6 +422,7 @@ def do_train():
         epsilon=training_args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=training_args.weight_decay,
+        grad_clip=training_args.grad_clip,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 

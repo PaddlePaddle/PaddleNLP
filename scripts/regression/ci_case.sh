@@ -282,6 +282,8 @@ gpt(){
 # TODO(wj-Mcat): remove the following scripts later.
 # run gpt testing with command line
 # data process
+
+echo 'run test on run_pretrain_trainer.py'
 cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
@@ -298,7 +300,7 @@ mv gpt_en_dataset_300m_ids.npy ./data
 mv gpt_en_dataset_300m_idx.npz ./data
 
 # pretrain
-python -m paddle.distributed.launch run_pretrain.py \
+python -m paddle.distributed.launch run_pretrain_trainer.py \
     --model_type gpt \
     --model_name_or_path __internal_testing__/gpt \
     --input_dir ./data \
@@ -332,7 +334,23 @@ print_info $? gpt_p_depoly
 # run pytest on gpt-testing
 pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
 print_info $? gpt
-fi
+
+echo 'run test on old run_pretrain.py'
+time (python -m paddle.distributed.launch run_pretrain.py \
+    --model_type gpt \
+    --model_name_or_path gpt2-en \
+    --input_dir "./data"\
+    --output_dir "output"\
+    --weight_decay 0.01\
+    --grad_clip 1.0\
+    --max_steps 2\
+    --save_steps 2\
+    --decay_steps 320000\
+    --warmup_rate 0.01\
+    --micro_batch_size 2 \
+    --device gpu >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
+print_info $? gpt_pretrain
+
 fast_gpt
 cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
