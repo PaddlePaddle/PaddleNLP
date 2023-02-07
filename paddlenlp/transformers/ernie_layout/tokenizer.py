@@ -104,7 +104,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
 
         self.tokens_to_ids["[MASK]"] = len(self.sp_model) + self.offset
         self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
-
         self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):
@@ -170,7 +169,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
     def get_offset_mapping(self, text):
-        split_tokens = self._tokenize(text)
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = "", []
 
         for i, ch in enumerate(text):

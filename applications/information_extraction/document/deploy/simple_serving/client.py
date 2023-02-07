@@ -18,7 +18,7 @@ import requests
 
 from paddlenlp.utils.doc_parser import DocParser
 
-# Define the docuemnt parser
+# Define the document parser
 doc_parser = DocParser()
 
 image_paths = ["../../data/images/b1.jpg"]
