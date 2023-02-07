@@ -18,6 +18,8 @@ import time
 from io import BytesIO
 
 import fastdeploy as fd
+import numpy as np
+import paddle
 import requests
 from fastdeploy import ModelFormat
 from PIL import Image
@@ -201,6 +203,14 @@ def get_scheduler(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # 0. Init device id
+    device_id = args.device_id
+    if args.device == "cpu":
+        device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
+
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -243,9 +253,6 @@ if __name__ == "__main__":
     }
 
     # 4. Init runtime
-    device_id = args.device_id
-    if args.device == "cpu":
-        device_id = -1
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
@@ -355,6 +362,22 @@ if __name__ == "__main__":
     init_image = init_image.resize((768, 512))
 
     prompt = "A fantasy landscape, trending on artstation"
-    images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
+
+    # Warm up
+    pipe(prompt=prompt, image=init_image, num_inference_steps=10)
+
+    time_costs = []
+    print(f"Run the stable diffusion img2img pipeline {args.benchmark_steps} times to test the performance.")
+
+    for step in range(args.benchmark_steps):
+        start = time.time()
+        images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
+        latency = time.time() - start
+        time_costs += [latency]
+        print(f"No {step:3d} time cost: {latency:2f} s")
+    print(
+        f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+        f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+    )
 
     images[0].save(args.image_path)

@@ -1,13 +1,13 @@
 # Diffusion 模型导出教程
 
 
-[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers) 是一款支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，其借鉴了🤗 Huggingface 团队的[Diffusers](https://github.com/huggingface/diffusers)的优秀设计，并且依托[PaddlePaddle](https://github.com/PaddlePaddle/Paddle)框架和 [PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理库。下面将介绍如何将 PPDiffusers 提供的预训练模型进行模型导出。
+[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers) 是一款支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，其借鉴了🤗 Huggingface 团队的 [Diffusers](https://github.com/huggingface/diffusers) 的优秀设计，并且依托 [PaddlePaddle](https://github.com/PaddlePaddle/Paddle) 框架和 [PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 自然语言处理库。下面将介绍如何将 PPDiffusers 提供的预训练模型进行模型导出。
 
 ### 模型导出
 
 ___注意：模型导出过程中，需要下载 StableDiffusion 模型。为了使用该模型与权重，你必须接受该模型所要求的 License，请访问 HuggingFace 的[model card](https://huggingface.co/runwayml/stable-diffusion-v1-5), 仔细阅读里面的 License，然后签署该协议。___
 
-___Tips: Stable Diffusion是基于以下的License: The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
+___Tips: Stable Diffusion 是基于以下的 License: The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
 
 可执行以下命令行完成模型导出。
 

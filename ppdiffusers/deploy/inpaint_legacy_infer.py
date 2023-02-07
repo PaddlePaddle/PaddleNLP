@@ -18,6 +18,7 @@ import time
 from io import BytesIO
 
 import fastdeploy as fd
+import paddle
 import PIL
 import requests
 from fastdeploy import ModelFormat
@@ -72,9 +73,7 @@ def parse_arguments():
         ],
         help="The inference runtime device of models.",
     )
-    parser.add_argument(
-        "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
-    )
+    parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
@@ -200,6 +199,13 @@ def get_scheduler(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # 0. Init device id
+    device_id = args.device_id
+    if args.device == "cpu":
+        device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -242,9 +248,6 @@ if __name__ == "__main__":
     }
 
     # 4. Init runtime
-    device_id = args.device_id
-    if args.device == "cpu":
-        device_id = -1
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
@@ -368,4 +371,4 @@ if __name__ == "__main__":
         num_inference_steps=args.inference_steps,
     ).images
 
-    images[0].save("cat_on_bench_new.png")
+    images[0].save(args.image_path)
