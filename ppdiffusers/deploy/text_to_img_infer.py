@@ -233,7 +233,7 @@ if __name__ == "__main__":
     if args.device == "cpu":
         device_id = -1
     if args.backend == "onnx_runtime":
-        text_encoder_runtime = create_ort_runtime(
+        text_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_ort_runtime(

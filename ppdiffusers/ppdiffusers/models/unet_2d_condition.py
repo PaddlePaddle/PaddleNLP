@@ -123,7 +123,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
         resnet_pre_temb_non_linearity=True,
-        c=True,
     ):
         super().__init__()
 
@@ -397,7 +396,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         if any(s % default_overall_up_factor != 0 for s in sample.shape[-2:]):
             logger.info("Forward upsample size to force interpolation output size.")
             forward_upsample_size = True
-        print("## for debug, in unet 2d condition:")
         # prepare attention_mask
         if attention_mask is not None:
             attention_mask = (1 - attention_mask.cast(sample.dtype)) * -10000.0
@@ -408,7 +406,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             sample = 2 * sample - 1.0
 
         # 1. time
-        print("## for debug, in unet 2d condition:")
         timesteps = timestep
         if not paddle.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
@@ -443,12 +440,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 2. pre-process
         sample = self.conv_in(sample)
-        print("## for debug, in unet 2d condition:")
 
         # 3. down
         down_block_res_samples = (sample,)
         down_nonlinear_temb=self.down_resnet_temb_nonlinearity(emb)
-        print("## for debug, in unet 2d condition:",self.down_resnet_temb_nonlinearity)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
