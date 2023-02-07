@@ -135,10 +135,6 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         else:
             return sample * self.latent_scales[step_index]
 
-
-    def scale_model_input_preconfigured(self, sample: paddle.Tensor, idx) -> paddle.Tensor:
-        return sample * self.latent_scales[idx]
-
     def get_lms_coefficient(self, order, t, current_order):
         """
         Compute a linear multistep coefficient.
@@ -276,66 +272,6 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             else:
                 return (prev_sample, pred_original_sample)
 
-        return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
-
-    def step_preconfigured(
-        self,
-        model_output: paddle.Tensor,
-        sample: paddle.Tensor,
-        step_index,
-        return_dict: bool = True,
-        return_pred_original_sample: bool = False,
-    ) -> Union[LMSDiscreteSchedulerOutput, Tuple]:
-        """
-        Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
-        process from the learned model outputs (most often the predicted noise).
-        Notice that this function is only called after configure() is done.
-
-        Args:
-            model_output (`paddle.Tensor`): direct output from learned diffusion model.
-            sample (`paddle.Tensor`):
-                current instance of sample being created by diffusion process.
-            step_index:
-                current time step index.
-            return_dict (`bool`): option for returning tuple rather than LMSDiscreteSchedulerOutput class
-            return_pred_original_sample ('bool'): option for returning pred_original_sample.
-        Returns:
-            [`~schedulers.scheduling_utils.LMSDiscreteSchedulerOutput`] or `tuple`:
-            [`~schedulers.scheduling_utils.LMSDiscreteSchedulerOutput`] if `return_dict` is True, otherwise a `tuple`.
-            When returning a tuple, the first element is the sample tensor.
-
-        """
-        # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        # 2. Convert to an ODE derivative
-
-        if self.config.prediction_type == "epsilon" and return_pred_original_sample == False:
-            self.derivatives.append(model_output)
-        else:
-            sigma = self.sigmas[step_index]
-            if self.config.prediction_type == "epsilon":
-                pred_original_sample = sample - sigma * model_output
-            elif self.config.prediction_type == "v_prediction":
-                # * c_out + input * c_skip
-                pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
-            else:
-                raise ValueError(
-                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
-                )
-            derivative = (sample - pred_original_sample) / sigma
-            self.derivatives.append(derivative)
-
-        if len(self.derivatives) > self.order:
-            self.derivatives.pop(0)
-
-        # 3. Compute previous sample based on the derivatives path
-        prev_sample = sample + sum(
-            coeff * derivative for coeff, derivative in zip(self.lms_coeffs[step_index], reversed(self.derivatives))
-        )
-        if return_dict == True:
-            if return_pred_original_sample == False:
-                return (prev_sample,)
-            else:
-                return (prev_sample, pred_original_sample)
         return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
 
     def add_noise(
