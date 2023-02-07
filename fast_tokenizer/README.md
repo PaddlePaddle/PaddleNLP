@@ -131,7 +131,7 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 
   3. 文本长度较长。若文本长度较短，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议文本平均长度大于16的时候再考虑开启多线程分词。
 
-**Q：Windows 上编译、运行示例出错。**
+**Q：Windows 上编译、运行示例出错。** 相关issue：[issues 4673](https://github.com/PaddlePaddle/PaddleNLP/issues/4673)。
 
 A：FastTokenizer 支持 Linux、Windows 以及 MacOS 系统上运行，同一示例可以在不同的操作系统上运行。如果出现在其他系统编译运行没错，但在 Windows 上编译或者运行示例出错的问题，大概率是编译过程中遇到中文字符的编码问题，FastTokenizer 要求字符集必须为 UTF-8。可以参考Visual Studio的官方文档，设置源字符集为/utf-8解决：[/utf-8（将源字符集和执行字符集设置为 UTF-8）](https://learn.microsoft.com/zh-cn/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-170)。
 
