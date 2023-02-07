@@ -113,7 +113,7 @@ print(text2)
 
 ## FAQ
 
-Q：我在 AutoTokenizer.from_pretrained 接口上已经打开 `use_fast=True` 开关，为什么文本预处理阶段性能上好像没有任何变化？
+**Q：我在 AutoTokenizer.from_pretrained 接口上已经打开 `use_fast=True` 开关，为什么文本预处理阶段性能上好像没有任何变化？**
 
 A：在有三种情况下，打开 `use_fast=True` 开关可能无法提升性能：
   1. 没有安装 fast_tokenizer 。若在没有安装 fast_tokenizer 库的情况下打开 `use_fast` 开关，PaddleNLP 会给出以下warning："Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. "。
@@ -122,7 +122,7 @@ A：在有三种情况下，打开 `use_fast=True` 开关可能无法提升性�
 
   3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用 FastTokenizer 后仍无法提升整体性能。
 
-Q：如何使用多线程加速分词？
+**Q：如何使用多线程加速分词？**
 
 A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进行分词。需要谨慎开启多线程加速分词，在以下场景下可以考虑开启多线程：
   1. CPU资源充足。若在推理阶段使用CPU进行推理，开启多线程分词可能会出现资源竞争情况，从而影响推理阶段的性能。
@@ -130,6 +130,10 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
   2. 文本的批大小较大。若批大小比较小，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议批大小大于4的时候再考虑开启多线程分词。
 
   3. 文本长度较长。若文本长度较短，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议文本平均长度大于16的时候再考虑开启多线程分词。
+
+**Q：Windows 上编译、运行示例出错。**
+
+A：FastTokenizer 支持 Linux、Windows 以及 MacOS 系统上运行，同一示例可以在不同的操作系统上运行。如果出现在其他系统编译运行没错，但在 Windows 上编译或者运行示例出错的问题，大概率是编译过程中遇到中文字符的编码问题，FastTokenizer 要求字符集必须为 UTF-8。可以参考Visual Studio的官方文档，设置源字符集为/utf-8解决：[/utf-8（将源字符集和执行字符集设置为 UTF-8）](https://learn.microsoft.com/zh-cn/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-170)。
 
 ## 参考文献
 
