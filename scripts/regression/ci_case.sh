@@ -17,6 +17,8 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+export PATH=${PATH}
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
 if [ -f "model_logs/" ];then 
     mkdir model_logs
 fi
