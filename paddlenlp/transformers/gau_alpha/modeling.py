@@ -185,12 +185,7 @@ def initializer(tensor, num_hidden_layers=12, order=2, gain=1.0):
 
 
 class RotaryPositionEmbedding(Layer):
-    def __init__(
-        self,
-        config: GAUAlphaConfig
-        # dim,
-        # max_position_embeddings=512
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super().__init__()
         inv_freq = 1.0 / (
             10000
@@ -453,12 +448,7 @@ class GAUAlphaForQuestionAnswering(GAUAlphaPretrainedModel):
             instance `gau_alpha`. Defaults to `None`.
     """
 
-    def __init__(
-        self,
-        config: GAUAlphaConfig
-        # gau_alpha,
-        # dropout=None
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super(GAUAlphaForQuestionAnswering, self).__init__(config)
         self.gau_alpha = GAUAlphaModel(config)
         self.dropout = nn.Dropout(

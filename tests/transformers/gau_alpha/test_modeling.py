@@ -25,8 +25,8 @@ from paddlenlp.transformers import (
     GAUAlphaModel,
     GAUAlphaPretrainedModel,
 )
-from tests.testing_utils import slow
 
+from ...testing_utils import slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
@@ -142,7 +142,6 @@ class GAUAlphaModelTester:
         result = model(input_ids, token_type_ids=token_type_ids)
         result = model(input_ids)
         self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        # self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
     def create_and_check_for_multiple_choice(
         self,
