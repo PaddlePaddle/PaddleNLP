@@ -230,7 +230,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             step_index = kwargs["step_index"]
         else:
             step_index = (self.timesteps == timestep).nonzero().item()
-        if self.config.prediction_type == "epsilon" and return_pred_original_sample == False:
+        if self.config.prediction_type == "epsilon" and not return_pred_original_sample:
             # if pred_original_sample is no need
             self.derivatives.append(model_output)
             pred_original_sample = None
