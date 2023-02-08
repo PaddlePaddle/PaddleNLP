@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import numpy as np
+import os
 from pprint import pprint
 
-import paddle
+import numpy as np
 from paddle import inference
 
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
-from paddlenlp.ops.ext_utils import load
 from paddlenlp.data import Pad
-import os
+from paddlenlp.ops.ext_utils import load
+from paddlenlp.transformers import UNIMOTokenizer
 
 
 def setup_args():
@@ -39,8 +38,8 @@ def setup_args():
 
 def setup_predictor(args):
     """Setup inference predictor."""
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     model_file = os.path.join(args.inference_model_dir, "unimo_text.pdmodel")
     params_file = os.path.join(args.inference_model_dir, "unimo_text.pdiparams")
     if not os.path.exists(model_file):
