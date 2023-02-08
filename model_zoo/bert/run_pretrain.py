@@ -289,6 +289,8 @@ def do_train():
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+    pretrained_models_list.append("__internal_testing__/bert")
+
     if model_args.model_name_or_path in pretrained_models_list:
         config = model_class.config_class.from_pretrained(model_args.model_name_or_path)
         config.fuse = model_args.fuse_transformer
