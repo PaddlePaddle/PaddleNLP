@@ -192,6 +192,14 @@ def load_torch(path: str, **pickle_load_args):
     Returns:
 
     """
+    import torch
+
+    ret_dict = torch.load(path, map_location="cpu")
+    for k, v in ret_dict.items():
+        if isinstance(v, torch.Tensor):
+            ret_dict[k] = v.numpy()
+    return ret_dict
+
     pickle_load_args.update({"encoding": "utf-8"})
 
     # 1. load the structure of pytorch weight file
