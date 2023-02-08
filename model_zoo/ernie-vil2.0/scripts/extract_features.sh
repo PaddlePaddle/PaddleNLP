@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # export NCCL_IB_DISABLE=0
-export PYTHONPATH=/root/paddlejob/workspace/env_run/wugaosheng/PaddleNLP:$PYTHONPATH
 DATAPATH=./data
 
 split=valid # 指定计算valid或test集特征

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # export NCCL_IB_DISABLE=0
-export PYTHONPATH=/root/paddlejob/workspace/env_run/wugaosheng/PaddleNLP:$PYTHONPATH
 DATAPATH=./data
 dataset_name=Flickr30k-CN
 
