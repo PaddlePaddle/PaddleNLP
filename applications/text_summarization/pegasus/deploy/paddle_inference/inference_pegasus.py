@@ -38,8 +38,8 @@ def setup_args():
 
 def setup_predictor(args):
     """Setup inference predictor."""
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     model_file = os.path.join(args.inference_model_dir, "pegasus.pdmodel")
     params_file = os.path.join(args.inference_model_dir, "pegasus.pdiparams")
     if not os.path.exists(model_file):
