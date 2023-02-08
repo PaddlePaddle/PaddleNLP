@@ -180,8 +180,8 @@ def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
     rougel = compute_metrics(all_preds, all_labels)
-    print("Accuracy:", round(total_correct / total_pre, 4))
-    print("loss:", round(total_loss / batch_num, 4))
+    logger.info("Accuracy: %.4f " % (total_correct / total_pre))
+    logger.info("loss: %.4f " % (total_loss / batch_num))
     model.train()
     return rougel
 
@@ -211,6 +211,7 @@ def do_train(args):
     with main_process_first(desc="dev dataset map pre-processing"):
         dev_set = dev_set.map(trans_func, batched=True, load_from_cache_file=True, remove_columns=remove_columns)
 
+    # TODO: use config to init
     model = PegasusForConditionalGeneration(PegasusModel(vocab_size=50000))
 
     train_batchify_fn = FakeAbstractCollator(tokenizer, stopwords_dict, args.max_source_length)

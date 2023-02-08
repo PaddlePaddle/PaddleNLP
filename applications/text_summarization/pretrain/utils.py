@@ -44,7 +44,6 @@ class FakeAbstractCollator:
             texts = text["content"]
             text = text_segmentate(texts)
 
-            # len(text) == 1 don't meet the requirment of Pegasus pretrained task
             if len(text) < 2:
                 continue
             sentence_id_vec, source, target, source_idxs, target_idxs = pseudo_summary_f1(
@@ -101,12 +100,10 @@ def text_segmentate(text):
     ch_seg_pattern = "((?:？|！|。|\\n)+)"
     try:
         text = re.sub(en_seg_pattern, r"\1[SEP]", text)
-        # print("sub text: ", text)
     except Exception as e:
         print("input: ", text)
         raise e
     text = re.sub(ch_seg_pattern, r"\1[SEP]", text)
-    # print("sub ch text: ", text)
     text_list = text.split("[SEP]")
     text_list = list(filter(lambda x: len(x) != 0, text_list))
     return text_list
