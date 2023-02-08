@@ -664,13 +664,13 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
         super(ErnieHealthDiscriminator, self).__init__(config)
 
         self.electra = ElectraModel(config)
-        self.discriminator_rtd = ElectraDiscriminatorPredictions(self.electra.config)
+        self.discriminator_rtd = ElectraDiscriminatorPredictions(config)
 
-        self.discriminator_mts = nn.Linear(self.electra.config["hidden_size"], self.electra.config["hidden_size"])
-        self.activation_mts = get_activation(self.electra.config["hidden_act"])
-        self.bias_mts = nn.Embedding(self.electra.config["vocab_size"], 1)
+        self.discriminator_mts = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation_mts = get_activation(config.hidden_act)
+        self.bias_mts = nn.Embedding(config.vocab_size, 1)
 
-        self.discriminator_csp = ElectraClassificationHead(self.electra.config)
+        self.discriminator_csp = ElectraClassificationHead(config)
 
         self.init_weights()
 
@@ -965,14 +965,12 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
     """
 
-    pretrained_init_configuration = ELECTRA_PRETRAINED_INIT_CONFIGURATION
-
     def __init__(self, config: ElectraConfig):
         super(ElectraForTotalPretraining, self).__init__(config)
 
         self.generator = ElectraGenerator(config)
         self.discriminator = ErnieHealthDiscriminator(config)
-        self.initializer_range = self.discriminator.electra.initializer_range
+        self.initializer_range = config.initializer_range
         self.init_weights()
 
     def get_input_embeddings(self):
@@ -1123,8 +1121,6 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         discriminator (:class:`ErnieHealthDiscriminator):
             An instance of :class:`ErnieHealthDiscriminator`.
     """
-
-    pretrained_init_configuration = ELECTRA_PRETRAINED_INIT_CONFIGURATION
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample

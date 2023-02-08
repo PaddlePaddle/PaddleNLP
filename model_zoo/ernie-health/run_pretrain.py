@@ -26,16 +26,17 @@ from dataset import DataCollatorForErnieHealth, MedicalCorpus, create_dataloader
 from visualdl import LogWriter
 
 from paddlenlp.transformers import (
-    ElectraGenerator,
+    ElectraConfig,
     ElectraTokenizer,
     ErnieHealthForTotalPretraining,
     ErnieHealthPretrainingCriterion,
     LinearDecayWithWarmup,
 )
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
+    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ErnieHealthPretrainingCriterion, ElectraTokenizer),
 }
 
 
@@ -133,6 +134,21 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
+def download_corpus(args):
+    os.makedirs(args.input_dir, exist_ok=True)
+    files = [
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_ids.npy",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_idx.npz",
+    ]
+
+    for file in files:
+        file_name = file.split("/")[-1]
+        file_path = os.path.join(args.input_dir, file_name)
+        if not os.path.exists(file_path):
+            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
+            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
+
+
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
     paddle.set_device(args.device)
@@ -141,14 +157,16 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
+    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
+    pretrained_models.append("__internal_testing__/ernie-health-chinese")
 
     if args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        model = model_class.from_pretrained(args.model_name_or_path)
+        model_config = config_class()
+        model = model_class(model_config)
         args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
@@ -174,14 +192,14 @@ def do_train(args):
                 "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
             )
 
-    criterion = ErnieHealthPretrainingCriterion(
-        getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"], model.gen_weight
-    )
+    model_config.gen_weight = model.gen_weight
+    criterion = criterion_class(model_config)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     # Loads dataset.
+    download_corpus(args)
     tic_load_data = time.time()
     logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
@@ -370,8 +388,8 @@ def do_train(args):
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config)
-                    if "self" in config_to_save:
+                    config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config.__dict__)
+                    if "self" in "self" in config_to_save:
                         del config_to_save["self"]
                     run_states = {
                         "model_name": model_name if args.init_from_ckpt else args.model_name_or_path,
