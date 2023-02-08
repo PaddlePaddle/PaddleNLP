@@ -524,11 +524,15 @@ class GPTPretrainedModel(PretrainedModel):
 
             model_mappings.extend(layer_mappings)
 
+        # downstream mappings
         if "GPT2Model" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "transformer." + mapping[0]
                 mapping[1] = "gpt." + mapping[1]
-
+        if "GPT2ForTokenClassification" in config.architectures:
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+        if "GPT2ForSequenceClassification" in config.architectures:
+            model_mappings.extend([["score.weight", "score.weight", "transpose"]])
         if "GPT2LMHeadModel" in config.architectures:
             model_mappings.append(["lm_head.weight", "lm_head.decoder_weight"])
 
@@ -1441,7 +1445,9 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
             )
 
-        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
+        pooled_logits = logits.gather_nd(
+            paddle.stack([paddle.arange(paddle.shape(logits)[0]), sequence_lengths], axis=-1)
+        )
 
         loss = None
         if labels is not None:

@@ -1265,7 +1265,7 @@ class Trainer:
                 labels = inputs.pop("labels")
             elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
-            elif self.label_names is not None:
+            elif self.args.label_names is not None:
                 labels = []
                 for label in self.label_names:
                     labels.append(inputs.pop(label))

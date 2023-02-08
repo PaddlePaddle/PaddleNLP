@@ -40,7 +40,7 @@ nlp2_build (){
 
     python -m pip install -r requirements.txt
     python setup.py bdist_wheel
-    python -m pip install --force-reinstall dist/paddlenlp****.whl
+    python -m pip install -U dist/paddlenlp****.whl
 }
 nlp2_build
 python -c 'from visualdl import LogWriter'

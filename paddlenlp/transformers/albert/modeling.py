@@ -15,18 +15,20 @@
 """Modeling classes for ALBERT model."""
 
 import math
-from typing import Optional, Tuple, List
-from dataclasses import dataclass
+from typing import Optional, Tuple
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutput,
-    ModelOutput,
     BaseModelOutputWithPooling,
     MaskedLMOutput,
+    ModelOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
@@ -46,45 +48,6 @@ __all__ = [
 ]
 
 dtype_float = paddle.get_default_dtype()
-
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
-
-
-def mish(x):
-    return x * F.tanh(F.softplus(x))
-
-
-def linear_act(x):
-    return x
-
-
-def swish(x):
-    return x * F.sigmoid(x)
-
-
-def gelu_new(x):
-    """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
-
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-    "gelu_new": gelu_new,
-    "tanh": F.tanh,
-    "sigmoid": F.sigmoid,
-    "mish": mish,
-    "linear": linear_act,
-    "swish": swish,
-}
 
 
 class AlbertForPreTrainingOutput(ModelOutput):

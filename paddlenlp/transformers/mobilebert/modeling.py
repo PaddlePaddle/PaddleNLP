@@ -17,9 +17,9 @@ import math
 
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 
 __all__ = [
     "MobileBertModel",
@@ -28,11 +28,6 @@ __all__ = [
     "MobileBertForSequenceClassification",
     "MobileBertForQuestionAnswering",
 ]
-
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-}
 
 
 class NoNorm(nn.Layer):

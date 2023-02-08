@@ -1,4 +1,4 @@
-[简体中文🀄](./README_cn.md) |  **English**🌎
+[简体中文🀄](./README.md) |  **English**🌎
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
@@ -276,7 +276,7 @@ pip install --upgrade paddlenlp
 or you can install the latest develop branch code with the following command:
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ## Quick Start

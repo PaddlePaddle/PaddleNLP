@@ -14,7 +14,9 @@ limitations under the License. */
 
 
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
+
 #include <Python.h>
+
 #include "fast_tokenizer/pybind/pretokenizers.h"
 #include "re2/re2.h"
 
@@ -41,6 +43,21 @@ public:
       pretokenizers::PreTokenizedString* pretokenized) const override {
     PYBIND11_OVERLOAD_NAME(
         void, WhitespacePreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
+class PyWhitespaceAndPunctuationPreTokenizer
+    : public pretokenizers::WhitespaceAndPunctuationPreTokenizer {
+public:
+  using WhitespaceAndPunctuationPreTokenizer::
+      WhitespaceAndPunctuationPreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(void,
+                           WhitespaceAndPunctuationPreTokenizer,
+                           "__call__",
+                           operator(),
+                           pretokenized);
   }
 };
 
@@ -117,22 +134,23 @@ void BindPreTokenizers(pybind11::module* m) {
            &pretokenizers::PreTokenizedString::GetSplitsSize)
       .def("get_original_text",
            &pretokenizers::PreTokenizedString::GetOriginStr)
-      .def("get_splits",
-           [](const pretokenizers::PreTokenizedString& self,
-              const std::string& offset_referential,
-              const std::string& offset_type) {
-             bool is_original = true;
-             if (offset_referential != "original") {
-               is_original = false;
-             }
-             core::OffsetType type = core::OffsetType::CHAR;
-             if (offset_type != "char") {
-               type = core::OffsetType::BYTE;
-             }
-             return self.GetSplits(is_original, type);
-           },
-           py::arg("offset_referential") = "original",
-           py::arg("offset_type") = "char")
+      .def(
+          "get_splits",
+          [](const pretokenizers::PreTokenizedString& self,
+             const std::string& offset_referential,
+             const std::string& offset_type) {
+            bool is_original = true;
+            if (offset_referential != "original") {
+              is_original = false;
+            }
+            core::OffsetType type = core::OffsetType::CHAR;
+            if (offset_type != "char") {
+              type = core::OffsetType::BYTE;
+            }
+            return self.GetSplits(is_original, type);
+          },
+          py::arg("offset_referential") = "original",
+          py::arg("offset_type") = "char")
       .def("to_encoding",
            [](const pretokenizers::PreTokenizedString& self,
               const std::vector<uint32_t>& word_idx,
@@ -151,6 +169,12 @@ void BindPreTokenizers(pybind11::module* m) {
       sub_module, "WhitespacePreTokenizer")
       .def(py::init<>())
       .def("__call__", &pretokenizers::WhitespacePreTokenizer::operator());
+  py::class_<pretokenizers::WhitespaceAndPunctuationPreTokenizer,
+             PyWhitespaceAndPunctuationPreTokenizer>(
+      sub_module, "WhitespaceAndPunctuationPreTokenizer")
+      .def(py::init<>())
+      .def("__call__",
+           &pretokenizers::WhitespaceAndPunctuationPreTokenizer::operator());
   py::class_<pretokenizers::BertPreTokenizer, PyBertPreTokenizer>(
       sub_module, "BertPreTokenizer")
       .def(py::init<>())
@@ -163,55 +187,63 @@ void BindPreTokenizers(pybind11::module* m) {
       .def("__call__", &pretokenizers::MetaSpacePreTokenizer::operator());
   py::class_<pretokenizers::SequencePreTokenizer, PySequencePreTokenizer>(
       sub_module, "SequencePreTokenizer")
-      .def(py::init([](const py::list& py_list) {
-             pretokenizers::PreTokenizer* pretokenizer_ptr;
-             std::vector<pretokenizers::PreTokenizer*> pretokenizers;
-             for (py::handle py_pretokenizer : py_list) {
-               if (pybind11::type::of(py_pretokenizer)
-                       .is(py::type::of<pretokenizers::BertPreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer.cast<pretokenizers::BertPreTokenizer*>();
-               } else if (pybind11::type::of(py_pretokenizer)
-                              .is(py::type::of<
-                                  pretokenizers::MetaSpacePreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer
-                         .cast<pretokenizers::MetaSpacePreTokenizer*>();
-               } else if (pybind11::type::of(py_pretokenizer)
-                              .is(py::type::of<
-                                  pretokenizers::SequencePreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer
-                         .cast<pretokenizers::SequencePreTokenizer*>();
-               } else if (pybind11::type::of(py_pretokenizer)
-                              .is(py::type::of<
-                                  pretokenizers::WhitespacePreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer
-                         .cast<pretokenizers::WhitespacePreTokenizer*>();
-               } else if (pybind11::type::of(py_pretokenizer)
-                              .is(py::type::of<
-                                  pretokenizers::ByteLevelPreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer
-                         .cast<pretokenizers::ByteLevelPreTokenizer*>();
-               } else if (py::type::of(py_pretokenizer)
-                              .is(py::type::of<
-                                  pretokenizers::SplitPreTokenizer>())) {
-                 pretokenizer_ptr =
-                     py_pretokenizer.cast<pretokenizers::SplitPreTokenizer*>();
-               } else {
-                 throw py::value_error(
-                     "Type of normalizers should be one of `BertPreTokenizer`,"
-                     " `MetaSpacePreTokenizer`, `SequencePreTokenizer`,"
-                     " `WhitespacePreTokenizer`, `ByteLevelPreTokenizer`, "
-                     "`SplitPreTokenizer`");
-               }
-               pretokenizers.push_back(pretokenizer_ptr);
-             }
-             return pretokenizers::SequencePreTokenizer(pretokenizers);
-           }),
-           py::arg("pretokenizers"))
+      .def(
+          py::init([](const py::list& py_list) {
+            pretokenizers::PreTokenizer* pretokenizer_ptr;
+            std::vector<pretokenizers::PreTokenizer*> pretokenizers;
+            for (py::handle py_pretokenizer : py_list) {
+              if (pybind11::type::of(py_pretokenizer)
+                      .is(py::type::of<pretokenizers::BertPreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer.cast<pretokenizers::BertPreTokenizer*>();
+              } else if (pybind11::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::MetaSpacePreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer
+                        .cast<pretokenizers::MetaSpacePreTokenizer*>();
+              } else if (pybind11::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::SequencePreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer
+                        .cast<pretokenizers::SequencePreTokenizer*>();
+              } else if (pybind11::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::WhitespacePreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer
+                        .cast<pretokenizers::WhitespacePreTokenizer*>();
+              } else if (pybind11::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::
+                                     WhitespaceAndPunctuationPreTokenizer>())) {
+                pretokenizer_ptr = py_pretokenizer.cast<
+                    pretokenizers::WhitespaceAndPunctuationPreTokenizer*>();
+              } else if (pybind11::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::ByteLevelPreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer
+                        .cast<pretokenizers::ByteLevelPreTokenizer*>();
+              } else if (py::type::of(py_pretokenizer)
+                             .is(py::type::of<
+                                 pretokenizers::SplitPreTokenizer>())) {
+                pretokenizer_ptr =
+                    py_pretokenizer.cast<pretokenizers::SplitPreTokenizer*>();
+              } else {
+                throw py::value_error(
+                    "Type of normalizers should be one of `BertPreTokenizer`,"
+                    " `MetaSpacePreTokenizer`, `SequencePreTokenizer`,"
+                    " `WhitespacePreTokenizer`, `ByteLevelPreTokenizer`,"
+                    " `WhitespaceAndPunctuationPreTokenizer`, "
+                    "`SplitPreTokenizer`");
+              }
+              pretokenizers.push_back(pretokenizer_ptr);
+            }
+            return pretokenizers::SequencePreTokenizer(pretokenizers);
+          }),
+          py::arg("pretokenizers"))
       .def("__call__", &pretokenizers::SequencePreTokenizer::operator());
   py::class_<pretokenizers::ByteLevelPreTokenizer, PyByteLevelPreTokenizer>(
       sub_module, "ByteLevelPreTokenizer")
