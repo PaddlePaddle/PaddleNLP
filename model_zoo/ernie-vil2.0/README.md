@@ -159,10 +159,13 @@ print(probs)
 为了训练的时候方便随机读取，我们将tsv和jsonl文件一起序列化，转换成内存索引的LMDB数据库文件。
 
 ```shell
+mkdir -p data/datasets
+wget https://clip-cn-beijing.oss-cn-beijing.aliyuncs.com/datasets/Flickr30k-CN.zip
+unzip Flickr30k-CN.zip -d data/datasets/
+
 python preprocess/create_lmdb_dataset.py \
     --data_dir data/datasets/Flickr30k-CN \
     --splits train,valid,test
-
 ```
 执行完后，data 目录应是如下结构：
 
@@ -388,6 +391,25 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradie
        [[0.99927372, 0.00072624]])
 ```
 可以看到`猫的照片`的相似度更高，结果符合预期。
+
+<a name="模型导出预测"></a>
+
+## 模型导出预测
+
+上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。
+
+```"shell
+python export_model.py --model_type=ernie_vil-2.0-base-zh \
+    --model_path=output_pd/checkpoint-600/ \
+    --output_path=./infer_model/
+```
+用户在`infer_model`中可以看到导出的文件。
+
+对于导出的模型，我们提供了Python的infer脚本，调用预测库对简单的例子进行预测。
+```shell
+python deploy/python/inference.py --model_type ernie_vil-2.0-base-zh \
+    --model_path ./infer_model/
+```
 
 <a name="参考文献"></a>
 

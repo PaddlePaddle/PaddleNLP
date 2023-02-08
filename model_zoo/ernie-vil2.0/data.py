@@ -128,7 +128,6 @@ class LMDBDataset(Dataset):
         image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
         image = self.transform(image)
         texts = self.tokenizer([_preprocess_text(raw_text)], max_len=self.max_txt_length, padding="max_length")
-        # print(text['input_ids'][0])
         text = texts["input_ids"][0]
 
         eos_index = text.index(self.tokenizer.vocab["[SEP]"])

@@ -16,10 +16,10 @@ import os
 from dataclasses import dataclass, field
 
 import paddle
-from data import get_train_eval_dataset
 from paddle.metric import Accuracy
 from trainer_util import ErnieViLTrainer
 
+from data import get_train_eval_dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
@@ -47,9 +47,10 @@ class DataArguments:
 @dataclass
 class ModelArguments:
     checkpoint_path: str = field(default="", metadata={"help": "checkpoint path"})
+    model_type: str = field(default="ernie_vil-2.0-base-zh", metadata={"help": "the type of model"})
 
 
-def main():
+def do_train():
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
@@ -61,7 +62,6 @@ def main():
     # tokenizer = ChineseCLIPTokenizer.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
     train_dataset, eval_dataset = get_train_eval_dataset(data_args, tokenizer=tokenizer)
-    print(train_dataset[0])
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint
@@ -99,8 +99,13 @@ def main():
         train_result = trainer.evaluate()
     elif training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
     print(train_result)
 
 
 if __name__ == "__main__":
-    main()
+    do_train()
