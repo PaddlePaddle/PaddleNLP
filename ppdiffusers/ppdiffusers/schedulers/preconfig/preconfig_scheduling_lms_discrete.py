@@ -82,7 +82,7 @@ class PreconfigLMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         prediction_type: str = "epsilon",
-        preconfig=False,
+        preconfig=True,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype="float32")

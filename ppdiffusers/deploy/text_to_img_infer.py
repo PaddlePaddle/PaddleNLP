@@ -22,10 +22,10 @@ from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
-    EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
     FastDeployStableDiffusionPipeline,
     PNDMScheduler,
+    PreconfigEulerAncestralDiscreteScheduler,
 )
 
 
@@ -187,7 +187,9 @@ def get_scheduler(args):
             steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
-        scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+        scheduler = PreconfigEulerAncestralDiscreteScheduler(
+            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+        )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")
     return scheduler
