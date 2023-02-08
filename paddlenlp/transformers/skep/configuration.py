@@ -19,7 +19,7 @@ from typing import Dict
 
 from ..configuration_utils import PretrainedConfig
 
-__all__ = ["SKEP_PRETRAINED_INIT_CONFIGURATION", "SKEP_PRETRAINED_RESOURCE_FILES_MAP", "SKEPConfig"]
+__all__ = ["SKEP_PRETRAINED_INIT_CONFIGURATION", "SKEP_PRETRAINED_RESOURCE_FILES_MAP", "SkepConfig"]
 
 SKEP_PRETRAINED_INIT_CONFIGURATION = {
     "skep_ernie_1.0_large_ch": {
@@ -75,7 +75,7 @@ SKEP_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class SKEPConfig(PretrainedConfig):
+class SkepConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of an [`SKEPModel`]. It is used to instantiate an SKEP Model according to the specified arguments, defining the model architecture.
     Instantiating a configuration with the defaults will yield a similar configuration to that of the SKEP skep_ernie_1.0_large_ch architecture.
@@ -98,9 +98,9 @@ class SKEPConfig(PretrainedConfig):
         pad_token_id(int, optional, defaults to 0): The index of padding token in the token vocabulary.
     Examples:
     ```python
-    >>> from paddlenlp.transformers import SKEPModel, SKEPConfig
+    >>> from paddlenlp.transformers import SKEPModel, SkepConfig
     >>> # Initializing an SKEP configuration
-    >>> configuration = SKEPConfig()
+    >>> configuration = SkepConfig()
     >>> # Initializing a model (with random weights) from the SKEP-base style configuration model
     >>> model = SKEPModel(configuration)
     >>> # Accessing the model configuration
