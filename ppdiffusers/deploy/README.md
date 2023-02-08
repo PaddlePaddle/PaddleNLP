@@ -1,10 +1,22 @@
 # FastDeploy Stable Diffusion 模型高性能部署
 
+ **目录**
+   * [部署模型准备](#部署模型准备)
+   * [环境依赖](#环境依赖)
+   * [快速体验](#快速体验)
+       * [文图生成（Text-to-Image Generation）](#文图生成)
+       * [文本引导的图像变换（Image-to-Image Text-Guided Generation）](#文本引导的图像变换)
+       * [文本引导的图像编辑（Text-Guided Image Inpainting）](#文本引导的图像编辑)
+
 本示例展现如何通过 FastDeploy 将我们 PPDiffusers 训练好的 Stable Diffusion 模型进行多硬件多推理引擎后端高性能部署。
+
+<a name="部署模型准备"></a>
 
 ## 部署模型准备
 
 本示例需要使用训练模型导出后的部署模型，可参考[模型导出文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)导出部署模型。
+
+<a name="环境依赖"></a>
 
 ## 环境依赖
 
@@ -14,11 +26,15 @@
 pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
 ```
 
+<a name="快速体验"></a>
+
 ## 快速体验
 
 我们经过部署模型准备，可以开始进行测试。本目录提供 StableDiffusion 模型支持的三种任务，分别是文图生成、文本引导的图像变换以及文本引导的图像编辑。
 
-### 文图生成 （Text-to-Image Generation）
+<a name="文图生成"></a>
+
+### 文图生成（Text-to-Image Generation）
 
 
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `text_to_img_infer.py` 脚本，完成文图生成任务。
@@ -59,6 +75,8 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 | --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
+
+<a name="文本引导的图像变换"></a>
 
 ### 文本引导的图像变换（Image-to-Image Text-Guided Generation）
 
@@ -107,6 +125,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 
 </details>
 
+<a name="文本引导的图像编辑"></a>
 
 ### 文本引导的图像编辑（Text-Guided Image Inpainting）
 
