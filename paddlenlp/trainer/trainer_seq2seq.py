@@ -184,7 +184,11 @@ class Seq2SeqTrainer(Trainer):
         # prepare generation inputs
         # some encoder-decoder models can have varying encoder's and thus
         # varying model input names
-        if hasattr(self.model, "encoder") and self.model.encoder.main_input_name != self.model.main_input_name:
+        if (
+            hasattr(self.model, "encoder")
+            and hasattr(self.model.encoder, "main_input_name")
+            and self.model.encoder.main_input_name != self.model.main_input_name
+        ):
             generation_inputs = inputs[self.model.encoder.main_input_name]
         else:
             generation_inputs = inputs[self.model.main_input_name]
@@ -193,6 +197,8 @@ class Seq2SeqTrainer(Trainer):
             generation_inputs,
             **gen_kwargs,
         )
+        if isinstance(generated_tokens, tuple):
+            generated_tokens = generated_tokens[0]
         # in case the batch is shorter than max length, the output should be padded
         if gen_kwargs.get("max_length") is not None and generated_tokens.shape[-1] < gen_kwargs["max_length"]:
             generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_kwargs["max_length"])
@@ -203,12 +209,15 @@ class Seq2SeqTrainer(Trainer):
 
         with paddle.no_grad():
             if has_labels:
-                with self.compute_loss_context_manager():
-                    outputs = model(**inputs)
-                if self.label_smoother is not None:
-                    loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
+                if hasattr(self, "compute_loss_context_manager"):
+                    with self.compute_loss_context_manager():
+                        outputs = model(**inputs)
+                    if self.label_smoother is not None:
+                        loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
+                    else:
+                        loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
                 else:
-                    loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
+                    loss = None
             else:
                 loss = None
 

@@ -15,34 +15,24 @@
 import os
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional
 
 import paddle
-import paddle.nn as nn
+
+# import paddle.nn as nn
 from data import CLUE_PROCESSED
 from utils import CLUE_METRICS, load_pickle, save_pickle
 
-from paddlenlp.data import Pad
+from paddlenlp.data.data_collator import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
-    Trainer,
-    TrainingArguments,
+    Seq2SeqTrainer,
+    Seq2SeqTrainingArguments,
     get_last_checkpoint,
 )
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 from paddlenlp.utils.log import logger
-
-# label_length_map = {
-#     "cola": 4,
-#     "sst-2": 1,
-#     "mrpc": 5,
-#     "sts-b": 5,
-#     "qqp": 5,
-#     "mnli": 4,
-#     "qnli": 5,
-#     "rte": 5,
-# }
 
 
 def trans_func(example, tokenizer, args):
@@ -111,37 +101,6 @@ def trans_func(example, tokenizer, args):
         }
     else:
         return {"input_ids": source["input_ids"], "attention_mask": source["attention_mask"]}
-
-
-class BatchDict(object):
-    def __init__(self, fn):
-        assert isinstance(fn, (dict)), (
-            "Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn "
-            "Received fn=%s" % (str(fn))
-        )
-
-        self._fn = fn
-
-        for col_name, ele_fn in self._fn.items():
-            assert callable(ele_fn), "Batchify functions must be callable! type(fn[%d]) = %s" % (
-                col_name,
-                str(type(ele_fn)),
-            )
-
-    def __call__(self, data):
-
-        ret = {}
-        if len(data) <= 0:
-            return ret
-
-        for col_name, ele_fn in self._fn.items():
-            # skip unused col_name, such as labels in test mode.
-            if col_name not in data[0].keys():
-                continue
-            result = ele_fn([ele[col_name] for ele in data])
-            ret[col_name] = result
-
-        return ret
 
 
 def get_train_dataset(tokenizer, args):
@@ -219,73 +178,8 @@ class ModelArguments:
     )
 
 
-class T5ClueTrainer(Trainer):
-    def __init__(self, do_generation: bool, label2id, **kwargs):
-        super().__init__(**kwargs)
-        self.do_generation = do_generation
-        self.label2id = label2id
-
-    def prediction_step(
-        self,
-        model: nn.Layer,
-        inputs: Dict[str, Union[paddle.Tensor, Any]],
-        prediction_loss_only: bool,
-        ignore_keys: Optional[List[str]] = None,
-    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
-
-        if not self.do_generation:
-            return super().prediction_step(
-                model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
-            )
-
-        all_preds = []
-        all_labels = []
-        # source_ids, source_mask, labels, target_mask = batch
-        labels = inputs["labels"]
-        target_mask = inputs["decoder_attention_mask"]
-
-        with paddle.no_grad():
-            outputs = model.generate(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                max_length=5,
-            )[0]
-
-        for p, l, m in zip(outputs.numpy(), labels.numpy(), target_mask.numpy()):
-            pred = self.tokenizer.decode(p, skip_special_tokens=True).strip()
-            label = self.tokenizer.decode(l[m.astype("bool")], skip_special_tokens=True).strip()
-
-            if self.label2id:
-                # for classifaction task.
-                label = self.label2id[label]
-                if pred not in self.label2id:
-                    # set to wrong label if the generated text not in the labal set.
-                    pred = 0
-                    if label == 0:
-                        pred = 1
-                else:
-                    pred = self.label2id[pred]
-            else:
-                # for regression task.
-                label = float(label.replace(" ", ""))
-                try:
-                    pred = float(pred.replace(" ", ""))
-                except Exception as e:
-                    # set to zero if the generated text can not convert to float
-                    pred = 0.0
-                    print(e)
-
-            all_preds.append(pred)
-            all_labels.append(label)
-
-        all_preds = paddle.to_tensor(all_preds).detach()
-        all_labels = paddle.to_tensor(all_labels).detach()
-
-        return (None, all_preds, all_labels)
-
-
 def main():
-    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, Seq2SeqTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if not os.path.exists(data_args.cache_dir):
@@ -330,60 +224,83 @@ def main():
     # get model and tokenizer
     model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
     tokenizer = T5Tokenizer.from_pretrained(model_args.model_name_or_path)
-
+    print(model)
     # get dataloader
     train_dataset = get_train_dataset(tokenizer, data_args)
     eval_dataset = get_dev_dataset(tokenizer, data_args)
 
-    # batchify_fn = lambda samples, fn=BatchDict(
-    #     {
-    #         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-    #         "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-    #         "labels": Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-    #         "decoder_attention_mask": Pad(
-    #             axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-    #         ),  # decoder_attention_mask
-    #     }
-    # ): fn(samples)
+    # def batchify_fn(
+    #     samples,
+    #     fn=BatchDict(
+    #         {
+    #             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+    #             "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+    #             "labels": Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+    #             "decoder_attention_mask": Pad(
+    #                 axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+    #             ),  # decoder_attention_mask
+    #         }
+    #     ),
+    # ):
+    #     return fn(samples)
 
-    def batchify_fn(
-        samples,
-        fn=BatchDict(
-            {
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-                "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-                "labels": Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-                "decoder_attention_mask": Pad(
-                    axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-                ),  # decoder_attention_mask
-            }
-        ),
-    ):
-        return fn(samples)
-
-    data_collator = batchify_fn
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer, model=model, pad_to_multiple_of=8 if training_args.fp16 else None
+    )
 
     # Define the metrics of tasks.
-    def compute_metrics(p):
+    def compute_metrics(p, tokenizer=tokenizer, label2id=label2id):
+        all_preds = []
+        all_labels = []
+        # source_ids, source_mask, labels, target_mask = batch
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        labels = p.label_ids
+        for p, l in zip(preds, labels):
+            pred = tokenizer.decode(p, skip_special_tokens=True).strip()
+            label = tokenizer.decode(l, skip_special_tokens=True).strip()
+            if label2id:
+                # for classifaction task.
+                label = label2id[label]
+                if pred not in label2id:
+                    # set to wrong label if the generated text not in the labal set.
+                    pred = 0
+                    if label == 0:
+                        pred = 1
+                else:
+                    pred = label2id[pred]
+            else:
+                # for regression task.
+                label = float(label.replace(" ", ""))
+                try:
+                    pred = float(pred.replace(" ", ""))
+                except Exception as e:
+                    # set to zero if the generated text can not convert to float
+                    pred = 0.0
+                    print(e)
+
+            all_preds.append(pred)
+            all_labels.append(label)
+
+        all_preds = paddle.to_tensor(all_preds).detach()
+        all_labels = paddle.to_tensor(all_labels).detach()
+
+        # return (None, all_preds, all_labels)
+        # preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
 
         results = {}
         for metric in metric_list:
-            results.update(metric(p.label_ids, preds))
+            results.update(metric(all_labels, all_preds))
 
         return results
 
-    trainer = T5ClueTrainer(
+    trainer = Seq2SeqTrainer(
         model=model,
-        criterion=None,
         args=training_args,
-        data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-        do_generation=True,
-        label2id=label2id,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
     checkpoint = None
