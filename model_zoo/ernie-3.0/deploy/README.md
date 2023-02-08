@@ -81,6 +81,8 @@
 
 ## 详细部署文档
 
-- [Python部署](python/README.md)
-- [C++部署](cpp/README.md)
+ERNIE 3.0 模型支持 Python、C++ 部署以及 Serving 服务化部署。以下是详细文档。
+
+- [Python 部署](python/README.md)
+- [C++ 部署](cpp/README.md)
 - [Serving 部署](serving/README.md)
