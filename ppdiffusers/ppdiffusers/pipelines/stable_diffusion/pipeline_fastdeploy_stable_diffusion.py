@@ -375,22 +375,25 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            unet = self.unet.model
-            unet_output_name = unet.get_output_info(0).name
+            unet_runtime = self.unet.model
+            unet_output_name = unet_runtime.get_output_info(0).name
             text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
                 # predict the noise residual
                 sample = pdtensor2fdtensor(latent_model_input, "sample")
                 timestep = pdtensor2fdtensor(t, "timestep")
                 encoder_hidden_states = pdtensor2fdtensor(text_embeddings, "encoder_hidden_states")
-                unet.bind_input_tensor("sample", sample)
-                unet.bind_input_tensor("timestep", timestep)
-                unet.bind_input_tensor("encoder_hidden_states", encoder_hidden_states)
-                unet.zero_copy_infer()
-                noise_pred = unet.get_output_tensor(unet_output_name)
+                unet_runtime.bind_input_tensor("sample", sample)
+                unet_runtime.bind_input_tensor("timestep", timestep)
+                unet_runtime.bind_input_tensor("encoder_hidden_states", encoder_hidden_states)
+
+                unet_runtime.zero_copy_infer()
+
+                noise_pred = unet_runtime.get_output_tensor(unet_output_name)
                 noise_pred = fdtensor2pdtensor(noise_pred)
                 # perform guidance
                 if do_classifier_free_guidance:
