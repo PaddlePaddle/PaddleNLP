@@ -13,7 +13,9 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 import sys
+import unittest
 from unittest import TestCase
 
 from tests.testing_utils import argv_context_guard, load_test_config
@@ -29,36 +31,37 @@ class GPTTest(TestCase):
         sys.path.remove(self.path)
 
     # TODO(wj-Mcat): disable old gpt `run_pretrain.py` and will be uncomment in: https://github.com/PaddlePaddle/PaddleNLP/pull/4614
-    # def test_pretrain(self):
+    @unittest.skip("disable for old gpt")
+    def test_pretrain(self):
 
-    #     # 1. run pretrain
-    #     pretrain_config = load_test_config(self.config_path, "pretrain")
-    #     with argv_context_guard(pretrain_config):
-    #         from run_pretrain import do_train
+        # 1. run pretrain
+        pretrain_config = load_test_config(self.config_path, "pretrain")
+        with argv_context_guard(pretrain_config):
+            from run_pretrain import do_train
 
-    #         do_train()
+            do_train()
 
-    #     # 2. export model
-    #     export_config = {
-    #         "model_type": pretrain_config["model_type"],
-    #         "model_path": pretrain_config["output_dir"],
-    #         "output_path": os.path.join(pretrain_config["output_dir"], "export_model"),
-    #     }
-    #     with argv_context_guard(export_config):
-    #         from export_model import main
+        # 2. export model
+        export_config = {
+            "model_type": pretrain_config["model_type"],
+            "model_path": pretrain_config["output_dir"],
+            "output_path": os.path.join(pretrain_config["output_dir"], "export_model"),
+        }
+        with argv_context_guard(export_config):
+            from export_model import main
 
-    #         main()
+            main()
 
-    #     # 3. infer model
-    #     infer_config = {
-    #         "model_type": export_config["model_type"],
-    #         "model_path": export_config["output_path"],
-    #         "select_device": pretrain_config["device"],
-    #     }
-    #     with argv_context_guard(infer_config):
-    #         from deploy.python.inference import main
+        # 3. infer model
+        infer_config = {
+            "model_type": export_config["model_type"],
+            "model_path": export_config["output_path"],
+            "select_device": pretrain_config["device"],
+        }
+        with argv_context_guard(infer_config):
+            from deploy.python.inference import main
 
-    #         main()
+            main()
 
     def test_msra_ner(self):
         config = load_test_config(self.config_path, "msra_ner")
