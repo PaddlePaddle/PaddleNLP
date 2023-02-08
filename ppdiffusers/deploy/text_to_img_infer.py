@@ -23,6 +23,7 @@ from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
+    DDIMScheduler,
     EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
     FastDeployStableDiffusionPipeline,
@@ -75,8 +76,14 @@ def parse_arguments():
         "--scheduler",
         type=str,
         default="pndm",
-        choices=["pndm", "euler_ancestral"],
+        choices=["pndm", "euler_ancestral", "ddim"],
         help="The scheduler type of stable diffusion.",
+    )
+    parser.add_argument(
+        "--resolution",
+        type=int,
+        default=512,
+        help="The resolution for output images",
     )
     return parser.parse_args()
 
@@ -178,17 +185,45 @@ def create_trt_runtime(model_dir, model_prefix, model_format, workspace=(1 << 31
 
 
 def get_scheduler(args):
+    # NOTE: SD-2 uses v_prediction which is saved in config, thus allowing to create
+    # from config to be compatible with SD-2 automatically.
+    scheduler_dir = os.path.join(args.model_dir, "scheduler")
     if args.scheduler == "pndm":
-        scheduler = PNDMScheduler(
-            beta_end=0.012,
-            beta_schedule="scaled_linear",
-            beta_start=0.00085,
-            num_train_timesteps=1000,
-            skip_prk_steps=True,
-            steps_offset=1,
+        scheduler = (
+            PNDMScheduler.from_pretrained(scheduler_dir, subfolder="scheduler")
+            if os.path.exists(scheduler_dir)
+            else PNDMScheduler(
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                beta_start=0.00085,
+                num_train_timesteps=1000,
+                skip_prk_steps=True,
+                steps_offset=1,
+            )
         )
     elif args.scheduler == "euler_ancestral":
-        scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+        scheduler = (
+            EulerAncestralDiscreteScheduler.from_pretrained(scheduler_dir, subfolder="scheduler")
+            if os.path.exists(scheduler_dir)
+            else EulerAncestralDiscreteScheduler(
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+            )
+        )
+    elif args.scheduler == "ddim":
+        scheduler = (
+            DDIMScheduler.from_pretrained(scheduler_dir, subfolder="scheduler")
+            if os.path.exists(scheduler_dir)
+            else DDIMScheduler(
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                beta_start=0.00085,
+                num_train_timesteps=1000,
+                skip_prk_steps=True,
+                steps_offset=1,
+            )
+        )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")
     return scheduler
@@ -212,17 +247,17 @@ if __name__ == "__main__":
     # 3. Set dynamic shape for trt backend
     vae_dynamic_shape = {
         "latent_sample": {
-            "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "min_shape": [1, 4, args.resolution // 8, args.resolution // 8],
+            "max_shape": [2, 4, args.resolution // 8, args.resolution // 8],
+            "opt_shape": [2, 4, args.resolution // 8, args.resolution // 8],
         }
     }
 
     unet_dynamic_shape = {
         "sample": {
-            "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "min_shape": [1, 4, args.resolution // 8, args.resolution // 8],
+            "max_shape": [2, 4, args.resolution // 8, args.resolution // 8],
+            "opt_shape": [2, 4, args.resolution // 8, args.resolution // 8],
         },
         "timestep": {
             "min_shape": [1],
@@ -230,7 +265,7 @@ if __name__ == "__main__":
             "opt_shape": [1],
         },
         "encoder_hidden_states": {
-            "min_shape": [1, 77, 768],
+            "min_shape": [1, 77, 768],  # 1024 for SD-2
             "max_shape": [2, 77, 768],
             "opt_shape": [2, 77, 768],
         },
@@ -319,13 +354,15 @@ if __name__ == "__main__":
 
     prompt = "a photo of an astronaut riding a horse on mars"
     # Warm up
-    pipe(prompt, num_inference_steps=10)
+    pipe(prompt, num_inference_steps=10, width=args.resolution, height=args.resolution)
 
     time_costs = []
     print(f"Run the stable diffusion pipeline {args.benchmark_steps} times to test the performance.")
     for step in range(args.benchmark_steps):
         start = time.time()
-        images = pipe(prompt, num_inference_steps=args.inference_steps).images
+        images = pipe(
+            prompt, num_inference_steps=args.inference_steps, width=args.resolution, height=args.resolution
+        ).images
         latency = time.time() - start
         time_costs += [latency]
         print(f"No {step:3d} time cost: {latency:2f} s")
