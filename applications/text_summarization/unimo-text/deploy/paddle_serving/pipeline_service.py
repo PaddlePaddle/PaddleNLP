@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle_serving_server.web_service import WebService, Op
 import numpy as np
+from paddle_serving_server.web_service import Op, WebService
+
+from paddlenlp.data import Pad
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.transformers import UNIMOTokenizer
-from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
-
-import paddle_serving_server.pipeline.operator
 
 
 def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
@@ -123,8 +122,8 @@ class UnimoTextService(WebService):
 
 
 if __name__ == "__main__":
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     service = UnimoTextService(name="text_summarization")
     service.prepare_pipeline_config("config.yml")
     service.run_service()
