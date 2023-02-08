@@ -21,11 +21,7 @@ import PIL
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import (
-    FastDeployRuntimeModel,
-    fdtensor2pdtensor,
-    pdtensor2fdtensor,
-)
+from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -421,8 +417,6 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            unet_runtime = self.unet.model
-            unet_output_name = unet_runtime.get_output_info(0).name
             text_embeddings = paddle.to_tensor(text_embeddings)
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
@@ -430,18 +424,9 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                sample = pdtensor2fdtensor(latent_model_input, "sample")
-                timestep = pdtensor2fdtensor(t, "timestep")
-                encoder_hidden_states = pdtensor2fdtensor(text_embeddings, "encoder_hidden_states")
-                unet_runtime.bind_input_tensor("sample", sample)
-                unet_runtime.bind_input_tensor("timestep", timestep)
-                unet_runtime.bind_input_tensor("encoder_hidden_states", encoder_hidden_states)
-
-                unet_runtime.zero_copy_infer()
-
-                noise_pred = unet_runtime.get_output_tensor(unet_output_name)
-                noise_pred = fdtensor2pdtensor(noise_pred)
-
+                noise_pred = self.unet.zero_copy_infer(
+                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
+                )[0]
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)

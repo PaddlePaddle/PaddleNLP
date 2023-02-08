@@ -55,6 +55,26 @@ class FastDeployRuntimeModel:
         self.latest_model_name = kwargs.get("latest_model_name", "inference.pdmodel")
         self.latest_params_name = kwargs.get("latest_params_name", "inference.pdiparams")
 
+    def zero_copy_infer(self, **kwargs):
+        """
+        Execute inference without copying data from cpu to gpu.
+
+        Arguments:
+            kwargs (`dict(name, paddle.Tensor)`):
+                An input map from name to tensor.
+        Return:
+            List of output tensor.
+        """
+        for name, pdtensor in kwargs.items():
+            fdtensor = pdtensor2fdtensor(pdtensor, name)
+            self.model.bind_input_tensor(name, fdtensor)
+        self.model.zero_copy_infer()
+
+        outputs = []
+        for i in range(self.model.num_outputs()):
+            outputs += [fdtensor2pdtensor(self.model.get_output_tensor(self.model.get_output_info(i).name))]
+        return outputs
+
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}
         return self.model.infer(inputs)
