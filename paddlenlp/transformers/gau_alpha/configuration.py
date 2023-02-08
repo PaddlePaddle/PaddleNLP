@@ -14,8 +14,6 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
 from ..configuration_utils import PretrainedConfig
 
 __all__ = ["GAUAlPHA_PRETRAINED_INIT_CONFIGURATION", "GAUAlphaConfig", "GAUAlPHA_PRETRAINED_RESOURCE_FILES_MAP"]
@@ -105,7 +103,6 @@ class GAUAlphaConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "gau_alpha"
-    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
     pretrained_init_configuration = GAUAlPHA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
