@@ -99,7 +99,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 以下是本项目主要代码结构及说明：
 
 ```text
-text_summarization/
+finetune/
 ├── data # 数据
 │   ├── train.json # 训练数据集文件
 │   └── test.json # 可选，待预测数据文件
