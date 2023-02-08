@@ -12,23 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import warnings
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+from scipy import integrate
 
-from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput, logging
-from .scheduling_utils import SchedulerMixin
-
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+from ...configuration_utils import ConfigMixin, register_to_config
+from ...utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput
+from ..scheduling_utils import SchedulerMixin
 
 
 @dataclass
-# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->EulerAncestralDiscrete
-class EulerAncestralDiscreteSchedulerOutput(BaseOutput):
+# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
+class PreconfigLMSDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
 
@@ -45,10 +44,11 @@ class EulerAncestralDiscreteSchedulerOutput(BaseOutput):
     pred_original_sample: Optional[paddle.Tensor] = None
 
 
-class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
+class PreconfigLMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
     """
-    Ancestral sampling with Euler method steps. Based on the original k-diffusion implementation by Katherine Crowson:
-    https://github.com/crowsonkb/k-diffusion/blob/481677d114f6ea445aa009cf5bd7a9cdee909e47/k_diffusion/sampling.py#L72
+    Linear Multistep Scheduler for discrete beta schedules. Based on the original k-diffusion implementation by
+    Katherine Crowson:
+    https://github.com/crowsonkb/k-diffusion/blob/481677d114f6ea445aa009cf5bd7a9cdee909e47/k_diffusion/sampling.py#L181
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
@@ -82,6 +82,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         prediction_type: str = "epsilon",
+        preconfig=False,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype="float32")
@@ -107,11 +108,15 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.num_inference_steps = None
         timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
+        self.derivatives = []
         self.is_scale_input_called = False
+        self.preconfig = preconfig
 
-    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
+    def scale_model_input(
+        self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor], **kwargs
+    ) -> paddle.Tensor:
         """
-        Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the Euler algorithm.
+        Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the K-LMS algorithm.
 
         Args:
             sample (`paddle.Tensor`): input sample
@@ -120,13 +125,41 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             `paddle.Tensor`: scaled input sample
         """
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1) ** 0.5)
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
         self.is_scale_input_called = True
-        return sample
+        if not self.preconfig:
+            sigma = self.sigmas[step_index]
+            sample = sample / ((sigma**2 + 1) ** 0.5)
+            return sample
+        else:
+            return sample * self.latent_scales[step_index]
 
-    def set_timesteps(self, num_inference_steps: int):
+    def get_lms_coefficient(self, order, t, current_order):
+        """
+        Compute a linear multistep coefficient.
+
+        Args:
+            order (TODO):
+            t (TODO):
+            current_order (TODO):
+        """
+
+        def lms_derivative(tau):
+            prod = 1.0
+            for k in range(order):
+                if current_order == k:
+                    continue
+                prod *= (tau - self.sigmas[t - k]) / (self.sigmas[t - current_order] - self.sigmas[t - k])
+            return prod
+
+        integrated_coeff = integrate.quad(lms_derivative, self.sigmas[t], self.sigmas[t + 1], epsrel=1e-4)[0]
+
+        return integrated_coeff
+
+    def set_timesteps(self, num_inference_steps: int, preconfig_order: int = 4):
         """
         Sets the timesteps used for the diffusion chain. Supporting function to be run before inference.
 
@@ -143,14 +176,26 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.sigmas = paddle.to_tensor(sigmas)
         self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
 
+        self.derivatives = []
+        if self.preconfig:
+            self.order = preconfig_order
+            self.lms_coeffs = []
+            self.latent_scales = [1.0 / ((sigma**2 + 1) ** 0.5) for sigma in self.sigmas]
+            for step_index in range(self.num_inference_steps):
+                order = min(step_index + 1, preconfig_order)
+                self.lms_coeffs.append(
+                    [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
+                )
+
     def step(
         self,
         model_output: paddle.Tensor,
         timestep: Union[float, paddle.Tensor],
         sample: paddle.Tensor,
-        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        order: int = 4,
         return_dict: bool = True,
-    ) -> Union[EulerAncestralDiscreteSchedulerOutput, Tuple]:
+        **kwargs
+    ) -> Union[PreconfigLMSDiscreteSchedulerOutput, Tuple]:
         """
         Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
         process from the learned model outputs (most often the predicted noise).
@@ -160,55 +205,76 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
             timestep (`float`): current timestep in the diffusion chain.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
-            generator (`paddle.Generator`, optional): Random number generator.
-            return_dict (`bool`): option for returning tuple rather than EulerAncestralDiscreteSchedulerOutput class
+            order: coefficient for multi-step inference.
+            return_dict (`bool`): option for returning tuple rather than PreconfigLMSDiscreteSchedulerOutput class
+            Args in kwargs:
+                step_index (`int`):
+                return_pred_original_sample (`bool`): option for return pred_original_sample
 
         Returns:
-            [`~schedulers.scheduling_utils.EulerAncestralDiscreteSchedulerOutput`] or `tuple`:
-            [`~schedulers.scheduling_utils.EulerAncestralDiscreteSchedulerOutput`] if `return_dict` is True, otherwise
-            a `tuple`. When returning a tuple, the first element is the sample tensor.
+            [`~schedulers.scheduling_utils.PreconfigLMSDiscreteSchedulerOutput`] or `tuple`:
+            [`~schedulers.scheduling_utils.PreconfigLMSDiscreteSchedulerOutput`] if `return_dict` is True, otherwise a `tuple`.
+            When returning a tuple, the first element is the sample tensor.
 
         """
         if not self.is_scale_input_called:
-            logger.warning(
+            warnings.warn(
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example."
             )
-        step_index = (self.timesteps == timestep).nonzero().item()
-        sigma = self.sigmas[step_index]
-
-        # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        if self.config.prediction_type == "epsilon":
-            pred_original_sample = sample - sigma * model_output
-        elif self.config.prediction_type == "v_prediction":
-            # * c_out + input * c_skip
-            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+        if kwargs.get("return_pred_original_sample") is not None:
+            return_pred_original_sample = kwargs["return_pred_original_sample"]
         else:
-            raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+            return_pred_original_sample = True
+        if kwargs.get("step_index") is not None:
+            step_index = kwargs["step_index"]
+        else:
+            step_index = (self.timesteps == timestep).nonzero().item()
+        if self.config.prediction_type == "epsilon" and not return_pred_original_sample:
+            # if pred_original_sample is no need
+            self.derivatives.append(model_output)
+            pred_original_sample = None
+        else:
+            sigma = self.sigmas[step_index]
+            # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
+            if self.config.prediction_type == "epsilon":
+                pred_original_sample = sample - sigma * model_output
+            elif self.config.prediction_type == "v_prediction":
+                # * c_out + input * c_skip
+                pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+            else:
+                raise ValueError(
+                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+                )
+            # 2. Convert to an ODE derivative
+            derivative = (sample - pred_original_sample) / sigma
+            self.derivatives.append(derivative)
+
+        if len(self.derivatives) > order:
+            self.derivatives.pop(0)
+
+        if not self.preconfig:
+            # 3. If not preconfiged, compute linear multistep coefficients.
+            order = min(step_index + 1, order)
+            lms_coeffs = [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
+            # 4. Compute previous sample based on the derivatives path
+            prev_sample = sample + sum(
+                coeff * derivative for coeff, derivative in zip(lms_coeffs, reversed(self.derivatives))
             )
-        sigma_from = self.sigmas[step_index]
-        sigma_to = self.sigmas[step_index + 1]
-        sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
-        sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
-
-        # 2. Convert to an ODE derivative
-        derivative = (sample - pred_original_sample) / sigma
-
-        dt = sigma_down - sigma
-
-        prev_sample = sample + derivative * dt
-
-        noise = paddle.randn(model_output.shape, dtype=model_output.dtype, generator=generator)
-
-        prev_sample = prev_sample + noise * sigma_up
+        else:
+            # 3. If preconfiged, direct compute previous sample based on the derivatives path
+            prev_sample = sample + sum(
+                coeff * derivative
+                for coeff, derivative in zip(self.lms_coeffs[step_index], reversed(self.derivatives))
+            )
 
         if not return_dict:
-            return (prev_sample,)
+            if not return_pred_original_sample:
+                return (prev_sample,)
+            else:
+                return (prev_sample, pred_original_sample)
 
-        return EulerAncestralDiscreteSchedulerOutput(
-            prev_sample=prev_sample, pred_original_sample=pred_original_sample
-        )
+        return PreconfigLMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
 
     def add_noise(
         self,
@@ -217,12 +283,12 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure sigmas and timesteps have the same dtype as original_samples
-        self.sigmas = self.sigmas.cast(original_samples.dtype)
-
+        sigmas = self.sigmas.cast(original_samples.dtype)
         schedule_timesteps = self.timesteps
+
         step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
 
-        sigma = self.sigmas[step_indices].flatten()
+        sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
             sigma = sigma.unsqueeze(-1)
 
