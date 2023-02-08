@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,15 +20,15 @@ from io import BytesIO
 import fastdeploy as fd
 import numpy as np
 import paddle
+import PIL
 import requests
 from fastdeploy import ModelFormat
-from PIL import Image
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
-    FastDeployStableDiffusionImg2ImgPipeline,
+    FastDeployStableDiffusionInpaintPipeline,
     PNDMScheduler,
 )
 
@@ -74,15 +74,13 @@ def parse_arguments():
         ],
         help="The inference runtime device of models.",
     )
-    parser.add_argument(
-        "--image_path", default="fantasy_landscape.png", help="The model directory of diffusion_model."
-    )
+    parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="pndm",
+        default="euler_ancestral",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )
@@ -192,7 +190,6 @@ def get_scheduler(args):
             beta_start=0.00085,
             num_train_timesteps=1000,
             skip_prk_steps=True,
-            steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
         scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
@@ -210,7 +207,6 @@ if __name__ == "__main__":
         paddle.set_device("cpu")
     else:
         paddle.set_device(f"gpu:{device_id}")
-
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -343,7 +339,7 @@ if __name__ == "__main__":
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    pipe = FastDeployStableDiffusionImg2ImgPipeline(
+    pipe = FastDeployStableDiffusionInpaintPipeline(
         vae_encoder=FastDeployRuntimeModel(model=vae_encoder_runtime),
         vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
@@ -355,23 +351,34 @@ if __name__ == "__main__":
     )
 
     # Download the init image
-    url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
-    response = requests.get(url)
-    init_image = Image.open(BytesIO(response.content)).convert("RGB")
-    init_image = init_image.resize((768, 512))
+    def download_image(url):
+        response = requests.get(url)
+        return PIL.Image.open(BytesIO(response.content)).convert("RGB")
 
-    prompt = "A fantasy landscape, trending on artstation"
+    img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+    mask_url = (
+        "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+    )
 
+    init_image = download_image(img_url).resize((512, 512))
+    mask_image = download_image(mask_url).resize((512, 512))
+
+    prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
     # Warm up
-    pipe(prompt=prompt, image=init_image, num_inference_steps=10)
+    pipe(prompt=prompt, image=init_image, mask_image=mask_image, num_inference_steps=10)
 
     time_costs = []
-    print(f"Run the stable diffusion img2img pipeline {args.benchmark_steps} times to test the performance.")
+    print(f"Run the stable diffusion inpaint legacy pipeline {args.benchmark_steps} times to test the performance.")
 
     for step in range(args.benchmark_steps):
         start = time.time()
-        images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
+        images = pipe(
+            prompt=prompt,
+            image=init_image,
+            mask_image=mask_image,
+            num_inference_steps=args.inference_steps,
+        ).images
         latency = time.time() - start
         time_costs += [latency]
         print(f"No {step:3d} time cost: {latency:2f} s")

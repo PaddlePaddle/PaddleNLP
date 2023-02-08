@@ -388,3 +388,4 @@ if __name__ == "__main__":
     )
 
     images[0].save(args.image_path)
+    print(f"Image saved in {args.image_path}!")
