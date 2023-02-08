@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +15,20 @@
 import distutils.util
 import os
 import time
+from io import BytesIO
 
 import fastdeploy as fd
 import numpy as np
 import paddle
+import PIL
+import requests
 from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
-    FastDeployStableDiffusionPipeline,
+    FastDeployStableDiffusionInpaintPipeline,
     PNDMScheduler,
 )
 
@@ -39,7 +42,12 @@ def parse_arguments():
     )
     parser.add_argument("--model_format", default="paddle", choices=["paddle", "onnx"], help="The model format.")
     parser.add_argument("--unet_model_prefix", default="unet", help="The file prefix of unet model.")
-    parser.add_argument("--vae_decoder_model_prefix", default="vae_decoder", help="The file prefix of vae model.")
+    parser.add_argument(
+        "--vae_decoder_model_prefix", default="vae_decoder", help="The file prefix of vae decoder model."
+    )
+    parser.add_argument(
+        "--vae_encoder_model_prefix", default="vae_encoder", help="The file prefix of vae encoder model."
+    )
     parser.add_argument(
         "--text_encoder_model_prefix", default="text_encoder", help="The file prefix of text_encoder model."
     )
@@ -49,14 +57,14 @@ def parse_arguments():
         "--backend",
         type=str,
         default="paddle",
-        # Note(zhoushunjie): Will support 'tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddlelite", "paddle_tensorrt"],
+        # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
+        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
         "--device",
         type=str,
-        default="cpu",
+        default="gpu",
         # Note(shentanyue): Will support more devices.
         choices=[
             "cpu",
@@ -66,15 +74,13 @@ def parse_arguments():
         ],
         help="The inference runtime device of models.",
     )
-    parser.add_argument(
-        "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
-    )
+    parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="pndm",
+        default="euler_ancestral",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )
@@ -96,7 +102,7 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0, disable_paddle_trt_ops=[]
+    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
@@ -105,7 +111,6 @@ def create_paddle_inference_runtime(
     else:
         option.use_gpu(device_id)
     if use_trt:
-        option.disable_paddle_trt_ops(disable_paddle_trt_ops)
         option.use_trt_backend()
         option.enable_paddle_to_trt()
         if use_fp16:
@@ -185,7 +190,6 @@ def get_scheduler(args):
             beta_start=0.00085,
             num_train_timesteps=1000,
             skip_prk_steps=True,
-            steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
         scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
@@ -210,11 +214,19 @@ if __name__ == "__main__":
     tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
-    vae_dynamic_shape = {
+    vae_decoder_dynamic_shape = {
         "latent_sample": {
             "min_shape": [1, 4, 64, 64],
             "max_shape": [2, 4, 64, 64],
             "opt_shape": [2, 4, 64, 64],
+        }
+    }
+
+    vae_encoder_dynamic_shape = {
+        "sample": {
+            "min_shape": [1, 3, 512, 512],
+            "max_shape": [2, 3, 512, 512],
+            "opt_shape": [2, 3, 512, 512],
         }
     }
 
@@ -244,14 +256,17 @@ if __name__ == "__main__":
         vae_decoder_runtime = create_ort_runtime(
             args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=device_id
         )
+        vae_encoder_runtime = create_ort_runtime(
+            args.model_dir, args.vae_encoder_model_prefix, args.model_format, device_id=device_id
+        )
         start = time.time()
         unet_runtime = create_ort_runtime(
             args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
-        use_trt = True if args.backend == "paddle_tensorrt" else False
-        # Note(zhoushunjie): Will change to paddle-trt runtime later
+    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
+        use_trt = True if args.backend == "paddle-tensorrt" else False
+        # Note(zhoushunjie): Will change to paddle runtime later
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
@@ -259,7 +274,15 @@ if __name__ == "__main__":
             args.model_dir,
             args.vae_decoder_model_prefix,
             use_trt,
-            vae_dynamic_shape,
+            vae_decoder_dynamic_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+        )
+        vae_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            use_trt,
+            vae_encoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
         )
@@ -270,8 +293,7 @@ if __name__ == "__main__":
             use_trt,
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=args.device_id,
-            disable_paddle_trt_ops=["sin", "cos"],
+            device_id=device_id,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":
@@ -281,7 +303,15 @@ if __name__ == "__main__":
             args.vae_decoder_model_prefix,
             args.model_format,
             workspace=(1 << 30),
-            dynamic_shape=vae_dynamic_shape,
+            dynamic_shape=vae_decoder_dynamic_shape,
+            device_id=device_id,
+        )
+        vae_encoder_runtime = create_trt_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            args.model_format,
+            workspace=(1 << 30),
+            dynamic_shape=vae_encoder_dynamic_shape,
             device_id=device_id,
         )
         start = time.time()
@@ -300,14 +330,17 @@ if __name__ == "__main__":
         vae_decoder_runtime = create_paddle_lite_runtime(
             args.model_dir, args.vae_decoder_model_prefix, device=args.device, device_id=device_id
         )
+        vae_encoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.vae_encoder_model_prefix, device=args.device, device_id=device_id
+        )
         start = time.time()
         unet_runtime = create_paddle_lite_runtime(
             args.model_dir, args.unet_model_prefix, device=args.device, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    pipe = FastDeployStableDiffusionPipeline(
-        vae_encoder=None,
+    pipe = FastDeployStableDiffusionInpaintPipeline(
+        vae_encoder=FastDeployRuntimeModel(model=vae_encoder_runtime),
         vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
         tokenizer=tokenizer,
@@ -317,15 +350,35 @@ if __name__ == "__main__":
         feature_extractor=None,
     )
 
-    prompt = "a photo of an astronaut riding a horse on mars"
+    # Download the init image
+
+    def download_image(url):
+        response = requests.get(url)
+        return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+    img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+    mask_url = (
+        "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+    )
+
+    init_image = download_image(img_url).resize((512, 512))
+    mask_image = download_image(mask_url).resize((512, 512))
+
+    prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
     # Warm up
-    pipe(prompt, num_inference_steps=10)
+    pipe(prompt=prompt, image=init_image, mask_image=mask_image, num_inference_steps=10)
 
     time_costs = []
-    print(f"Run the stable diffusion pipeline {args.benchmark_steps} times to test the performance.")
+    print(f"Run the stable diffusion inpaint legacy pipeline {args.benchmark_steps} times to test the performance.")
+
     for step in range(args.benchmark_steps):
         start = time.time()
-        images = pipe(prompt, num_inference_steps=args.inference_steps).images
+        images = pipe(
+            prompt=prompt,
+            image=init_image,
+            mask_image=mask_image,
+            num_inference_steps=args.inference_steps,
+        ).images
         latency = time.time() - start
         time_costs += [latency]
         print(f"No {step:3d} time cost: {latency:2f} s")
@@ -333,5 +386,6 @@ if __name__ == "__main__":
         f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
         f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
     )
+
     images[0].save(args.image_path)
     print(f"Image saved in {args.image_path}!")
