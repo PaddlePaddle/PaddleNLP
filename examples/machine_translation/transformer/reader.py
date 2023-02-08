@@ -21,6 +21,7 @@ import numpy as np
 import paddle.distributed as dist
 from paddle.io import BatchSampler, DataLoader
 
+import paddlenlp
 from paddlenlp.data import Pad, Vocab
 
 
@@ -62,28 +63,24 @@ def create_data_loader(args, places=None):
             if args.dev_file is not None:
                 data_files["dev"] = list(args.dev_file)
 
-        from datasets import load_dataset
+        if args.benchmark:
+            from paddlenlp.datasets import load_dataset
 
-        if len(data_files) > 0:
-            for split in data_files:
-                if isinstance(data_files[split], (list, tuple)):
-                    for i, path in enumerate(data_files[split]):
-                        data_files[split][i] = os.path.abspath(data_files[split][i])
-                else:
-                    data_files[split] = os.path.abspath(data_files[split])
+            datasets = load_dataset("wmt14ende", data_files=[args.train_file, args.dev_file], splits=("train", "dev"))
 
-        datasets = load_dataset("language_pair", data_files=data_files, split=("train", "dev"))
-
-        if args.src_vocab is not None:
-            src_vocab = Vocab.load_vocabulary(
-                filepath=args.src_vocab,
-                unk_token=args.unk_token,
-                bos_token=args.bos_token,
-                eos_token=args.eos_token,
-                pad_token=args.pad_token,
-            )
+            map_kwargs["lazy"] = False
         else:
-            raise ValueError("The --src_vocab must be specified when using custom dataset. ")
+            from datasets import load_dataset
+
+            if len(data_files) > 0:
+                for split in data_files:
+                    if isinstance(data_files[split], (list, tuple)):
+                        for i, path in enumerate(data_files[split]):
+                            data_files[split][i] = os.path.abspath(data_files[split][i])
+                    else:
+                        data_files[split] = os.path.abspath(data_files[split])
+
+            datasets = load_dataset("language_pair", data_files=data_files, split=("train", "dev"))
 
     else:
         from paddlenlp.datasets import load_dataset
@@ -92,18 +89,20 @@ def create_data_loader(args, places=None):
 
         map_kwargs["lazy"] = False
 
-        if args.src_vocab is not None:
-            src_vocab = Vocab.load_vocabulary(
-                filepath=args.src_vocab,
-                unk_token=args.unk_token,
-                bos_token=args.bos_token,
-                eos_token=args.eos_token,
-                pad_token=args.pad_token,
-            )
-        elif not args.benchmark:
-            src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
-        else:
-            src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
+    if args.src_vocab is not None:
+        src_vocab = Vocab.load_vocabulary(
+            filepath=args.src_vocab,
+            unk_token=args.unk_token,
+            bos_token=args.bos_token,
+            eos_token=args.eos_token,
+            pad_token=args.pad_token,
+        )
+    elif not isinstance(datasets, paddlenlp.datasets.WMT14ende):
+        raise ValueError("The --src_vocab must be specified when using custom dataset. ")
+    elif not args.benchmark:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
 
     if use_custom_dataset and not args.joined_dictionary:
         if args.trg_vocab is not None:
@@ -201,28 +200,25 @@ def create_infer_loader(args):
                 # datasets.load_dataset doesn't support tuple
                 data_files["test"] = list(args.test_file) if isinstance(args.test_file, tuple) else args.test_file
 
-        from datasets import load_dataset
+        if args.benchmark:
+            from paddlenlp.datasets import load_dataset
 
-        if len(data_files) > 0:
-            for split in data_files:
-                if isinstance(data_files[split], (list, tuple)):
-                    for i, path in enumerate(data_files[split]):
-                        data_files[split][i] = os.path.abspath(data_files[split][i])
-                else:
-                    data_files[split] = os.path.abspath(data_files[split])
+            datasets = load_dataset("wmt14ende", data_files=[args.train_file, args.dev_file], splits=("train", "dev"))
 
-        dataset = load_dataset("language_pair", data_files=data_files, split=("test"))
+            map_kwargs["lazy"] = False
 
-        if args.src_vocab is not None:
-            src_vocab = Vocab.load_vocabulary(
-                filepath=args.src_vocab,
-                unk_token=args.unk_token,
-                bos_token=args.bos_token,
-                eos_token=args.eos_token,
-                pad_token=args.pad_token,
-            )
         else:
-            raise ValueError("The --src_vocab must be specified when using custom dataset. ")
+            from datasets import load_dataset
+
+            if len(data_files) > 0:
+                for split in data_files:
+                    if isinstance(data_files[split], (list, tuple)):
+                        for i, path in enumerate(data_files[split]):
+                            data_files[split][i] = os.path.abspath(data_files[split][i])
+                    else:
+                        data_files[split] = os.path.abspath(data_files[split])
+
+            dataset = load_dataset("language_pair", data_files=data_files, split=("test"))
 
     else:
         from paddlenlp.datasets import load_dataset
@@ -231,18 +227,20 @@ def create_infer_loader(args):
 
         map_kwargs["lazy"] = False
 
-        if args.src_vocab is not None:
-            src_vocab = Vocab.load_vocabulary(
-                filepath=args.src_vocab,
-                unk_token=args.unk_token,
-                bos_token=args.bos_token,
-                eos_token=args.eos_token,
-                pad_token=args.pad_token,
-            )
-        elif not args.benchmark:
-            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
-        else:
-            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
+    if args.src_vocab is not None:
+        src_vocab = Vocab.load_vocabulary(
+            filepath=args.src_vocab,
+            unk_token=args.unk_token,
+            bos_token=args.bos_token,
+            eos_token=args.eos_token,
+            pad_token=args.pad_token,
+        )
+    elif not isinstance(datasets, paddlenlp.datasets.WMT14ende):
+        raise ValueError("The --src_vocab must be specified when using custom dataset. ")
+    elif not args.benchmark:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
 
     if use_custom_dataset and not args.joined_dictionary:
         if args.trg_vocab is not None:
