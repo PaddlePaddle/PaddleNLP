@@ -433,7 +433,8 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                tensor_t = paddle.to_tensor(t)
+                tensor_t = paddle.to_tensor([t])
+
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
@@ -456,7 +457,6 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                     paddle.to_tensor(noise_pred), tensor_t, paddle.to_tensor(latents), **extra_step_kwargs
                 )
                 latents = scheduler_output.prev_sample.numpy()
-
                 init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, tensor_t)
 
                 init_latents_proper = init_latents_proper.numpy()

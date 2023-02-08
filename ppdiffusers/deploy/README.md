@@ -114,4 +114,29 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 
 #### Legacy 版本
 
+下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_legacy_infer.py` 脚本，完成文本引导的图像编辑任务。
+
+```
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-4/ --scheduler euler_ancestral --device gpu --backend paddle
+```
+
+脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，待变换的图像为：
+
+![image](https://user-images.githubusercontent.com/10826371/217423470-b2a3f8ac-618b-41ee-93e2-121bddc9fd36.png)
+
+mask 图像为：
+
+![overture-creations-mask](https://user-images.githubusercontent.com/10826371/217424068-99d0a97d-dbc3-4126-b80c-6409d2fd7ebc.png)
+
+
+运行得到的图像文件为 cat_on_bench_new.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
+
+![cat_on_bench_new.png](https://user-images.githubusercontent.com/10826371/217200795-811a8c73-9fb3-4445-b363-b445c7ee52cd.png)
+
+如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
+
+```
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5/ --scheduler euler_ancestral --device gpu --backend paddle
+```
+
 #### 正式版本
