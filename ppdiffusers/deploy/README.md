@@ -150,7 +150,7 @@ mask 图像为：
 
 运行得到的图像文件为 cat_on_bench_new.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
-![image](https://user-images.githubusercontent.com/10826371/217449299-19b13fcb-37ca-45fa-a546-cc6b9afc8e91.png)
+![image](https://user-images.githubusercontent.com/10826371/217455594-187aa99c-b321-4535-aca0-9159ad658a97.png)
 
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
@@ -177,7 +177,7 @@ mask 图像为：
 
 运行得到的图像文件为 cat_on_bench_new.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
-![image](https://user-images.githubusercontent.com/10826371/217448912-a0d7f01f-511c-480b-bf7a-7cca3e70f40f.png)
+![image](https://user-images.githubusercontent.com/10826371/217454490-7d6c6a89-fde6-4393-af8e-05e84961b354.png)
 
 
 #### 参数说明
