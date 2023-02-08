@@ -62,6 +62,7 @@ def do_train():
     # tokenizer = ChineseCLIPTokenizer.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
     train_dataset, eval_dataset = get_train_eval_dataset(data_args, tokenizer=tokenizer)
+
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint
