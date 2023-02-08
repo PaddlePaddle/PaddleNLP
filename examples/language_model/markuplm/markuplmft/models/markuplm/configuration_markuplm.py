@@ -14,10 +14,11 @@
 # limitations under the License.
 """ MarkupLM model configuration """
 
-from transformers.models.roberta.configuration_roberta import RobertaConfig
-from transformers.utils import logging
+from paddlenlp.transformers.roberta.configuration import RobertaConfig
 
-logger = logging.get_logger(__name__)
+# from paddlenlp.utils.log import logger
+
+# logger = logging.get_logger(__name__)
 
 MARKUPLM_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "microsoft/markuplm-base": "https://huggingface.co/microsoft/markuplm-base/resolve/main/config.json",
@@ -102,6 +103,7 @@ class MarkupLMConfig(RobertaConfig):
 
     """
     model_type = "markuplm"
+    pretrained_init_configuration = MARKUPLM_PRETRAINED_CONFIG_ARCHIVE_MAP
 
     def __init__(
         self,

@@ -65,6 +65,11 @@ from paddlenlp.utils.log import logger
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
+from .paddle_utils import (
+    apply_chunking_to_forward,
+    find_pruneable_heads_and_indices,
+    prune_linear_layer,
+)
 from .utils import (
     InitTrackerMeta,
     adapt_stale_fwd_patch,
@@ -75,7 +80,12 @@ from .utils import (
 __all__ = [
     "PretrainedModel",
     "register_base_model",
+    "apply_chunking_to_forward",
+    "find_pruneable_heads_and_indices",
+    "prune_linear_layer",
 ]
+
+_init_weights = True
 
 
 def unwrap_model(model, *args, **kwargs):
@@ -342,6 +352,84 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 self.deprecated_warnings[name] = True
 
             return result
+
+    def _init_weights(self, layer):
+        """
+        Initialize the weights. This method should be overridden by derived class.
+        """
+        raise NotImplementedError(f"Make sure `_init_weights` is implemented for {self.__class__}")
+
+    def init_weights(self):
+        """
+        If needed prunes and maybe initializes weights.
+        """
+
+        with paddle.no_grad():
+            # Prune heads if needed
+            if self.config.pruned_heads:
+                self.prune_heads(self.config.pruned_heads)
+
+            if _init_weights:
+                # Initialize weights
+                self.apply(self._init_weights)
+
+                # Tie weights should be skipped when not initializing all weights
+                # since from_pretrained(...) calls tie weights anyways
+                self.tie_weights()
+
+    def prune_heads(self, heads_to_prune: Dict[int, List[int]]):
+        """
+        Prunes heads of the base model.
+        Arguments:
+            heads_to_prune (`Dict[int, List[int]]`):
+                Dictionary with keys being selected layer indices (`int`) and associated values being the list of heads
+                to prune in said layer (list of `int`). For instance {1: [0, 2], 2: [2, 3]} will prune heads 0 and 2 on
+                layer 1 and heads 2 and 3 on layer 2.
+        """
+        # save new sets of pruned heads as union of previously stored pruned heads and newly pruned heads
+        for layer, heads in heads_to_prune.items():
+            union_heads = set(self.config.pruned_heads.get(layer, [])) | set(heads)
+            self.config.pruned_heads[layer] = list(union_heads)  # Unfortunately we have to store it as list for JSON
+
+        self.base_model._prune_heads(heads_to_prune)
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings"):
+            output_embeddings = self.get_output_embeddings()
+            if output_embeddings is not None:
+                logger.error("tie_weights")
+                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
+
+    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
+        """Tie or clone layer weights"""
+        if output_embeddings.weight.shape == input_embeddings.weight.shape:
+            logger.info("output_embeddings weight is setted!!!!!!!")
+            output_embeddings.weight = input_embeddings.weight
+        elif output_embeddings.weight.shape == input_embeddings.weight.t().shape:
+            logger.info("output_embeddings transposed weight is setted!!!!!!!")
+            raise ValueError(
+                "paddlenlp.nn.SharingLinear is expected to replace paddle.nn.Linear in your output_embeddings"
+            )
+            output_embeddings.weight.set_value(input_embeddings.weight.t())
+        else:
+            raise ValueError(
+                "when tie input/output embeddings, the shape of output embeddings: {} "
+                "should be equal to shape of input embeddings: {} "
+                "or should be equal to the shape of transpose input embeddings: {}".format(
+                    output_embeddings.weight.shape, input_embeddings.weight.shape, input_embeddings.weight.t().shape
+                )
+            )
+        if getattr(output_embeddings, "bias", None) is not None:
+            if output_embeddings.weight.shape[0] != output_embeddings.bias.shape[0]:
+                raise ValueError(
+                    "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
+                    "please check output_embeddings configuration".format(
+                        output_embeddings.weight.shape[-1], output_embeddings.bias.shape[0]
+                    )
+                )
 
     @property
     def base_model(self):
@@ -1048,17 +1136,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if url_file_exists(community_model_file_path):
                 return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
-            logger.warning(
-                f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-                f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-            )
-
-            if ENABLE_TORCH_CHECKPOINT:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
             else:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+                # 6. Fail for all failed
+                logger.warning(
+                    f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
+                    f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
+                )
 
-            raise FileNotFoundError(msg)
+                if ENABLE_TORCH_CHECKPOINT:
+                    msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+                else:
+                    msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+
+                raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(
