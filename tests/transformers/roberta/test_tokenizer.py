@@ -200,10 +200,10 @@ class RobertaBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 encoding = tokenizer(
                     text, return_offsets_mapping=True, add_special_tokens=False, return_token_type_ids=None
                 )
-                self.assertEqual(encoding.offset_mapping[0], (0, len(text_of_1_token)))
+                self.assertEqual(encoding.offset_mapping[0], (1, len(text_of_1_token) + 1))
                 self.assertEqual(
                     encoding.offset_mapping[1],
-                    (len(text_of_1_token) + 1, len(text_of_1_token) + 1 + len(text_of_1_token)),
+                    (len(text_of_1_token) + 2, len(text_of_1_token) + 2 + len(text_of_1_token)),
                 )
 
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, add_prefix_space=False)

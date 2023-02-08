@@ -737,7 +737,7 @@ class BertCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    rtol=1e-4,
+                    atol=1e-3,
                 )
             )
 

@@ -59,11 +59,14 @@ def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Option
         max_length = get_dynamic_max_length(
             examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
         )
+        # always pad to max_length
+        tokenized_examples = tokenizer(
+            questions, contexts, stride=args.doc_stride, max_length=max_length, padding="max_length", truncation=True
+        )
     else:
-        max_length = args.max_seq_length
-    tokenized_examples = tokenizer(
-        questions, contexts, stride=args.doc_stride, max_length=max_length, padding="max_length", truncation=True
-    )
+        tokenized_examples = tokenizer(
+            questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
+        )
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -140,11 +143,14 @@ def prepare_validation_features(examples, tokenizer, args, dynamic_max_length: O
         max_length = get_dynamic_max_length(
             examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
         )
+        # always pad to max_length
+        tokenized_examples = tokenizer(
+            questions, contexts, stride=args.doc_stride, max_length=max_length, padding="max_length", truncation=True
+        )
     else:
-        max_length = args.max_seq_length
-    tokenized_examples = tokenizer(
-        questions, contexts, stride=args.doc_stride, max_length=max_length, padding="max_length", truncation=True
-    )
+        tokenized_examples = tokenizer(
+            questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
+        )
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
     sample_mapping = tokenized_examples.pop("overflow_to_sample")
@@ -315,9 +321,10 @@ def seq_convert_example(
             max_length = get_dynamic_max_length(
                 examples=temp_example, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
+            # always pad to max_length
+            example = tokenizer(example["sentence"], max_length=max_length, padding="max_length", truncation=True)
         else:
-            max_length = max_seq_length
-        example = tokenizer(example["sentence"], max_length=max_length, padding="max_length", truncation=True)
+            example = tokenizer(example["sentence"], max_length=max_seq_length, truncation=True)
     elif "sentence1" in example:
         if dynamic_max_length is not None:
             temp_example = tokenizer(
@@ -329,15 +336,21 @@ def seq_convert_example(
             max_length = get_dynamic_max_length(
                 examples=temp_example, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
+            example = tokenizer(
+                example["sentence1"],
+                text_pair=example["sentence2"],
+                max_length=max_length,
+                padding="max_length",
+                truncation=True,
+            )
         else:
-            max_length = max_seq_length
-        example = tokenizer(
-            example["sentence1"],
-            text_pair=example["sentence2"],
-            max_length=max_length,
-            padding="max_length",
-            truncation=True,
-        )
+            example = tokenizer(
+                example["sentence1"],
+                text_pair=example["sentence2"],
+                max_length=max_seq_length,
+                truncation=True,
+            )
+
     if not is_test:
         if "token_type_ids" in example:
             return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"], "labels": label}
@@ -369,16 +382,23 @@ def token_convert_example(
             max_length = get_dynamic_max_length(
                 examples=tokenized_input, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
+            # always pad to max_length
+            tokenized_input = tokenizer(
+                example,
+                is_split_into_words=True,
+                max_length=max_length,
+                padding="max_length",
+                truncation=True,
+                return_length=return_length,
+            )
         else:
-            max_length = max_seq_length
-        tokenized_input = tokenizer(
-            example,
-            is_split_into_words=True,
-            max_length=max_length,
-            padding="max_length",
-            truncation=True,
-            return_length=return_length,
-        )
+            tokenized_input = tokenizer(
+                example,
+                is_split_into_words=True,
+                max_length=max_seq_length,
+                truncation=True,
+                return_length=return_length,
+            )
 
         # -2 for [CLS] and [SEP]
         if len(tokenized_input["input_ids"]) - 2 < len(labels):
@@ -406,17 +426,24 @@ def token_convert_example(
             max_length = get_dynamic_max_length(
                 examples=tokenized_input, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
+            # always pad to max_length
+            tokenized_input = tokenizer(
+                example["tokens"],
+                max_length=max_length,
+                padding="max_length",
+                truncation=True,
+                is_split_into_words=True,
+                return_length=return_length,
+            )
         else:
-            max_length = max_seq_length
+            tokenized_input = tokenizer(
+                example["tokens"],
+                max_length=max_seq_length,
+                truncation=True,
+                is_split_into_words=True,
+                return_length=return_length,
+            )
 
-        tokenized_input = tokenizer(
-            example["tokens"],
-            max_length=max_length,
-            padding="max_length",
-            truncation=True,
-            is_split_into_words=True,
-            return_length=return_length,
-        )
         label_ids = example["ner_tags"]
         if len(tokenized_input["input_ids"]) - 2 < len(label_ids):
             label_ids = label_ids[: len(tokenized_input["input_ids"]) - 2]

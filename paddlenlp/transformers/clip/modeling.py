@@ -498,6 +498,7 @@ class CLIPPretrainedModel(PretrainedModel):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
+        subfolder = kwargs.pop("subfolder", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -511,6 +512,7 @@ class CLIPPretrainedModel(PretrainedModel):
                 return_unused_kwargs=True,
                 force_download=force_download,
                 from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
                 **kwargs,
             )
         # Attention! we donot save this config.json
@@ -522,7 +524,7 @@ class CLIPPretrainedModel(PretrainedModel):
 
         # 3. resolve model_weight file
         model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub
+            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub, subfolder=subfolder
         )
 
         # 4. loading the state dict
