@@ -29,8 +29,10 @@ from paddlenlp.utils.downloader import (
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoBackbone",
@@ -233,12 +235,16 @@ class _BaseAutoModelClass:
             )
 
     @classmethod
-    def _from_pretrained(cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, *model_args, **kwargs):
+    def _from_pretrained(
+        cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, subfolder=None, *model_args, **kwargs
+    ):
         if task:
             if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print("We only support task choice for AutoModel.")
+        cache_dir = kwargs.get("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         all_model_names = []
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
@@ -251,7 +257,8 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.model_config_file,
-                    cache_dir=HF_CACHE_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -260,7 +267,8 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.legacy_model_config_file,
-                    cache_dir=HF_CACHE_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -314,7 +322,9 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            default_root = (
+                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            )
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
