@@ -101,6 +101,42 @@ fastdeployserver --model-repository=/models --model-control-mode=explicit --load
 
 ```shell
 
+I0209 09:15:49.314029 708 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls_model' version 1
+I0209 09:15:49.314917 708 model_repository_manager.cc:1022] loading: ernie_seqcls:1
+I0209 09:15:49.417014 708 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls' version 1
+...
+I0209 09:15:49.417394 708 server.cc:549]
++------------+---------------------------------------------------------------+--------+
+| Backend    | Path                                                          | Config |
++------------+---------------------------------------------------------------+--------+
+| python     | /opt/tritonserver/backends/python/libtriton_python.so         | {}     |
+| fastdeploy | /opt/tritonserver/backends/fastdeploy/libtriton_fastdeploy.so | {}     |
++------------+---------------------------------------------------------------+--------+
+
+I0209 09:15:49.417552 708 server.cc:592]
++--------------------------+---------+--------+
+| Model                    | Version | Status |
++--------------------------+---------+--------+
+| ernie_seqcls             | 1       | READY  |
+| ernie_seqcls_model       | 1       | READY  |
+| ernie_seqcls_postprocess | 1       | READY  |
+| ernie_seqcls_tokenizer   | 1       | READY  |
++--------------------------+---------+--------+
+
+```
+
+### 序列标注任务
+
+在容器内执行下面命令启动序列标注服务:
+
+```shell
+fastdeployserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_tokencls --backend-config=python,shm-default-byte-size=10485760
+```
+
+输出打印如下:
+
+```shell
+
 I0209 09:15:49.314029 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls_model' version 1
 I0209 09:15:49.314917 708 model_repository_manager.cc:1022] loading: ernie_tokencls:1
 I0209 09:15:49.417014 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls' version 1
@@ -123,37 +159,6 @@ I0209 09:15:49.417552 708 server.cc:592]
 | ernie_tokencls_tokenizer   | 1       | READY  |
 +----------------------------+---------+--------+
 
-```
-
-### 序列标注任务
-
-在容器内执行下面命令启动序列标注服务:
-
-```shell
-fastdeployserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_tokencls --backend-config=python,shm-default-byte-size=10485760
-```
-
-输出打印如下:
-
-```shell
-I1019 09:41:15.375496 2823 model_repository_manager.cc:1183] successfully loaded 'ernie_tokenizer' version 1
-I1019 09:41:15.375987 2823 model_repository_manager.cc:1022] loading: ernie_seqcls:1
-I1019 09:41:15.477147 2823 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls' version 1
-I1019 09:41:15.477325 2823 server.cc:522]
-...
-I0613 08:59:20.577820 10021 server.cc:592]
-+----------------------------+---------+--------+
-| Model                      | Version | Status |
-+----------------------------+---------+--------+
-| ernie_tokencls             | 1       | READY  |
-| ernie_tokencls_model       | 1       | READY  |
-| ernie_tokencls_postprocess | 1       | READY  |
-| ernie_tokenizer            | 1       | READY  |
-+----------------------------+---------+--------+
-...
-I0601 07:15:15.923270 8059 grpc_server.cc:4117] Started GRPCInferenceService at 0.0.0.0:8001
-I0601 07:15:15.923604 8059 http_server.cc:2815] Started HTTPService at 0.0.0.0:8000
-I0601 07:15:15.964984 8059 http_server.cc:167] Started Metrics Service at 0.0.0.0:8002
 ```
 
 ## 客户端请求
@@ -183,9 +188,8 @@ python seq_cls_grpc_client.py
 输出打印如下:
 
 ```shell
-{'label': array([5, 9]), 'confidence': array([0.6425664 , 0.66534853], dtype=float32)}
-{'label': array([4]), 'confidence': array([0.53198355], dtype=float32)}
-acc: 0.5731
+{'label': array([0, 0]), 'confidence': array([0.54437345, 0.98503494], dtype=float32)}
+acc: 0.7224281742354032
 ```
 
 

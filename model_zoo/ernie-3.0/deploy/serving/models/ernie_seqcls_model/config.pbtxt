@@ -16,7 +16,7 @@ output [
     {
       name: "linear_75.tmp_1"
       data_type: TYPE_FP32
-      dims: [ 15 ]
+      dims: [ 2 ]
     }
 ]
 
@@ -25,7 +25,7 @@ instance_group [
       # 创建1个实例
       count: 1
       # 使用CPU推理(KIND_CPU、KIND_GPU)
-      kind: KIND_CPU
+      kind: KIND_GPU
   }
 ]
 
@@ -34,7 +34,7 @@ optimization {
     cpu_execution_accelerator : [
       {
         # use openvino backend
-        name: "openvino"
+        name: "paddle"
         parameters { key: "cpu_threads" value: "5" }
       }
     ]

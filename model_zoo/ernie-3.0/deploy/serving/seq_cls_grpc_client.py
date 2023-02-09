@@ -104,21 +104,22 @@ def test_afqmc_dataset(runner):
     idx = 0
     batch_size = 32
     while idx < len(dev_ds):
-        data = []
+        texts = []
+        text_pairs = []
         label = []
         for i in range(batch_size):
             if idx + i >= len(dev_ds):
                 break
-            data.append(dev_ds[idx + i]["sentence"])
+            texts.append(dev_ds[idx + i]["sentence1"])
+            text_pairs.append(dev_ds[idx + i]["sentence2"])
             label.append(dev_ds[idx + i]["label"])
-        batches.append(data)
+        batches.append((texts, text_pairs))
         labels.append(np.array(label))
         idx += batch_size
 
     accuracy = 0
     for i, data in enumerate(batches):
-        ret = runner.Run([data])
-        # print("ret:", ret)
+        ret = runner.Run(data)
         accuracy += np.sum(labels[i] == ret["label"])
     print("acc:", 1.0 * accuracy / len(dev_ds))
 
@@ -128,9 +129,12 @@ if __name__ == "__main__":
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    text_pairs = [[("花呗收款额度限制", "收钱码，对花呗支付的金额有限制吗")], [("花呗支持高铁票支付吗", "为什么友付宝不支持花呗付款")]]
-    for batch_text_pair in text_pairs:
+
+    # [([texts], [text_pairs])]
+    dataset = [(["花呗收款额度限制", "花呗支持高铁票支付吗"], ["收钱码，对花呗支付的金额有限制吗", "为什么友付宝不支持花呗付款"])]
+
+    for batch_text_pair in dataset:
         result = runner.Run(batch_text_pair)
         print(result)
 
-    # test_afqmc_dataset(runner)
+    test_afqmc_dataset(runner)

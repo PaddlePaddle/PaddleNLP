@@ -84,15 +84,15 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            text = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
-            text = text.as_numpy()
-            text = [i[0].decode("utf-8") for i in text]
+            texts = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
+            texts = texts.as_numpy()
+            texts = [i[0].decode("utf-8") for i in texts]
 
-            text_pair = pb_utils.get_input_tensor_by_name(request, self.input_names[1])
-            text_pair = text_pair.as_numpy()
-            text_pair = [i[0].decode("utf-8") for i in text_pair]
+            text_pairs = pb_utils.get_input_tensor_by_name(request, self.input_names[1])
+            text_pairs = text_pairs.as_numpy()
+            text_pairs = [i[0].decode("utf-8") for i in text_pairs]
 
-            data = self.tokenizer(text, text_pair=text_pair, max_length=128, padding=True, truncation=True)
+            data = self.tokenizer(texts, text_pair=text_pairs, max_length=128, padding=True, truncation=True)
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
             token_type_ids = np.array(data["token_type_ids"], dtype=self.output_dtype[1])
 
