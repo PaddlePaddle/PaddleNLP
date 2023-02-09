@@ -7,7 +7,7 @@
 
 ## 准备模型
 
-以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 模型在 CLUE Benchmark 的 [AFQMC 数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务以及 [MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的**服务化部署**。按照[ERNIE 3.0 训练文档](../../README.md)分别训练并导出文本分类模型以及序列标注模型，并将导出的模型移动到 models 目录下相应位置。
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 模型在 CLUE Benchmark 的 [AFQMC 数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务以及 [MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的**服务化部署**。按照[ERNIE 3.0 训练文档](../../README.md)分别训练并导出文本分类模型以及序列标注模型，并将导出的模型移动到 models 目录下相应位置。注意：模型与参数文件必须命名为 **model.pdmodel** 和 **model.pdiparams**。
 
 模型移动好之后，文本分类任务的 models 目录结构如下:
 
