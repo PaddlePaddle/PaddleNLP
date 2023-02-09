@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m paddle_serving_client.convert --dirname ../../inference_model \
-                                        --model_filename pegasus.pdmodel \
-                                        --params_filename pegasus.pdiparams \
-                                        --serving_server inference_model_server \
-                                        --serving_client inference_model_client
+from paddlenlp import SimpleServer, Taskflow
+
+ts = Taskflow("text_summarization")
+app = SimpleServer()
+app.register_taskflow("taskflow/text_summarization", ts)
