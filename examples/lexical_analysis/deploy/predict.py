@@ -165,7 +165,8 @@ class Predictor(object):
             examples.append((token_ids, length))
 
         def batchify_fn(samples):
-            fn = Tuple(Pad(axis=0, pad_val=0, dtype="int64"), Stack(axis=0, dtype="int64"))  # input  # length
+            fn = Tuple(Pad(axis=0, pad_val=0, dtype="int64"), Stack(axis=0, dtype="int64"))
+
             return fn(samples)
 
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
