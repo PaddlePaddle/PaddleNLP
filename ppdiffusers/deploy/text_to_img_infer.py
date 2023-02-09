@@ -198,7 +198,7 @@ def get_scheduler(args):
         )
     elif args.scheduler == "euler_ancestral":
         scheduler = PreconfigEulerAncestralDiscreteScheduler(
-            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", preconfig=True
         )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")

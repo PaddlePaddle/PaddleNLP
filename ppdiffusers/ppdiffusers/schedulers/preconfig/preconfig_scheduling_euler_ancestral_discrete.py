@@ -163,7 +163,6 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
                 self.sigma_up.append(sigma_up)
                 self.sigma_down.append(sigma_down)
-
             self.latent_scales = 1 / ((self.sigmas**2 + 1) ** 0.5)
 
     def step(
