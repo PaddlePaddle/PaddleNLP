@@ -28,17 +28,13 @@ logger = logging.getLogger(__name__)
 FilterType = Dict[str, Union[Dict[str, Any], List[Any], str, int, float, bool]]
 
 
-# TODO the keys should match with ContentTypes (currently 'audio' is missing)
 DOCUMENT_CONVERTERS = {
     # NOTE: Keep this '?' cleaning step, it needs to be double-checked for impact on the inference results.
     "text": lambda doc: doc.content[:-1] if doc.content[-1] == "?" else doc.content,
-    "table": lambda doc: " ".join(
-        doc.content.columns.tolist() + [cell for row in doc.content.values.tolist() for cell in row]
-    ),
     "image": lambda doc: Image.open(doc.content),
 }
 
-CAN_EMBED_META = ["text", "table"]
+CAN_EMBED_META = ["text"]
 
 
 class MultiModalEmbedder:
@@ -52,13 +48,11 @@ class MultiModalEmbedder:
     ):
         """
         Init the Retriever and all its models from a local or remote model checkpoint.
-        The checkpoint format matches the Hugging Face transformers' model format.
         :param embedding_models: A dictionary matching a local path or remote name of encoder checkpoint with
-            the content type it should handle ("text", "table", "image", etc...).
-            The format is the one that Hugging Face Hub models use.
+            the content type it should handle ("text",  "image", etc...).
             Expected input format: `{'text': 'name_or_path_to_text_model', 'image': 'name_or_path_to_image_model', ... }`
             Keep in mind that the models should output in the same embedding space for this retriever to work.
-        :param feature_extractors_params: A dictionary matching a content type ("text", "table", "image" and so on) with the
+        :param feature_extractors_params: A dictionary matching a content type ("text",  "image" and so on) with the
             parameters of its own feature extractor if the model requires one.
             Expected input format: `{'text': {'param_name': 'param_value', ...}, 'image': {'param_name': 'param_value', ...}, ...}`
         :param batch_size: Number of questions or passages to encode at once. In case of multiple GPUs, this will be the total batch size.
@@ -78,7 +72,7 @@ class MultiModalEmbedder:
 
         feature_extractors_params = {
             content_type: {"max_length": 256, **(feature_extractors_params or {}).get(content_type, {})}
-            for content_type in ["text", "table", "image"]  # FIXME get_args(ContentTypes) from Python3.8 on
+            for content_type in ["text", "image"]  # FIXME get_args(ContentTypes) from Python3.8 on
         }
 
         self.models = {}  # replace str with ContentTypes starting from Python3.8
@@ -167,7 +161,7 @@ class MultiModalEmbedder:
             of a text document, a linearized table, a PIL image object, and so on)
         """
         docs_data: Dict[str, List[Any]] = {  # FIXME replace str to ContentTypes from Python3.8
-            key: [] for key in ["text", "table", "image"]
+            key: [] for key in ["text", "image"]
         }  # FIXME get_args(ContentTypes) from Python3.8 on
         for doc in documents:
             try:
