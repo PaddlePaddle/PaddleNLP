@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import time
 
-import argparse
-import numpy as np
-
 import paddle
-from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
+
+from paddlenlp.data import Pad, Stack, Tuple
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -30,7 +28,7 @@ parser.add_argument("--data_dir", type=str, default=None, help="The folder where
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--epochs", default=1, type=int, help="The number of epochs when running benchmark.")
 
 args = parser.parse_args()
@@ -73,7 +71,7 @@ def load_vocab(dict_path):
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
-                if reverse == None:
+                if reverse is None:
                     reverse = True if terms[0].isdigit() else False
                 if reverse:
                     value, key = terms
@@ -166,10 +164,10 @@ class Predictor(object):
             )
             examples.append((token_ids, length))
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=0),  # input
-            Stack(axis=0),  # length
-        ): fn(samples)
+        def batchify_fn(samples):
+            fn = Tuple(Pad(axis=0, pad_val=0, dtype="int64"), Stack(axis=0, dtype="int64"))
+
+            return fn(samples)
 
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
