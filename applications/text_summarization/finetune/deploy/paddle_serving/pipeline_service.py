@@ -71,8 +71,8 @@ class PegasusService(WebService):
 
 
 if __name__ == "__main__":
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     service = PegasusService(name="text_summarization")
     service.prepare_pipeline_config("config.yml")
     service.run_service()
