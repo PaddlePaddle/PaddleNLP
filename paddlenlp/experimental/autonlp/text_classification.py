@@ -90,7 +90,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
 
     @property
-    def supported_language(self) -> List[str]:
+    def supported_languages(self) -> List[str]:
         return ["Chinese", "English"]
 
     @property
