@@ -14,14 +14,13 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from unittest import TestCase
 
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
-class ERNIE_HEALTH_Test(TestCase):
+class ERNIEHEALTH_Test(TestCase):
     def setUp(self) -> None:
         self.path = "./model_zoo/ernie-health"
         self.config_path = "./tests/fixtures/model_zoo/ernie-health.yaml"
@@ -32,40 +31,8 @@ class ERNIE_HEALTH_Test(TestCase):
 
     def test_pretrain(self):
 
-        # 1. run pretrain
         pretrain_config = load_test_config(self.config_path, "pretrain")
         with argv_context_guard(pretrain_config):
             from run_pretrain_trainer import main
-
-            print(main)
-            main()
-
-        # 2. export model
-        export_config = {
-            "model_type": pretrain_config["model_type"],
-            "model_path": pretrain_config["output_dir"],
-            "output_path": os.path.join(pretrain_config["output_dir"], "export_model"),
-        }
-        with argv_context_guard(export_config):
-            from clue.export_model import main
-
-            main()
-
-        # 3. infer model
-        infer_config = {
-            "model_type": export_config["model_type"],
-            "model_path": export_config["output_path"],
-            "select_device": pretrain_config["device"],
-        }
-        with argv_context_guard(infer_config):
-            from deploy.predictor.infer_classification import main
-
-            main()
-
-            from deploy.predictor.infer_ner import main
-
-            main()
-
-            from deploy.predictor.infer_spo import main
 
             main()

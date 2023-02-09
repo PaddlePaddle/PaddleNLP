@@ -36,6 +36,7 @@ from paddlenlp.transformers import (
     ErnieTokenizer,
     LinearDecayWithWarmup,
 )
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -265,6 +266,20 @@ class PretrainingTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
+def download_corpus(args: DataArguments):
+    os.makedirs(args.input_dir, exist_ok=True)
+    files = [
+        "https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5",
+    ]
+
+    for file in files:
+        file_name = file.split("/")[-1]
+        file_path = os.path.join(args.input_dir, file_name)
+        if not os.path.exists(file_path):
+            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
+            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
+
+
 def do_train():
     data_args, training_args, model_args = PdArgumentParser(
         [DataArguments, TrainingArguments, ModelArguments]
@@ -298,6 +313,7 @@ def do_train():
     else:
         model = model_class.from_pretrained(model_args.model_name_or_path)
 
+    download_corpus(data_args)
     data_file = get_train_data_file(data_args)
     train_dataset = PretrainingDataset(input_file=data_file, max_pred_length=model_args.max_predictions_per_seq)
 

@@ -138,7 +138,11 @@ def main():
     pretrained_models.append("__internal_testing__/ernie-health-chinese")
 
     if model_args.model_name_or_path in pretrained_models:
-        tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+        if model_args.model_name_or_path == "__internal_testing__/ernie-health-chinese":
+            tokenizer = ElectraTokenizer.from_pretrained("__internal_testing__/ernie-health-chinese")
+        else:
+            tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+
         model_config = config_class()
         model = model_class(model_config)
     else:
