@@ -124,23 +124,13 @@ def test_afqmc_dataset(runner):
 
 
 if __name__ == "__main__":
-    from paddlenlp.datasets import load_dataset
-
-    dev_ds = load_dataset("clue", "tnews", splits="dev")
     model_name = "ernie_seqcls"
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    texts = [
-        ["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
-        [
-            "区块链投资心得，能做到就不会亏钱",
-        ],
-    ]
-
-    for text in texts:
-        # input format:[input1, input2 ... inputn], n = len(self._input_names)
-        result = runner.Run([text])
+    text_pairs = [[("花呗收款额度限制", "收钱码，对花呗支付的金额有限制吗")], [("花呗支持高铁票支付吗", "为什么友付宝不支持花呗付款")]]
+    for batch_text_pair in text_pairs:
+        result = runner.Run(batch_text_pair)
         print(result)
 
-    test_afqmc_dataset(runner)
+    # test_afqmc_dataset(runner)
