@@ -1,11 +1,11 @@
-pretrain:
+finetune:
   default:
     model_type: ernie_vil-2.0-base-zh
     train_data: ./tests/fixtures/Flickr30k-CN/lmdb/train
     val_data: ./tests/fixtures/Flickr30k-CN/lmdb/valid
     data_root: .
     learning_rate: 5e-5
-    output_dir: ./output_dir/pretrain
+    output_dir: ./output_dir/finetune
     weight_decay: 0.01
     max_steps: 2
     save_steps: 2

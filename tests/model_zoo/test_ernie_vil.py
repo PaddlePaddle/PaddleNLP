@@ -29,20 +29,20 @@ class ErnieViLTest(TestCase):
     def tearDown(self) -> None:
         sys.path.remove(self.path)
 
-    def test_pretrain(self):
+    def test_finetune(self):
 
-        # 1. run pretrain
-        pretrain_config = load_test_config(self.config_path, "pretrain")
-        with argv_context_guard(pretrain_config):
-            from trainer_finetune import do_train
+        # 1. run finetune
+        finetune_config = load_test_config(self.config_path, "finetune")
+        with argv_context_guard(finetune_config):
+            from run_finetune import do_train
 
             do_train()
 
         # 2. export model
         export_config = {
-            "model_type": pretrain_config["model_type"],
-            "model_path": pretrain_config["output_dir"],
-            "output_path": pretrain_config["output_dir"],
+            "model_type": finetune_config["model_type"],
+            "model_path": finetune_config["output_dir"],
+            "output_path": finetune_config["output_dir"],
         }
         with argv_context_guard(export_config):
             from export_model import main
@@ -53,7 +53,7 @@ class ErnieViLTest(TestCase):
         infer_config = {
             "model_type": export_config["model_type"],
             "model_path": export_config["output_path"],
-            "select_device": pretrain_config["device"],
+            "select_device": finetune_config["device"],
         }
         with argv_context_guard(infer_config):
             from deploy.python.inference import main

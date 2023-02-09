@@ -24,7 +24,7 @@ val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
 log_dir=train_log
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --log_dir ${log_dir}  \
-                trainer_finetune.py --output_dir output_pd \
+                run_finetune.py --output_dir output_pd \
                 --do_train \
                 --train_data=${train_data} \
                 --val_data=${val_data} \

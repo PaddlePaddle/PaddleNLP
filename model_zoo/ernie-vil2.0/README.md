@@ -126,7 +126,7 @@ print(probs)
 ├── recall_text_to_image.sh # 以文搜图的bash脚本
 ├── run_train.sh # 微调的bash脚本
 ├── test_example.py # 预测的示例
-├── trainer_finetune.py # trainer实现微调
+├── run_finetune.py # trainer实现微调
 ├── trainer_util.py # 微调的工具代码
 └── utils
     ├── evaluation.py # 评估以文搜图的召回脚本
@@ -225,7 +225,7 @@ val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
 log_dir=train_log
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --log_dir ${log_dir}  \
-                trainer_finetune.py --output_dir output_pd \
+                run_finetune.py --output_dir output_pd \
                 --train_data=${train_data} \
                 --val_data=${val_data} \
                 --do_train \
