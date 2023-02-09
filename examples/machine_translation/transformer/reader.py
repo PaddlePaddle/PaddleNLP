@@ -97,7 +97,7 @@ def create_data_loader(args, places=None):
             eos_token=args.eos_token,
             pad_token=args.pad_token,
         )
-    elif not isinstance(datasets, paddlenlp.datasets.WMT14ende):
+    elif not isinstance(datasets[0], paddlenlp.datasets.dataset.MapDataset):
         raise ValueError("The --src_vocab must be specified when using custom dataset. ")
     elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
@@ -235,7 +235,7 @@ def create_infer_loader(args):
             eos_token=args.eos_token,
             pad_token=args.pad_token,
         )
-    elif not isinstance(datasets, paddlenlp.datasets.WMT14ende):
+    elif not isinstance(datasets, paddlenlp.datasets.dataset.MapDataset):
         raise ValueError("The --src_vocab must be specified when using custom dataset. ")
     elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
