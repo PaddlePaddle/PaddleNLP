@@ -71,7 +71,7 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install ${paddle};
+    python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
     python -c 'from visualdl import LogWriter'
 }
@@ -222,7 +222,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         install_paddle
         echo "install_nlp_develop"
         wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
-        python -m pip install paddlenlp-ci-py3-none-any.whl
+        python -m pip install --user paddlenlp-ci-py3-none-any.whl
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl

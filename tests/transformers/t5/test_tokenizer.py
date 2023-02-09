@@ -19,7 +19,7 @@ import unittest
 
 from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, T5Tokenizer
 from paddlenlp.transformers.tokenizer_utils_base import BatchEncoding
-from tests.testing_utils import get_tests_dir, slow
+from tests.testing_utils import get_tests_dir
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
@@ -190,7 +190,9 @@ class T5TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         src_text = ["A long paragraph for summarization. </s>"]
         tgt_text = ["Summary of the text. </s>"]
         expected_src_tokens = [71, 307, 8986, 21, 4505, 1635, 1707, 5, 1]
-        expected_tgt_tokens = [20698, 13, 8, 1499, 5, 1]
+
+        # TODO(wj-Mcat): to enable `expected_tgt_tokens`
+        # expected_tgt_tokens = [20698, 13, 8, 1499, 5, 1]
 
         batch = tokenizer(src_text, text_target=tgt_text)
 
@@ -279,3 +281,16 @@ class T5TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_offsets_mapping(self):
         pass
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 3)
+            self.assertEqual(len(encoding["offset_mapping"]), 3)
