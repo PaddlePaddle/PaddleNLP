@@ -31,6 +31,10 @@ from ...schedulers import (
     LMSDiscreteScheduler,
     PNDMScheduler,
 )
+from ...schedulers.preconfig import (
+    PreconfigEulerAncestralDiscreteScheduler,
+    PreconfigLMSDiscreteScheduler,
+)
 from ...utils import logging
 from . import StableDiffusionPipelineOutput
 
@@ -80,8 +84,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             DDIMScheduler,
             PNDMScheduler,
             LMSDiscreteScheduler,
+            PreconfigLMSDiscreteScheduler,
             EulerDiscreteScheduler,
             EulerAncestralDiscreteScheduler,
+            PreconfigEulerAncestralDiscreteScheduler,
             DPMSolverMultistepScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
@@ -375,7 +381,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
 
                 # predict the noise residual
                 noise_pred = self.unet.zero_copy_infer(
@@ -387,7 +393,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                scheduler_output = self.scheduler.step(
+                    noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                )
                 latents = scheduler_output.prev_sample
 
                 # call the callback, if provided
