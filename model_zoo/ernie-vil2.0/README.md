@@ -118,7 +118,7 @@ print(probs)
 │           ├── valid_imgs.tsv # 图像验证集
 │           ├── valid_texts.jsonl # 文本验证集，文到图
 │           └── valid_texts.tr.jsonl # 文本验证集，图到文
-├── data.py  # 训练的预处理操作
+├── data_util.py  # 训练的预处理操作
 ├── extract_features.py # 提取图片和文本特征
 ├── extract_features.sh # 提取特征的bash脚本
 ├── README.md # README文档

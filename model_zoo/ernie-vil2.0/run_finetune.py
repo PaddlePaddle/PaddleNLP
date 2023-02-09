@@ -16,10 +16,10 @@ import os
 from dataclasses import dataclass, field
 
 import paddle
+from data_util import get_train_eval_dataset
 from paddle.metric import Accuracy
 from trainer_util import ErnieViLTrainer
 
-from data import get_train_eval_dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
