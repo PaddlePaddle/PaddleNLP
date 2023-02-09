@@ -14,9 +14,8 @@
 
 import argparse
 
+from ernie_m_predictor import ErnieMPredictor
 from psutil import cpu_count
-
-from .ernie_m_predictor import ErnieMPredictor
 
 
 def parse_args():

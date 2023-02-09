@@ -994,7 +994,7 @@ if [ ! -f 'test.py' ];then
         --remove_unused_columns False >${log_path}/ernie-m_clt >>${log_path}/ernie-m_clt 2>&1
     print_info $? ernie-m_clt
     # inference for cross-lingual-transfer
-    python deploy/predictor/inference.py 
+    python deploy/predictor/inference.py \
         --device cpu \
         --task_name seq_cls \
         --model_path output_clt/export/model >${log_path}/ernie-m_clt_infer >>${log_path}/ernie-m_clt_infer 2>&1
@@ -1016,7 +1016,7 @@ if [ ! -f 'test.py' ];then
         --remove_unused_columns False >${log_path}/ernie-m_tta >>${log_path}/ernie-m_tta 2>&1
     print_info $? ernie-m_tta
     # inference for translate-train-all
-    python deploy/predictor/inference.py 
+    python deploy/predictor/inference.py \
         --device cpu \
         --task_name seq_cls \
         --model_path output_tta/export/model >${log_path}/ernie-m_tta_infer >>${log_path}/ernie-m_tta_infer 2>&1
