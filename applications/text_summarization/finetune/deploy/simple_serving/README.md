@@ -13,6 +13,7 @@
     - [server参数](#server参数)
       - [模型路径](#模型路径)
       - [多卡服务化预测](#多卡服务化预测)
+      - [Taskflow加速](#Taskflow加速)
     - [client参数](#client参数)
 
 
@@ -55,7 +56,7 @@ python client.py
 ```shell
 ts = Taskflow("text_summarization", task_path='../../checkpoint/model_best/')
 ```
-可选模型有 `unimo-text-1.0-summary`, `IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese`, `IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese`
+可选模型有 `PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA`， `PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA`， `unimo-text-1.0-summary`， `IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese`， `IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese`
 
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码：
@@ -64,6 +65,13 @@ PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注�
 ts1 = Taskflow('text_summarization', device_id=0)
 ts2 = Taskflow('text_summarization', device_id=1)
 service.register_taskflow("taskflow/text_summarization", [ts1, ts2])
+```
+
+#### Taskflow加速
+PaddleNLP SimpleServing 支持在线服务加速，需要在注册Taskflow时设置参数`use_faster`：
+
+```shell
+ts = Taskflow("text_summarization", use_faster=True)
 ```
 
 ### client参数
