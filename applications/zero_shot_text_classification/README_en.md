@@ -207,7 +207,7 @@ You can use `paddlenlp.Taskflow` to load your custom model by specifying the pat
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
->>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best', precision="fp16")
+>>> my_cls = Taskflow("zero_shot_text_classification", model="utc-base", schema=schema, task_path="./checkpoint/model_best", precision="fp16")
 >>> pprint(my_cls("中性粒细胞比率偏低"))
 ```
 
@@ -223,6 +223,7 @@ from paddlenlp import SimpleServer, Taskflow
 
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
+               model="utc-base",
                schema=schema,
                task_path="../../checkpoint/model_best/",
                precision="fp32")
