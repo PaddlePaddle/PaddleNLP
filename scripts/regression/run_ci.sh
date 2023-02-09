@@ -157,7 +157,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+            P0case_list[${#P0case_list[*]}]=${dir2}
+        elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
             P0case_list[${#P0case_list[*]}]=${dir3}
         elif [[ ${dir3##*.} == "py" ]] && [[ !(${all_example_dict[*]} =~ ${dir2}) ]];then #新增规范模型
             P0case_list[${#P0case_list[*]}]=${dir2}
