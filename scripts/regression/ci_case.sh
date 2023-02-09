@@ -319,6 +319,8 @@ python deploy/python/inference.py \
     --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
 print_info $? gpt_p_depoly
 
+echo 'run gpt test with pytest'
+cd ${nlp_dir}
 python -m pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
 print_info $? gpt
 
