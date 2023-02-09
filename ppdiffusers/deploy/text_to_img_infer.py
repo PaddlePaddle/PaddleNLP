@@ -233,7 +233,7 @@ if __name__ == "__main__":
     if args.device == "cpu":
         device_id = -1
     if args.backend == "onnx_runtime":
-        text_encoder_runtime = create_paddle_inference_runtime(
+        text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_ort_runtime(
@@ -248,7 +248,8 @@ if __name__ == "__main__":
         use_trt = True if args.backend == "paddle_tensorrt" else False
         # Note(zhoushunjie): Will change to paddle-trt runtime later
         text_encoder_runtime = create_paddle_inference_runtime(
-            args.model_dir, args.text_encoder_model_prefix,             
+            args.model_dir,
+            args.text_encoder_model_prefix,
             use_trt,
             vae_dynamic_shape,
             use_fp16=args.use_fp16,
