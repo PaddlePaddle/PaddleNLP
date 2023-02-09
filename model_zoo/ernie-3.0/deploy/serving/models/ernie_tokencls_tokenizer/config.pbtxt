@@ -1,4 +1,4 @@
-name: "ernie_tokenizer"
+name: "ernie_tokencls_tokenizer"
 backend: "python"
 max_batch_size: 64
 

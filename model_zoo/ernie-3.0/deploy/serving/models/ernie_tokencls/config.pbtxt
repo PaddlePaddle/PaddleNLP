@@ -18,7 +18,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "ernie_tokenizer"
+      model_name: "ernie_tokencls_tokenizer"
       model_version: 1
       input_map {
         key: "INPUT_0"
