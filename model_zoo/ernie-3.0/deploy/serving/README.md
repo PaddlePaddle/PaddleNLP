@@ -211,10 +211,12 @@ The model detects all entities:
 entity: 北京   label: LOC   pos: [0, 1]
 entity: 重庆   label: LOC   pos: [6, 7]
 entity: 成都   label: LOC   pos: [12, 13]
-input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
+input data: 乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。
 The model detects all entities:
-entity: 玛雅   label: LOC   pos: [2, 3]
-entity: 华夏   label: LOC   pos: [14, 15]
+entity: 乔丹   label: PER   pos: [0, 1]
+entity: 科比   label: PER   pos: [3, 4]
+entity: 詹姆斯   label: PER   pos: [6, 8]
+entity: 姚明   label: PER   pos: [10, 11]
 
 ```
 
