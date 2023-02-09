@@ -197,6 +197,13 @@ class MarkupLMEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         xpath_embeddings = self.xpath_embeddings(xpath_tags_seq, xpath_subs_seq)
+
+        # print("self.word_embeddings.weight", self.word_embeddings.weight.abs().mean().item())
+        # print("words_embeddings", words_embeddings.abs().mean().item())
+        # print("position_embeddings", position_embeddings.abs().mean().item())
+        # print("token_type_embeddings", token_type_embeddings.abs().mean().item())
+        # print("xpath_embeddings", xpath_embeddings.abs().mean().item())
+
         embeddings = words_embeddings + position_embeddings + token_type_embeddings + xpath_embeddings
 
         embeddings = self.LayerNorm(embeddings)
@@ -356,7 +363,11 @@ class MarkupLMSelfAttention(nn.Layer):
         past_key_value=None,
         output_attentions=False,
     ):
+
         mixed_query_layer = self.query(hidden_states)
+        print("MarkupLMSelfAttention hidden_states", hidden_states.abs().mean().item())
+        print("self.query.weight", self.query.weight.abs().mean().item())
+        print("mixed_query_layer", mixed_query_layer.abs().mean().item())
 
         # If this is instantiated as a cross-attention module, the keys
         # and values come from an encoder; the attention mask needs to be
@@ -457,7 +468,6 @@ class MarkupLMAttention(nn.Layer):
         heads, index = find_pruneable_heads_and_indices(
             heads, self.self.num_attention_heads, self.self.attention_head_size, self.pruned_heads
         )
-
         # Prune linear layers
         self.self.query = prune_linear_layer(self.self.query, index)
         self.self.key = prune_linear_layer(self.self.key, index)
@@ -526,7 +536,11 @@ class MarkupLMLayer(nn.Layer):
             output_attentions=output_attentions,
             past_key_value=self_attn_past_key_value,
         )
+
+        print("attention_mask", attention_mask.abs().mean().item())
+        # print("head_mask", head_mask.abs().mean().item())
         attention_output = self_attention_outputs[0]
+        print("attention_output", attention_output.abs().mean().item())
 
         # if decoder, the last output is tuple of self-attn cache
         if self.is_decoder:
@@ -604,6 +618,9 @@ class MarkupLMEncoder(nn.Layer):
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
+
+            # print(f"hidden_states_{i}", )
+            print(f"hidden_states_{i}", hidden_states.abs().mean().item())
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
             past_key_value = past_key_values[i] if past_key_values is not None else None
@@ -699,15 +716,28 @@ class MarkupLMPretrainedModel(PretrainedModel):
         # mappings = []
         model_mappings = []
         trans_name = [
+            "cls.predictions.decoder.weight",
+            "cls.predictions.transform.dense.weight",
             "markuplm.embeddings.xpath_embeddings.xpath_unitseq2_embeddings.weight",
             "markuplm.embeddings.xpath_embeddings.xpath_unitseq2_inner.weight",
             "markuplm.embeddings.xpath_embeddings.inner2emb.weight",
+            "markuplm.pooler.dense.weight",
+            "nrp_cls.decoder.weight",
+            "nrp_cls.dense.weight",
+            "ptc_cls.weight",
         ]
         for name in trans_name:
             model_mappings.append((name, name, "transpose"))
 
         for layer_index in range(config.num_hidden_layers):
-            for key_name in ["intermediate.dense.weight", "output.dense.weight"]:
+            for key_name in [
+                "attention.self.query.weight",
+                "attention.self.key.weight",
+                "attention.self.value.weight",
+                "attention.output.dense.weight",
+                "intermediate.dense.weight",
+                "output.dense.weight",
+            ]:
                 name = f"markuplm.encoder.layer.{layer_index}.{key_name}"
                 model_mappings.append((name, name, "transpose"))
 
@@ -906,6 +936,7 @@ class MarkupLMModel(MarkupLMPretrainedModel):
             token_type_ids=token_type_ids,
             inputs_embeds=inputs_embeds,
         )
+        print("embedding_output", embedding_output.abs().mean().item())
         encoder_outputs = self.encoder(
             embedding_output,
             extended_attention_mask,
@@ -914,7 +945,9 @@ class MarkupLMModel(MarkupLMPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
         sequence_output = encoder_outputs[0]
+        print("sequence_output", sequence_output.abs().mean().item())
 
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
