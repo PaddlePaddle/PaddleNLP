@@ -150,6 +150,7 @@ from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
+from .gau_alpha.configuration import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
