@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import unittest
 
 import numpy as np
@@ -35,6 +36,7 @@ class TestMarkupLM(unittest.TestCase):
         # python -c 'import torch;a = torch.load("~/.paddlenlp/models/models--microsoft--markuplm-base/snapshots/7b1ef356189e6803bd5b58b305c783fd1d395ae6/pytorch_model.bin", map_location="cpu");[print(x) for x in sorted(a.keys())];'
         pass
 
+    # @unittest.skip("")
     def testForwardMarkuplmPaddle(self):
         """_summary_"""
         import sys
@@ -52,6 +54,7 @@ class TestMarkupLM(unittest.TestCase):
         result_paddle = out.pooler_output.abs().mean().item()
         np.testing.assert_allclose(result_paddle, 0.31490570306777954, atol=1e-6)
 
+    # @unittest.skip("")
     def testForwardMarkuplmTorch(self):
         """_summary_"""
         import torch
@@ -63,3 +66,22 @@ class TestMarkupLM(unittest.TestCase):
         out = model(input_ids=torch.tensor(input_ids, dtype=torch.long))
         result_torch = out.pooler_output.abs().mean().item()
         np.testing.assert_allclose(result_torch, 0.31490570306777954, atol=1e-6)
+
+    def testTokenization(self):
+        """_summary_"""
+        from markuplmft import MarkupLMTokenizer
+
+        # {'input_ids': [[0, 387, 5526, 257, 16, 10, 372, 138, 6979, 5, 232, 328, 2]], 'attention_mask': [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]}
+        sentences = ["Baidu is a great company int the world!"]
+
+        tokenizer = MarkupLMTokenizer.from_pretrained("microsoft/markuplm-base")
+        torch_ids = tokenizer(sentences)
+
+        sys.path.append("./")
+        from markuplm import MarkupLMTokenizer
+
+        tokenizer = MarkupLMTokenizer.from_pretrained("microsoft/markuplm-base", from_hf_hub=True)
+        paddle_ids = tokenizer(sentences)
+
+        for k, v in torch_ids.items():
+            np.testing.assert_allclose(torch_ids[k], paddle_ids[k])

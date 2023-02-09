@@ -14,10 +14,11 @@
 # limitations under the License.
 """ Tokenization class for model MarkupLM."""
 
-from transformers import RobertaTokenizer
-from transformers.utils import logging
+from paddlenlp.transformers import RobertaBPETokenizer as RobertaTokenizer
 
-logger = logging.get_logger(__name__)
+# from transformers.utils import logging
+
+# logger = logging.get_logger(__name__)
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.json",
