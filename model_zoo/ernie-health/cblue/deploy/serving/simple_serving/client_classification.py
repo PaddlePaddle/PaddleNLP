@@ -13,16 +13,17 @@
 # limitations under the License.
 
 import argparse
-import requests
 import json
 
-# yapf: disable
+import requests
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, type=str, help="The dataset name for the simple seving")
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization.")
+parser.add_argument(
+    "--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization."
+)
 parser.add_argument("--batch_size", default=1, type=int, help="Batch size per GPU/CPU for predicting.")
 args = parser.parse_args()
-# yapf: enable
 
 url = "http://0.0.0.0:8189/models/cblue_cls"
 headers = {"Content-Type": "application/json"}
