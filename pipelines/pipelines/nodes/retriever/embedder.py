@@ -78,7 +78,7 @@ class MultiModalEmbedder:
 
         feature_extractors_params = {
             content_type: {"max_length": 256, **(feature_extractors_params or {}).get(content_type, {})}
-            for content_type in ["text", "table", "image", "audio"]  # FIXME get_args(ContentTypes) from Python3.8 on
+            for content_type in ["text", "table", "image"]  # FIXME get_args(ContentTypes) from Python3.8 on
         }
 
         self.models = {}  # replace str with ContentTypes starting from Python3.8
@@ -90,7 +90,7 @@ class MultiModalEmbedder:
             sizes = {model.embedding_dim for model in self.models.values()}
             if None in sizes:
                 logger.warning(
-                    "Haystack could not find the output embedding dimensions for '%s'. "
+                    "Pipelines could not find the output embedding dimensions for '%s'. "
                     "Dimensions won't be checked before computing the embeddings.",
                     ", ".join(
                         {
@@ -167,7 +167,7 @@ class MultiModalEmbedder:
             of a text document, a linearized table, a PIL image object, and so on)
         """
         docs_data: Dict[str, List[Any]] = {  # FIXME replace str to ContentTypes from Python3.8
-            key: [] for key in ["text", "table", "image", "audio"]
+            key: [] for key in ["text", "table", "image"]
         }  # FIXME get_args(ContentTypes) from Python3.8 on
         for doc in documents:
             try:

@@ -22,10 +22,45 @@ from ..utils.log import logger
 from .task import Task
 from .utils import dygraph_mode_guard, static_mode_guard
 
+usage = r"""
+            from paddlenlp import Taskflow
+            from PIL import Image
+
+            # multi modal feature_extraction with ernie_vil-2.0-base-zh
+            senta = Taskflow("feature_extraction")
+            image_embeds = vision_language([Image.open("demo/000000039769.jpg")])
+            print(image_embeds)
+            '''
+            Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                    [[-0.59475428, -0.69795364,  0.22144008,  0.88066685, -0.58184201,
+                        -0.73454666,  0.95557910, -0.61410815,  0.23474170,  0.13301648,
+                        0.86196446,  0.12281934,  0.69097638,  1.47614217,  0.07238606,
+                        ...
+            '''
+            text_embeds = vision_language(["猫的照片","狗的照片"])
+            text_features = text_embeds["features"]
+            print(text_features)
+            '''
+            Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                    [[ 0.04250504, -0.41429776,  0.26163983, ...,  0.26221892,
+                        0.34387422,  0.18779707],
+            '''
+            image_features /= image_features.norm(axis=-1, keepdim=True)
+            text_features /= text_features.norm(axis=-1, keepdim=True)
+            logits_per_image = 100 * image_features @ text_features.t()
+            probs = F.softmax(logits_per_image, axis=-1)
+            print(probs)
+            '''
+            Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                [[0.99833173, 0.00166824]])
+            '''
+         """
+
 
 class MultimodalFeatureExtractionTask(Task):
     """
-    The text_to_image generation model to generate the image.
+    Feature extraction task using no model head. This task extracts the hidden states from the base
+    model, which can be used as features in retrieval and clustering tasks.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -99,9 +134,11 @@ class MultimodalFeatureExtractionTask(Task):
         Check whether the input text meet the requirement.
         """
         inputs = inputs[0]
-        if isinstance(inputs, (str, Image.Image)):
+        if isinstance(inputs, str):
             if len(inputs) == 0:
-                raise ValueError("Invalid inputs, input text/image should not be empty, please check your input.")
+                raise ValueError("Invalid inputs, input text should not be empty, please check your input.")
+            inputs = [inputs]
+        elif isinstance(inputs, Image.Image):
             inputs = [inputs]
         elif isinstance(inputs, list):
             # and len(inputs[0].strip()) > 0
@@ -117,13 +154,13 @@ class MultimodalFeatureExtractionTask(Task):
 
     def _preprocess(self, inputs):
         """
-        Transform the raw text to the model inputs, two steps involved:
-           1) Transform the raw text to token ids.
-           2) Generate the other model inputs from the raw text and token ids.
+        Transform the raw inputs to the model inputs, two steps involved:
+           1) Transform the raw text/image to token ids/pixel_values.
+           2) Generate the other model inputs from the raw text/image and token ids/pixel_values.
         """
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
-        outputs = {"batches": batches, "text": inputs}
+        outputs = {"batches": batches, "inputs": inputs}
         return outputs
 
     def _run_model(self, inputs):
