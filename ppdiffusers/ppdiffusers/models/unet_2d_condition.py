@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..modeling_utils import ModelMixin
@@ -35,6 +36,11 @@ from .unet_2d_blocks import (
 )
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+class Mish(nn.Layer):
+    def forward(self, hidden_states):
+        return hidden_states * paddle.tanh(F.softplus(hidden_states))
 
 
 @dataclass
@@ -443,7 +449,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 3. down
         down_block_res_samples = (sample,)
-        down_nonlinear_temb=self.down_resnet_temb_nonlinearity(emb)
+        down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
@@ -490,7 +496,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 )
             else:
                 sample = upsample_block(
-                    hidden_states=sample, temb=down_nonlinear_temb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
+                    hidden_states=sample,
+                    temb=down_nonlinear_temb,
+                    res_hidden_states_tuple=res_samples,
+                    upsample_size=upsample_size,
                 )
         # 6. post-process
         sample = self.conv_norm_out(sample)
