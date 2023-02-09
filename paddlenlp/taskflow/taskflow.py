@@ -483,6 +483,34 @@ TASKS = {
                 "task_class": ZeroShotTextClassificationTask,
                 "task_flag": "zero_shot_text_classification-utc-large",
             },
+            "utc-xbase": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-xbase",
+            },
+            "utc-base": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-base",
+            },
+            "utc-medium": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-medium",
+            },
+            "utc-micro": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-micro",
+            },
+            "utc-mini": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-mini",
+            },
+            "utc-nano": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-nano",
+            },
+            "utc-pico": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-pico",
+            },
         },
         "default": {"model": "utc-large"},
     },
@@ -507,6 +535,13 @@ support_schema_list = [
     "uie-senta-micro",
     "uie-senta-nano",
     "utc-large",
+    "utc-xbase",
+    "utc-base",
+    "utc-medium",
+    "utc-micro",
+    "utc-mini",
+    "utc-nano",
+    "utc-pico",
 ]
 
 support_argument_list = [
