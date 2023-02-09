@@ -98,7 +98,7 @@ class SyncGRPCTritonRunner:
 if __name__ == "__main__":
     model_name = "ernie_tokencls"
     model_version = "1"
-    url = "localhost:8001"
+    url = "10.21.226.184:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
     dataset = [
         ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"],
@@ -112,11 +112,13 @@ if __name__ == "__main__":
             print("input data:", batch_input[i])
             print("The model detects all entities:")
             for iterm in ret:
-                print(
-                    "entity:",
-                    batch_input[i][iterm["pos"][0] : iterm["pos"][1] + 1],
-                    "  label:",
-                    iterm["label"],
-                    "  pos:",
-                    iterm["pos"],
-                )
+                entity = batch_input[i][iterm["pos"][0] : iterm["pos"][1] + 1]
+                if len(entity) > 0:
+                    print(
+                        "entity:",
+                        entity,
+                        "  label:",
+                        iterm["label"],
+                        "  pos:",
+                        iterm["pos"],
+                    )

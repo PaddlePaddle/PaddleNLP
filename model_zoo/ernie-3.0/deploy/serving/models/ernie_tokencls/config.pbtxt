@@ -45,7 +45,8 @@ ensemble_scheduling {
         value: "tokenizer_token_type_ids"
       }
       output_map {
-        key: "linear_113.tmp_1"
+        # 需要按照实际模型输出进行配置。
+        key: "linear_75.tmp_1"
         value: "OUTPUT_2"
       }
     },

@@ -14,7 +14,8 @@ input [
 ]
 output [
     {
-      name: "linear_113.tmp_1"
+      # 需要按照实际模型输出进行配置。
+      name: "linear_75.tmp_1"
       data_type: TYPE_FP32
       dims: [ -1, 7 ]
     }

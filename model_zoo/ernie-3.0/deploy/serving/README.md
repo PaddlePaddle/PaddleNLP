@@ -62,7 +62,10 @@ docker pull registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt
 # CPU镜像
 docker pull registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-cpu-only-21.10
 
-# 运行
+# GPU 运行
+nvidia-docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models rregistry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10 bash
+
+# CPU 运行
 docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-cpu-only-21.10 bash
 ```
 
@@ -80,7 +83,7 @@ token_cls_rpc_client.py   # 序列标注任务发送 pipeline 预测请求的脚
 
 1. 启动容器时设置 shm-size 参数, 比如: docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10 bash
 
-2. 启动服务时设置 python 后端的 shm-default-byte-size 参数, 设置 python 后端的默认内存为10M： tritonserver --model-repository=/models --backend-config=python,shm-default-byte-size=10485760
+2. 启动服务时设置 python 后端的 shm-default-byte-size 参数, 设置 python 后端的默认内存为10M： fastdeployserver --model-repository=/models --backend-config=python,shm-default-byte-size=10485760
 
 ### 分类任务
 
@@ -98,24 +101,27 @@ fastdeployserver --model-repository=/models --model-control-mode=explicit --load
 
 ```shell
 
-I1019 09:41:15.375496 2823 model_repository_manager.cc:1183] successfully loaded 'ernie_tokenizer' version 1
-I1019 09:41:15.375987 2823 model_repository_manager.cc:1022] loading: ernie_seqcls:1
-I1019 09:41:15.477147 2823 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls' version 1
-I1019 09:41:15.477325 2823 server.cc:522]
+I0209 09:15:49.314029 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls_model' version 1
+I0209 09:15:49.314917 708 model_repository_manager.cc:1022] loading: ernie_tokencls:1
+I0209 09:15:49.417014 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls' version 1
 ...
-I0613 08:59:20.577820 10021 server.cc:592]
+I0209 09:15:49.417394 708 server.cc:549]
++------------+---------------------------------------------------------------+--------+
+| Backend    | Path                                                          | Config |
++------------+---------------------------------------------------------------+--------+
+| python     | /opt/tritonserver/backends/python/libtriton_python.so         | {}     |
+| fastdeploy | /opt/tritonserver/backends/fastdeploy/libtriton_fastdeploy.so | {}     |
++------------+---------------------------------------------------------------+--------+
+
+I0209 09:15:49.417552 708 server.cc:592]
 +----------------------------+---------+--------+
 | Model                      | Version | Status |
 +----------------------------+---------+--------+
-| ernie_seqcls               | 1       | READY  |
-| ernie_seqcls_model         | 1       | READY  |
-| ernie_seqcls_postprocess   | 1       | READY  |
-| ernie_tokenizer            | 1       | READY  |
+| ernie_tokencls             | 1       | READY  |
+| ernie_tokencls_model       | 1       | READY  |
+| ernie_tokencls_postprocess | 1       | READY  |
+| ernie_tokencls_tokenizer   | 1       | READY  |
 +----------------------------+---------+--------+
-...
-I0601 07:15:15.923270 8059 grpc_server.cc:4117] Started GRPCInferenceService at 0.0.0.0:8001
-I0601 07:15:15.923604 8059 http_server.cc:2815] Started HTTPService at 0.0.0.0:8000
-I0601 07:15:15.964984 8059 http_server.cc:167] Started Metrics Service at 0.0.0.0:8002
 
 ```
 
