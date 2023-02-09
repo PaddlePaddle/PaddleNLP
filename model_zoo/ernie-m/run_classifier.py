@@ -255,11 +255,9 @@ def do_train():
         label = paddle.to_tensor(p.label_ids)
 
         metric = Accuracy()
-        metric.reset()
         result = metric.compute(preds, label)
         metric.update(result)
         accu = metric.accumulate()
-        metric.reset()
         return {"accuracy": accu}
 
     trainer = Trainer(
