@@ -74,10 +74,41 @@
 
 ## 支持的NLP任务列表
 
-| 任务 Task  |  是否支持   |
-| :--------------- | ------- |
-| 文本分类 | ✅ |
-| 序列标注 | ✅  |
+符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
+
+<table>
+    <tr>
+        <td align=center> 任务 Task</td>
+        <td align=center> 部署方式  </td>
+        <td align=center> 是否支持</td>
+    </tr>
+    <tr>
+        <td rowspan=3 align=center> 文本分类 </td>
+        <td align=center> Python </td>
+        <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> C++ </td>
+      <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> Serving </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td rowspan=4 align=center> 序列标注 </td>
+        <td align=center> Python </td>
+        <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> C++ </td>
+      <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> Serving </td>
+      <td align=center> ✅ </td>
+    </tr>
+</table>
 
 ## 详细部署文档
 
