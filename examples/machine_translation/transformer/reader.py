@@ -203,7 +203,7 @@ def create_infer_loader(args):
         if args.benchmark:
             from paddlenlp.datasets import load_dataset
 
-            datasets = load_dataset("wmt14ende", data_files=[args.train_file, args.dev_file], splits=("train", "dev"))
+            dataset = load_dataset("wmt14ende", data_files=[args.train_file, args.dev_file], splits=("train", "dev"))
 
             map_kwargs["lazy"] = False
 
@@ -235,7 +235,7 @@ def create_infer_loader(args):
             eos_token=args.eos_token,
             pad_token=args.pad_token,
         )
-    elif not isinstance(datasets, paddlenlp.datasets.dataset.MapDataset):
+    elif not isinstance(dataset, paddlenlp.datasets.dataset.MapDataset):
         raise ValueError("The --src_vocab must be specified when using custom dataset. ")
     elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
