@@ -18,6 +18,10 @@ import numpy as np
 
 
 class TestMarkupLM(unittest.TestCase):
+    """
+    TestMarkupLM
+    """
+
     def setUp(self):
         self.input_ids = [[2, 2, 4, 5, 6]]
         self.model_name = "microsoft/markuplm-base"
@@ -32,7 +36,7 @@ class TestMarkupLM(unittest.TestCase):
         pass
 
     def testForwardMarkuplmPaddle(self):
-        """ """
+        """_summary_"""
         import sys
 
         import paddle
@@ -49,6 +53,7 @@ class TestMarkupLM(unittest.TestCase):
         np.testing.assert_allclose(result_paddle, 0.31490570306777954, atol=1e-6)
 
     def testForwardMarkuplmTorch(self):
+        """_summary_"""
         import torch
         from markuplmft.models.markuplm import MarkupLMModel
 
