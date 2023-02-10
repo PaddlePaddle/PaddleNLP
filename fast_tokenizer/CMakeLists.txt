@@ -18,6 +18,7 @@ project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
 option(WITH_TESTING     "Compile PaddleNLP fast_tokenizer with unit testing"        OFF)
 option(WITH_PYTHON      "Compile PaddleNLP fast_tokenizer with python interpreter"   ON)
+option(WITH_ICU_LITE      "Compile PaddleNLP fast_tokenizer with lite icu library"   OFF)
 add_definitions(-DFASTTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -202,6 +203,12 @@ elseif(APPLE)
     add_custom_target(copy_shared_library ALL
         COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
         DEPENDS build_cpp_package_dir core_tokenizers)
+elseif(ANDROID)
+        set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
+        add_custom_target(copy_shared_library ALL
+            COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+            COMMAND ${CMAKE_STRIP} --strip-all ${CPP_PACKAGE_DIR}/lib/lib${TOKENIZER_CORE_NAME}.so
+            DEPENDS build_cpp_package_dir core_tokenizers)
 else()
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
     add_custom_target(copy_shared_library ALL

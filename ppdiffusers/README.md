@@ -1,15 +1,23 @@
+<div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/215372703-4385f66a-abe4-44c7-9626-96b7b65270c8.png" width="40%" height="40%" />
+</div>
+
+<p align="center">
+    <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/pyversions/paddlenlp"></a>
+    <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg"></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/github/license/paddlepaddle/paddlenlp"></a>
+</p>
+
+<h4 align="center">
+  <a href=#特性> 特性 </a> |
+  <a href=#安装> 安装 </a> |
+  <a href=#快速开始> 快速开始 </a> |
+  <a href=#模型部署> 模型部署</a>
+</h4>
+
 # PPDiffusers: Diffusers toolbox implemented based on PaddlePaddle
 
 **PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库，具体来说，PPDiffusers具有以下特性：
-#### <a href=#sota扩散模型pipelines集合> 📦 SOTA扩散模型Pipelines集合 </a>
-
-#### <a href=#提供丰富的noise-scheduler> 🔊 提供丰富的Noise Scheduler </a>
-
-#### <a href=#提供多种扩散模型组件> 🎛️ 提供多种扩散模型组件 </a>
-
-#### <a href=#提供丰富的训练和推理教程> 📖 提供丰富的训练和推理教程 </a>
-
-#### <a href=#支持FastDeploy高性能部署> 🚀 支持FastDeploy高性能部署 </a>
 
 ## News 📢
 * 🔥 **2023.01.18 发布 0.11.0 版本，新增Heun和Single step DPM-Solver噪声调度器，支持Karlo UnCLIP、Paint-by-example、Depth-Guided Stable Diffusion等图像生成扩散模型， 支持Audio Diffusion音频生成扩散模型；**
@@ -23,35 +31,25 @@
 * 🔥 **2022.10.27 发布 PPDiffusers仓库**。
 
 
-<h4 align="center">
-  <a href=#特性> 特性 </a> |
-  <a href=#安装> 安装 </a> |
-  <a href=#快速开始> 快速开始 </a> |
-  <a href=#模型部署> 模型部署</a>
-</h4>
-
 ## 特性
-### SOTA扩散模型Pipelines集合
+#### 📦 SOTA扩散模型Pipelines集合
 我们提供**SOTA（State-of-the-Art）** 的扩散模型Pipelines集合。
 目前**PPDiffusers**已经集成了**33+Pipelines**，支持文图生成（Text-to-Image Generation）、文本引导的图像编辑（Text-Guided Image Inpainting）、文本指导的图像变换（Image-to-Image Text-Guided Generation）、超分（Super Superresolution）在内的10+任务，覆盖文本图像跨模态、图像、音频等多种模态。
 如果想要了解当前支持的所有**Pipelines**以及对应的来源信息，可以阅读[🔥 PPDiffusers Pipelines](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/README.md)文档。
 
 
-### 提供丰富的Noise Scheduler
+#### 🔊 提供丰富的Noise Scheduler
 我们提供了丰富的**噪声调度器（Noise Scheduler）**，可以对**速度**与**质量**进行权衡，用户可在推理时根据需求快速切换使用。
 当前**PPDiffusers**已经集成了**14+Scheduler**，不仅支持 [DDPM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddpm.py)、[DDIM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddim.py) 和 [PNDM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_pndm.py)，还支持最新的 [🔥 DPMSolver](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_dpmsolver_multistep.py)！
 
-
-
-### 提供多种扩散模型组件
+#### 🎛️ 提供多种扩散模型组件
 我们提供了**多种扩散模型**组件，如[UNet1DModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_1d.py)、[UNet2DModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d.py)、[UNet2DConditionModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d_condition.py)、[VQModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/vae.py)、[AutoencoderKL](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/vae.py)等。
 
-
-### 提供丰富的训练和推理教程
+#### 📖 提供丰富的训练和推理教程
 我们提供了丰富的训练教程，不仅支持扩散模型的二次开发微调，如基于[Textual Inversion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/textual_inversion)和[DreamBooth](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)使用3-5张图定制化训练生成图像的风格或物体，还支持使用[Laion400M](https://laion.ai/blog/laion-400-open-dataset)数据集[🔥 从零训练Latent Diffusion Model](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/text_to_image_laion400m) 模型！
 此外，我们还提供了丰富的[🔥 Pipelines推理脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference)。
 
-### 支持FastDeploy高性能部署
+#### 🚀 支持FastDeploy高性能部署
 我们提供基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)的[🔥 高性能Stable Diffusion Pipeline](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion/pipeline_fastdeploy_stable_diffusion.py)，更多有关FastDeploy进行多推理引擎后端高性能部署的信息请参考[🔥 高性能FastDeploy推理教程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/deploy)。
 ```python
 from ppdiffusers import StableDiffusionPipeline, FastDeployStableDiffusionPipeline

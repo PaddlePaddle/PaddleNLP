@@ -263,7 +263,7 @@ For more super large-scale model pre-training details please refer to [GPT-3](./
 ### Prerequisites
 
 * python >= 3.7
-* paddlepaddle >= 2.2
+* paddlepaddle >= 2.3
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 
@@ -276,7 +276,7 @@ pip install --upgrade paddlenlp
 or you can install the latest develop branch code with the following command:
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ## Quick Start
