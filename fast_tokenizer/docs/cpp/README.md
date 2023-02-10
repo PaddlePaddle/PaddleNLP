@@ -5,11 +5,11 @@
 当前版本 FastTokenizer C++ 库支持不同的操作系统以及硬件平台，并为以下平台提供预编译包：
 |系统|下载地址|
 |---|---|
-|Linux-x64| [fast_tokenizer-linux-x64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.0.tgz) |
-|Linux-aarch64| [fast_tokenizer-linux-aarch64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-aarch64-1.0.0.tgz) |
-|Windows| [fast_tokenizer-win-x64-1.0.0.zip](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-win-x64-1.0.0.zip) |
-|MacOS-x64| [fast_tokenizer-osx-x86_64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-x86_64-1.0.0.tgz) |
-|MacOS-arm64| [fast_tokenizer-osx-arm64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-arm64-1.0.0.tgz) |
+|Linux-x64| [fast_tokenizer-linux-x64-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.2.tgz) |
+|Linux-aarch64| [fast_tokenizer-linux-aarch64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-aarch64-1.0.2.tgz) |
+|Windows| [fast_tokenizer-win-x64-1.0.2.zip](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-win-x64-1.0.2.zip) |
+|MacOS-x64| [fast_tokenizer-osx-x86_64-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-x86_64-1.0.2.tgz) |
+|MacOS-arm64| [fast_tokenizer-osx-arm64-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-arm64-1.0.2.tgz) |
 
 ### 环境依赖
 
@@ -36,9 +36,9 @@
 ### 下载解压
 
 ```shell
-wget -c https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.0.tgz
+wget -c https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.2.tgz
 
-tar xvfz fast_tokenizer-linux-x64-1.0.0.tgz
+tar xvfz fast_tokenizer-linux-x64-1.0.2.tgz
 # 解压后为fast_tokenizer目录
 ```
 
