@@ -69,7 +69,7 @@ echo "python="${python}
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
-    python -m pip install -r scripts/regression/requirements_ci.txt
+    python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
     python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
@@ -157,7 +157,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+            P0case_list[${#P0case_list[*]}]=${dir2}
+        elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
             P0case_list[${#P0case_list[*]}]=${dir3}
         elif [[ ${dir3##*.} == "py" ]] && [[ !(${all_example_dict[*]} =~ ${dir2}) ]];then #新增规范模型
             P0case_list[${#P0case_list[*]}]=${dir2}
