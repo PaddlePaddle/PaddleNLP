@@ -374,16 +374,16 @@ TASKS = {
     },
     "text_classification": {
         "models": {
-            "multi_class": {
+            "finetune": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification-multi_class",
+                "task_flag": "text_classification-finetune",
             },
-            "multi_label": {
+            "prompt": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification-multi_label",
+                "task_flag": "text_classification-prompt",
             },
         },
-        "default": {"model": "multi_class"},
+        "default": {"model": "finetune"},
     },
     "text_to_image": {
         "models": {
