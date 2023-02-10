@@ -1812,7 +1812,6 @@ from paddlenlp import Taskflow
 * `max_length`：最长输入长度，包括所有标签的长度，默认为512。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `plm_model_name`：提示学习模型中使用的预训练模型名。
-* `input_spec`：模型输入信息，用于动态图转静态图模型。
 * `id2label`：标签映射字典（如无指定，提示学习模型会从verbalizer读取，微调模型会从模型配置文件读取）。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
