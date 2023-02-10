@@ -268,6 +268,37 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 # test export
                 auto_trainer.export(temp_dir)
 
+    def test_unsupported_languages(self):
+        with TemporaryDirectory() as temp_dir:
+            train_ds = copy.deepcopy(self.multi_class_train_ds)
+            dev_ds = copy.deepcopy(self.multi_class_dev_ds)
+            with self.assertRaises(ValueError):
+                AutoTrainerForTextClassification(
+                    train_dataset=train_ds,
+                    eval_dataset=dev_ds,
+                    label_column="label_desc",
+                    text_column="sentence",
+                    language="Spanish",  # spanish is unsupported for now
+                    output_dir=temp_dir,
+                )
+
+    def test_model_language_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            train_ds = copy.deepcopy(self.multi_class_train_ds)
+            dev_ds = copy.deepcopy(self.multi_class_dev_ds)
+            auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
+                label_column="label_desc",
+                text_column="sentence",
+                language="Chinese",
+                output_dir=temp_dir,
+            )
+            for language in auto_trainer.supported_languages:
+                model_candidates = auto_trainer._filter_model_candidates(language=language)
+                for candidate in model_candidates:
+                    self.assertEqual(candidate["language"], language)
+
 
 if __name__ == "__main__":
     unittest.main()
