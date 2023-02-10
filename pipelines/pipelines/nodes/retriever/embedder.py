@@ -77,7 +77,10 @@ class MultiModalEmbedder:
 
         self.models = {}  # replace str with ContentTypes starting from Python3.8
         for content_type, embedding_model in embedding_models.items():
-            self.models[content_type] = Taskflow("feature_extraction", model=embedding_model)
+            if content_type in ["text", "image"]:
+                self.models[content_type] = Taskflow("feature_extraction", model=embedding_model)
+            else:
+                raise ValueError(f"{content_type} is not a supported content.")
 
         # Check embedding sizes for models: they must all match
         if len(self.models) > 1:

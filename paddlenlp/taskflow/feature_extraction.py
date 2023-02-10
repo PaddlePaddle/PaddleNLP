@@ -260,7 +260,6 @@ class MultimodalFeatureExtractionTask(Task):
             )
 
         onnx_dir = os.path.join(self._task_path, "onnx", self.mode)
-        # onnx_dir = os.path.join(self._task_path, "onnx")
         if not os.path.exists(onnx_dir):
             os.makedirs(onnx_dir)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
@@ -333,7 +332,7 @@ class MultimodalFeatureExtractionTask(Task):
             self.output_handle_map["image"] = self.output_handle
             self._config_map["image"] = self._config
         else:
-            # Get text inference model
+            # Get text onnx model
             self.mode = "text"
             self.inference_model_path = self.inference_text_model_path
             self._static_model_file = self.inference_model_path + ".pdmodel"
@@ -341,7 +340,7 @@ class MultimodalFeatureExtractionTask(Task):
             self._prepare_onnx_mode()
             self.predictor_map["text"] = self.predictor
 
-            # Get image inference model
+            # Get image onnx model
             self.mode = "image"
             self.inference_model_path = self.inference_image_model_path
             self._static_model_file = self.inference_model_path + ".pdmodel"
