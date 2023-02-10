@@ -14,7 +14,10 @@
 
 import argparse
 
-from ernie_m_predictor import ErnieMPredictor
+try:
+    from ernie_m_predictor import ErnieMPredictor
+except ImportError:
+    from .ernie_m_predictor import ErnieMPredictor
 from psutil import cpu_count
 
 
