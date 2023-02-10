@@ -26,6 +26,8 @@ from ppdiffusers import (
     FastDeployStableDiffusionPipeline,
     LMSDiscreteScheduler,
     PNDMScheduler,
+    PreconfigEulerAncestralDiscreteScheduler,
+    PreconfigLMSDiscreteScheduler,
 )
 from ppdiffusers.utils.testing_utils import (
     is_fastdeploy_available,
@@ -109,6 +111,22 @@ class FastDeployStableDiffusionPipelineFastTests(FastDeployPipelineTesterMixin, 
         expected_slice = np.array([0.53755, 0.60786, 0.47402, 0.49488, 0.51869, 0.49819, 0.47985, 0.38957, 0.44279])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
+    def test_pipeline_preconfig_lms(self):
+        pipe = FastDeployStableDiffusionPipeline.from_pretrained(
+            self.hub_checkpoint,
+            runtime_options=self.runtime_options,
+        )
+        pipe.scheduler = PreconfigLMSDiscreteScheduler.from_config(pipe.scheduler.config)
+        pipe.set_progress_bar_config(disable=None)
+
+        inputs = self.get_dummy_inputs()
+        image = pipe(**inputs).images
+        image_slice = image[0, -3:, -3:, -1]
+
+        assert image.shape == (1, 128, 128, 3)
+        expected_slice = np.array([0.53755, 0.60786, 0.47402, 0.49488, 0.51869, 0.49819, 0.47985, 0.38957, 0.44279])
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+
     def test_pipeline_euler(self):
         pipe = FastDeployStableDiffusionPipeline.from_pretrained(
             self.hub_checkpoint,
@@ -131,6 +149,22 @@ class FastDeployStableDiffusionPipelineFastTests(FastDeployPipelineTesterMixin, 
             runtime_options=self.runtime_options,
         )
         pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+        pipe.set_progress_bar_config(disable=None)
+
+        inputs = self.get_dummy_inputs()
+        image = pipe(**inputs).images
+        image_slice = image[0, -3:, -3:, -1]
+
+        assert image.shape == (1, 128, 128, 3)
+        expected_slice = np.array([0.53817, 0.60812, 0.47384, 0.49530, 0.51894, 0.49814, 0.47984, 0.38958, 0.44271])
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+
+    def test_pipeline_preconfig_euler_ancestral(self):
+        pipe = FastDeployStableDiffusionPipeline.from_pretrained(
+            self.hub_checkpoint,
+            runtime_options=self.runtime_options,
+        )
+        pipe.scheduler = PreconfigEulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
         pipe.set_progress_bar_config(disable=None)
 
         inputs = self.get_dummy_inputs()
@@ -226,6 +260,27 @@ class FastDeployStableDiffusionPipelineIntegrationTests(unittest.TestCase):
 
     def test_inference_k_lms(self):
         lms_scheduler = LMSDiscreteScheduler.from_pretrained(
+            "runwayml/stable-diffusion-v1-5@fastdeploy", subfolder="scheduler"
+        )
+        sd_pipe = FastDeployStableDiffusionPipeline.from_pretrained(
+            "runwayml/stable-diffusion-v1-5@fastdeploy",
+            scheduler=lms_scheduler,
+            runtime_options=self.runtime_options,
+        )
+        sd_pipe.set_progress_bar_config(disable=None)
+
+        prompt = "open neural network exchange"
+        generator = np.random.RandomState(0)
+        output = sd_pipe([prompt], guidance_scale=7.5, num_inference_steps=10, generator=generator, output_type="np")
+        image = output.images
+        image_slice = image[0, -3:, -3:, -1]
+
+        assert image.shape == (1, 512, 512, 3)
+        expected_slice = np.array([0.2306, 0.1959, 0.1593, 0.6549, 0.6394, 0.5408, 0.5065, 0.6010, 0.6161])
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
+
+    def test_inference_k_preconfig_lms(self):
+        lms_scheduler = PreconfigLMSDiscreteScheduler.from_pretrained(
             "runwayml/stable-diffusion-v1-5@fastdeploy", subfolder="scheduler"
         )
         sd_pipe = FastDeployStableDiffusionPipeline.from_pretrained(
