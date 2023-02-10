@@ -10,6 +10,10 @@
 |Windows| [fast_tokenizer-win-x64-1.0.2.zip](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-win-x64-1.0.2.zip) |
 |MacOS-x64| [fast_tokenizer-osx-x86_64-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-x86_64-1.0.2.tgz) |
 |MacOS-arm64| [fast_tokenizer-osx-arm64-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-arm64-1.0.2.tgz) |
+|Android-arm64-v8a| [fast_tokenizer-android-arm64-v8a-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-android-arm64-v8a-1.0.2.tgz) |
+|Android-armeabi-v7a| [fast_tokenizer-android-armeabi-v7a-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-android-armeabi-v7a-1.0.2.tgz) |
+|Android-lite-arm64-v8a| [fast_tokenizer-lite-android-arm64-v8a-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-lite-android-arm64-v8a-1.0.2.tgz) |
+|Android-lite-armeabi-v7a| [fast_tokenizer-lite-android-armeabi-v7a-1.0.2.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-lite-android-armeabi-v7a-1.0.2.tgz) |
 
 ### 环境依赖
 
