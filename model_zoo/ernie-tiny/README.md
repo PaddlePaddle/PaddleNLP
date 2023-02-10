@@ -61,12 +61,12 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 
 本项目开源 **ERNIE 3.0 Tiny _Base_** 、**ERNIE 3.0 Tiny _Medium_** 、 **ERNIE 3.0 Tiny _Mini_** 、 **ERNIE 3.0 Tiny _Micro_** 、 **ERNIE 3.0 Tiny _Nano_**、**ERNIE 3.0 Tiny _Pico_** 六种结构的中文模型：
 
-- **ERNIE 3.0-Tiny-_Base_** (_12-layer, 768-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Medium_**(_6-layer, 768-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Mini_** (_6-layer, 384-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Micro_** (_4-layer, 384-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Nano_** (_4-layer, 312-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Pico_** (_3-layer, 128-hidden, 2-heads_)
+- **ERNIE 3.0-Tiny-_Base_**-zh (_12-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Medium_**-zh(_6-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Mini_**-zh (_6-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Micro_**-zh (_4-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Nano_**-zh (_4-layer, 312-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Pico_**-zh (_3-layer, 128-hidden, 2-heads_)
 
 其中，v2 版本开源了 6 种结构的模型，v1 版本开源了前 5 种结构的模型。
 
@@ -547,7 +547,7 @@ python run_eval.py  \
 端上模型压缩流程如下图所示：
 
 <p align="center">
-        <img width="1000" alt="image" src="https://user-images.githubusercontent.com/16698950/212007542-b651c57a-9e4e-46c2-8724-cd7a6a20973f.png" title="compression plan">
+        <img width="1000" alt="image" src="https://user-images.githubusercontent.com/26483581/218037457-8b91cac4-e19e-401f-86c8-b64d7247014c.png" title="compression plan">
 </p>
 <br>
 
