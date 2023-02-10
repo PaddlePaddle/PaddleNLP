@@ -23,10 +23,10 @@ from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
-    EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
     FastDeployStableDiffusionPipeline,
     PNDMScheduler,
+    PreconfigEulerAncestralDiscreteScheduler,
 )
 
 
@@ -96,21 +96,30 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0, disable_paddle_trt_ops=[]
+    model_dir,
+    model_prefix,
+    use_trt=False,
+    dynamic_shape=None,
+    use_fp16=False,
+    device_id=0,
+    disable_paddle_trt_ops=[],
+    disable_paddle_pass=[],
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
+    option.paddle_infer_option.enable_log_info = True
     if device_id == -1:
         option.use_cpu()
     else:
         option.use_gpu(device_id)
     if use_trt:
-        option.disable_paddle_trt_ops(disable_paddle_trt_ops)
-        option.use_trt_backend()
-        option.enable_paddle_to_trt()
+        option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
+        # option.use_trt_backend()
+        # option.enable_trt()
+        option.paddle_infer_option.enable_trt = True
         if use_fp16:
-            option.enable_trt_fp16()
-        cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+            option.trt_option.enable_fp16 = True
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache")
         option.set_trt_cache_file(cache_file)
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
@@ -188,7 +197,9 @@ def get_scheduler(args):
             steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
-        scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+        scheduler = PreconfigEulerAncestralDiscreteScheduler(
+            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", preconfig=True
+        )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")
     return scheduler
@@ -210,6 +221,13 @@ if __name__ == "__main__":
     tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
+    text_encoder_shape = {
+        "input_ids": {
+            "min_shape": [1, 77],
+            "max_shape": [2, 77],
+            "opt_shape": [2, 77],
+        }
+    }
     vae_dynamic_shape = {
         "latent_sample": {
             "min_shape": [1, 4, 64, 64],
@@ -251,9 +269,14 @@ if __name__ == "__main__":
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
         use_trt = True if args.backend == "paddle_tensorrt" else False
-        # Note(zhoushunjie): Will change to paddle-trt runtime later
-        text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
+        text_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.text_encoder_model_prefix,
+            use_trt,
+            text_encoder_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+            disable_paddle_trt_ops=["arg_max", "range"],
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
