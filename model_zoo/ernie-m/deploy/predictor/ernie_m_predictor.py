@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from typing import List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import paddle
@@ -203,12 +203,12 @@ class InferBackend(object):
         return result
 
 
-def seq_cls_print_ret(infer_result, input_data):
+def seq_cls_print_ret(infer_result: List[np.ndarray], input_data: Tuple[List[str], List[str]]):
     label_list = ["entailment", "neutral", "contradiction"]
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i in range(len(label)):
-        print("input data:", input_data[i])
+        print("input data:", input_data[0][i], input_data[1][i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
@@ -258,21 +258,17 @@ class ErnieMPredictor(object):
             self.set_dynamic_shape(args.max_seq_length, args.batch_size)
             exit(0)
 
-    def seq_cls_preprocess(self, input_data: List[List[str]]):
+    def seq_cls_preprocess(self, input_data: Tuple[List[str], List[str]]) -> Dict[str, np.ndarray]:
         # tokenizer + pad
-        data = self.tokenizer.batch_encode(
-            input_data,
-            max_length=self.max_seq_length,
-            padding=True,
-            truncation=True,
-            return_token_type_ids=False,
+        data = self.tokenizer(
+            *input_data, max_length=self.max_seq_length, padding=True, truncation=True, return_token_type_ids=False
         )
         input_ids = data["input_ids"]
         return {
             "input_ids": np.array(input_ids, dtype="int64"),
         }
 
-    def seq_cls_postprocess(self, infer_data, input_data):
+    def seq_cls_postprocess(self, infer_data: List[np.ndarray], input_data: Tuple[List[str], List[str]]):
         logits = np.array(infer_data[0])
         max_value = np.max(logits, axis=1, keepdims=True)
         exp_data = np.exp(logits - max_value)
@@ -303,10 +299,10 @@ class ErnieMPredictor(object):
             self.inference_backend.infer(batch)
         print("[InferBackend] Set dynamic shape finished, please close set_dynamic_shape and restart.")
 
-    def infer(self, data):
+    def infer(self, data: Dict[str, np.ndarray]) -> List[np.ndarray]:
         return self.inference_backend.infer(data)
 
-    def predict(self, input_data: list):
+    def predict(self, input_data: Tuple[List[str], List[str]]):
         preprocess_result = self.preprocess(input_data)
         infer_result = self.infer(preprocess_result)
         result = self.postprocess(infer_result, input_data)

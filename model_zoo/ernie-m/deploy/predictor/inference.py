@@ -92,13 +92,10 @@ def main():
     predictor = ErnieMPredictor(args)
 
     if args.task_name == "seq_cls":
-        text = [
-            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "我从来没有被告知任何与任何人会面。"],
-            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "我被告知将有一个人被叫进来与我见面。"],
-            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "那个人来得有点晚。"],
-        ]
+        text = ["他们告诉我，呃，我最后会被叫到一个人那里去见面。"] * 3
+        text_pair = ["我从来没有被告知任何与任何人会面。", "我被告知将有一个人被叫进来与我见面。", "那个人来得有点晚。"]
 
-    outputs = predictor.predict(text)
+    outputs = predictor.predict((text, text_pair))
     print(outputs)
 
 
