@@ -16,6 +16,9 @@ import argparse
 
 from .modules.bert_for_question_answering import BertForQuestionAnsweringBenchmark
 from .modules.bigru_crf import BiGruCrfBenchmark
+from .modules.ernie3_for_sequence_classification import (
+    Ernie3ForSequenceClassificationBenchmark,
+)
 from .modules.ernie_tiny import ErnieTinyBenchmark
 from .modules.gpt_for_sequence_classification import (
     GPTForSequenceClassificationBenchmark,
@@ -41,6 +44,7 @@ MODEL_REGISTRY = {
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
     "ernie_tiny": ErnieTinyBenchmark,
+    "ernie-3.0_for_sequence_classification": Ernie3ForSequenceClassificationBenchmark,
     "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
     "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
     "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
@@ -56,6 +60,15 @@ LR_SCHEDULER_REGISTRY = {
     "lambda_decay": LambdaDecayBenchmark,  # noqa: F405
     "linear_decay_with_warmup": LinearDecayWithWarmupBenchmark,  # noqa: F405
 }
+
+
+def str2bool(v):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def get_training_parser():
@@ -110,9 +123,9 @@ def get_parser():
     parser.add_argument("--logging_steps", type=int, default=10, help="Print logs after N steps. ")
     parser.add_argument("--seed", type=int, default=None, help="Random generator seed. ")
 
-    parser.add_argument("--use_amp", action="store_true", help="Enable AMP. ")
+    parser.add_argument("--use_amp", type=str2bool, nargs="?", const=False, help="Enable AMP. ")
     parser.add_argument("--scale_loss", type=float, default=128, help="Loss scale. ")
-    parser.add_argument("--amp_level", type=str, default="O1", help="AMP LEVEL. O1 or O2. ")
+    parser.add_argument("--amp_level", type=str, default="O2", help="AMP LEVEL. O1 or O2. ")
     parser.add_argument("--custom_black_list", type=str, nargs="+", default=None, help="Custom black list for AMP. ")
 
     parser.add_argument("--to_static", action="store_true", help="Enable to static. ")

@@ -90,6 +90,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
 
     @property
+    def supported_languages(self) -> List[str]:
+        return ["Chinese", "English"]
+
+    @property
     def _default_training_argument(self) -> TrainingArguments:
         return TrainingArguments(
             output_dir=self.training_path,
@@ -129,17 +133,40 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "ernie-3.0-nano-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
             ],
         )
+        english_models = hp.choice(
+            "models",
+            [
+                # add deberta-v3 when we have it
+                "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
+                "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
+                "distilroberta-base",  # 6-layer, 768-hidden, 12-heads, 66M parameters. Case-sensitive
+                "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
+                "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
+                "distilbert-base-uncased",  # 6-layer, 768-hidden, 12-heads, 66M parameters
+            ],
+        )
         return [
             # fast learning: high LR, small early stop patience
             {
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 2,
+                "EarlyStoppingCallback.early_stopping_patience": 5,
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
                 "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.learning_rate": 3e-5,
+            },
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             # slow learning: small LR, large early stop patience
@@ -152,6 +179,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
                 "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.learning_rate": 5e-6,
+            },
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
             # Note: prompt tuning candidates not included for now due to lack of inference capability

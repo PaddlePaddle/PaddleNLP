@@ -1295,7 +1295,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         text, token_mapping, offset = normalized_text, [], 0
 
         char_mapping_indexes = []
-        for token in split_tokens:
+        for index, token in enumerate(split_tokens):
             if token[:2] == "##":
                 token = token[2:]
             if token in self.all_special_tokens:
@@ -1309,7 +1309,12 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
                 # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
                 if token not in text[offset:]:
-                    start = -1
+                    # check whether there are consecutive UNK tokens, eg: ['好', '[UNK]', '[UNK]', 'good']
+                    if index < len(split_tokens) - 1 and split_tokens[index + 1] in self.all_special_tokens:
+                        start = offset
+                        token = " "  # only contains one char
+                    else:
+                        start = -1
                 else:
                     start = text[offset:].index(token) + offset
 

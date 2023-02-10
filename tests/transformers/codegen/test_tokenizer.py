@@ -20,8 +20,8 @@ import unittest
 
 from paddlenlp.transformers import CodeGenTokenizer
 from paddlenlp.transformers.codegen.tokenizer import VOCAB_FILES_NAMES
-from ...testing_utils import slow
 
+from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin
 
 
@@ -198,3 +198,16 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         for weights_list_2 in weights_lists_2:
             self.assertListEqual(weights_list, weights_list_2)
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 2)
+            self.assertEqual(len(encoding["offset_mapping"]), 2)

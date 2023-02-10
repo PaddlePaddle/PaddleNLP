@@ -56,8 +56,6 @@ private:
   DataType_ *decoder_buf_;
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
-  DataType_ *trans_out_buf_;
-  DataType_ *lm_normed_result_buf_;
   DataType_ *logits_buf_;
   int *word_ids_buf_;
   bool *finished_buf_;
@@ -135,6 +133,7 @@ public:
 
     args_.num_bucket_ = num_bucket;
     args_.max_distance_ = max_distance;
+    args_.tie_word_embeddings_ = tie_word_embeddings;
 
     // For models without parallel
     if (l_parallel_param_.layers_per_group == 0) {
@@ -255,8 +254,8 @@ public:
 
     size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
-        (cache_size * 4 + mem_cache_size * 2) * args_.decoder_layers_ +
-        decoder_normed_result_buffer_size * 3;
+        (cache_size * 2 + mem_cache_size * 2) * args_.decoder_layers_ +
+        decoder_normed_result_buffer_size;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
         ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
@@ -287,8 +286,6 @@ public:
                         i * mem_cache_size * 2 + mem_cache_size;
     }
 
-    /* We use two-way buffer since we have to update KV buf at the end of each
-     * step. */
     K_cache_[0] = V_mem_cache_[args_.decoder_layers_ - 1] + mem_cache_size +
                   0 * cache_size * args_.decoder_layers_;
     V_cache_[0] = V_mem_cache_[args_.decoder_layers_ - 1] + mem_cache_size +
@@ -474,7 +471,7 @@ public:
 
     // TODO(guosheng): move cache offset into for loop for pipeline parallel
     size_t cache_size = (args_.batch_size_ * args_.seq_len_ *
-                         t_parallel_param_.local_hidden_units_);  // type T
+                         args_.hidden_units_);  // type T
 
     const int local_batch = l_parallel_param_.local_batch_size;
     for (uint step = 1; step <= args_.seq_len_; ++step) {

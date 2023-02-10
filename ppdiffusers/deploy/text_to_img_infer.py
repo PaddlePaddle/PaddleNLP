@@ -18,6 +18,7 @@ import time
 
 import fastdeploy as fd
 import numpy as np
+import paddle
 from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
@@ -195,6 +196,13 @@ def get_scheduler(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # 0. Init device id
+    device_id = args.device_id
+    if args.device == "cpu":
+        device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -229,9 +237,6 @@ if __name__ == "__main__":
     }
 
     # 4. Init runtime
-    device_id = args.device_id
-    if args.device == "cpu":
-        device_id = -1
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
