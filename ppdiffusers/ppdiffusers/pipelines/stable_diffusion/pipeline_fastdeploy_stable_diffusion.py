@@ -159,7 +159,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
         text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
-
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance:
             uncond_tokens: List[str]
@@ -360,7 +359,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         )
 
         # 4. Prepare timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
@@ -380,29 +378,38 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        scheduler_support_kwagrs=self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input)
+        unet_output_name = self.unet.model.get_output_info(0).name
+        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
+                noise_pred_unet = paddle.zeros([2 * batch_size * num_images_per_prompt, 4, height // 8,
+                                width // 8],dtype='float32')
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                if self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input):
+                if scheduler_support_kwagrs:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet.zero_copy_infer(
-                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
-                )[0]
+                self.unet.zero_copy_infer(
+                    prebinded_inputs={unet_input_names[0]:latent_model_input,
+                                      unet_input_names[1]:t, 
+                                      unet_input_names[2]:text_embeddings},
+                    prebinded_outputs={unet_output_name:noise_pred_unet},
+                    share_with_raw_ptr=True,
+                )
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
                 # TODO(wangboyun) need remove synchronize
                 # after fastdeploy support use same stream as paddle
-                paddle.device.cuda.synchronize()
+                # paddle.device.cuda.synchronize()
                 # compute the previous noisy sample x_t -> x_t-1
-                if self.check_var_kwargs_of_scheduler_func(self.scheduler.step):
+                if scheduler_support_kwagrs:
                     scheduler_output = self.scheduler.step(
                         noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
                     )
