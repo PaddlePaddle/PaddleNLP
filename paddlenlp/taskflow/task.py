@@ -40,13 +40,6 @@ class Task(metaclass=abc.ABCMeta):
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
         self.is_static_model = kwargs.get("is_static_model", False)
-        if self.is_static_model:
-            if "static_model_prefix" in kwargs:
-                self._static_model_prefix = kwargs.pop("static_model_prefix")
-            else:
-                raise NotImplementedError(
-                    "'static_model_prefix' is required while is_static_model is True (ex. static_model_prefix='inference')."
-                )
         self.task = task
         self.kwargs = kwargs
         self._priority_path = priority_path
@@ -76,6 +69,8 @@ class Task(metaclass=abc.ABCMeta):
             self._task_path = os.path.join(self._home_path, "taskflow", self._priority_path)
         else:
             self._task_path = os.path.join(self._home_path, "taskflow", self.task, self.model)
+        if self.is_static_model:
+            self._static_model_name = self._get_static_model_name()
 
         if not self.from_hf_hub:
             download_check(self._task_flag)
@@ -117,6 +112,17 @@ class Task(metaclass=abc.ABCMeta):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
+
+    def _get_static_model_name(self):
+        names = []
+        for file_name in os.listdir(self._task_path):
+            if ".pdmodel" in file_name:
+                names.append(file_name[:-8])
+        if len(names) == 0:
+            raise IOError(f"{self._task_path} should include '.pdmodel' file.")
+        if len(names) > 1:
+            logger.warning(f"{self._task_path} includes more than one '.pdmodel' file.")
+        return names[0]
 
     def _check_task_files(self):
         """
@@ -193,9 +199,8 @@ class Task(metaclass=abc.ABCMeta):
 
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if (
-            self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]
-            or self.model == "prompt"
+        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"] or (
+            self.task == "text_classification" and self.model == "prompt"
         ):
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
@@ -290,12 +295,12 @@ class Task(metaclass=abc.ABCMeta):
 
         # When the user-provided model path is already a static model, skip to_static conversion
         if self.is_static_model:
-            self.inference_model_path = os.path.join(self._task_path, self._static_model_prefix)
+            self.inference_model_path = os.path.join(self._task_path, self._static_model_name)
             if not os.path.exists(self.inference_model_path + ".pdmodel") or not os.path.exists(
                 self.inference_model_path + ".pdiparams"
             ):
                 raise IOError(
-                    f"{self._task_path} should include {self._static_model_prefix + '.pdmodel'} and {self._static_model_prefix + '.pdiparams'} while is_static_model is True"
+                    f"{self._task_path} should include {self._static_model_name + '.pdmodel'} and {self._static_model_name + '.pdiparams'} while is_static_model is True"
                 )
         else:
             # Since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way

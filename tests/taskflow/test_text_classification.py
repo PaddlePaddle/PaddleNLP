@@ -130,7 +130,6 @@ class TestTextClassificationTask(unittest.TestCase):
             task_path=static_model_path,
             id2label=id2label,
             batch_size=batch_size,
-            static_model_prefix="model",
             device_id=0,
             problem_type=problem_type,
         )
@@ -188,7 +187,6 @@ class TestTextClassificationTask(unittest.TestCase):
             task_path=static_model_path,
             id2label=id2label,
             batch_size=batch_size,
-            static_model_prefix="model",
             device_id=0,
             problem_type=problem_type,
         )

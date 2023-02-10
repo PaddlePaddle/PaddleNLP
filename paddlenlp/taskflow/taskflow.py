@@ -376,11 +376,11 @@ TASKS = {
         "models": {
             "finetune": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification_finetune",
+                "task_flag": "text_classification-finetune",
             },
             "prompt": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification_prompt",
+                "task_flag": "text_classification-prompt",
             },
         },
         "default": {"model": "finetune"},

@@ -35,6 +35,7 @@ from ..transformers import (
     AutoTokenizer,
 )
 from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
+from ..utils.log import logger
 from .task import Task
 from .utils import static_mode_guard
 
@@ -121,16 +122,29 @@ class TextClassificationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self.problem_type = kwargs.get("problem_type", "multi_class")
         self.multilabel_threshold = kwargs.get("multilabel_threshold", 0.5)
+        self._max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
 
         self._construct_tokenizer()
-        if model == "prompt":
-            self._construct_plm_model()
-            self._construct_template()
-            self._construct_verbalizer()
-
-        self._construct_id2label()
+        if self.model == "prompt":
+            self._initialize_prompt()
         self._check_predictor_type()
         self._get_inference_model()
+        self._construct_id2label()
+
+    def _initialize_prompt(self):
+        if "plm_model_name" in self.kwargs:
+            self._plm_model = AutoModelForMaskedLM.from_pretrained(self.kwargs["plm_model_name"])
+        elif os.path.isdir(os.path.join(self._task_path, "plm")):
+            self._plm_model = AutoModelForMaskedLM.from_pretrained(os.path.join(self._task_path, "plm"))
+            logger.info(f"Load pretrained language model from {self._plm_model}")
+        else:
+            raise NotImplementedError(
+                "Please specify the pretrained language model name （ex. plm_model_name='ernie-3.0-medium-zh'）."
+            )
+        self._template = AutoTemplate.load_from(self._task_path, self._tokenizer, self._max_length, self._plm_model)
+        with open(os.path.join(self._task_path, "verbalizer_config.json"), "r", encoding="utf-8") as fp:
+            self._label_words = json.load(fp)
+        self._verbalizer = SoftVerbalizer(self._label_words, self._tokenizer, self._plm_model)
 
     def _construct_input_spec(self):
         """
@@ -142,11 +156,9 @@ class TextClassificationTask(Task):
             if os.path.exists(os.path.join(self._task_path, LEGACY_CONFIG_NAME)):
                 with open(os.path.join(self._task_path, LEGACY_CONFIG_NAME)) as fb:
                     init_class = json.load(fb)["init_class"]
-                fb.close()
             elif os.path.exists(os.path.join(self._task_path, CONFIG_NAME)):
                 with open(os.path.join(self._task_path, CONFIG_NAME)) as fb:
                     init_class = json.load(fb)["architectures"].pop()
-                fb.close()
             else:
                 raise IOError(
                     f"Model configuration file dosen't exist.[task_path] should inclue {LEGACY_CONFIG_NAME} or {CONFIG_NAME}"
@@ -174,8 +186,6 @@ class TextClassificationTask(Task):
             model_instance = AutoModelForSequenceClassification.from_pretrained(self._task_path)
         elif model == "prompt":
             model_instance = PromptModelForSequenceClassification(self._plm_model, self._template, self._verbalizer)
-            # We load the model state dict on the CPU to avoid an OOM error.
-            # If the model is on the GPU, it still works!
             state_dict = paddle.load(os.path.join(self._task_path, "model_state.pdparams"), return_numpy=True)
             model_instance.set_state_dict(state_dict)
             # release memory
@@ -195,61 +205,28 @@ class TextClassificationTask(Task):
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
-    def _construct_plm_model(self):
-        """
-        Construct the plm model for prompt-model.
-        """
-        if "plm_model_name" in self.kwargs:
-            self._plm_model = AutoModelForMaskedLM.from_pretrained(self.kwargs["plm_model_name"])
-        else:
-            if "plm_model_path" in self.kwargs:
-                plm_model_path = self.kwargs["plm_model_path"]
-            else:
-                plm_model_path = os.path.join(self._task_path, "plm")
-
-            if os.path.isdir(plm_model_path):
-                self._plm_model = AutoModelForMaskedLM.from_pretrained(plm_model_path)
-            else:
-                raise IOError(
-                    f"{plm_model_path} does not exist. Please specify the pretrained language model name （ex. plm_model_name='ernie-3.0-medium-zh'）or the pretrained language model parameter path(ex. plm_model_path='./checkpoints/plm')"
-                )
-
-    def _construct_template(self):
-        """
-        Construct the template for prompt-model.
-        """
-        with open(os.path.join(self._task_path, "template_config.json"), "r", encoding="utf-8") as fp:
-            prompt = json.loads(fp.readline())
-        fp.close()
-        max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
-        self._template = AutoTemplate.create_from(prompt, self._tokenizer, max_length, model=self._plm_model)
-
-    def _construct_verbalizer(self):
-        """
-        Construct the verbalizer for prompt-model.
-        """
-        with open(os.path.join(self._task_path, "verbalizer_config.json"), "r", encoding="utf-8") as fp:
-            self._label_words = json.load(fp)
-        fp.close()
-        self._verbalizer = SoftVerbalizer(self._label_words, self._tokenizer, self._plm_model)
-
     def _construct_id2label(self):
         if "id2label" in self.kwargs:
             self.id2label = self.kwargs["id2label"]
         elif os.path.exists(os.path.join(self._task_path, "id2label.json")):
-            self.id2label = json.load(open(os.path.join(self._task_path, "id2label.json")))
+            id2label_path = os.path.join(self._task_path, "id2label.json")
+            with open(id2label_path) as fb:
+                self.id2label = json.load(fb)
+            logger.info(f"Load id2label from {id2label_path}.")
         elif self.model == "prompt" and os.path.exists(os.path.join(self._task_path, "verbalizer_config.json")):
-            label_list = sorted(list(self._label_words.keys()))
+            label_list = sorted(list(self._verbalizer.label_words.keys()))
             self.id2label = {}
             for i, l in enumerate(label_list):
                 self.id2label[i] = l
+            logger.info("Load id2label from verbalizer.")
         elif self.model == "finetune" and os.path.exists(os.path.join(self._task_path, CONFIG_NAME)):
-            with open(os.path.join(self._task_path, CONFIG_NAME)) as fb:
+            config_path = os.path.join(self._task_path, CONFIG_NAME)
+            with open(config_path) as fb:
                 id2label = json.load(fb)["id2label"]
-            fb.close()
             self.id2label = {}
             for i in id2label:
                 self.id2label[int(i)] = id2label[i]
+            logger.info(f"Load id2label from {config_path}.")
         else:
             self.id2label = None
 
@@ -263,10 +240,9 @@ class TextClassificationTask(Task):
         # Get the config from the kwargs
         batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
 
-        max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
         if self.model == "finetune":
             collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
-            tokenized_inputs = [self._tokenizer(i, max_length=max_length, truncation=True) for i in inputs]
+            tokenized_inputs = [self._tokenizer(i, max_length=self._max_length, truncation=True) for i in inputs]
             batches = [tokenized_inputs[idx : idx + batch_size] for idx in range(0, len(tokenized_inputs), batch_size)]
         elif self.model == "prompt":
             collator = PromptDataCollatorWithPadding(
@@ -274,7 +250,6 @@ class TextClassificationTask(Task):
             )
             template_inputs = [self._template({"text_a": x}) for x in inputs]
             batches = [template_inputs[idx : idx + batch_size] for idx in range(0, len(template_inputs), batch_size)]
-
         else:
             raise NotImplementedError(
                 f"'{self.model}' is not a supported model_type. Please select among ['finetune', 'prompt']"
