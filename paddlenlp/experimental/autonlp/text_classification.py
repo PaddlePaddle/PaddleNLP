@@ -410,5 +410,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         else:
             exported_model_path = os.path.join(model_result.log_dir, self.export_path)
             return Taskflow(
-                "text_classification", model=self.problem_type, task_path=exported_model_path, id2label=self.id2label
+                "text_classification",
+                model="finetune",
+                problem_type=self.problem_type,
+                task_path=exported_model_path,
+                id2label=self.id2label,
             )
