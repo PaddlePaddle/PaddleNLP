@@ -11,18 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import math
 
-import numpy as np
 import paddle
 import paddle.nn as nn
 
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
-from paddlenlp.utils.tools import compare_version
 
-if compare_version(paddle.version.full_version, "2.2.0") >= 0:
-    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+if hasattr(paddle, "text") and hasattr(paddle.text, "ViterbiDecoder"):
     from paddle.text import ViterbiDecoder
 else:
     from paddlenlp.layers.crf import ViterbiDecoder

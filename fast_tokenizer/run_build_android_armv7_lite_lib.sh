@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m paddle_serving_client.convert --dirname ../../inference_model \
-                                        --model_filename pegasus.pdmodel \
-                                        --params_filename pegasus.pdiparams \
-                                        --serving_server inference_model_server \
-                                        --serving_client inference_model_client
+mkdir build_android_armeabi_v7a_lite
+cd build_android_armeabi_v7a_lite
+cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-21 -DANDROID_STL=c++_shared -DWITH_TESTING=OFF -DWITH_PYTHON=OFF -DANDROID_TOOLCHAIN=clang -DWITH_ICU_LITE=ON
+make -j8
