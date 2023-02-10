@@ -7,9 +7,14 @@ pip install -r requirements.txt
 # 如果paddlenlp 2.5.1还没有发布，那么需要安装develop版本的paddlenlp
 pip install paddlenlp>=2.5.1
 ```
+## 准备data数据（包含artists.txt、flavors.txt、mediums.txt、movements.txt）
+```shell
+wget https://paddlenlp.bj.bcebos.com/models/community/Salesforce/blip-image-captioning-large/data.zip
+# 将data文件解压至clip_interrogator目录下
+unzip -d clip_interrogator data.zip
+```
 
 ## 使用
-
 ### 快速开始
 ```python
 from PIL import Image
