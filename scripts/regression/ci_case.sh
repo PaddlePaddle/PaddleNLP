@@ -17,6 +17,8 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+export PATH=${PATH}
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
 if [ -f "model_logs/" ];then 
     mkdir model_logs
 fi
@@ -279,49 +281,49 @@ print_info $? gpt_deploy_C_FT
 }
 # 8 gpt
 gpt(){
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-    # data process
-    cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-    sed -i "s/python3/python/g" Makefile
-    sed -i "s/python-config/python3.7m-config/g" Makefile
-    cd ${nlp_dir}/model_zoo/gpt/
-    # pretrain
-    python -m paddle.distributed.launch run_pretrain.py \
-    --model_name_or_path "__internal_testing__/gpt" \
-    --input_dir "./pre_data" \
-    --output_dir "output" \
-    --weight_decay 0.01 \
-    --max_steps 2 \
-    --save_steps 2 \
-    --device gpu \
-    --warmup_steps 320000 \
-    --warmup_ratio 0.01 \
-    --micro_batch_size 8 \
-    --eval_steps 100 \
-    --overwrite_output_dir true \
-    --dataloader_drop_last true \
-    --do_train true \
-    --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
-    print_info $? gpt_pretrain
-    # export model
-    python export_model.py --model_type=gpt \
-        --model_path=gpt2-medium-en \
-        --output_path=./infer_model/model >${log_path}/gpt_export >>${log_path}/gpt_export 2>&1
-    print_info $? gpt_export
-    # inference
-    python deploy/python/inference.py \
-        --model_type gpt \
-        --model_path ./infer_model/model >${log_path}/gpt_p_depoly >>${log_path}/gpt_p_depoly 2>&1
-    print_info $? gpt_p_depoly
-    # test acc
-    # cd ${nlp_dir}/tests/examples/gpt/
-    # time (python -m unittest test_accuracy.py >${log_path}/gpt_test_acc) >>${log_path}/gpt_test_acc 2>&1
-    # print_info $? gpt_test_acc
-else 
-    pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
-    print_info $? gpt
-fi
+
+# TODO(wj-Mcat): revert the gpt run_pretrain.py code, remove it later.
+
+cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
+sed -i "s/python3/python/g" Makefile
+sed -i "s/python-config/python3.7m-config/g" Makefile
+#pretrain
+cd ${nlp_dir}/model_zoo/gpt/
+mkdir pre_data
+cd ./pre_data
+wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+cd ../
+time (python -m paddle.distributed.launch run_pretrain.py \
+    --model_type gpt \
+    --model_name_or_path gpt2-en \
+    --input_dir "./pre_data"\
+    --output_dir "output"\
+    --weight_decay 0.01\
+    --grad_clip 1.0\
+    --max_steps 2\
+    --save_steps 2\
+    --decay_steps 320000\
+    --warmup_rate 0.01\
+    --micro_batch_size 2 \
+    --device gpu >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
+print_info $? gpt_pretrain
+time (
+python export_model.py --model_type=gpt \
+    --model_path=gpt2-medium-en \
+    --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
+print_info $? gpt_export
+time (
+python deploy/python/inference.py \
+    --model_type gpt \
+    --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
+print_info $? gpt_p_depoly
+
+echo 'run gpt test with pytest'
+cd ${nlp_dir}
+python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
+print_info $? gpt
+
 fast_gpt
 cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
@@ -373,7 +375,7 @@ if [ ! -f 'test.py' ];then
         --device "gpu" >${log_path}/ernie_pretrain >>${log_path}/ernie_pretrain 2>&1
     print_info $? ernie_pretrain
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
     print_info $? ernie-1.0
 fi
 }
@@ -983,7 +985,7 @@ if [ ! -f 'test.py' ];then
         --logging_steps 1  >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
         print_info $? ernie-m
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
     print_info $? ernie-layout
 fi
 }
@@ -1079,7 +1081,7 @@ print_info $? textcnn_predict
 #33 taskflow
 taskflow (){
 cd ${nlp_dir}
-pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
+python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
 print_info $? taskflow_unittest
 python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
@@ -1092,12 +1094,16 @@ for apicase in `ls`;do
             continue
     else
         cd ${nlp_dir}
-        pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+        python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
         print_info $? tests ${apicase}_unittest
     fi
 done
 }
 fast_generation(){
+
+export CC=/usr/local/gcc-8.2/bin/gcc
+export CXX=/usr/local/gcc-8.2/bin/g++
+
 cd ${nlp_dir}/fast_generation/samples
 python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
 print_info $? fast_generation_codegen
@@ -1155,7 +1161,7 @@ if [ ! -f 'test.py' ];then
     python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
     print_info $? ernie-3.0_compress_qa
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
     print_info $? ernie-3.0
 fi
 }
@@ -1163,7 +1169,7 @@ ernie-health(){
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
     print_info $? ernie-health
 fi
 }
@@ -1172,7 +1178,7 @@ cd ${nlp_dir}/model_zoo/uie/
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
     print_info $? uie
 fi
 }
@@ -1181,7 +1187,7 @@ cd ${nlp_dir}/model_zoo/ernie-layout/
 if [ ! -f 'test.py' ];then
     echo '模型测试文件不存在！'
 else 
-    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    python -m pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
     print_info $? ernie-layout
 fi
 }

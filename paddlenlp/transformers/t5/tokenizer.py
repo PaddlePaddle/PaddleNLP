@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 import re
+import warnings
 
 import sentencepiece as spm
 
@@ -211,6 +211,26 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         else:
             token_ids_1 = self._add_eos_if_not_present(token_ids_1)
             return token_ids_0 + token_ids_1
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            offset_mapping_0 (List[tuple]):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (List[tuple], optional):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return offset_mapping_0 + [(0, 0)]
+
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
     def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """

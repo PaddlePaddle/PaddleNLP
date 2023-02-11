@@ -53,7 +53,7 @@ class ModelArguments:
 
 
 @paddle.no_grad()
-def dynabert_evaluate(self, model, data_loader):
+def custom_evaluate(self, model, data_loader):
     metric = MetricReport()
     model.eval()
     metric.reset()
@@ -116,7 +116,7 @@ def main():
 
     compression_args.print_config()
 
-    trainer.compress(custom_evaluate=dynabert_evaluate)
+    trainer.compress(custom_evaluate=custom_evaluate)
 
 
 if __name__ == "__main__":

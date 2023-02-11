@@ -232,7 +232,15 @@ class BertPretrainedModel(PretrainedModel):
 
         # downstream mappings
         if "BertForQuestionAnswering" in config.architectures:
-            model_mappings.extend([["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]])
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+        if (
+            "BertForMultipleChoice" in config.architectures
+            or "BertForSequenceClassification" in config.architectures
+            or "BertForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
@@ -885,12 +893,8 @@ class BertPretrainingHeads(Layer):
     Perform language modeling task and next sentence classification task.
 
     Args:
-        hidden_size (int):
-            See :class:`BertModel`.
-        vocab_size (int):
-            See :class:`BertModel`.
-        activation (str):
-            Activation function used in the language modeling task.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForPretraining.
         embedding_weights (Tensor, optional):
             Decoding weights used to map hidden_states to logits of the masked token prediction.
             Its data type should be float32 and its shape is [vocab_size, hidden_size].

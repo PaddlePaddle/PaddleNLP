@@ -30,47 +30,16 @@ Image.MAX_IMAGE_PIXELS = 2300000000
 
 def parse_line(line, filename):
     def parse_src(filename):
-        if "alt_aesthetic" in filename:
-            return "alt_aesthetic"
-        elif "laion_aesthetic" in filename:
-            return "laion_aesthetic"
-        elif "cc_15m_tag_watermark_1024" in filename or "laion400m_1024" in filename:
-            return "img1024_cc15m_laion400m"
-        elif "cc_tag_watermark" in filename or "cc_12m_tag_watermark" in filename:
-            return "cc"
-        elif "alt-text2image_gen_filted_data_shuffle_watermark" in filename:
-            return "alt"
-        elif "image_search_key_201810" in filename:
-            return "click"
-        elif "laion400m" in filename:
+        if "laion400m" in filename:
             return "laion400m"
-        elif "yfcc_en_zh" in filename:
-            return "yfcc"
-        elif "vc" in filename:
-            return "vc"
         else:
             raise NotImplementedError(f"Unkown data source, {filename}")
 
     try:
         vec = line.strip().split("\t")
         data_source = parse_src(filename)
-        if data_source == "alt_aesthetic":
-            caption, img_b64 = vec[1], vec[4]
-        elif data_source == "laion_aesthetic":
-            caption, img_b64 = vec[10], vec[12]
-        elif data_source == "cc":
-            caption, _, _, _, img_b64 = vec[:5]
-            caption = caption.replace("<mark>", "")
-        elif data_source == "alt":
-            img_b64, caption = vec[:2]
-        elif data_source == "laion400m":
+        if data_source == "laion400m":
             caption, _, img_b64 = vec[:3]
-        elif data_source == "yfcc":
-            caption, _, _, _, img_b64 = vec[:5]
-        elif data_source == "img1024_cc15m_laion400m":
-            caption, _, _, _, img_b64 = vec[:5]
-        elif data_source == "vc":
-            _, _, _, img_b64, _, _, caption = vec[:7]
         else:
             _, captions, _, _, _, img_b64 = vec[:6]
             caption = random.sample(captions.split("|"), 1)[0].replace("\1", "")

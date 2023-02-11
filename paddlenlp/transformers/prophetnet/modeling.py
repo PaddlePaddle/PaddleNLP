@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+from typing import Optional, Tuple
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Layer
-from typing import Optional, Tuple
 
-import paddlenlp
 from .. import PretrainedModel, register_base_model
+from ..activations import ACT2FN
 
 __all__ = [
     "ProphetNetModel",
@@ -30,8 +31,6 @@ __all__ = [
     "ProphetNetDecoder",
     "ProphetNetForConditionalGeneration",
 ]
-
-ACT2FN = {"gelu": F.gelu}
 
 
 def ngram_attention_bias(sequence_length, ngram, dtype):

@@ -174,3 +174,16 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # No max_model_input_sizes
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 2)
+            self.assertEqual(len(encoding["offset_mapping"]), 2)

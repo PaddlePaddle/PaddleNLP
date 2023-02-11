@@ -99,6 +99,13 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "ernie-3.0-tiny-nano-v2-zh": 2048,
     "ernie-3.0-tiny-pico-v2-zh": 2048,
     "utc-large": 512,
+    "utc-xbase": 2048,
+    "utc-base": 2048,
+    "utc-medium": 2048,
+    "utc-mini": 2048,
+    "utc-micro": 2048,
+    "utc-nano": 2048,
+    "utc-pico": 2048,
 }
 
 
@@ -224,7 +231,14 @@ class ErnieTokenizer(PretrainedTokenizer):
             "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2_vocab.txt",
             "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2_vocab.txt",
             "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2_vocab.txt",
-            "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/utc-large/vocab.txt",
+            "utc-large": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_large_vocab.txt",
+            "utc-xbase": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_xbase_vocab.txt",
+            "utc-base": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_base_vocab.txt",
+            "utc-medium": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_medium_vocab.txt",
+            "utc-mini": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_mini_vocab.txt",
+            "utc-micro": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_micro_vocab.txt",
+            "utc-nano": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_nano_vocab.txt",
+            "utc-pico": "https://paddlenlp.bj.bcebos.com/models/transformers/utc/utc_pico_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -299,6 +313,13 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-3.0-tiny-nano-v2-zh": {"do_lower_case": True},
         "ernie-3.0-tiny-pico-v2-zh": {"do_lower_case": True},
         "utc-large": {"do_lower_case": True},
+        "utc-xbase": {"do_lower_case": True},
+        "utc-base": {"do_lower_case": True},
+        "utc-medium": {"do_lower_case": True},
+        "utc-mini": {"do_lower_case": True},
+        "utc-micro": {"do_lower_case": True},
+        "utc-nano": {"do_lower_case": True},
+        "utc-pico": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
