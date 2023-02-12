@@ -820,11 +820,11 @@ class PretrainedConfig:
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
             )
         else:
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
+            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME])
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME])
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
