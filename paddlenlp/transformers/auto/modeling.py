@@ -206,7 +206,8 @@ class _BaseAutoModelClass:
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
-        init_class = init_class[:-5] if init_class.endswith("Model") else init_class
+        init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
+        model_name = None
         if init_class:
             for model_flag, name in MAPPING_NAMES.items():
                 if model_flag in init_class:
@@ -218,6 +219,10 @@ class _BaseAutoModelClass:
                 if name in pretrained_model_name_or_path.lower():
                     model_name = model_flag + "Model"
                     break
+        if model_name is None:
+            raise AttributeError(
+                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
+            )
         init_class = cls._name_mapping[model_name + "_Import_Class"]
         class_name = cls._name_mapping[init_class]
         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
