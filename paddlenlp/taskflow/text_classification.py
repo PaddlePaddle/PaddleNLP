@@ -132,7 +132,7 @@ class TextClassificationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self.problem_type = self.kwargs.get("problem_type", "multi_class")
         self.multilabel_threshold = self.kwargs.get("multilabel_threshold", 0.5)
-        self._max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
+        self._max_length = self.kwargs.get("max_length", 512)
 
         self._construct_tokenizer()
         if self.model == "prompt":
