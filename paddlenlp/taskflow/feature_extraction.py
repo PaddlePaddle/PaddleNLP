@@ -182,12 +182,13 @@ class MultimodalFeatureExtractionTask(Task):
         },
     }
 
-    def __init__(self, task, model, batch_size=1, _static_mode=True, **kwargs):
+    def __init__(self, task, model, batch_size=1, _static_mode=True, return_tensors=True, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
+        self.return_tensors = return_tensors
         self._check_task_files()
         self._construct_tokenizer()
         self._static_mode = _static_mode
@@ -316,18 +317,17 @@ class MultimodalFeatureExtractionTask(Task):
             for batch_inputs in inputs["batches"]:
                 if "input_ids" in batch_inputs:
                     text_features = self._model.get_text_features(input_ids=batch_inputs["input_ids"])
-                    all_feats.append(text_features)
+                    all_feats.append(text_features.numpy())
                 if "pixel_values" in batch_inputs:
                     image_features = self._model.get_image_features(pixel_values=batch_inputs["pixel_values"])
-                    all_feats.append(image_features)
+                    all_feats.append(image_features.numpy())
         inputs.update({"features": all_feats})
         return inputs
 
     def _postprocess(self, inputs):
-        if self._static_mode:
-            inputs["features"] = paddle.to_tensor(np.concatenate(inputs["features"], axis=0))
-        else:
-            inputs["features"] = paddle.concat(inputs["features"], axis=0)
+        inputs["features"] = np.concatenate(inputs["features"], axis=0)
+        if self.return_tensors:
+            inputs["features"] = paddle.to_tensor(inputs["features"])
         return inputs
 
     def _construct_input_spec(self):
