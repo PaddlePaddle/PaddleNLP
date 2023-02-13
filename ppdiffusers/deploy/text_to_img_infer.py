@@ -116,8 +116,6 @@ def create_paddle_inference_runtime(
         option._option.set_external_raw_stream(paddle_stream)
     if use_trt:
         option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
-        # option.use_trt_backend()
-        # option.enable_trt()
         option.paddle_infer_option.enable_trt = True
         if use_fp16:
             option.trt_option.enable_fp16 = True
@@ -216,8 +214,7 @@ if __name__ == "__main__":
         paddle.set_device("cpu")
     else:
         paddle.set_device(f"gpu:{device_id}")
-        paddle_stream=paddle.device.cuda.current_stream(device_id).cuda_stream
-        # paddle_stream=None
+        paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
 
     # 1. Init scheduler
     scheduler = get_scheduler(args)
@@ -282,7 +279,6 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id,
-            # disable_paddle_trt_ops=["sin", "cos"],
             paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
@@ -294,7 +290,7 @@ if __name__ == "__main__":
             text_encoder_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
-            disable_paddle_trt_ops=["arg_max", "range","lookup_table_v2"],
+            disable_paddle_trt_ops=["arg_max", "range", "lookup_table_v2"],
             paddle_stream=paddle_stream,
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
