@@ -44,7 +44,11 @@ class DataArguments:
 @dataclass
 class ModelArguments:
     model_name_or_path: str = field(
-        default="utc-large", metadata={"help": "The build-in pretrained UTC model name or path to its checkpoints."}
+        default="utc-base",
+        metadata={
+            "help": "The build-in pretrained UTC model name or path to its checkpoints, such as "
+            "`utc-xbase`, `utc-base`, `utc-medium`, `utc-mini`, `utc-micro`, `utc-nano` and `utc-pico`."
+        },
     )
     export_type: str = field(default="paddle", metadata={"help": "The type to export. Support `paddle` and `onnx`."})
     export_model_dir: str = field(default="checkpoints/model_best", metadata={"help": "The export model path."})

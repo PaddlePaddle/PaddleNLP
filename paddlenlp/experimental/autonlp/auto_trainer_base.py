@@ -67,8 +67,20 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.greater_is_better = greater_is_better
+        if language not in self.supported_languages:
+            raise ValueError(
+                f"'{language}' is not supported. Please choose among the following: {self.supported_languages}"
+            )
+
         self.language = language
         self.output_dir = output_dir
+
+    @property
+    @abstractmethod
+    def supported_languages(self) -> List[str]:
+        """
+        Override to store the supported languages for each auto trainer class
+        """
 
     @property
     @abstractmethod

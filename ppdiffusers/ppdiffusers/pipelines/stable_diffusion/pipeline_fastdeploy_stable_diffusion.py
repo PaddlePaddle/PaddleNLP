@@ -31,6 +31,10 @@ from ...schedulers import (
     LMSDiscreteScheduler,
     PNDMScheduler,
 )
+from ...schedulers.preconfig import (
+    PreconfigEulerAncestralDiscreteScheduler,
+    PreconfigLMSDiscreteScheduler,
+)
 from ...utils import logging
 from . import StableDiffusionPipelineOutput
 
@@ -80,8 +84,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             DDIMScheduler,
             PNDMScheduler,
             LMSDiscreteScheduler,
+            PreconfigLMSDiscreteScheduler,
             EulerDiscreteScheduler,
             EulerAncestralDiscreteScheduler,
+            PreconfigEulerAncestralDiscreteScheduler,
             DPMSolverMultistepScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
@@ -230,8 +236,13 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
-
         return extra_step_kwargs
+
+    def check_var_kwargs_of_scheduler_func(self, scheduler_func):
+        sig = inspect.signature(scheduler_func)
+        params = sig.parameters.values()
+        has_kwargs = any([True for p in params if p.kind == p.VAR_KEYWORD])
+        return has_kwargs
 
     def check_inputs(self, prompt, height, width, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
@@ -350,7 +361,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps.numpy()
+        timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
         num_channels_latents = 4
@@ -363,36 +374,41 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             generator,
             latents,
         )
+        if isinstance(latents, np.ndarray):
+            latents = paddle.to_tensor(latents)
         # 6. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
-
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
-                tensor_t = paddle.to_tensor(t)
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
-                latent_model_input = latent_model_input.numpy()
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                if self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input):
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(
-                    sample=latent_model_input.astype(np.float32),
-                    timestep=np.array([t], dtype=np.int64),
-                    encoder_hidden_states=text_embeddings.astype(np.float32),
+                noise_pred = self.unet.zero_copy_infer(
+                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
                 )[0]
-
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
+                # TODO(wangboyun) need remove synchronize
+                # after fastdeploy support use same stream as paddle
+                paddle.device.cuda.synchronize()
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), tensor_t, paddle.to_tensor(latents), **extra_step_kwargs
-                )
-                latents = scheduler_output.prev_sample.numpy()
+                if self.check_var_kwargs_of_scheduler_func(self.scheduler.step):
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
@@ -401,7 +417,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                         callback(i, t, latents)
 
         # 8. Post-processing
-        image = self.decode_latents(latents)
+        image = self.decode_latents(latents.numpy())
 
         # 9. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)

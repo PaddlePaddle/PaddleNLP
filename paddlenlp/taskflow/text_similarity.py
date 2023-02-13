@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import paddle
+
 from paddlenlp.transformers import BertModel, BertTokenizer
-from ..transformers import ErnieCrossEncoder, ErnieTokenizer
 
 from ..data import Pad, Tuple
-from .utils import static_mode_guard
+from ..transformers import ErnieCrossEncoder, ErnieTokenizer
 from .task import Task
+from .utils import static_mode_guard
 
 usage = r"""
          from paddlenlp import Taskflow
@@ -179,8 +180,6 @@ class TextSimilarityTask(Task):
            2) Generate the other model inputs from the raw text and token ids.
         """
         inputs = self._check_input_text(inputs)
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
 
         examples = []
         for data in inputs:
@@ -203,12 +202,12 @@ class TextSimilarityTask(Task):
 
         batches = [examples[idx : idx + self._batch_size] for idx in range(0, len(examples), self._batch_size)]
         if "rocketqa" in self.model_name:
-            batchify_fn = lambda samples, fn=Tuple(
+            batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input ids
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token type ids
             ): [data for data in fn(samples)]
         else:
-            batchify_fn = lambda samples, fn=Tuple(
+            batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # text1_input_ids
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # text1_token_type_ids
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # text2_input_ids
@@ -265,6 +264,7 @@ class TextSimilarityTask(Task):
             result = {}
             result["text1"] = text[0]
             result["text2"] = text[1]
-            result["similarity"] = similarity
+            # The numpy.float32 can not be converted to the json format
+            result["similarity"] = float(similarity)
             final_results.append(result)
         return final_results

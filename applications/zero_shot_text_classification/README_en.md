@@ -88,7 +88,7 @@ For multi-task training, you can convert data with script seperately and move th
 
 ### 2.3 Finetuning
 
-Use the following command to fine-tune the model using `utc-large` as the pre-trained model, and save the fine-tuned model to `./checkpoint/model_best/`:
+Use the following command to fine-tune the model using `utc-base` as the pre-trained model, and save the fine-tuned model to `./checkpoint/model_best/`:
 
 Single GPU:
 
@@ -99,7 +99,7 @@ python run_train.py  \
     --save_steps 100 \
     --eval_steps 100 \
     --seed 1000 \
-    --model_name_or_path utc-large \
+    --model_name_or_path utc-base \
     --output_dir ./checkpoint/model_best \
     --dataset_path ./data/ \
     --max_seq_length 512  \
@@ -128,7 +128,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
     --save_steps 100 \
     --eval_steps 100 \
     --seed 1000 \
-    --model_name_or_path utc-large \
+    --model_name_or_path utc-base \
     --output_dir ./checkpoint/model_best \
     --dataset_path ./data/ \
     --max_seq_length 512  \
@@ -155,7 +155,7 @@ Parameters:
 * `save_steps`: The number of interval steps to save the model checkpoint during training, the default is 100.
 * `eval_steps`: The number of interval steps to save the model checkpoint during training, the default is 100.
 * `seed`: global random seed, default is 42.
-* `model_name_or_path`: The pre-trained model used for few shot training. Defaults to "utc-large".
+* `model_name_or_path`: The pre-trained model used for few shot training. Defaults to "utc-base". Options: "utc-xbase", "utc-base", "utc-medium", "utc-mini", "utc-micro", "utc-nano", "utc-pico".
 * `output_dir`: Required, the model directory saved after model training or compression; the default is `None`.
 * `dataset_path`: The directory to dataset; defaults to `./data`.
 * `train_file`: Training file name; defaults to `train.txt`.
@@ -207,7 +207,7 @@ You can use `paddlenlp.Taskflow` to load your custom model by specifying the pat
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
->>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best', precision="fp16")
+>>> my_cls = Taskflow("zero_shot_text_classification", model="utc-base", schema=schema, task_path="./checkpoint/model_best", precision="fp16")
 >>> pprint(my_cls("中性粒细胞比率偏低"))
 ```
 
@@ -223,6 +223,7 @@ from paddlenlp import SimpleServer, Taskflow
 
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
+               model="utc-base",
                schema=schema,
                task_path="../../checkpoint/model_best/",
                precision="fp32")
@@ -241,13 +242,14 @@ It supports FP16 (half-precision) and multiple process for inference acceleratio
 
 ### 2.7 Experiments
 
-The results reported here are based on the development set of KUAKE-QIC.
+The zero-shot results reported here are based on the development set of KUAKE-QIC.
 
-  |          |  Accuracy  | Micro F1   | Macro F1   |
-  | :------: | :--------: | :--------: | :--------: |
-  | 0-shot   | 28.69 | 87.03 | 60.90 |
-  | 5-shot   | 64.75 | 93.34 | 80.33 |
-  | 10-shot  | 65.88 | 93.76 | 81.34 |
-  | full-set | 81.81 | 96.65 | 89.87 |
-
-where k-shot means that there are k annotated samples per label for training.
+  |            | Macro F1   | Micro F1   |
+  | :--------: | :--------: | :--------: |
+  | utc-xbase  | 66.30 | 89.67 |
+  | utc-base   | 64.13 | 89.06 |
+  | utc-medium | 69.62 | 89.15 |
+  | utc-micro  | 60.31 | 79.14 |
+  | utc-mini   | 65.82 | 89.82 |
+  | utc-nano   | 62.03 | 80.92 |
+  | utc-pico   | 53.63 | 83.57 |
