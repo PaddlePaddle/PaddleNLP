@@ -830,7 +830,15 @@ class Trainer:
 
         metrics = None
         if self.control.should_evaluate:
-            metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            if isinstance(self.eval_dataset, dict):
+                for eval_dataset_name, eval_dataset in self.eval_dataset.items():
+                    metrics = self.evaluate(
+                        eval_dataset=eval_dataset,
+                        ignore_keys=ignore_keys_for_eval,
+                        metric_key_prefix=f"eval_{eval_dataset_name}",
+                    )
+            else:
+                metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
             self._save_checkpoint(model, metrics=metrics)
