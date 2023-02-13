@@ -47,7 +47,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 | [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
-| [通用特征提取](#通用特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |            |          | 集成文本，图片的特征抽取工具       |
+| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |            |          | 集成文本，图片的特征抽取工具       |
 
 ## QuickStart
 

@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 BaseConfig.arbitrary_types_allowed = True
 
 #: Types of content_types supported
-ContentTypes = Literal["text", "table", "image", "audio"]
+ContentTypes = Literal["text", "image"]
 FilterType = Dict[str, Union[Dict[str, Any], List[Any], str, int, float, bool]]
 
 
