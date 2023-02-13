@@ -39,7 +39,7 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="utc-large", metadata={"help": "Build-in pretrained model."})
+    model_name_or_path: str = field(default="utc-base", metadata={"help": "Build-in pretrained model."})
     model_path: str = field(default=None, metadata={"help": "Build-in pretrained model."})
 
 
@@ -54,10 +54,6 @@ def main():
     # Load the pretrained language model.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = UTC.from_pretrained(model_args.model_name_or_path)
-    if model_args.model_name_or_path != "utc-large":
-        omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
-        tokenizer.add_special_tokens(omask_dict)
-        model.resize_token_embeddings(len(tokenizer))
 
     # Define template for preprocess and verbalizer for postprocess.
     template = UTCTemplate(tokenizer, training_args.max_seq_length)

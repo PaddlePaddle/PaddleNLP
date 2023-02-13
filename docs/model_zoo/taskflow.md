@@ -1773,7 +1773,7 @@ from paddlenlp import Taskflow
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `task_path`：自定义任务路径，默认为None。
 * `schema`：定义任务标签候选集合。
-* `model`：选择任务使用的模型，默认为`utc-large`, 目前只支持`utc-large`。
+* `model`：选择任务使用的模型，默认为`utc-large`, 支持`utc-xbase`, `utc-base`, `utc-medium`, `utc-micro`, `utc-mini`, `utc-nano`, `utc-pico`。
 * `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
 * `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
@@ -1800,7 +1800,7 @@ from paddlenlp import Taskflow
 | `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
 |       `Taskflow("knowledge_mining", model="wordtag")`        |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
 |        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
-|        `Taskflow("zero_shot_text_classification", model="utc-large")`         |      `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-large`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification) |
+|        `Taskflow("zero_shot_text_classification", model="utc-base")`         |      `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-base`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification) |
 
 </div></details>
 
