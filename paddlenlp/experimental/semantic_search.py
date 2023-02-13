@@ -16,9 +16,10 @@ from __future__ import annotations
 import inspect
 from typing import Dict, List
 
+import paddle
 from paddle import nn
 
-from paddlenlp.transformers import AutoModel, PretrainedConfig, PretrainedModel
+from paddlenlp.transformers import PretrainedConfig, PretrainedModel
 from paddlenlp.transformers.auto.modeling import get_name_mapping
 from paddlenlp.utils.import_utils import import_module
 
@@ -134,6 +135,10 @@ class EncoderConfig(PretrainedConfig):
                     config.architectures = [model_name]
                     break
 
+        architecture = None
+        if config.architectures:
+            architecture = config.architectures[0]
+
         if not mode and config.architectures:
             architecture = config.architectures[0]
             if architecture in cls.mode_mapping["text_image"]:
@@ -157,8 +162,6 @@ class Encoder(nn.Layer):
         config = EncoderConfig.from_pretrained(pretrained_model_name_or_path, mode=mode, **kwargs)
         if not config.mode:
             raise ValueError(f"mode of model from <{pretrained_model_name_or_path}> should not be None.")
-        if "text_image" in config.mode:
-            return TextImageEncoder(config)
         if "text" in config.mode:
             return TextEncoder(config)
         if "image" in config.mode:
@@ -188,13 +191,17 @@ class _TextFeatureMixin:
 
         output = method(*args, **kwargs)
 
+        # some `get_text_features` not support return_dict params
+        if paddle.is_tensor(output):
+            return output
+
         if self.config.embedding_type == "cls":
             return output.last_hidden_state[:, 0, :]
         if self.config.embedding_type == "pooler":
             return output.pooler_output
 
 
-class TextEncoder(Encoder, _TextFeatureMixin):
+class TextEncoder(_TextFeatureMixin, Encoder):
     def __init__(self, config: EncoderConfig):
         super().__init__(config)
         model_class = import_module(f"paddlenlp.transformers.{config.architecture}")
@@ -210,7 +217,7 @@ class _ImageFeatureMixin:
     image_method_name: str | None = None
 
     def get_image_features(self, *args, **kwargs):
-        image_method_name = self.image_method_name or "forwrad"
+        image_method_name = self.image_method_name or "forward"
         # resolve image features
         model_class_name = self.model.__class__.__name__
 
@@ -222,10 +229,18 @@ class _ImageFeatureMixin:
         if not inspect.ismethod(method):
             raise ValueError(f"<{method}> is not the method")
 
-        return method(*args, **kwargs)
+        output = method(*args, **kwargs)
+        # some `get_image_features` not support return_dict params
+        if paddle.is_tensor(output):
+            return output
+
+        if self.config.embedding_type == "cls":
+            return output.last_hidden_state[:, 0, :]
+        if self.config.embedding_type == "pooler":
+            return output.pooler_output
 
 
-class ImageEncoder(Encoder, _ImageFeatureMixin):
+class ImageEncoder(_ImageFeatureMixin, Encoder):
     def __init__(self, config: EncoderConfig):
         super().__init__(config)
         model_class = import_module(f"paddlenlp.transformers.{config.architecture}")
@@ -236,20 +251,56 @@ class ImageEncoder(Encoder, _ImageFeatureMixin):
         return self.image_features(*args, **kwargs)
 
 
-class TextImageEncoder(Encoder, _TextFeatureMixin, _ImageFeatureMixin):
-    def __init__(self, config: EncoderConfig):
-        super().__init__(config)
-        import pdb
+class EncoderForRetrieval(PretrainedModel):
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, second_pretrained_model_name_or_path: str | None = None):
+        config = EncoderConfig.from_pretrained(pretrained_model_name_or_path)
+        second_config = None
 
-        pdb.set_trace()
-        model_class = import_module(f"paddlenlp.transformers.{config.architecture}")
-        self.model = model_class.from_pretrained(config.pretrained_model_name_or_path)
+        if second_pretrained_model_name_or_path:
+            second_config = EncoderConfig.from_pretrained(second_pretrained_model_name_or_path)
 
-    def forward(self, input_ids):
-        return self.model(input_ids)
+        second_mode = second_config.mode if second_config else config.mode
+        modes = [config.mode, second_mode]
+        if modes == ["text", "text"]:
+            return EncoderForTextTextRetrieval(config, second_config)
+
+        if modes == ["text", "image"]:
+            assert (
+                second_config is not None
+            ), "when init `EncoderForTextImageRetrieval` model, `second_config`<image config> is required"
+            return EncoderForTextImageRetrieval(config, second_config)
+
+        if modes == ["image", "text"]:
+            assert (
+                second_config is not None
+            ), "when init `EncoderForTextImageRetrieval` model, `second_config`<text config> is required"
+            return EncoderForTextImageRetrieval(config, second_config)
+
+        if modes == ["image", "image"]:
+            return EncoderForImageImageRetrieval(config, second_config)
+
+        raise ValueError(f"invalide modes<{','.join(modes)}>")
 
 
-class EncoderForTextImageRetrieval(TextImageEncoder):
+class EncoderForTextTextRetrieval(PretrainedModel, _TextFeatureMixin):
+    """Encoder for Text-Image feature Retrieval"""
+
+    def __init__(self, config: EncoderConfig, second_config: EncoderConfig | None = None):
+        super().__init__()
+        self.model = Encoder.from_pretrained(config.pretrained_model_name_or_path)
+
+        if not second_config:
+            self.second_model = self.model
+        else:
+            self.second_model = Encoder.from_pretrained(second_config.pretrained_model_name_or_path)
+
+        self.dropout = nn.Dropout(config.dropout)
+        if config.projection_dim:
+            self.projection_layer = nn.Linear(config.projection_dim)
+
+
+class EncoderForImageImageRetrieval(PretrainedModel, _TextFeatureMixin, _ImageFeatureMixin):
     """Encoder for Text-Image feature Retrieval"""
 
     get_features_mapping = {
@@ -258,14 +309,39 @@ class EncoderForTextImageRetrieval(TextImageEncoder):
             "get_image_features": "get_image_features",
         }
     }
+    text_method_name = "get_text_features"
+    image_method_name = "get_image_features"
 
-    def __init__(self, config: EncoderConfig):
+    def __init__(self, config: EncoderConfig, second_config: EncoderConfig | None = None):
         super().__init__()
-        self.model = AutoModel.from_pretrained(config.pretrained_model_name_or_path)
-        self.dropout = nn.Dropout(config.dropout)
-        self.projection_layer = nn.Linear(config.projection_dim)
+        self.model = Encoder.from_pretrained(config.pretrained_model_name_or_path)
+        if not second_config:
+            self.second_model = self.model
+        else:
+            self.second_model = Encoder.from_pretrained(second_config.pretrained_model_name_or_path)
 
-    # def forward(self, **kwargs):
-    #     kwargs["return_dict"] = True
-    #     output = self.model(**kwargs)
-    # loss = output["loss"]
+        self.dropout = nn.Dropout(config.dropout)
+        if config.projection_dim:
+            self.projection_layer = nn.Linear(config.projection_dim)
+
+
+class EncoderForTextImageRetrieval(PretrainedModel, _TextFeatureMixin, _ImageFeatureMixin):
+    """Encoder for Text-Image feature Retrieval"""
+
+    get_features_mapping = {
+        "CLIPModel": {
+            "get_text_features": "get_text_features",
+            "get_image_features": "get_image_features",
+        }
+    }
+    text_method_name = "get_text_features"
+    image_method_name = "get_image_features"
+
+    def __init__(self, config: EncoderConfig, second_config: EncoderConfig):
+        super().__init__()
+        self.model = Encoder.from_pretrained(config.pretrained_model_name_or_path)
+        self.second_model = Encoder.from_pretrained(second_config.pretrained_model_name_or_path)
+        self.dropout = nn.Dropout(config.dropout)
+
+        if config.projection_dim:
+            self.projection_layer = nn.Linear(config.projection_dim)
