@@ -153,13 +153,13 @@ class TestTextClassificationTask(unittest.TestCase):
             (1, "multi_label", "prompt"),
         ]
     )
-    def test_taskflow_task(self, batch_size, problem_type, model):
+    def test_taskflow_task(self, batch_size, problem_type, mode):
         input_text = ["百度", "深度学习框架", "飞桨", "PaddleNLP"]
         id2label = {
             0: "negative",
             1: "positive",
         }
-        if model == "finetune":
+        if mode == "finetune":
             dygraph_model_path = self.finetune_dygraph_model_path
             static_model_path = self.finetune_static_model_path
         else:
@@ -167,7 +167,7 @@ class TestTextClassificationTask(unittest.TestCase):
             static_model_path = self.prompt_static_model_path
 
         dygraph_taskflow = Taskflow(
-            model=model,
+            mode=mode,
             task="text_classification",
             task_path=dygraph_model_path,
             id2label=id2label,
@@ -181,7 +181,7 @@ class TestTextClassificationTask(unittest.TestCase):
         self.assertEqual(len(dygraph_results), len(input_text))
 
         static_taskflow = Taskflow(
-            model=model,
+            mode=mode,
             task="text_classification",
             is_static_model=True,
             task_path=static_model_path,
@@ -199,5 +199,5 @@ class TestTextClassificationTask(unittest.TestCase):
                 self.assertEqual(dygraph_pred["label"], static_pred["label"])
                 self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
                 # if multi_label, all predictions should be greater than the threshold
-                if model == "multi_label":
+                if mode == "multi_label":
                     self.assertGreater(dygraph_pred["score"], dygraph_taskflow.task_instance.multilabel_threshold)
