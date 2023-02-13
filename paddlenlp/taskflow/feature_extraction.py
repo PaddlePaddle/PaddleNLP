@@ -134,7 +134,7 @@ class MultimodalFeatureExtractionTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
-        self.mode = "text"
+        self.export_type = "text"
         self._batch_size = batch_size
         self._check_task_files()
         self._construct_tokenizer()
@@ -356,7 +356,7 @@ class MultimodalFeatureExtractionTask(Task):
             self._config_map["image"] = self._config
         else:
             # Get text onnx model
-            self.mode = "text"
+            self.export_type = "text"
             self.inference_model_path = self.inference_text_model_path
             self._static_model_file = self.inference_model_path + ".pdmodel"
             self._static_params_file = self.inference_model_path + ".pdiparams"
@@ -364,7 +364,7 @@ class MultimodalFeatureExtractionTask(Task):
             self.predictor_map["text"] = self.predictor
 
             # Get image onnx model
-            self.mode = "image"
+            self.export_type = "image"
             self.inference_model_path = self.inference_image_model_path
             self._static_model_file = self.inference_model_path + ".pdmodel"
             self._static_params_file = self.inference_model_path + ".pdiparams"

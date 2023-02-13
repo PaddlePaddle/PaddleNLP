@@ -62,7 +62,7 @@ class Task(metaclass=abc.ABCMeta):
         self._task_flag = self.kwargs["task_flag"] if "task_flag" in self.kwargs else self.model
         self.from_hf_hub = kwargs.pop("from_hf_hub", False)
         # Add mode flag for onnx output path redirection
-        self.mode = None
+        self.export_type = None
 
         if "task_path" in self.kwargs:
             self._task_path = self.kwargs["task_path"]
@@ -223,11 +223,11 @@ class Task(metaclass=abc.ABCMeta):
             logger.warning(
                 "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
             )
-        if self.mode is None:
+        if self.export_type is None:
             onnx_dir = os.path.join(self._task_path, "onnx")
         else:
             # Compatible multimodal model for saving image and text path
-            onnx_dir = os.path.join(self._task_path, "onnx", self.mode)
+            onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
         if not os.path.exists(onnx_dir):
             os.mkdir(onnx_dir)
