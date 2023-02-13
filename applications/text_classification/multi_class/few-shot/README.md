@@ -16,6 +16,9 @@
 <a name="项目说明"></a>
 ## 1. 项目说明
 
+**零样本/小样本文本分类推荐使用 UTC 模型，详情见[目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification)，本项目将会在未来下线。**
+
+
 本项目提供了小样本场景下文本二/多分类的解决方案，在 ERNIE3.0 的基础上利用提示学习取得比微调更好的分类效果，充分利用标注信息。
 
 ### 模型介绍
