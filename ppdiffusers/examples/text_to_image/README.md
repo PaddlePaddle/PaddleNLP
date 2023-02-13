@@ -235,7 +235,7 @@ from ppdiffusers import StableDiffusionPipeline
 import paddle
 
 model_path = "sayakpaul/sd-model-finetuned-lora-t4"
-pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=paddle.float32)
+pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float32)
 pipe.unet.load_attn_procs(model_path)
 
 prompt = "A pokemon with green eyes and red legs."

@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import tempfile
 from collections import defaultdict
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Optional, Union
 
 import paddle
 import paddle.nn as nn
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 
 from .modeling_utils import _get_model_file, load_dict
 from .models.cross_attention import LoRACrossAttnProcessor
@@ -77,42 +87,13 @@ class UNet2DConditionLoadersMixin:
                       `./my_model_directory/`.
                     - A [paddle state
                       dict].
+            from_hf_hub (bool, optional): whether to load from Huggingface Hub.
             cache_dir (`Union[str, os.PathLike]`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
-            force_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
-                cached versions if they exist.
-            resume_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
-            local_files_only(`bool`, *optional*, defaults to `False`):
-                Whether or not to only look at local files (i.e., do not try to download the model).
-            use_auth_token (`str` or *bool*, *optional*):
-                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
-                when running `diffusers-cli login` (stored in `~/.huggingface`).
-            revision (`str`, *optional*, defaults to `"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
-            subfolder (`str`, *optional*, defaults to `""`):
+            subfolder (`str`, *optional*, defaults to `None`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
-            mirror (`str`, *optional*):
-                Mirror source to accelerate downloads in China. If you are from China and have an accessibility
-                problem, you can set this option to resolve it. Note that we do not guarantee the timeliness or safety.
-                Please refer to the mirror site for more information.
-        <Tip>
-         It is required to be logged in (`huggingface-cli login`) when you want to use private or [gated
-         models](https://huggingface.co/docs/hub/models-gated#gated-models).
-        </Tip>
-        <Tip>
-        Activate the special ["offline-mode"](https://huggingface.co/diffusers/installation.html#offline-mode) to use
-        this method in a firewalled environment.
-        </Tip>
         """
 
         from_hf_hub = kwargs.pop("from_hf_hub", False)
@@ -120,20 +101,9 @@ class UNet2DConditionLoadersMixin:
             cache_dir = kwargs.pop("cache_dir", HF_CACHE)
         else:
             cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
-        # force_download = kwargs.pop("force_download", False)
-        # resume_download = kwargs.pop("resume_download", False)
-        # proxies = kwargs.pop("proxies", None)
-        # use_auth_token = kwargs.pop("use_auth_token", None)
-        # revision = kwargs.pop("revision", None)
         subfolder = kwargs.pop("subfolder", None)
         weight_name = kwargs.pop("weight_name", LORA_WEIGHT_NAME)
 
-        # user_agent = {
-        #     "file_type": "attn_procs_weights",
-        #     "framework": "pytorch",
-        # }
-        # local_files_only = True
-        # TODO 这个下载的逻辑。
         if not isinstance(pretrained_model_name_or_path_or_dict, dict):
             model_file = _get_model_file(
                 pretrained_model_name_or_path_or_dict,
@@ -193,6 +163,8 @@ class UNet2DConditionLoadersMixin:
                 Whether the process calling this is the main process or not. Useful when in distributed training like
                 TPUs and need to call this function on all processes. In this case, set `is_main_process=True` only on
                 the main process to avoid race conditions.
+            weights_name (`str`, *optional*, defaults to `LORA_WEIGHT_NAME`):
+                The name of weights.
             save_function (`Callable`):
                 The function to use to save the state dictionary. Useful on distributed training like TPUs when one
                 need to replace `torch.save` by another method. Can be configured with the environment variable
@@ -225,3 +197,65 @@ class UNet2DConditionLoadersMixin:
         save_function(state_dict, os.path.join(save_directory, weights_name))
 
         logger.info(f"Model weights saved in {os.path.join(save_directory, weights_name)}")
+
+    def save_attn_procs_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this model to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_attn_procs(save_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=root_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
