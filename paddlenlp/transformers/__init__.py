@@ -116,6 +116,8 @@ from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
+from .mt5.configuration import *
+from .mt5.modeling import *
 from .nezha.configuration import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
