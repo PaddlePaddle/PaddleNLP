@@ -82,7 +82,7 @@ class UIEPredictor(object):
             print(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
+        self._tokenizer = AutoTokenizer.from_pretrained(args.model_path_prefix.rsplit("/", 1)[0])
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._batch_size = args.batch_size
