@@ -108,7 +108,7 @@ def create_paddle_inference_runtime(
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
-    option.paddle_infer_option.enable_log_info = True
+    # option.paddle_infer_option.enable_log_info = True
     if device_id == -1:
         option.use_cpu()
     else:
@@ -284,7 +284,7 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id,
-            disable_paddle_trt_ops=["sin", "cos"],
+            # disable_paddle_trt_ops=["sin", "cos"],
             paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")

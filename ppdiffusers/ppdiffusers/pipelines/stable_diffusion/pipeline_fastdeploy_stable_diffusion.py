@@ -18,7 +18,7 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 import paddle
-
+import time
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
 from ...fastdeploy_utils import FastDeployRuntimeModel
@@ -218,12 +218,22 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
     def decode_latents(self, latents):
         latents = 1 / 0.18215 * latents
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
+        latents_shape = latents.shape
+        vae_output_shape = [latents_shape[0],3,latents_shape[2]*8,latents_shape[3]*8]
+        images_vae = paddle.zeros(vae_output_shape,dtype='float32')
+
+        vae_input_name = self.vae_decoder.model.get_input_info(0).name
+        vae_output_name = self.vae_decoder.model.get_output_info(0).name
+        
+        self.vae_decoder.zero_copy_infer(
+            prebinded_inputs={vae_input_name:latents},
+            prebinded_outputs={vae_output_name:images_vae},
+            share_with_raw_ptr=True,
         )
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose([0, 2, 3, 1])
-        return image
+        
+        images_vae = paddle.clip(images_vae / 2 + 0.5, 0, 1)
+        images = images_vae.transpose([0, 2, 3, 1])
+        return images.numpy()
 
     def prepare_extra_step_kwargs(self, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
@@ -354,10 +364,11 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
+        start_time_encode_prompt = time.perf_counter()
         text_embeddings = self._encode_prompt(
             prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
         )
-
+        print("_encode_prompt latency:",time.perf_counter()-start_time_encode_prompt)
         # 4. Prepare timesteps
         timesteps = self.scheduler.timesteps
 
@@ -405,9 +416,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-                # TODO(wangboyun) need remove synchronize
-                # after fastdeploy support use same stream as paddle
-                # paddle.device.cuda.synchronize()
                 # compute the previous noisy sample x_t -> x_t-1
                 if scheduler_support_kwagrs:
                     scheduler_output = self.scheduler.step(
@@ -416,16 +424,19 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 else:
                     scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
                 latents = scheduler_output.prev_sample
-
+                if i == num_inference_steps - 1:
+                    # sync for accuracy it/s measure
+                    paddle.device.cuda.synchronize()
                 # call the callback, if provided
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                if i == num_inference_steps - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
         # 8. Post-processing
-        image = self.decode_latents(latents.numpy())
-
+        time_start_decoder = time.perf_counter()
+        image = self.decode_latents(latents)
+        print("decoder latency:",time.perf_counter()-time_start_decoder)
         # 9. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
