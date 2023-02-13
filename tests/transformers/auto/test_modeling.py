@@ -49,7 +49,6 @@ class AutoModelTest(unittest.TestCase):
     def test_from_pretrained_no_init_class_no_model_name(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             model = copy.deepcopy(self.model)
-            # when init_class is not found, we rely on the filename to get the import class
             model.save_pretrained(tmp_dir)
             config = model.config.to_dict()
             config.pop("architectures")
@@ -57,5 +56,3 @@ class AutoModelTest(unittest.TestCase):
                 writer.write(json.dumps(config, indent=2, sort_keys=True) + "\n")
             with self.assertRaises(AttributeError):
                 AutoModel.from_pretrained(tmp_dir)
-
-    # def test_from_hf_hub(self):
