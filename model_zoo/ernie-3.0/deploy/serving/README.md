@@ -13,7 +13,7 @@
 
 ```
 models
-├── ernie_seqcls                      # 分类任务的pipeline
+├── ernie_seqcls                      # 分类任务的 pipeline
 │   ├── 1
 │   └── config.pbtxt                  # 通过这个文件组合前后处理和模型推理
 ├── ernie_seqcls_model                # 分类任务的模型推理
@@ -56,7 +56,7 @@ models
 ## 拉取并运行镜像
 
 ```
-# x.y.z为镜像版本号，需参照serving文档替换为数字
+# x.y.z为镜像版本号，需参照 serving 文档替换为数字
 # GPU镜像
 docker pull registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10
 # CPU镜像
@@ -90,7 +90,7 @@ token_cls_rpc_client.py   # 序列标注任务发送 pipeline 预测请求的脚
 在容器内执行下面命令启动服务:
 
 ```
-# 默认启动models下所有模型
+# 默认启动 models 下所有模型
 fastdeployserver --model-repository=/models
 
 # 可通过参数只启动分类任务
@@ -222,4 +222,4 @@ entity: 姚明   label: PER   pos: [10, 11]
 
 ## 配置修改
 
-当前分类任务(ernie_seqcls_model/config.pbtxt)默认配置在 CPU上 运行 OpenVINO 引擎; 序列标注任务默认配置在 GPU 上运行 PaddleInference 引擎。如果要在 CPU/GPU 或其他推理引擎上运行, 需要修改配置，详情请参考[配置文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/serving/docs/zh_CN/model_configuration.md)。
+当前分类任务( ernie_seqcls_model/config.pbtxt )默认配置在 CPU上 运行 OpenVINO 引擎; 序列标注任务默认配置在 GPU 上运行 Paddle Inference 引擎。如果要在 CPU/GPU 或其他推理引擎上运行, 需要修改配置，详情请参考[配置文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/serving/docs/zh_CN/model_configuration.md)。
