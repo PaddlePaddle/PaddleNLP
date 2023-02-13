@@ -32,7 +32,6 @@ from paddlenlp.transformers import (
     ErnieHealthPretrainingCriterion,
     LinearDecayWithWarmup,
 )
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -134,21 +133,6 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def download_corpus(args):
-    os.makedirs(args.input_dir, exist_ok=True)
-    files = [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_ids.npy",
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_idx.npz",
-    ]
-
-    for file in files:
-        file_name = file.split("/")[-1]
-        file_path = os.path.join(args.input_dir, file_name)
-        if not os.path.exists(file_path):
-            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
-            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
-
-
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
     paddle.set_device(args.device)
@@ -199,7 +183,6 @@ def do_train(args):
         model = paddle.DataParallel(model)
 
     # Loads dataset.
-    download_corpus(args)
     tic_load_data = time.time()
     logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 

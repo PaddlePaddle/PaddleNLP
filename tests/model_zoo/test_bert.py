@@ -14,13 +14,29 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from unittest import TestCase
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+from paddlenlp.utils.log import logger
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
 class BERT_Test(TestCase):
+    def download_corpus(self, input_dir):
+        os.makedirs(input_dir, exist_ok=True)
+        files = [
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5",
+        ]
+
+        for file in files:
+            file_name = file.split("/")[-1]
+            file_path = os.path.join(input_dir, file_name)
+            if not os.path.exists(file_path):
+                logger.info(f"start to download corpus: <{file_name}> into <{input_dir}>")
+                get_path_from_url_with_filelock(file, root_dir=input_dir)
+
     def setUp(self) -> None:
         self.path = "./model_zoo/bert"
         self.config_path = "./tests/fixtures/model_zoo/bert.yaml"
@@ -33,6 +49,7 @@ class BERT_Test(TestCase):
 
         # 1. run pretrain
         pretrain_config = load_test_config(self.config_path, "pretrain")
+        self.download_corpus(pretrain_config["input_dir"])
         with argv_context_guard(pretrain_config):
             from run_pretrain import do_train
 

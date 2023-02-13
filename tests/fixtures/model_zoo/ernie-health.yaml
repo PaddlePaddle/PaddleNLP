@@ -4,14 +4,15 @@ pretrain:
     model_name_or_path: __internal_testing__/ernie-health-chinese
     input_dir: model_zoo/ernie-health/data
     output_dir: model_zoo/ernie-health/output/eheath-pretraining
-    max_seq_length: 512 
+    max_seq_length: 32
     gradient_accumulation_steps: 1
     weight_decay: 0.01
     max_steps: 2
-    save_steps: 10
-    warmup_steps: 10
+    num_train_epochs: 0.05
+    save_steps: 5
+    warmup_steps: 5
     warmup_ratio: 0.01
-    per_device_train_batch_size: 2
+    per_device_train_batch_size: 8
     device: cpu
     eval_steps: 10
     do_train: true

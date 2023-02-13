@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import distutils.util
-import logging
 import os
 import random
 from dataclasses import dataclass, field
@@ -27,24 +26,15 @@ from paddlenlp.data import Stack
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
     BertForPretraining,
-    BertModel,
-    BertPretrainingCriterion,
     BertTokenizer,
     ErnieForPretraining,
-    ErnieModel,
-    ErniePretrainingCriterion,
     ErnieTokenizer,
-    LinearDecayWithWarmup,
 )
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-
-FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "bert": (BertModel, BertForPretraining, BertPretrainingCriterion, BertTokenizer),
-    "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
+    "bert": (BertForPretraining, BertTokenizer),
+    "ernie": (ErnieForPretraining, ErnieTokenizer),
 }
 
 
@@ -121,12 +111,6 @@ def get_train_data_file(data_args):
     return data_file
 
 
-def set_seed(seed):
-    random.seed(seed + paddle.distributed.get_rank())
-    np.random.seed(seed + paddle.distributed.get_rank())
-    paddle.seed(seed + paddle.distributed.get_rank())
-
-
 class WorkerInitObj(object):
     def __init__(self, seed):
         self.seed = seed
@@ -160,14 +144,18 @@ def data_collator(data, stack_fn=Stack()):
             out[4][mask_token_num] = x[4][j]
             mask_token_num += 1
     # mask_token_num
-    out.append(np.asarray([mask_token_num], dtype=np.float32))
+    # out.append(np.asarray([mask_token_num], dtype=np.float32))
+    import pdb
+
+    pdb.set_trace()
     return {
         "input_ids": out[0],
         "token_type_ids": out[1],
         "attention_mask": out[2],
         "masked_positions": out[3],
-        "labels": (out[4], out[5]),
-        "masked_lm_scale": out[6],
+        "labels": out[4],
+        "next_sentence_label": out[5],
+        # "masked_token_num": out[6],
     }
 
 
@@ -216,8 +204,10 @@ class PretrainingDataset(Dataset):
         padded_mask_indices = (masked_lm_positions == 0).nonzero()[0]
         if len(padded_mask_indices) != 0:
             index = padded_mask_indices[0].item()
+            # mask_token_num = index
         else:
             index = self.max_pred_length
+            # mask_token_num = self.max_pred_length
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]
@@ -229,55 +219,41 @@ class PretrainingDataset(Dataset):
         return [input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels]
 
 
-class PretrainingTrainer(Trainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+# class PretrainingTrainer(Trainer):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
 
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        if self.criterion is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
-            labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
-        elif self.criterion is not None and "generator_labels" in inputs:
-            labels = inputs["generator_labels"]
-        else:
-            labels = None
-        # TODO: label_names pop
+#     def compute_loss(self, model, inputs, return_outputs=False):
+#         """
+#         How the loss is computed by Trainer. By default, all models return the loss in the first element.
+#         Subclass and override for custom behavior.
+#         """
+#         if self.criterion is not None and "labels" in inputs:
+#             labels = inputs.pop("labels")
+#         elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
+#             labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+#         elif self.criterion is not None and "generator_labels" in inputs:
+#             labels = inputs["generator_labels"]
+#         else:
+#             labels = None
+#         # TODO: label_names pop
 
-        masked_lm_scale = inputs.pop("masked_lm_scale")
-        outputs = model(**inputs)
+#         masked_lm_scale = inputs.pop("masked_lm_scale")
+#         outputs = model(**inputs)
 
-        if self.criterion is not None:
-            loss = self.criterion(outputs, labels, masked_lm_scale)
-            outputs = (loss, outputs)
+#         if self.criterion is not None:
+#             loss = self.criterion(outputs, labels, masked_lm_scale)
+#             outputs = (loss, outputs)
 
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
+#         # Save past state if it exists
+#         # TODO: this needs to be fixed and made cleaner later.
+#         if self.args.past_index >= 0:
+#             self._past = outputs[self.args.past_index]
 
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+#         # We don't use .loss here since the model may return tuples instead of ModelOutput.
+#         loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
-        return (loss, outputs) if return_outputs else loss
-
-
-def download_corpus(args: DataArguments):
-    os.makedirs(args.input_dir, exist_ok=True)
-    files = [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5",
-    ]
-
-    for file in files:
-        file_name = file.split("/")[-1]
-        file_path = os.path.join(args.input_dir, file_name)
-        if not os.path.exists(file_path):
-            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
-            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
+#         return (loss, outputs) if return_outputs else loss
 
 
 def do_train():
@@ -292,14 +268,8 @@ def do_train():
     training_args.print_config(model_args, "Model")
     training_args.print_config(model_args, "Training")
 
-    paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    set_seed(training_args.seed)
-
     model_args.model_type = model_args.model_type.lower()
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
+    model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
@@ -313,29 +283,28 @@ def do_train():
     else:
         model = model_class.from_pretrained(model_args.model_name_or_path)
 
-    download_corpus(data_args)
     data_file = get_train_data_file(data_args)
     train_dataset = PretrainingDataset(input_file=data_file, max_pred_length=model_args.max_predictions_per_seq)
 
-    class CriterionWrapper(paddle.nn.Layer):
-        def __init__(self):
-            """CriterionWrapper"""
-            super(CriterionWrapper, self).__init__()
-            self.criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
+    # class CriterionWrapper(paddle.nn.Layer):
+    #     def __init__(self):
+    #         """CriterionWrapper"""
+    #         super(CriterionWrapper, self).__init__()
+    #         self.criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
 
-        def forward(self, output, labels, masked_lm_scale):
-            # input_ids, segment_ids, input_mask, masked_lm_positions,
-            # masked_lm_labels, next_sentence_labels, mask_token_num
-            masked_lm_labels, next_sentence_labels = labels
-            prediction_scores, seq_relationship_score = output
-            loss = self.criterion(
-                prediction_scores,
-                seq_relationship_score,
-                masked_lm_labels,
-                next_sentence_labels,
-                masked_lm_scale,
-            )
-            return loss
+    #     def forward(self, output, labels, masked_lm_scale):
+    #         # input_ids, segment_ids, input_mask, masked_lm_positions,
+    #         # masked_lm_labels, next_sentence_labels, mask_token_num
+    #         masked_lm_labels, next_sentence_labels = labels
+    #         prediction_scores, seq_relationship_score = output
+    #         loss = self.criterion(
+    #             prediction_scores,
+    #             seq_relationship_score,
+    #             masked_lm_labels,
+    #             next_sentence_labels,
+    #             masked_lm_scale,
+    #         )
+    #         return loss
 
     # decorate @to_static for benchmark, skip it by default.
     if model_args.to_static:
@@ -345,39 +314,34 @@ def do_train():
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
-    num_training_steps = (
-        training_args.max_steps
-        if training_args.max_steps > 0
-        else (len(train_dataset) // training_args.per_device_train_batch_size) * training_args.num_train_epochs
-    )
+    # num_training_steps = (
+    #     training_args.max_steps
+    #     if training_args.max_steps > 0
+    #     else (len(train_dataset) // training_args.per_device_train_batch_size) * training_args.num_train_epochs
+    # )
 
-    lr_scheduler = LinearDecayWithWarmup(
-        training_args.learning_rate, num_training_steps, training_args.warmup_steps, last_epoch=0
-    )
+    # lr_scheduler = LinearDecayWithWarmup(
+    #     training_args.learning_rate, num_training_steps, training_args.warmup_steps, last_epoch=0
+    # )
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        epsilon=training_args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=training_args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-    )
+    # decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    # optimizer = paddle.optimizer.AdamW(
+    #     learning_rate=lr_scheduler,
+    #     epsilon=training_args.adam_epsilon,
+    #     parameters=model.parameters(),
+    #     weight_decay=training_args.weight_decay,
+    #     apply_decay_param_fun=lambda x: x in decay_params,
+    # )
 
-    if training_args.fp16:
-        model = paddle.amp.decorate(models=model, level=training_args.fp16_opt_level, save_dtype="float32")
-
-    trainer = PretrainingTrainer(
+    trainer = Trainer(
         model=model,
-        criterion=CriterionWrapper(),
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=None,
         tokenizer=tokenizer,
-        optimizers=[optimizer, lr_scheduler],
     )
     # training
     if training_args.do_train:

@@ -32,7 +32,6 @@ from paddlenlp.transformers import (
     ErnieHealthForTotalPretraining,
     ErnieHealthPretrainingCriterion,
 )
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -79,21 +78,6 @@ class ModelArguments:
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
-
-
-def download_corpus(args: DataArguments):
-    os.makedirs(args.input_dir, exist_ok=True)
-    files = [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_ids.npy",
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_idx.npz",
-    ]
-
-    for file in files:
-        file_name = file.split("/")[-1]
-        file_path = os.path.join(args.input_dir, file_name)
-        if not os.path.exists(file_path):
-            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
-            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
 
 
 def main():
@@ -149,7 +133,6 @@ def main():
         raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
     # Loads dataset.
-    download_corpus(data_args)
     tic_load_data = time.time()
     logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 

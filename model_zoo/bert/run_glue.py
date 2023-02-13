@@ -12,23 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 from dataclasses import dataclass, field
 
-import numpy as np
-import paddle
 from datasets import load_dataset
 from paddle.metric import Accuracy
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.transformers import (
-    BertForSequenceClassification,
-    BertTokenizer,
-    ErnieForSequenceClassification,
-    ErnieTokenizer,
-)
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -53,11 +45,6 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-}
-
 
 @dataclass
 class ModelArguments:
@@ -65,17 +52,9 @@ class ModelArguments:
         default=None,
         metadata={"help": "The name of the task to train selected in the list: " + ", ".join(METRIC_CLASSES.keys())},
     )
-    model_type: str = field(
-        default=None, metadata={"help": "Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys())}
-    )
     model_name_or_path: str = field(
         default=None,
-        metadata={
-            "help": "Path to pre-trained model or shortcut name selected in the list: "
-            + ", ".join(
-                sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
-            )
-        },
+        metadata={"help": "Path to pre-trained model or shortcut name"},
     )
     max_seq_length: int = field(
         default=128,
@@ -86,16 +65,6 @@ class ModelArguments:
     )
 
 
-def set_seed(seed):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(seed)
-    np.random.seed(seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(seed)
-
-
 def do_train():
     training_args, model_args = PdArgumentParser([TrainingArguments, ModelArguments]).parse_args_into_dataclasses()
     training_args: TrainingArguments = training_args
@@ -104,14 +73,9 @@ def do_train():
     training_args.print_config(model_args, "Model")
     training_args.print_config(training_args, "Training")
 
-    set_seed(training_args.seed)
-
     model_args.task_name = model_args.task_name.lower()
 
     sentence1_key, sentence2_key = task_to_keys[model_args.task_name]
-
-    model_args.model_type = model_args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
     train_ds = load_dataset("glue", model_args.task_name, split="train")
     columns = train_ds.column_names
@@ -122,7 +86,7 @@ def do_train():
         num_classes = len(label_list)
     else:
         num_classes = 1
-    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     def preprocess_function(examples):
         # Tokenize the texts
@@ -149,46 +113,15 @@ def do_train():
         dev_ds = load_dataset("glue", model_args.task_name, split="validation")
         dev_ds = dev_ds.map(preprocess_function, batched=True, remove_columns=columns)
 
-    model = model_class.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
-
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    # decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-    # optimizer = paddle.optimizer.AdamW(
-    #     beta1=0.9,
-    #     beta2=0.999,
-    #     epsilon=training_args.adam_epsilon,
-    #     parameters=model.parameters(),
-    #     weight_decay=training_args.weight_decay,
-    #     apply_decay_param_fun=lambda x: x in decay_params,
-    # )
-
-    criterion = paddle.nn.loss.CrossEntropyLoss() if not is_regression else paddle.nn.loss.MSELoss()
-
-    def compute_metrics(p):
-        # Define the metrics of tasks.
-        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-
-        preds = paddle.to_tensor(preds)
-        label = paddle.to_tensor(p.label_ids)
-
-        metric = Accuracy()
-        metric.reset()
-        result = metric.compute(preds, label)
-        metric.update(result)
-        accu = metric.accumulate()
-        metric.reset()
-        return {"accuracy": accu}
+    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
 
     trainer = Trainer(
         model=model,
-        criterion=criterion,
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_ds if training_args.do_train else None,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
     )
 
     # training
@@ -201,9 +134,15 @@ def do_train():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_metrics = trainer.evaluate()
-        trainer.log_metrics("eval", eval_metrics)
-        trainer.save_metrics("eval", eval_metrics)
+        if model_args.task_name == "mnli":
+            for _, eval_dataset in dev_ds.items():
+                eval_metrics = trainer.evaluate(eval_dataset)
+                trainer.log_metrics("eval", eval_metrics)
+                trainer.save_metrics("eval", eval_metrics)
+        else:
+            eval_metrics = trainer.evaluate(dev_ds)
+            trainer.log_metrics("eval", eval_metrics)
+            trainer.save_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
