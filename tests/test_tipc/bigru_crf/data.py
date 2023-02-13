@@ -18,10 +18,10 @@ The file_reader converts raw corpus to input.
 import os
 from functools import partial
 
-import numpy as np
 import paddle
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import MapDataset
-from paddlenlp.data import Pad, Tuple, Stack
 
 # We use "\002" to separate sentence characters and sequence labels,
 # for example: 除\002了\002他\002续\002任\002十\002二\002届\002政\002协\002委\002员
@@ -62,7 +62,7 @@ def load_vocab(dict_path):
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
-                if reverse == None:
+                if reverse is None:
                     reverse = True if terms[0].isdigit() else False
                 if reverse:
                     value, key = terms
