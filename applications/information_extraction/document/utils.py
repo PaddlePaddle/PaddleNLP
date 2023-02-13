@@ -292,16 +292,18 @@ def _encode_doc(tokenizer, offset_mapping, last_offset, prompt, this_text_line, 
         q_sep_index = content_encoded_inputs["input_ids"].index(2, 1)
 
         bias = 0
-        for index in range(len(sub_offset_mapping)):
-            if index == 0:
+        for i in range(len(sub_offset_mapping)):
+            if i == 0:
                 continue
-            mapping = sub_offset_mapping[index]
+            mapping = sub_offset_mapping[i]
             if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-                bias = sub_offset_mapping[index - 1][-1] + 1
+                bias = sub_offset_mapping[i - 1][-1] + 1
             if mapping[0] == 0 and mapping[1] == 0:
                 continue
-            sub_offset_mapping[index][0] += bias
-            sub_offset_mapping[index][1] += bias
+            if mapping == sub_offset_mapping[i - 1]:
+                continue
+            sub_offset_mapping[i][0] += bias
+            sub_offset_mapping[i][1] += bias
 
         offset_mapping = sub_offset_mapping[:-1]
         last_offset = offset_mapping[-1][-1]
@@ -316,7 +318,7 @@ def _encode_doc(tokenizer, offset_mapping, last_offset, prompt, this_text_line, 
             if i == 0:
                 org_offset = sub_list[1]
             else:
-                if sub_list[0] != org_offset:
+                if sub_list[0] != org_offset and sub_offset_mapping[1:-1][i - 1] != sub_list:
                     last_offset += 1
                 org_offset = sub_list[1]
             offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
