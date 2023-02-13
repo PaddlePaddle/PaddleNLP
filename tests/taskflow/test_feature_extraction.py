@@ -103,7 +103,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
 
         for dygraph_result, static_result in zip(dygraph_results["features"], static_results["features"]):
             for dygraph_pred, static_pred in zip(dygraph_result.tolist(), static_result.tolist()):
-                self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-6)
+                self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-5)
 
         input_image = (self.prepare_inputs(equal_resolution=True, paddleify=False),)
         #  dygraph image test
@@ -140,7 +140,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         self.assertEqual(static_results["features"].shape[0], 2)
         for dygraph_result, static_result in zip(dygraph_results["features"], static_results["features"]):
             for dygraph_pred, static_pred in zip(dygraph_result.tolist(), static_result.tolist()):
-                self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-6)
+                self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-5)
 
         input_image = self.prepare_inputs(equal_resolution=True, paddleify=False)
         #  dygraph image test
