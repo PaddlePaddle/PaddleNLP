@@ -67,13 +67,77 @@ class MultimodalFeatureExtractionTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "config": "config.json",
+        "vocab_file": "vocab.txt",
+        "preprocessor_config": "preprocessor_config.json",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
+    }
+    resource_files_urls = {
+        "PaddlePaddle/ernie_vil-2.0-base-zh": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/model_state.pdparams",
+                "38d8c8e01f74ba881e87d9a3f669e5ae",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/config.json",
+                "caf929b450d5638e8df2a95c936519e7",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
+            ],
+            "preprocessor_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/preprocessor_config.json",
+                "9a2e8da9f41896fedb86756b79355ee2",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/PaddlePaddle/ernie_vil-2.0-base-zh/tokenizer_config.json",
+                "da5385c23c8f522d33fc3aac829e4375",
+            ],
+        },
+        "OFA-Sys/chinese-clip-vit-base-patch16": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/model_state.pdparams",
+                "d594c94833b8cfeffc4f986712b3ef79",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/config.json",
+                "3611b5c34ad69dcf91e3c1d03b01a93a",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/vocab.txt",
+                "3b5b76c4aef48ecf8cb3abaafe960f09",
+            ],
+            "preprocessor_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/preprocessor_config.json",
+                "ba1fb66c75b18b3c9580ea5120e01ced",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/tokenizer_config.json",
+                "573ba0466e15cdb5bd423ff7010735ce",
+            ],
+        },
+    }
+
     def __init__(self, task, model, batch_size=1, _static_mode=True, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
         self.mode = "text"
         self._batch_size = batch_size
-        self._construct_tokenizer(model_name=model)
+        self._check_task_files()
+        self._construct_tokenizer()
         self._static_mode = _static_mode
         self._config_map = {}
         self.predictor_map = {}
@@ -90,14 +154,14 @@ class MultimodalFeatureExtractionTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        self._model = AutoModel.from_pretrained(model)
+        self._model = AutoModel.from_pretrained(self._task_path)
         self._model.eval()
 
-    def _construct_tokenizer(self, model_name):
+    def _construct_tokenizer(self):
         """
         Construct the tokenizer for the predictor.
         """
-        self._processor = AutoProcessor.from_pretrained(model_name)
+        self._processor = AutoProcessor.from_pretrained(self.model)
 
     def _batchify(self, data, batch_size):
         """
