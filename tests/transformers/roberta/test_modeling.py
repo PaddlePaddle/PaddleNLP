@@ -348,7 +348,6 @@ class RobertaModelTester:
 )
 class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RobertaModel
-    use_test_inputs_embeds: bool = True
     return_dict: bool = False
     use_labels: bool = False
 
