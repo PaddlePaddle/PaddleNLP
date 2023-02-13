@@ -23,6 +23,15 @@ from paddlenlp.transformers.auto.modeling import get_name_mapping
 from paddlenlp.utils.import_utils import import_module
 
 
+def _load_text_image_model_names() -> List[str]:
+    """load image model names
+
+    Returns:
+        List[str]: the names of text & image model
+    """
+    return ["CLIPModel", "CLIPChineseModel", "ErnieViLModel"]
+
+
 def _load_text_model_names() -> List[str]:
     """load text model names
 
@@ -30,7 +39,9 @@ def _load_text_model_names() -> List[str]:
         List[str]: the names of text model
     """
     model = get_name_mapping("Model")
-    return {value for key, value in model.items() if key.endswith("Model_Import_Class")}
+    return [
+        value for key, value in model.items() if key.endswith("Model_Import_Class")
+    ] + _load_text_image_model_names()
 
 
 def _load_image_model_names() -> List[str]:
@@ -43,16 +54,7 @@ def _load_image_model_names() -> List[str]:
         "ErnieViLVisionModel",
         "CLIPViLVisionModel",
         "ChineseCLIPViLVisionModel",
-    ]
-
-
-def _load_text_image_model_names() -> List[str]:
-    """load image model names
-
-    Returns:
-        List[str]: the names of text & image model
-    """
-    return ["CLIPModel", "CLIPChineseModel", "ErnieViLModel"]
+    ] + _load_text_image_model_names()
 
 
 class AutoConfig:
@@ -95,7 +97,7 @@ class AutoConfig:
 class EncoderConfig(PretrainedConfig):
 
     mode_mapping: Dict[str, List[str]] = {
-        "text": _load_text_model_names(),
+        "text": list(_load_text_model_names()),
         "text_image": _load_text_image_model_names(),
         "image": _load_image_model_names(),
     }
@@ -105,7 +107,7 @@ class EncoderConfig(PretrainedConfig):
         pretrained_model_name_or_path,
         architecture: str,
         mode: str | list[str] | None = None,
-        embedding_type: str = "pool",
+        embedding_type: str = "pooler",
     ):
         super().__init__()
         self.pretrained_model_name_or_path = pretrained_model_name_or_path
@@ -122,6 +124,8 @@ class EncoderConfig(PretrainedConfig):
         if not config.architectures:
             for model_name in _load_text_model_names():
                 model_module = import_module(f"paddlenlp.transformers.{model_name}")
+                if not inspect.isclass(model_module):
+                    continue
                 # TODO(wj-Mcat): assume that `pretrained_model_name_or_path` is name not dir
                 if (
                     issubclass(model_module, PretrainedModel)
@@ -130,14 +134,13 @@ class EncoderConfig(PretrainedConfig):
                     config.architectures = [model_name]
                     break
 
-        architecture = None
         if not mode and config.architectures:
-            architecture = config.architectures
-            if architecture in mode.mapping["text_image"]:
+            architecture = config.architectures[0]
+            if architecture in cls.mode_mapping["text_image"]:
                 mode = "text_image"
-            elif architecture in mode.mapping["text"]:
+            elif architecture in cls.mode_mapping["text"]:
                 mode = "text"
-            elif architecture in mode.mapping["image"]:
+            elif architecture in cls.mode_mapping["image"]:
                 mode = "image"
 
         # TODO(wj-Mcat): check the configuration of EncoderConfig
@@ -152,6 +155,8 @@ class Encoder(nn.Layer):
     @staticmethod
     def from_pretrained(pretrained_model_name_or_path: str, mode: str | list[str] | None = None, **kwargs):
         config = EncoderConfig.from_pretrained(pretrained_model_name_or_path, mode=mode, **kwargs)
+        if not config.mode:
+            raise ValueError(f"mode of model from <{pretrained_model_name_or_path}> should not be None.")
         if "text_image" in config.mode:
             return TextImageEncoder(config)
         if "text" in config.mode:
@@ -162,23 +167,31 @@ class Encoder(nn.Layer):
 
 
 class _TextFeatureMixin:
+    # map the special feature method
+    feature_method_mapping = {}
+    text_method_name = None
+
     def get_text_features(self, *args, **kwargs):
+        kwargs["return_dict"] = True
+        text_method_name = self.text_method_name or "forward"
+
         # resolve text features
-        attribute = getattr(self.model, "get_text_features", None)
-        if attribute is not None:
-            if not inspect.ismethod(attribute):
-                raise ValueError("`get_text_features` is not a method")
-
-            return self.model.get_text_features(*args, **kwargs)
-
         model_class_name = self.model.__class__.__name__
 
-        # TODO(wj-Mcat): should support detecting features
-        if model_class_name not in self.get_features_mapping:
-            raise ValueError(f"<{model_class_name}> not supported `get_text_features`")
+        method_name = self.feature_method_mapping.get(model_class_name, text_method_name)
+        method = getattr(self.model, method_name, None)
+        if method is None:
+            raise ValueError(f"<{model_class_name}> not supported `{text_method_name}`")
 
-        attribute = getattr(self.model, self.get_features_mapping[model_class_name]["get_text_features"])
-        return attribute(*args, **kwargs)
+        if not inspect.ismethod(method):
+            raise ValueError(f"<{method}> is not the method")
+
+        output = method(*args, **kwargs)
+
+        if self.config.embedding_type == "cls":
+            return output.last_hidden_state[:, 0, :]
+        if self.config.embedding_type == "pooler":
+            return output.pooler_output
 
 
 class TextEncoder(Encoder, _TextFeatureMixin):
@@ -192,23 +205,24 @@ class TextEncoder(Encoder, _TextFeatureMixin):
 
 
 class _ImageFeatureMixin:
+    # map the special feature method
+    feature_method_mapping = {}
+    image_method_name: str | None = None
+
     def get_image_features(self, *args, **kwargs):
+        image_method_name = self.image_method_name or "forwrad"
         # resolve image features
-        attribute = getattr(self.model, "get_image_features", None)
-        if attribute is not None:
-            if not inspect.ismethod(attribute):
-                raise ValueError("`get_image_features` is not a method")
-
-            return self.model.get_image_features(*args, **kwargs)
-
         model_class_name = self.model.__class__.__name__
 
-        # TODO(wj-Mcat): should support detecting features
-        if model_class_name not in self.get_features_mapping:
+        method_name = self.feature_method_mapping.get(model_class_name, image_method_name)
+        method = getattr(self.model, method_name, None)
+        if method is None:
             raise ValueError(f"<{model_class_name}> not supported `get_image_features`")
 
-        attribute = getattr(self.model, self.get_features_mapping[model_class_name]["get_image_features"])
-        return attribute(*args, **kwargs)
+        if not inspect.ismethod(method):
+            raise ValueError(f"<{method}> is not the method")
+
+        return method(*args, **kwargs)
 
 
 class ImageEncoder(Encoder, _ImageFeatureMixin):
@@ -225,6 +239,9 @@ class ImageEncoder(Encoder, _ImageFeatureMixin):
 class TextImageEncoder(Encoder, _TextFeatureMixin, _ImageFeatureMixin):
     def __init__(self, config: EncoderConfig):
         super().__init__(config)
+        import pdb
+
+        pdb.set_trace()
         model_class = import_module(f"paddlenlp.transformers.{config.architecture}")
         self.model = model_class.from_pretrained(config.pretrained_model_name_or_path)
 
