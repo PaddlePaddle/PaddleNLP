@@ -15,14 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
+
 from ...transformers import PretrainedModel, register_base_model
-from ..generation_utils import BeamSearchScorer
-import math
 from ...utils.log import logger
+from ..generation_utils import BeamSearchScorer
 
 __all__ = [
     "DalleBartModel",
@@ -1119,7 +1121,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
         num_return_sequences=1,
         diversity_rate=0.0,
         use_cache=True,
-        use_faster=False,
+        use_fast=False,
         use_fp16_decoding=False,
         condition_scale=1.0,
         **model_kwargs
@@ -1190,10 +1192,10 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to
                 speed up decoding. Default to True.
-            use_faster: (bool, optional): Whether to use faster entry of model
-                for FasterGeneration. Default to False.
+            use_fast: (bool, optional): Whether to use fast entry of model
+                for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when faster entry is avalible. Default to False.
+                Only works when fast entry is avalible. Default to False.
             condition_scale (float, optional): The scale of super conditioning. See
                 `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__
                 Default to 1.0.
@@ -1274,17 +1276,17 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             else getattr(self, "decoder_start_token_id", None)
         )
 
-        if getattr(self, "_faster_entry", None) is not False and use_faster:
+        if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
             args.pop("__class__", None)
             model_kwargs = args.pop("model_kwargs")
             args.update(model_kwargs)
             try:
-                if not hasattr(self, "_faster_entry"):
-                    self._build_faster(args)
-                if self._faster_entry:
-                    output = self._faster_entry(**args)
+                if not hasattr(self, "_fast_entry"):
+                    self._build_fast(args)
+                if self._fast_entry:
+                    output = self._fast_entry(**args)
                     if isinstance(output, tuple):
                         output_ids, dummy_srore = output
                     else:
@@ -1302,10 +1304,10 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
 
             except Exception as e:
                 args["model_kwargs"] = model_kwargs
-                # Prevent self._convert_to_faster to throw Exception
-                self._convert_to_faster(args)
+                # Prevent self._convert_to_fast to throw Exception
+                self._convert_to_fast(args)
                 logger.warning(e)
-                logger.warning("FasterGeneration is not available, " "and the original version would be used instead.")
+                logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
 
         # params check
         if input_ids is None:

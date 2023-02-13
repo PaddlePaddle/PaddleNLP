@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.framework import core
-import numpy as np
 from collections import OrderedDict
 
-from paddle.fluid.framework import in_dygraph_mode, _in_legacy_dygraph
-
-if in_dygraph_mode():
-    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_storage import ParamStorage, GradStorage
-elif _in_legacy_dygraph():
-    from paddle.distributed.fleet.utils.internal_storage import ParamStorage, GradStorage
-
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import Type
+import numpy as np
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_storage import (
+    GradStorage,
+    ParamStorage,
+)
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import Type
+from paddle.framework import core
 
 alignment = {
     "gpu": 256,
@@ -37,10 +34,7 @@ align = {
 def assign_group_by_size(parameters, group_size=256 * 1024 * 1024):
     is_sparse_gradient = [False] * len(parameters)
 
-    if in_dygraph_mode():
-        group_indices = core.eager_assign_group_by_size(parameters, is_sparse_gradient, [group_size, group_size])
-    elif _in_legacy_dygraph():
-        group_indices = core.assign_group_by_size(parameters, is_sparse_gradient, [group_size, group_size])
+    group_indices = core.eager_assign_group_by_size(parameters, is_sparse_gradient, [group_size, group_size])
 
     var_groups = OrderedDict()
     for group_idx, indices in enumerate(group_indices):

@@ -12,109 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import math
+import argparse
 import json
+import math
 import random
-from tqdm import tqdm
+import re
 
 import numpy as np
 import paddle
-from paddlenlp.utils.log import logger
+from tqdm import tqdm
 
-MODEL_MAP = {
-    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default Chinese model.
-    "uie-base": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-        }
-    },
-    "uie-medium": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-        }
-    },
-    "uie-mini": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-        }
-    },
-    "uie-micro": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-        }
-    },
-    "uie-nano": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-        }
-    },
-    # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
-    "uie-tiny": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
-        }
-    },
-    "uie-base-en": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json",
-        }
-    },
-    "uie-m-base": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/tokenizer_config.json",
-            "sentencepiece_model_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
-        }
-    },
-    "uie-m-large": {
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
-            "vocab_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
-            "special_tokens_map": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/special_tokens_map.json",
-            "tokenizer_config": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/tokenizer_config.json",
-            "sentencepiece_model_file": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model",
-        }
-    },
-}
+from paddlenlp.utils.log import logger
 
 
 def set_seed(seed):
     paddle.seed(seed)
     random.seed(seed)
     np.random.seed(seed)
+
+
+def str2bool(v):
+    """Support bool type for argparse."""
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
@@ -383,8 +307,8 @@ def convert_cls_examples(raw_examples, prompt_prefix="情感倾向", options=["�
     Convert labeled data export from doccano for classification task.
     """
     examples = []
-    logger.info(f"Converting doccano data...")
-    with tqdm(total=len(raw_examples)) as pbar:
+    logger.info("Converting doccano data...")
+    with tqdm(total=len(raw_examples)):
         for line in raw_examples:
             items = json.loads(line)
             # Compatible with doccano >= 1.6.2
@@ -429,7 +353,7 @@ def convert_ext_examples(
     inverse_relation_list = []
     predicate_list = []
 
-    logger.info(f"Converting doccano data...")
+    logger.info("Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
@@ -571,7 +495,7 @@ def convert_ext_examples(
             predicate_list.append(predicates)
             pbar.update(1)
 
-    logger.info(f"Adding negative samples for first stage prompt...")
+    logger.info("Adding negative samples for first stage prompt...")
     positive_examples, negative_examples = add_entity_negative_example(
         entity_examples, texts, entity_prompts, entity_label_set, negative_ratio
     )
@@ -582,7 +506,7 @@ def convert_ext_examples(
 
     all_relation_examples = []
     if len(predicate_set) != 0:
-        logger.info(f"Adding negative samples for second stage prompt...")
+        logger.info("Adding negative samples for second stage prompt...")
         if is_train:
 
             positive_examples = []
@@ -706,7 +630,7 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
     if multilingual:
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
+            "position_ids": encoded_inputs["position_ids"],
             "start_positions": start_ids,
             "end_positions": end_ids,
         }
@@ -714,8 +638,8 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
             "token_type_ids": encoded_inputs["token_type_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
-            "att_mask": encoded_inputs["attention_mask"],
+            "position_ids": encoded_inputs["position_ids"],
+            "attention_mask": encoded_inputs["attention_mask"],
             "start_positions": start_ids,
             "end_positions": end_ids,
         }

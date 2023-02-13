@@ -14,11 +14,14 @@
 
 import argparse
 
-from termcolor import colored, cprint
 import paddle
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from termcolor import colored, cprint
+from utils import print_args, select_response, set_seed
 
-from utils import print_args, set_seed, select_response
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 # yapf: disable
@@ -75,7 +78,7 @@ def interaction(args, model, tokenizer):
                 length_penalty=args.length_penalty,
                 early_stopping=args.early_stopping,
                 num_return_sequences=args.num_return_sequences,
-                use_faster=True,
+                use_fast=True,
             )
             bot_response = select_response(
                 ids, scores, tokenizer, args.max_dec_len, args.num_return_sequences, keep_space=False
@@ -91,7 +94,6 @@ def main(args):
         set_seed(args.seed)
 
     # Initialize the model and tokenizer
-    model_name_or_path = "plato-mini"
     model = UnifiedTransformerLMHeadModel.from_pretrained(args.model_name_or_path)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(args.model_name_or_path)
 

@@ -12,24 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import copy
-import uuid
-import math
-import json
-import gzip
-import tqdm
-import random
-import pickle
-import re
 import base64
-from functools import cmp_to_key
+import random
+import re
+import uuid
 from collections.abc import Sequence
-from PIL import Image
+from functools import cmp_to_key
 from io import BytesIO
+
 import numpy as np
-from .log import logger
+from PIL import Image
 
 
 class BaseOperator(object):
@@ -119,8 +111,7 @@ class ResizeImage(BaseOperator):
         resize_w = selected_size
         resize_h = selected_size
 
-        im = im.astype("uint8")
-        im = Image.fromarray(im)
+        im = Image.fromarray(im.astype("uint8"))
         im = im.resize((int(resize_w), int(resize_h)), self.interp)
         sample["image"] = np.array(im)
         return sample
@@ -159,7 +150,7 @@ class Permute(BaseOperator):
 
 
 class NormalizeImage(BaseOperator):
-    def __init__(self, mean=[0.485, 0.456, 0.406], std=[1, 1, 1], is_channel_first=True):
+    def __init__(self, mean=[0.485, 0.456, 0.406], std=[1, 1, 1], is_channel_first=True, is_scale=False):
         """
         Args:
             mean (list): the pixel mean
@@ -170,6 +161,7 @@ class NormalizeImage(BaseOperator):
         self.mean = mean
         self.std = std
         self.is_channel_first = is_channel_first
+        self.is_scale = is_scale
         from functools import reduce
 
         if reduce(lambda x, y: x * y, self.std) == 0:
@@ -197,6 +189,8 @@ class NormalizeImage(BaseOperator):
                     else:
                         mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
                         std = np.array(self.std)[np.newaxis, np.newaxis, :]
+                    if self.is_scale:
+                        im = im / 255.0
                     im -= mean
                     im /= std
                     sample[k] = im
@@ -258,6 +252,29 @@ def img2base64(img_path):
     with open(img_path, "rb") as f:
         base64_str = base64.b64encode(f.read()).decode("utf-8")
     return base64_str
+
+
+def np2base64(image_np):
+    img = Image.fromarray(image_np)
+    base64_str = pil2base64(img)
+    return base64_str
+
+
+def pil2base64(image, image_type=None, size=False):
+    if not image_type:
+        image_type = "JPEG"
+    img_buffer = BytesIO()
+    image.save(img_buffer, format=image_type)
+
+    byte_data = img_buffer.getvalue()
+    base64_str = base64.b64encode(byte_data)
+
+    base64_string = base64_str.decode("utf-8")
+
+    if size:
+        return base64_string, image.size
+    else:
+        return base64_string
 
 
 class Bbox(object):

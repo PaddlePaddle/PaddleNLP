@@ -95,6 +95,7 @@ def parse_flag_from_env(key, default=False):
 
 
 _run_slow_tests = parse_flag_from_env("RUN_SLOW", default=False)
+_run_nightly_tests = parse_flag_from_env("RUN_NIGHTLY", default=False)
 
 
 def floats_tensor(shape, scale=1.0, rng=None, name=None):
@@ -128,6 +129,14 @@ def require_paddle(test_case):
     Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
     """
     return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
+
+
+def nightly(test_case):
+    """
+    Decorator marking a test that runs nightly in the diffusers CI.
+    Slow tests are skipped by default. Set the RUN_NIGHTLY environment variable to a truthy value to run them.
+    """
+    return unittest.skipUnless(_run_nightly_tests, "test is nightly")(test_case)
 
 
 def require_fastdeploy(test_case):

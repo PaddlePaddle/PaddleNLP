@@ -19,13 +19,12 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import VersatileDiffusionTextToImagePipeline
 from ppdiffusers.utils.testing_utils import slow
 
 
-class VersatileDiffusionTextToImagePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class VersatileDiffusionTextToImagePipelineFastTests(unittest.TestCase):
     pass
 
 

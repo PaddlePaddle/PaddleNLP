@@ -17,7 +17,7 @@ norm_train:../examples/machine_translation/transformer/train.py --config ../exam
 pact_train:null
 fpgm_train:null
 distill_train:null
-to_static_train:--to_static
+null:null
 null:null
 ##
 ===========================eval_params=========================== 
@@ -49,6 +49,8 @@ null:null
 null:null
 null:null
 null:null
+===========================to_static_train_benchmark_params===========================
+to_static_train:--to_static
 ===========================train_benchmark_params==========================
 batch_size:5120|4096
 fp_items:fp32|fp16

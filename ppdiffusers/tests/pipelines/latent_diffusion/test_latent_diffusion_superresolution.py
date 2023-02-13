@@ -18,13 +18,12 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DDIMScheduler, LDMSuperResolutionPipeline, UNet2DModel, VQModel
 from ppdiffusers.utils import PIL_INTERPOLATION, floats_tensor, load_image, slow
 
 
-class LDMSuperResolutionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class LDMSuperResolutionPipelineFastTests(unittest.TestCase):
     @property
     def dummy_image(self):
         batch_size = 1

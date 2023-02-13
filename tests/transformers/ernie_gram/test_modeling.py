@@ -14,21 +14,22 @@
 # limitations under the License.
 
 import unittest
-from typing import Optional, Tuple, Dict, Any
+from dataclasses import Field, dataclass, fields
+from typing import Any, Dict, Optional, Tuple
+
 import paddle
 from paddle import Tensor
 
-from dataclasses import dataclass, asdict, fields, Field
 from paddlenlp.transformers import (
-    ErnieGramModel,
-    ErnieGramPretrainedModel,
+    ErnieGramForQuestionAnswering,
     ErnieGramForSequenceClassification,
     ErnieGramForTokenClassification,
-    ErnieGramForQuestionAnswering,
+    ErnieGramModel,
+    ErnieGramPretrainedModel,
 )
 
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 @dataclass
@@ -36,14 +37,14 @@ class ErnieGramTestModelConfig:
     """ernie-gram model config which keep consist with pretrained_init_configuration sub fields"""
 
     attention_probs_dropout_prob: float = 0.1
-    emb_size: int = 768
+    emb_size: int = 8
     hidden_act: str = "gelu"
     hidden_dropout_prob: float = 0.1
-    hidden_size: int = 768
+    hidden_size: int = 8
     initializer_range: float = 0.02
     max_position_embeddings: int = 512
-    num_attention_heads: int = 12
-    num_hidden_layers: int = 12
+    num_attention_heads: int = 2
+    num_hidden_layers: int = 2
     type_vocab_size: int = 2
     vocab_size: int = 1801
 
@@ -387,7 +388,6 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
-        past_key_value = output.past_key_values[0][0]
         expected_shape = [1, 11, 768]
         self.assertEqual(output[0].shape, expected_shape)
         expected_slice = paddle.to_tensor(

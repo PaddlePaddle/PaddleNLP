@@ -12,65 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 from functools import partial
 
 import paddle
+from utils import DataArguments, ModelArguments, load_config, seq_convert_example
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
-from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from paddlenlp.utils.log import logger
-
-sys.path.append("../ernie-1.0/finetune")
-from sequence_classification import seq_trans_fn, clue_trans_fn
-from utils import ALL_DATASETS, DataArguments, ModelArguments
+from paddlenlp.trainer import CompressionArguments, PdArgumentParser, Trainer
+from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, compression_args = parser.parse_args_into_dataclasses()
 
+    # Log model and data config
+    model_args, data_args, compression_args = load_config(
+        model_args.config, "SequenceClassification", data_args.dataset, model_args, data_args, compression_args
+    )
+
     paddle.set_device(compression_args.device)
 
     data_args.dataset = data_args.dataset.strip()
-
-    if data_args.dataset in ALL_DATASETS:
-        # If you custom you hyper-parameters in yaml config, it will overwrite all args.
-        config = ALL_DATASETS[data_args.dataset]
-        logger.info("Over-writing compression config by yaml config!")
-        for args in (model_args, data_args, compression_args):
-            for arg in vars(args):
-                if arg in config.keys():
-                    setattr(args, arg, config[arg])
-
-        compression_args.per_device_train_batch_size = config["batch_size"]
-        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
     compression_args.print_config(model_args, "Model")
     compression_args.print_config(data_args, "Data")
 
-    dataset_config = data_args.dataset.split(" ")
-    raw_datasets = load_dataset(
-        dataset_config[0], None if len(dataset_config) <= 1 else dataset_config[1], splits=("train", "dev", "test")
-    )
+    raw_datasets = load_dataset("clue", data_args.dataset)
 
     data_args.label_list = getattr(raw_datasets["train"], "label_list", None)
-    num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
+    num_classes = len(raw_datasets["train"].label_list)
 
     criterion = paddle.nn.CrossEntropyLoss()
     # Defines tokenizer, model, loss function.
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = ErnieForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
 
     # Defines dataset pre-process function
-    if "clue" in data_args.dataset:
-        trans_fn = partial(clue_trans_fn, tokenizer=tokenizer, args=data_args)
-    else:
-        trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
+    trans_fn = partial(
+        seq_convert_example, tokenizer=tokenizer, label_list=data_args.label_list, max_seq_len=data_args.max_seq_length
+    )
 
     # Defines data collector
     data_collator = DataCollatorWithPadding(tokenizer)

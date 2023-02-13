@@ -21,13 +21,17 @@ from diffusers import AltDiffusionPipeline as DiffusersAltDiffusionPipeline
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
-    CLIPVisionModel,
+    CLIPVisionConfig,
     XLMRobertaTokenizer,
 )
 from ppdiffusers import AltDiffusionPipeline as PPDiffusersAltDiffusionPipeline
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    HeunDiscreteScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
     UNet2DConditionModel,
@@ -228,11 +232,13 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     )
 
     # 1. vae
-    pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
+    pp_vae = AutoencoderKL.from_config(diffusers_pipe.vae.config)
+
     pp_vae.set_dict(vae_state_dict)
 
     # 2. unet
-    pp_unet = UNet2DConditionModel(**diffusers_pipe.unet.config)
+    pp_unet = UNet2DConditionModel.from_config(diffusers_pipe.unet.config)
+
     pp_unet.set_dict(unet_state_dict)
 
     # 3. text_encoder
@@ -241,36 +247,43 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
     # 4. safety_checker
-    pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionModel(**safety_checker_config))
+    pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionConfig.from_dict(safety_checker_config))
     pp_safety_checker.set_dict(safety_checker_state_dict)
 
     # 5. scheduler
     beta_start = diffusers_pipe.scheduler.beta_start
     beta_end = diffusers_pipe.scheduler.beta_end
+    num_train_timesteps = diffusers_pipe.scheduler.num_train_timesteps
     scheduler_type = diffusers_pipe.scheduler._class_name.lower()
-    if "pndm" in scheduler_type:
-        pp_scheduler = PNDMScheduler(
-            beta_start=beta_start,
-            beta_end=beta_end,
-            beta_schedule="scaled_linear",
-            # Make sure the scheduler compatible with DDIM
-            set_alpha_to_one=False,
-            steps_offset=1,
-            # Make sure the scheduler compatible with PNDM
-            skip_prk_steps=True,
-        )
-    elif "lms" in scheduler_type:
-        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start, beta_end=beta_end, beta_schedule="scaled_linear")
-    elif "ddim" in scheduler_type:
-        pp_scheduler = DDIMScheduler(
-            beta_start=beta_start,
-            beta_end=beta_end,
-            beta_schedule="scaled_linear",
-            # Make sure the scheduler compatible with DDIM
-            clip_sample=False,
-            set_alpha_to_one=False,
-            steps_offset=1,
-        )
+
+    scheduler = DDIMScheduler(
+        beta_end=beta_end,
+        beta_schedule="scaled_linear",
+        beta_start=beta_start,
+        num_train_timesteps=num_train_timesteps,
+        steps_offset=1,
+        clip_sample=False,
+        set_alpha_to_one=False,
+    )
+    # make sure scheduler works correctly with DDIM
+    scheduler.register_to_config(clip_sample=False)
+
+    if scheduler_type == "pndm":
+        config = dict(scheduler.config)
+        config["skip_prk_steps"] = True
+        scheduler = PNDMScheduler.from_config(config)
+    elif scheduler_type == "lms":
+        scheduler = LMSDiscreteScheduler.from_config(scheduler.config)
+    elif scheduler_type == "heun":
+        scheduler = HeunDiscreteScheduler.from_config(scheduler.config)
+    elif scheduler_type == "euler":
+        scheduler = EulerDiscreteScheduler.from_config(scheduler.config)
+    elif scheduler_type == "euler-ancestral":
+        scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
+    elif scheduler_type == "dpm":
+        scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
+    elif scheduler_type == "ddim":
+        scheduler = scheduler
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
@@ -291,7 +304,7 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             unet=pp_unet,
             safety_checker=pp_safety_checker,
             feature_extractor=pp_feature_extractor,
-            scheduler=pp_scheduler,
+            scheduler=scheduler,
         )
         # 9. save_pretrained
         paddle_pipe.save_pretrained(output_path)

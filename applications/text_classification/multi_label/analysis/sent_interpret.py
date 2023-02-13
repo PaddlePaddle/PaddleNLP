@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
-import random
-import os
 import argparse
-import numpy as np
+import functools
+import os
+import random
 
+import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddle.io import DataLoader, BatchSampler
+from paddle.io import BatchSampler, DataLoader
+from trustai.interpretation import FeatureSimilarityModel
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer, LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.utils.log import logger
-from trustai.interpretation import FeatureSimilarityModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -98,11 +98,7 @@ def find_positive_influence_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:

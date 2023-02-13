@@ -14,25 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import random
-import six
 import base64
-import hashlib
 import collections
-from PIL import Image
-import editdistance
-from seqeval.metrics.sequence_labeling import get_entities
+import hashlib
+import random
+
 import cv2
-import scipy
-import numpy as np
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import EvalPrediction
-
 import datasets
+import editdistance
+import numpy as np
+import scipy
+import six
+from PIL import Image
+from seqeval.metrics.sequence_labeling import get_entities
 
-from data_collator import DataCollator
+from paddlenlp.trainer import EvalPrediction
 
 
 def _get_md5(string):
@@ -116,8 +112,6 @@ def _permute(im, channel_first=True, to_bgr=False):
 def _str2im(
     im_base64,
     target_size=224,
-    mean=[103.530, 116.280, 123.675],
-    std=[57.375, 57.120, 58.395],
 ):
     # Step1: decode image
     origin_im = _decode_image(im_base64)

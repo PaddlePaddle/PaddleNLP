@@ -26,7 +26,7 @@ except ImportError:
     )
 from transformers import CLIPTextModel as HFCLIPTextModel
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -699,7 +699,7 @@ if __name__ == "__main__":
     clip = HFCLIPTextModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
     ppdiffusers_clip_checkpoint, clip_config = convert_hf_clip_to_ppnlp_clip(clip, layer_idx)
 
-    text_encoder = CLIPTextModel(**clip_config)
+    text_encoder = CLIPTextModel(CLIPTextConfig.from_dict(clip_config))
     text_encoder.load_dict(ppdiffusers_clip_checkpoint)
 
     # 5. load tokenizer.

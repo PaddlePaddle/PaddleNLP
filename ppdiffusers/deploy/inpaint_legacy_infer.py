@@ -18,6 +18,8 @@ import time
 from io import BytesIO
 
 import fastdeploy as fd
+import numpy as np
+import paddle
 import PIL
 import requests
 from fastdeploy import ModelFormat
@@ -56,15 +58,23 @@ def parse_arguments():
         type=str,
         default="paddle",
         # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
-        choices=[
-            "onnx_runtime",
-            "paddle",
-        ],
+        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
-        "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
+        "--device",
+        type=str,
+        default="gpu",
+        # Note(shentanyue): Will support more devices.
+        choices=[
+            "cpu",
+            "gpu",
+            "huawei_ascend_npu",
+            "kunlunxin_xpu",
+        ],
+        help="The inference runtime device of models.",
     )
+    parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
@@ -123,6 +133,29 @@ def create_paddle_inference_runtime(
     return fd.Runtime(option)
 
 
+def create_paddle_lite_runtime(model_dir, model_prefix, device="cpu", device_id=0):
+    option = fd.RuntimeOption()
+    option.use_lite_backend()
+    if device == "huawei_ascend_npu":
+        option.use_ascend()
+        option.set_lite_device_names(["huawei_ascend_npu"])
+        option.set_lite_model_cache_dir(os.path.join(model_dir, model_prefix))
+        option.set_lite_context_properties(
+            "HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={};HUAWEI_ASCEND_NPU_PRECISION_MODE=allow_mix_precision".format(
+                device_id
+            )
+        )
+    elif device == "kunlunxin_xpu":
+        # TODO(shentanyue): Add kunlunxin_xpu code
+        pass
+    else:
+        pass
+    model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
+    params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")
+    option.set_model_path(model_file, params_file)
+    return fd.Runtime(option)
+
+
 def create_trt_runtime(model_dir, model_prefix, model_format, workspace=(1 << 31), dynamic_shape=None, device_id=0):
     option = fd.RuntimeOption()
     option.use_trt_backend()
@@ -167,6 +200,13 @@ def get_scheduler(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # 0. Init device id
+    device_id = args.device_id
+    if args.device == "cpu":
+        device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -211,24 +251,24 @@ if __name__ == "__main__":
     # 4. Init runtime
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_ort_runtime(
-            args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.vae_encoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.vae_encoder_model_prefix, args.model_format, device_id=device_id
         )
         start = time.time()
         unet_runtime = create_ort_runtime(
-            args.model_dir, args.unet_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
         use_trt = True if args.backend == "paddle-tensorrt" else False
         # Note(zhoushunjie): Will change to paddle runtime later
         text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -236,7 +276,7 @@ if __name__ == "__main__":
             use_trt,
             vae_decoder_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         vae_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -244,7 +284,7 @@ if __name__ == "__main__":
             use_trt,
             vae_encoder_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
@@ -253,7 +293,7 @@ if __name__ == "__main__":
             use_trt,
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":
@@ -264,7 +304,7 @@ if __name__ == "__main__":
             args.model_format,
             workspace=(1 << 30),
             dynamic_shape=vae_decoder_dynamic_shape,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         vae_encoder_runtime = create_trt_runtime(
             args.model_dir,
@@ -272,7 +312,7 @@ if __name__ == "__main__":
             args.model_format,
             workspace=(1 << 30),
             dynamic_shape=vae_encoder_dynamic_shape,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         start = time.time()
         unet_runtime = create_trt_runtime(
@@ -280,7 +320,22 @@ if __name__ == "__main__":
             args.unet_model_prefix,
             args.model_format,
             dynamic_shape=unet_dynamic_shape,
-            device_id=args.device_id,
+            device_id=device_id,
+        )
+        print(f"Spend {time.time() - start : .2f} s to load unet model.")
+    elif args.backend == "paddlelite":
+        text_encoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.text_encoder_model_prefix, device=args.device, device_id=device_id
+        )
+        vae_decoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.vae_decoder_model_prefix, device=args.device, device_id=device_id
+        )
+        vae_encoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.vae_encoder_model_prefix, device=args.device, device_id=device_id
+        )
+        start = time.time()
+        unet_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.unet_model_prefix, device=args.device, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
@@ -310,11 +365,27 @@ if __name__ == "__main__":
     mask_image = download_image(mask_url).resize((512, 512))
 
     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
-    images = pipe(
-        prompt=prompt,
-        image=init_image,
-        mask_image=mask_image,
-        num_inference_steps=args.inference_steps,
-    ).images
+    # Warm up
+    pipe(prompt=prompt, image=init_image, mask_image=mask_image, num_inference_steps=10)
 
-    images[0].save("cat_on_bench_new.png")
+    time_costs = []
+    print(f"Run the stable diffusion inpaint legacy pipeline {args.benchmark_steps} times to test the performance.")
+
+    for step in range(args.benchmark_steps):
+        start = time.time()
+        images = pipe(
+            prompt=prompt,
+            image=init_image,
+            mask_image=mask_image,
+            num_inference_steps=args.inference_steps,
+        ).images
+        latency = time.time() - start
+        time_costs += [latency]
+        print(f"No {step:3d} time cost: {latency:2f} s")
+    print(
+        f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+        f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+    )
+
+    images[0].save(args.image_path)
+    print(f"Image saved in {args.image_path}!")

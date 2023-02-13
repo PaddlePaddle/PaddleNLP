@@ -19,7 +19,6 @@ import paddle.nn as nn
 from paddle import Tensor
 
 from .. import PretrainedModel, register_base_model
-from ..ernie.modeling import ErniePooler
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
     QuestionAnsweringModelOutput,
@@ -99,6 +98,21 @@ class ErnieGramEmbeddings(nn.Layer):
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
+
+class ErnieGramPooler(nn.Layer):
+    def __init__(self, hidden_size, weight_attr=None):
+        super(ErnieGramPooler, self).__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size, weight_attr=weight_attr)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
 
 
 class ErnieGramPretrainedModel(PretrainedModel):
@@ -264,7 +278,7 @@ class ErnieGramModel(ErnieGramPretrainedModel):
             act_dropout=0,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = ErniePooler(hidden_size)
+        self.pooler = ErnieGramPooler(hidden_size)
         self.apply(self.init_weights)
 
     def forward(

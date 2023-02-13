@@ -12,25 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
 import random
 import time
 
+import lr
 import numpy as np
 import paddle
-from visualdl import LogWriter
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.utils.log import logger
-from paddlenlp.utils import profiler
-from paddlenlp.ops import Topology
-
-from dataset import create_pretrained_dataset
 from args import parse_args
-import lr
-from paddle.distributed import fleet
+from dataset import create_pretrained_dataset
+from visualdl import LogWriter
+
+from paddlenlp.ops import Topology
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTConfig,
+    GPTForPretraining,
+    GPTPretrainingCriterion,
+    GPTTokenizer,
+)
+from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -130,7 +132,7 @@ def do_train(args):
         model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-        model = GPTForPretraining(GPTModel(**model_config))
+        model = GPTForPretraining(GPTConfig(**model_config))
     else:
         model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,
@@ -195,7 +197,6 @@ def do_train(args):
 
     global_step = 0
     epoch = 0
-    tic_train = time.time()
     while True:
         files = get_train_data_file(args)
         files.sort()
@@ -275,7 +276,6 @@ def do_train(args):
                     log_writer.add_scalar("loss", loss_numpy, global_step)
                     log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
 
-                    tic_train = time.time()
                     train_reader_cost = 0.0
                     train_run_cost = 0.0
 

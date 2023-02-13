@@ -15,10 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Tuple
-
-from fast_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from fast_tokenizer.models import WordPiece, FastWordPiece, BPE, Unigram
+from fast_tokenizer import (
+    Tokenizer,
+    decoders,
+    normalizers,
+    postprocessors,
+    pretokenizers,
+)
+from fast_tokenizer.models import BPE, FastWordPiece, Unigram
 
 
 # Extract the vocab and merge file from sentencepiece file
@@ -127,12 +131,12 @@ class SpmConverter(Converter):
         return proto.trainer_spec.unk_id
 
     def tokenizer(self, proto):
-        model_type = proto.trainer_spec.model_type
+        self.model_type = proto.trainer_spec.model_type
         vocab = self.vocab(proto)
         unk_id = self.unk_id(proto)
-        if model_type == 1:
+        if self.model_type == 1:
             tokenizer = Tokenizer(Unigram(vocab, unk_id))
-        elif model_type == 2:
+        elif self.model_type == 2:
             # Special case for ernie-m
             if hasattr(self.original_tokenizer, "sentencepiece_model_file"):
                 orginal_vocab_file = self.original_tokenizer.sentencepiece_model_file
@@ -200,13 +204,15 @@ class SpmConverter(Converter):
 class ErnieMConverter(SpmConverter):
     def set_model(self, tokenizer):
         SPLICE_UNDERLINE = self.replacement()
-        tokenizer.model.set_filter_token(SPLICE_UNDERLINE)
-        chinese_chars = r"\x{4e00}-\x{9fff}"
-        punc_chars = r",;:.?!~，；：。？！《》【】"
-        digits = r"0-9"
-        tokenizer.model.set_split_rule(
-            rf"[{chinese_chars}]|[{punc_chars}]|[{digits}]+|[^{chinese_chars}{punc_chars}{digits}]+"
-        )
+        if self.model_type == 1:
+            # Unigram
+            tokenizer.model.set_filter_token(SPLICE_UNDERLINE)
+            chinese_chars = r"\x{4e00}-\x{9fff}"
+            punc_chars = r",;:.?!~，；：。？！《》【】"
+            digits = r"0-9"
+            tokenizer.model.set_split_rule(
+                rf"[{chinese_chars}]|[{punc_chars}]|[{digits}]+|[^{chinese_chars}{punc_chars}{digits}]+"
+            )
 
     def normalizer(self, proto):
         list_normalizers = []

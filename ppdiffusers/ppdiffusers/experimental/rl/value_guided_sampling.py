@@ -22,6 +22,21 @@ from ...utils.dummy_paddle_objects import DDPMScheduler
 
 
 class ValueGuidedRLPipeline(DiffusionPipeline):
+    r"""
+    This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
+    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    Pipeline for sampling actions from a diffusion model trained to predict sequences of states.
+    Original implementation inspired by this repository: https://github.com/jannerm/diffuser.
+
+    Parameters:
+        value_function ([`UNet1DModel`]): A specialized UNet for fine-tuning trajectories base on reward.
+        unet ([`UNet1DModel`]): U-Net architecture to denoise the encoded trajectories.
+        scheduler ([`SchedulerMixin`]):
+            A scheduler to be used in combination with `unet` to denoise the encoded trajectories. Default for this
+            application is [`DDPMScheduler`].
+        env: An environment following the OpenAI gym API to act in. For now only Hopper has pretrained models.
+    """
+
     def __init__(
         self,
         value_function: UNet1DModel,
@@ -77,21 +92,23 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
             for _ in range(n_guide_steps):
                 with paddle.set_grad_enabled(True):
                     x.stop_gradient = False
+                    # permute to match dimension for pre-trained models
                     y = self.value_function(x.transpose([0, 2, 1]), timesteps).sample
                     grad = paddle.autograd.grad([y.sum()], [x])[0]
 
                     posterior_variance = self.scheduler._get_variance(i)
                     model_std = paddle.exp(0.5 * posterior_variance)
                     grad = model_std * grad
+
                 grad[timesteps < 2] = 0
                 x = x.detach()
                 x = x + scale * grad
                 x = self.reset_x0(x, conditions, self.action_dim)
             prev_x = self.unet(x.transpose([0, 2, 1]), timesteps).sample.transpose([0, 2, 1])
-            # TODO: set prediction_type when instantiating the model
+            # TODO: verify deprecation of this kwarg
             x = self.scheduler.step(prev_x, i, x, predict_epsilon=False)["prev_sample"]
 
-            # apply conditions to the trajectory
+            # apply conditions to the trajectory (set the initial state)
             x = self.reset_x0(x, conditions, self.action_dim)
             x = self.to_paddle(x)
         return x, y

@@ -13,20 +13,18 @@
 # limitations under the License.
 
 import collections
-import math
 
-import numpy as np
 import paddle
+import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+from paddle.distributed.fleet import fleet
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.distributed.fleet import fleet
-import paddle.incubate as incubate
 
-from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
+from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = ["GPTModel", "GPTForPretraining", "GPTPretrainingCriterion", "GPTForGeneration"]
 
@@ -154,7 +152,7 @@ class MultiHeadAttention(nn.Layer):
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
 
-            ## if not assign here, assign in While loop
+            # if not assign here, assign in While loop
             # layers.assign(k, cache.k)    # update caches
             # layers.assign(v, cache.v)
 
@@ -220,7 +218,7 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
         # scale dot product attention
-        product = layers.matmul(x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
         if self.training:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
@@ -424,7 +422,7 @@ class TransformerDecoderLayer(nn.Layer):
             if isinstance(cache, self.Cache):
                 attn_output, cache_kv_out = self.self_attn(tgt, attn_mask=tgt_mask, cache=cache.kv)
 
-                ## if not assign here, update caches in While loop
+                # if not assign here, update caches in While loop
                 # layers.assign(cache_kv_out, cache.kv)
                 if use_cache:
                     cache = self.Cache(cache_kv_out)
@@ -1069,7 +1067,7 @@ class GPTForGeneration(GPTPretrainedModel):
             inputs (dict): include src_ids.
                 pos_ids, input_mask and max_dec_len are optional.
         """
-        ######### forward context #########
+        # forward context
         input_ids = inputs["src_ids"]
         position_ids = inputs["pos_ids"] if "pos_ids" in inputs else None
         attention_mask = inputs["input_mask"] if "input_mask" in inputs else None
@@ -1092,13 +1090,12 @@ class GPTForGeneration(GPTPretrainedModel):
         logits, cached_kvs = self.model(input_ids, position_ids, encode_mask, use_cache=True, cache=gen_caches)
 
         next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
-        ####################################
 
         if "max_dec_len" not in inputs:
             max_len = layers.fill_constant([1], dtype=int_type, value=self.max_dec_len, force_cpu=True)
         else:
             max_len = inputs["max_dec_len"]
-        min_len = layers.fill_constant(shape=[1], dtype=int_type, value=self.min_dec_len, force_cpu=True)
+        # min_len = layers.fill_constant(shape=[1], dtype=int_type, value=self.min_dec_len, force_cpu=True)
         step_idx = layers.fill_constant(shape=[1], value=0, dtype="int64", force_cpu=True)
 
         placehold_ids = layers.fill_constant_batch_size_like(
@@ -1108,7 +1105,7 @@ class GPTForGeneration(GPTPretrainedModel):
 
         if "max_dec_len" in inputs:
             max_len = paddle.tensor.creation._memcpy(max_len, place=paddle.CPUPlace())
-        cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
+        # cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
         cond = paddle.less_than(step_idx, max_len)
 
         if attention_mask is not None:

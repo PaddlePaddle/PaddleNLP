@@ -22,7 +22,9 @@ import PIL
 
 from ...utils import (
     BaseOutput,
+    OptionalDependencyNotAvailable,
     is_fastdeploy_available,
+    is_k_diffusion_available,
     is_paddle_available,
     is_paddlenlp_available,
 )
@@ -46,6 +48,16 @@ class StableDiffusionPipelineOutput(BaseOutput):
     nsfw_content_detected: Optional[List[bool]]
 
 
+try:
+    if not (is_paddlenlp_available() and is_paddle_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ...utils.dummy_paddle_and_paddlenlp_objects import (
+        StableDiffusionDepth2ImgPipeline,
+    )
+else:
+    from .pipeline_stable_diffusion_depth2img import StableDiffusionDepth2ImgPipeline
+
 if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_cycle_diffusion import CycleDiffusionPipeline
     from .pipeline_stable_diffusion import StableDiffusionPipeline
@@ -59,15 +71,25 @@ if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_stable_diffusion_upscale import StableDiffusionUpscalePipeline
     from .safety_checker import StableDiffusionSafetyChecker
 
-if is_paddlenlp_available() and is_paddle_available():
-    from .pipeline_stable_diffusion_image_variation import (
-        StableDiffusionImageVariationPipeline,
-    )
-else:
+try:
+    if not (is_paddlenlp_available() and is_paddle_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import (
         StableDiffusionImageVariationPipeline,
     )
+else:
+    from .pipeline_stable_diffusion_image_variation import (
+        StableDiffusionImageVariationPipeline,
+    )
 
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ...utils.dummy_paddle_and_paddlenlp_and_k_diffusion_objects import *  # noqa F403
+else:
+    from .pipeline_stable_diffusion_k_diffusion import StableDiffusionKDiffusionPipeline
 
 if is_paddlenlp_available() and is_fastdeploy_available():
     from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline

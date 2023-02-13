@@ -14,7 +14,8 @@
 
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import ErniePretrainedModel
+
+from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.utils.tools import compare_version
 
@@ -54,9 +55,9 @@ class BiGRUWithCRF(nn.Layer):
 class ErnieCrfForTokenClassification(nn.Layer):
     def __init__(self, ernie, crf_lr=100):
         super().__init__()
-        self.num_classes = ernie.num_classes
+        self.num_labels = ernie.num_labels
         self.ernie = ernie  # allow ernie to be config
-        self.crf = LinearChainCrf(self.num_classes, crf_lr=crf_lr, with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_labels, crf_lr=crf_lr, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 

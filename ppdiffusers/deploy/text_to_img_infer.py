@@ -18,14 +18,15 @@ import time
 
 import fastdeploy as fd
 import numpy as np
+import paddle
 from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
-    EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
     FastDeployStableDiffusionPipeline,
     PNDMScheduler,
+    PreconfigEulerAncestralDiscreteScheduler,
 )
 
 
@@ -48,12 +49,22 @@ def parse_arguments():
         "--backend",
         type=str,
         default="paddle",
-        # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
-        choices=[
-            "onnx_runtime",
-            "paddle",
-        ],
+        # Note(zhoushunjie): Will support 'tensorrt' soon.
+        choices=["onnx_runtime", "paddle", "paddlelite", "paddle_tensorrt"],
         help="The inference runtime backend of unet model and text encoder model.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        # Note(shentanyue): Will support more devices.
+        choices=[
+            "cpu",
+            "gpu",
+            "huawei_ascend_npu",
+            "kunlunxin_xpu",
+        ],
+        help="The inference runtime device of models.",
     )
     parser.add_argument(
         "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
@@ -85,20 +96,30 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0
+    model_dir,
+    model_prefix,
+    use_trt=False,
+    dynamic_shape=None,
+    use_fp16=False,
+    device_id=0,
+    disable_paddle_trt_ops=[],
+    disable_paddle_pass=[],
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
+    option.paddle_infer_option.enable_log_info = True
     if device_id == -1:
         option.use_cpu()
     else:
         option.use_gpu(device_id)
     if use_trt:
-        option.use_trt_backend()
-        option.enable_paddle_to_trt()
+        option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
+        # option.use_trt_backend()
+        # option.enable_trt()
+        option.paddle_infer_option.enable_trt = True
         if use_fp16:
-            option.enable_trt_fp16()
-        cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+            option.trt_option.enable_fp16 = True
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache")
         option.set_trt_cache_file(cache_file)
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
@@ -110,6 +131,29 @@ def create_paddle_inference_runtime(
                     opt_shape=shape_dict.get("opt_shape", None),
                     max_shape=shape_dict.get("max_shape", None),
                 )
+    model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
+    params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")
+    option.set_model_path(model_file, params_file)
+    return fd.Runtime(option)
+
+
+def create_paddle_lite_runtime(model_dir, model_prefix, device="cpu", device_id=0):
+    option = fd.RuntimeOption()
+    option.use_lite_backend()
+    if device == "huawei_ascend_npu":
+        option.use_ascend()
+        option.set_lite_device_names(["huawei_ascend_npu"])
+        option.set_lite_model_cache_dir(os.path.join(model_dir, model_prefix))
+        option.set_lite_context_properties(
+            "HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={};HUAWEI_ASCEND_NPU_PRECISION_MODE=allow_mix_precision".format(
+                device_id
+            )
+        )
+    elif device == "kunlunxin_xpu":
+        # TODO(shentanyue): Add kunlunxin_xpu code
+        pass
+    else:
+        pass
     model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
     params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")
     option.set_model_path(model_file, params_file)
@@ -153,7 +197,9 @@ def get_scheduler(args):
             steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
-        scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+        scheduler = PreconfigEulerAncestralDiscreteScheduler(
+            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", preconfig=True
+        )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")
     return scheduler
@@ -161,6 +207,13 @@ def get_scheduler(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # 0. Init device id
+    device_id = args.device_id
+    if args.device == "cpu":
+        device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -168,6 +221,13 @@ if __name__ == "__main__":
     tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
+    text_encoder_shape = {
+        "input_ids": {
+            "min_shape": [1, 77],
+            "max_shape": [2, 77],
+            "opt_shape": [2, 77],
+        }
+    }
     vae_dynamic_shape = {
         "latent_sample": {
             "min_shape": [1, 4, 64, 64],
@@ -197,21 +257,26 @@ if __name__ == "__main__":
     # 4. Init runtime
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_ort_runtime(
-            args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=device_id
         )
         start = time.time()
         unet_runtime = create_ort_runtime(
-            args.model_dir, args.unet_model_prefix, args.model_format, device_id=args.device_id
+            args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
-        use_trt = True if args.backend == "paddle-tensorrt" else False
-        # Note(zhoushunjie): Will change to paddle runtime later
-        text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=args.device_id
+    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
+        use_trt = True if args.backend == "paddle_tensorrt" else False
+        text_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.text_encoder_model_prefix,
+            use_trt,
+            text_encoder_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+            disable_paddle_trt_ops=["arg_max", "range"],
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -219,7 +284,7 @@ if __name__ == "__main__":
             use_trt,
             vae_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
@@ -229,6 +294,7 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id,
+            disable_paddle_trt_ops=["sin", "cos"],
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":
@@ -239,7 +305,7 @@ if __name__ == "__main__":
             args.model_format,
             workspace=(1 << 30),
             dynamic_shape=vae_dynamic_shape,
-            device_id=args.device_id,
+            device_id=device_id,
         )
         start = time.time()
         unet_runtime = create_trt_runtime(
@@ -247,7 +313,19 @@ if __name__ == "__main__":
             args.unet_model_prefix,
             args.model_format,
             dynamic_shape=unet_dynamic_shape,
-            device_id=args.device_id,
+            device_id=device_id,
+        )
+        print(f"Spend {time.time() - start : .2f} s to load unet model.")
+    elif args.backend == "paddlelite":
+        text_encoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.text_encoder_model_prefix, device=args.device, device_id=device_id
+        )
+        vae_decoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.vae_decoder_model_prefix, device=args.device, device_id=device_id
+        )
+        start = time.time()
+        unet_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.unet_model_prefix, device=args.device, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 

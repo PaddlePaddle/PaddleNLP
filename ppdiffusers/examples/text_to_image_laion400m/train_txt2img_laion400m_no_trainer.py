@@ -78,7 +78,7 @@ def main():
         os.makedirs(training_args.output_dir, exist_ok=True)
 
     model = LatentDiffusionModel(model_args)
-
+    model.set_recompute(training_args.recompute)
     params_to_train = itertools.chain(model.text_encoder.parameters(), model.unet.parameters())
 
     if num_processes > 1:

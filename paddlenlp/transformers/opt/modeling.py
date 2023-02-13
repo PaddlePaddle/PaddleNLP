@@ -14,17 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import paddle
 import paddle.nn as nn
-from paddle.nn import LayerNorm, Layer
-import paddle.nn.functional as F
-import paddle.tensor as tensor
-from paddle.fluid import layers
-from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddlenlp.transformers.gpt.modeling import MultiHeadAttention, TransformerDecoderLayer
+from paddle.nn import Layer
+
+from paddlenlp.transformers.gpt.modeling import TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 __all__ = [
@@ -520,7 +516,7 @@ class OPTForCausalLM(OPTPretrainedModel):
         else:
             return logits
 
-    def prepare_faster_entry(self, kwargs: Dict[str, Any]):
+    def prepare_fast_entry(self, kwargs: Dict[str, Any]):
         # import FasterOPT at here to avoid cycling import
         from paddlenlp.ops import FasterOPT
 
@@ -530,21 +526,21 @@ class OPTForCausalLM(OPTPretrainedModel):
         decoding_lib = kwargs.get("decoding_lib", None)
 
         if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the faster version of OPT")
+            raise AttributeError("'beam_search' is not supported yet in the fast version of OPT")
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.opt.config["hidden_size"] // self.opt.config["num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of OPT" % size_per_head
+                "'size_per_head = %d' is not supported yet in the fast version of OPT" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
         if kwargs["min_length"] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
+        self._fast_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
+        return self._fast_entry
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

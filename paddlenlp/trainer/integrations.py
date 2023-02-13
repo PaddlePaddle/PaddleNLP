@@ -19,9 +19,9 @@
 import importlib
 import json
 
-from .trainer_callback import TrainerCallback
-from ..utils.log import logger
 from ..transformers import PretrainedModel
+from ..utils.log import logger
+from .trainer_callback import TrainerCallback
 
 
 def is_visualdl_available():

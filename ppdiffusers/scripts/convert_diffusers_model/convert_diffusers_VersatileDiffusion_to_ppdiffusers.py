@@ -21,8 +21,10 @@ from diffusers import VersatileDiffusionPipeline as DiffusersVersatileDiffusionP
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
+    CLIPTextConfig,
     CLIPTextModelWithProjection,
     CLIPTokenizer,
+    CLIPVisionConfig,
     CLIPVisionModelWithProjection,
 )
 from ppdiffusers import (
@@ -167,7 +169,8 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path, output_path=
     )
 
     # 1. vae
-    pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
+    pp_vae = AutoencoderKL.from_config(diffusers_pipe.vae.config)
+
     pp_vae.set_dict(vae_state_dict)
     check_keys(pp_vae, vae_state_dict)
 
@@ -182,12 +185,12 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path, output_path=
     check_keys(pp_text_unet, text_unet_state_dict)
 
     # 4. image_encoder
-    pp_image_encoder = CLIPVisionModelWithProjection(**vision_config)
+    pp_image_encoder = CLIPVisionModelWithProjection(CLIPVisionConfig.from_dict(vision_config))
     pp_image_encoder.set_dict(image_encoder_state_dict)
     check_keys(pp_image_encoder, image_encoder_state_dict)
 
     # 5. text_encoder
-    pp_text_encoder = CLIPTextModelWithProjection(**text_config)
+    pp_text_encoder = CLIPTextModelWithProjection(CLIPTextConfig.from_dict(text_config))
     pp_text_encoder.set_dict(text_encoder_state_dict)
     check_keys(pp_text_encoder, text_encoder_state_dict)
 

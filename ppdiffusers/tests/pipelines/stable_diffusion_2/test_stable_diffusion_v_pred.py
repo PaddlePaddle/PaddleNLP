@@ -18,9 +18,8 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -29,10 +28,10 @@ from ppdiffusers import (
     StableDiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.utils import load_numpy, slow
+from ppdiffusers.utils import TEST_DOWNLOAD_SERVER, load_numpy, slow
 
 
-class StableDiffusion2VPredictionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class StableDiffusion2VPredictionPipelineFastTests(unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -83,7 +82,8 @@ class StableDiffusion2VPredictionPipelineFastTests(PipelineTesterMixin, unittest
             text_hidden_act="gelu",
             projection_dim=64,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 
@@ -137,15 +137,15 @@ class StableDiffusion2VPredictionPipelineFastTests(PipelineTesterMixin, unittest
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
             [
-                0.30307483673095703,
-                0.3711841404438019,
-                0.2971755266189575,
-                0.21124267578125,
-                0.24938753247261047,
-                0.4050242006778717,
-                0.22494885325431824,
-                0.21655383706092834,
-                0.42639416456222534,
+                0.27571171522140503,
+                0.37133634090423584,
+                0.3277124762535095,
+                0.1836441159248352,
+                0.3016784191131592,
+                0.44378769397735596,
+                0.25616952776908875,
+                0.3397156298160553,
+                0.4897196888923645,
             ]
         )
 
@@ -196,15 +196,15 @@ class StableDiffusion2VPredictionPipelineFastTests(PipelineTesterMixin, unittest
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
             [
-                0.28467634320259094,
-                0.3477485179901123,
-                0.2706109285354614,
-                0.2010326385498047,
-                0.24505868554115295,
-                0.36301904916763306,
-                0.3366130590438843,
-                0.32769495248794556,
-                0.44537732005119324,
+                0.3141702115535736,
+                0.42426782846450806,
+                0.29949408769607544,
+                0.18228402733802795,
+                0.35838770866394043,
+                0.42029133439064026,
+                0.3721151351928711,
+                0.5333338379859924,
+                0.5516339540481567,
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
@@ -233,6 +233,36 @@ class StableDiffusion2VPredictionPipelineIntegrationTests(unittest.TestCase):
 
         assert image.shape == (1, 768, 768, 3)
         expected_slice = np.array([0.0567, 0.057, 0.0416, 0.0463, 0.0433, 0.06, 0.0517, 0.0526, 0.0866])
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+
+    def test_stable_diffusion_v_pred_upcast_attention(self):
+        sd_pipe = StableDiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-2-1",
+        )
+        sd_pipe.enable_attention_slicing()
+        sd_pipe.set_progress_bar_config(disable=None)
+
+        prompt = "A painting of a squirrel eating a burger"
+        generator = paddle.Generator().manual_seed(0)
+        output = sd_pipe([prompt], generator=generator, guidance_scale=7.5, num_inference_steps=20, output_type="np")
+
+        image = output.images
+        image_slice = image[0, 253:256, 253:256, -1]
+
+        assert image.shape == (1, 768, 768, 3)
+        expected_slice = np.array(
+            [
+                0.044666826725006104,
+                0.05484366416931152,
+                0.04472467303276062,
+                0.04933345317840576,
+                0.049497634172439575,
+                0.07107359170913696,
+                0.07392224669456482,
+                0.05245906114578247,
+                0.05491039156913757,
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
     def test_stable_diffusion_v_pred_euler(self):
@@ -288,10 +318,7 @@ class StableDiffusion2VPredictionPipelineIntegrationTests(unittest.TestCase):
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
     def test_stable_diffusion_text2img_pipeline_v_pred_default(self):
-        expected_image = load_numpy(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/"
-            "sd2-text2img/astronaut_riding_a_horse_v_pred.npy"
-        )
+        expected_image = load_numpy(f"{TEST_DOWNLOAD_SERVER}/sd2-text2img/astronaut_riding_a_horse_v_pred.npy")
 
         pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2")
         pipe.enable_attention_slicing()

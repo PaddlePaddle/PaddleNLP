@@ -24,40 +24,44 @@ from ppdiffusers.utils.testing_utils import slow
 
 
 class DDIMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-    @property
-    def dummy_uncond_unet(self):
+    pipeline_class = DDIMPipeline
+
+    def get_dummy_components(self):
         paddle.seed(0)
-        model = UNet2DModel(
+        unet = UNet2DModel(
             block_out_channels=(32, 64),
             layers_per_block=2,
             sample_size=32,
-            in_channels=3,
-            out_channels=3,
             down_block_types=("DownBlock2D", "AttnDownBlock2D"),
             up_block_types=("AttnUpBlock2D", "UpBlock2D"),
         )
-        return model
+        scheduler = DDIMScheduler()
+        components = {"unet": unet, "scheduler": scheduler}
+        return components
+
+    def get_dummy_inputs(self, seed=0):
+        generator = paddle.Generator().manual_seed(seed)
+        inputs = {
+            "batch_size": 1,
+            "generator": generator,
+            "num_inference_steps": 2,
+            "output_type": "numpy",
+        }
+        return inputs
 
     def test_inference(self):
-        unet = self.dummy_uncond_unet
-        scheduler = DDIMScheduler()
+        components = self.get_dummy_components()
+        pipe = self.pipeline_class(**components)
+        pipe.set_progress_bar_config(disable=None)
 
-        ddpm = DDIMPipeline(unet=unet, scheduler=scheduler)
-        ddpm.set_progress_bar_config(disable=None)
-
-        generator = paddle.Generator().manual_seed(0)
-        image = ddpm(generator=generator, num_inference_steps=2, output_type="numpy").images
-
-        generator = paddle.Generator().manual_seed(0)
-        image_from_tuple = ddpm(generator=generator, num_inference_steps=2, output_type="numpy", return_dict=False)[0]
-
+        inputs = self.get_dummy_inputs()
+        image = pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1]
-        image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
-        assert image.shape == (1, 32, 32, 3)
+        self.assertEqual(image.shape, (1, 32, 32, 3))
         expected_slice = np.array([0.0, 0.00152004, 0.0, 0.0, 0.00860906, 0.00182715, 0.00189051, 1.0, 0.668702])
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
+        max_diff = np.abs(image_slice.flatten() - expected_slice).max()
+        self.assertLessEqual(max_diff, 1e-3)
 
 
 @slow

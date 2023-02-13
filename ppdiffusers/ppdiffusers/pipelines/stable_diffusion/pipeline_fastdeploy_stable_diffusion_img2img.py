@@ -37,13 +37,26 @@ from . import StableDiffusionPipelineOutput
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
+# Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.preprocess
 def preprocess(image):
-    w, h = image.size
-    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    image = image.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])
-    image = np.array(image).astype(np.float32) / 255.0
-    image = image[None].transpose(0, 3, 1, 2)
-    return 2.0 * image - 1.0
+    if isinstance(image, paddle.Tensor):
+        return image
+    elif isinstance(image, PIL.Image.Image):
+        image = [image]
+
+    if isinstance(image[0], PIL.Image.Image):
+        w, h = image[0].size
+        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+
+        image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
+        image = np.concatenate(image, axis=0)
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image.transpose(0, 3, 1, 2)
+        image = 2.0 * image - 1.0
+        image = paddle.to_tensor(image)
+    elif isinstance(image[0], paddle.Tensor):
+        image = paddle.concat(image, axis=0)
+    return image
 
 
 class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
@@ -151,7 +164,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             return_tensors="np",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="np").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
 
         if not np.array_equal(text_input_ids, untruncated_ids):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
@@ -264,7 +277,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         init_timestep = min(init_timestep, num_inference_steps)
 
         t_start = max(num_inference_steps - init_timestep + offset, 0)
-        timesteps = self.scheduler.timesteps.numpy()
+        timesteps = self.scheduler.timesteps
         timesteps = timesteps[t_start:]
         return timesteps, num_inference_steps - t_start
 
@@ -292,15 +305,15 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             noise = paddle.to_tensor(noise, dtype=dtype)
 
         # get latents
-        init_latents = self.scheduler.add_noise(paddle.to_tensor(init_latents), noise, paddle.to_tensor(timestep))
-        latents = init_latents.numpy()
+        init_latents = self.scheduler.add_noise(paddle.to_tensor(init_latents), noise, timestep)
+        latents = init_latents
 
         return latents
 
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[np.ndarray, PIL.Image.Image] = None,
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -386,13 +399,12 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        if isinstance(image, PIL.Image.Image):
-            image = preprocess(image)
+        image = preprocess(image)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
-        latent_timestep = timesteps[:1].repeat(batch_size * num_images_per_prompt)
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
         latents = self.prepare_latents(
@@ -405,30 +417,24 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            text_embeddings = paddle.to_tensor(text_embeddings)
             for i, t in enumerate(timesteps):
-                tensor_t = paddle.to_tensor(t)
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
-                latent_model_input = latent_model_input.numpy()
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(
-                    sample=latent_model_input.astype(np.float32),
-                    timestep=np.array([t], dtype=np.int64),
-                    encoder_hidden_states=text_embeddings.astype(np.float32),
+                noise_pred = self.unet.zero_copy_infer(
+                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
                 )[0]
-
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), tensor_t, paddle.to_tensor(latents), **extra_step_kwargs
-                )
-                latents = scheduler_output.prev_sample.numpy()
+                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
@@ -437,7 +443,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                         callback(i, t, latents)
 
         # 9. Post-processing
-        image = self.decode_latents(latents)
+        image = self.decode_latents(latents.numpy())
 
         # 10. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)

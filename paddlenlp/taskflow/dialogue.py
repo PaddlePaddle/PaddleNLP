@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import contextlib
 from collections import deque
 
 import numpy as np
 import paddle
 
-from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from ..data import Pad
+from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            # 非交互模式
            dialogue = Taskflow("dialogue")
@@ -48,7 +47,7 @@ usage = r"""
            [Bot]:那你喜欢什么运动啊?
            [Human]:篮球,你喜欢篮球吗
            [Bot]:当然了,我很喜欢打篮球的。
-           '''           
+           '''
          """
 
 
@@ -215,8 +214,8 @@ class DialogueTask(Task):
         """
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
+        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0  # noqa: F841
+        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False  # noqa: F841
 
         batches = self._batchify(inputs, self._max_seq_len, self._batch_size)
 
@@ -248,7 +247,7 @@ class DialogueTask(Task):
                 num_beams=0,
                 length_penalty=1.0,
                 early_stopping=False,
-                use_faster=False,
+                use_fast=False,
                 num_return_sequences=1,
             )
             all_ids.extend([ids])

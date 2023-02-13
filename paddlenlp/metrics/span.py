@@ -14,7 +14,7 @@
 
 from paddle.metric import Metric
 
-from ..utils.tools import get_span, get_bool_ids_greater_than
+from ..utils.tools import get_bool_ids_greater_than, get_span
 
 
 class SpanEvaluator(Metric):
@@ -22,20 +22,21 @@ class SpanEvaluator(Metric):
     SpanEvaluator computes the precision, recall and F1-score for span detection.
     """
 
-    def __init__(self):
+    def __init__(self, limit=0.5):
         super(SpanEvaluator, self).__init__()
         self.num_infer_spans = 0
         self.num_label_spans = 0
         self.num_correct_spans = 0
+        self.limit = limit
 
     def compute(self, start_probs, end_probs, gold_start_ids, gold_end_ids):
         """
         Computes the precision, recall and F1-score for span detection.
         """
-        pred_start_ids = get_bool_ids_greater_than(start_probs)
-        pred_end_ids = get_bool_ids_greater_than(end_probs)
-        gold_start_ids = get_bool_ids_greater_than(gold_start_ids.tolist())
-        gold_end_ids = get_bool_ids_greater_than(gold_end_ids.tolist())
+        pred_start_ids = get_bool_ids_greater_than(start_probs, self.limit)
+        pred_end_ids = get_bool_ids_greater_than(end_probs, self.limit)
+        gold_start_ids = get_bool_ids_greater_than(gold_start_ids.tolist(), self.limit)
+        gold_end_ids = get_bool_ids_greater_than(gold_end_ids.tolist(), self.limit)
         num_correct_spans = 0
         num_infer_spans = 0
         num_label_spans = 0

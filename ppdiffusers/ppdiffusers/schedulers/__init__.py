@@ -14,12 +14,22 @@
 # limitations under the License.
 # flake8: noqa
 
-from ..utils import is_paddle_available, is_scipy_available
+from ..utils import (
+    OptionalDependencyNotAvailable,
+    is_paddle_available,
+    is_scipy_available,
+)
 
-if is_paddle_available():
+try:
+    if not is_paddle_available():
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_objects import *  # noqa F403
+else:
     from .scheduling_ddim import DDIMScheduler
     from .scheduling_ddpm import DDPMScheduler
     from .scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
+    from .scheduling_dpmsolver_singlestep import DPMSolverSinglestepScheduler
     from .scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
     from .scheduling_euler_discrete import EulerDiscreteScheduler
     from .scheduling_heun_discrete import HeunDiscreteScheduler
@@ -31,12 +41,14 @@ if is_paddle_available():
     from .scheduling_repaint import RePaintScheduler
     from .scheduling_sde_ve import ScoreSdeVeScheduler
     from .scheduling_sde_vp import ScoreSdeVpScheduler
+    from .scheduling_unclip import UnCLIPScheduler
     from .scheduling_utils import SchedulerMixin
     from .scheduling_vq_diffusion import VQDiffusionScheduler
-else:
-    from ..utils.dummy_paddle_objects import *  # noqa F403
 
-if is_scipy_available() and is_paddle_available():
-    from .scheduling_lms_discrete import LMSDiscreteScheduler
-else:
+try:
+    if not (is_paddle_available() and is_scipy_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_scipy_objects import *  # noqa F403
+else:
+    from .scheduling_lms_discrete import LMSDiscreteScheduler

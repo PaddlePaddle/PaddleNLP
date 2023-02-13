@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import argparse
+import random
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import (
-    GPTLMHeadModel,
-    GPTTokenizer,
-    GPTChineseTokenizer,
-)
+
+from paddlenlp.transformers import GPTChineseTokenizer, GPTLMHeadModel, GPTTokenizer
 
 MODEL_CLASSES = {
     "gpt2": (GPTLMHeadModel, GPTTokenizer),
@@ -43,6 +40,7 @@ def parse_args():
         type=str,
         help="The path or shortcut name of the pre-trained model.",
     )
+    parser.add_argument("--from_hf_hub", type=bool, default=False, help="Whether load model from hf hub")
     parser.add_argument(
         "--decode_strategy", type=str, default="greedy_search", help="The decode strategy in generation."
     )
@@ -115,8 +113,8 @@ def main(args, input_text):
             )
         )
 
-    model = model_class.from_pretrained(args.model_name_or_path)
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
     model.eval()
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len, model.max_position_embeddings)
@@ -156,7 +154,11 @@ def main(args, input_text):
     return generated_sequences
 
 
-if __name__ == "__main__":
+def run():
     args = parse_args()
     input_text = "花间一壶酒，独酌无相亲。举杯邀明月，"
     main(args, input_text)
+
+
+if __name__ == "__main__":
+    run()

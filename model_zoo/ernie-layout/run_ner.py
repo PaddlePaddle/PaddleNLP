@@ -13,22 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import collections
+import os
 from functools import partial
 
 import paddle
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
-from seqeval.metrics import classification_report
-
-from datasets import load_dataset
 from data_collator import DataCollator
-
+from datasets import load_dataset
 from finetune_args import DataArguments, ModelArguments
-from utils import PreProcessor, PostProcessor, get_label_ld
 from layout_trainer import LayoutTrainer
+from seqeval.metrics import classification_report
+from utils import PostProcessor, PreProcessor, get_label_ld
+
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 def main():

@@ -19,7 +19,6 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import XLMRobertaTokenizer
 from ppdiffusers import (
@@ -35,7 +34,7 @@ from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 
 
-class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -117,8 +116,7 @@ class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta")
-        tokenizer.model_max_length = 77
+        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta", model_max_length=77)
 
         init_image = self.dummy_image
 

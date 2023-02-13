@@ -166,14 +166,14 @@ msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:83
 msgid ""
-"(bool, optional): Whether to use faster entry of model for "
-"FasterGeneration. Default to False."
+"(bool, optional): Whether to use fast entry of model for "
+"FastGeneration. Default to False."
 msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:85
 msgid ""
 "(bool, optional): Whether to use fp16 for decoding. Only works when "
-"faster entry is avalible. Default to False."
+"fast entry is avalible. Default to False."
 msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:87

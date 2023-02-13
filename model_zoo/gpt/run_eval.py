@@ -11,20 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
-import os
+import argparse
 import json
 import math
+import os
+import re
 import time
-import argparse
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import GPTModel, GPTForPretraining
-from paddlenlp.transformers import GPTTokenizer
-from paddlenlp.transformers import GPTModel
-from paddlenlp.data import Stack, Tuple, Pad
+from paddle.io import DataLoader
+
+from paddlenlp.data import Stack, Tuple
+from paddlenlp.transformers import GPTForPretraining, GPTModel, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -33,8 +32,7 @@ MODEL_CLASSES = {
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
+parser.add_argument("--model_name", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
 parser.add_argument("--eval_path", default=None, type=str, required=True, help="The eval file path.", )
 parser.add_argument('--cloze_eval', action='store_true', help='Evaluation dataset from `--eval_path` is a cloze task.')
 parser.add_argument('--overlapping_eval', type=int, default=32, help='Sliding window for overlapping eval.')
@@ -228,7 +226,6 @@ def create_eval_dataset(args):
 def do_eval(args):
     paddle.set_device(args.device)
     model_class, tokenizer_class = MODEL_CLASSES["gpt"]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name)
 
     if args.init_checkpoint_path is not None:
         model = GPTForPretraining(GPTModel(**model_class.pretrained_init_configuration[args.model_name]))
@@ -285,6 +282,10 @@ def do_eval(args):
     logger.info(string)
 
 
-if __name__ == "__main__":
+def run():
     args = parser.parse_args()
     do_eval(args)
+
+
+if __name__ == "__main__":
+    run()

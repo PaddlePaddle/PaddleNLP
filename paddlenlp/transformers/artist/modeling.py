@@ -15,8 +15,9 @@
 
 import paddle
 import paddle.nn.functional as F
+
 from ..dallebart.modeling import VQGanDetokenizer
-from ..gpt.modeling import GPTLMHeadModel, GPTLMHead, GPTModel
+from ..gpt.modeling import GPTLMHead, GPTLMHeadModel, GPTModel
 
 __all__ = [
     "ArtistModel",
@@ -181,7 +182,7 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
         top_p=1.0,
         temperature=1.0,
         num_return_sequences=1,
-        use_faster=False,
+        use_fast=False,
         use_fp16_decoding=False,
         **kwargs
     ):
@@ -204,10 +205,10 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
                 which means no effect.
             num_return_sequences (int, optional): The number of returned
                 sequences for each sequence in the batch. Default to 1.
-            use_faster: (bool, optional): Whether to use faster entry of model
-                for FasterGeneration. Default to False.
+            use_fast: (bool, optional): Whether to use fast entry of model
+                for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when faster entry is avalible. Default to False.
+                Only works when fast entry is avalible. Default to False.
 
         Returns:
             Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
@@ -252,7 +253,7 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             top_p=top_p,
             temperature=temperature,
             num_return_sequences=num_return_sequences,
-            use_faster=use_faster,
+            use_fast=use_fast,
             use_fp16_decoding=use_fp16_decoding,
             seq_len=paddle.ones((input_ids.shape[0],), dtype="int32") * 32,
             **kwargs,

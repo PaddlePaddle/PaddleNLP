@@ -12,21 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 
 import psutil
-import paddle
-from paddlenlp.utils.log import logger
-from paddlenlp.datasets import load_dataset
-
 from predictor import Predictor
+
+from paddlenlp.datasets import load_dataset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
 parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="Select model to train, defaults to ernie-3.0-medium-zh.",
-                    choices=["ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"])
+                    choices=["ernie-1.0-large-zh-cw", "ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en", "ernie-m-base", "ernie-m-large"])
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
 parser.add_argument("--use_quantize", action='store_true', help="Whether to use quantization for acceleration, only takes effect when deploying on cpu.")
@@ -37,6 +35,7 @@ parser.add_argument('--device_id', default=0, help="Select which gpu device to t
 parser.add_argument("--perf", action='store_true', help="Whether to compute the latency and f1 score of the test set.")
 parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="The dataset directory including data.txt, taxonomy.txt, test.txt(optional, if evaluate the performance).")
 parser.add_argument("--perf_dataset", choices=['dev', 'test'], default='dev', type=str, help="evaluate the performance on dev dataset or test dataset")
+parser.add_argument('--multilingual', action='store_true', help='Whether is multilingual task')
 args = parser.parse_args()
 # yapf: enable
 

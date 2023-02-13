@@ -13,18 +13,22 @@
 # limitations under the License.
 
 import argparse
-import os
 from functools import partial
 
 import paddle
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.metrics import SpanEvaluator
-from paddlenlp.utils.log import logger
-from paddlenlp.data import DataCollatorWithPadding
+from utils import (
+    convert_example,
+    create_data_loader,
+    get_relation_type_dict,
+    reader,
+    unify_prompt_name,
+)
 
-from model import UIE, UIEM
-from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.datasets import MapDataset, load_dataset
+from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.transformers import UIE, UIEM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 @paddle.no_grad()
@@ -41,10 +45,10 @@ def evaluate(model, metric, data_loader, multilingual=False):
     metric.reset()
     for batch in data_loader:
         if multilingual:
-            start_prob, end_prob = model(batch["input_ids"], batch["pos_ids"])
+            start_prob, end_prob = model(batch["input_ids"], batch["position_ids"])
         else:
             start_prob, end_prob = model(
-                batch["input_ids"], batch["token_type_ids"], batch["pos_ids"], batch["att_mask"]
+                batch["input_ids"], batch["token_type_ids"], batch["position_ids"], batch["attention_mask"]
             )
 
         start_ids = paddle.cast(batch["start_positions"], "float32")

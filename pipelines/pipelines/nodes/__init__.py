@@ -36,4 +36,9 @@ from pipelines.nodes.question_generator import QuestionGenerator
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
 from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
+from pipelines.nodes.sentiment_analysis import (
+    SentaProcessor,
+    SentaVisualization,
+    UIESenta,
+)
 from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator

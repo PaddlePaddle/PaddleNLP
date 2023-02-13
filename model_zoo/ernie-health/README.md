@@ -11,7 +11,7 @@ ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型
 ![Overview_of_EHealth](https://user-images.githubusercontent.com/25607475/163949632-8b34e23c-d0cd-49df-8d88-8549a253d221.png)
 
 更多技术细节可参考论文
-- [Building Chinese Biomedical Language Models via Multi-Level Text Discrimination, ACL 2022](https://arxiv.org/pdf/2110.07244.pdf)
+- [Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/pdf/2110.07244.pdf)
 
 ## 模型效果
 

@@ -17,6 +17,7 @@
 import importlib
 import inspect
 import os
+import tempfile
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
@@ -24,6 +25,14 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import PIL
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 from packaging import version
 from PIL import Image
 from tqdm.auto import tqdm
@@ -51,6 +60,7 @@ LOADABLE_CLASSES = {
         "PretrainedModel": ["save_pretrained", "from_pretrained"],
         "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
         "ProcessorMixin": ["save_pretrained", "from_pretrained"],
+        "ImageProcessingMixin": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -195,6 +205,62 @@ class DiffusionPipeline(ConfigMixin):
             save_method = getattr(sub_model, save_method_name)
             save_method(os.path.join(save_directory, pipeline_component_name))
 
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this pipeline to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # save model
+            self.save_pretrained(tmp_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=tmp_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
+
     def to(self, paddle_device: Optional[str] = None):
         if paddle_device is None:
             return self
@@ -254,6 +320,8 @@ class DiffusionPipeline(ConfigMixin):
                 will be automatically derived from the model's weights.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
             kwargs (remaining dictionary of keyword arguments, *optional*):
                 Can be used to overwrite load - and saveable variables - *i.e.* the pipeline components - of the
                 specific pipeline class. The overwritten components are then directly passed to the pipelines
@@ -285,12 +353,14 @@ class DiffusionPipeline(ConfigMixin):
         # custom_pipeline = kwargs.pop("custom_pipeline", None)
         # for fastdeploy model
         runtime_options = kwargs.pop("runtime_options", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
 
         # 1. Download the checkpoints and configs
         if not os.path.isdir(pretrained_model_name_or_path):
             config_dict = cls.load_config(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
+                from_hf_hub=from_hf_hub,
             )
         else:
             config_dict = cls.load_config(pretrained_model_name_or_path)
@@ -359,7 +429,7 @@ class DiffusionPipeline(ConfigMixin):
                 f"Keyword arguments {unused_kwargs} are not expected by {pipeline_class.__name__} and will be ignored."
             )
         # import it here to avoid circular import
-        from . import ModelMixin, pipelines
+        from . import pipelines
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
@@ -431,7 +501,10 @@ class DiffusionPipeline(ConfigMixin):
                     )
 
                 load_method = getattr(class_obj, load_method_name)
-                loading_kwargs = {}
+                loading_kwargs = {
+                    "from_hf_hub": from_hf_hub,
+                    "cache_dir": cache_dir,
+                }
 
                 if issubclass(class_obj, FastDeployRuntimeModel):
                     if isinstance(runtime_options, dict):
@@ -439,22 +512,21 @@ class DiffusionPipeline(ConfigMixin):
                     else:
                         options = runtime_options
                     loading_kwargs["runtime_options"] = options
-                    loading_kwargs["cache_dir"] = cache_dir
 
-                if issubclass(class_obj, ModelMixin):
-                    loading_kwargs["cache_dir"] = cache_dir
-
-                model_path_dir = (
-                    os.path.join(pretrained_model_name_or_path, name)
-                    if os.path.isdir(pretrained_model_name_or_path)
-                    else pretrained_model_name_or_path + "/" + name
-                )
+                if os.path.isdir(pretrained_model_name_or_path):
+                    model_path_dir = os.path.join(pretrained_model_name_or_path, name)
+                elif from_hf_hub:
+                    model_path_dir = pretrained_model_name_or_path
+                    loading_kwargs["subfolder"] = name
+                else:
+                    # BOS does not require 'subfolder'. We simpy concat the model name with the subfolder
+                    model_path_dir = pretrained_model_name_or_path + "/" + name
 
                 loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):
-                if next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:
+                if paddle_dtype is not None and next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
                 # paddlenlp model is training mode not eval mode
                 loaded_sub_model.eval()
@@ -477,6 +549,35 @@ class DiffusionPipeline(ConfigMixin):
         # 5. Instantiate the pipeline
         model = pipeline_class(**init_kwargs)
         return model
+
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
+        r"""
+        Enable sliced attention computation.
+        When this option is enabled, the attention module will split the input tensor in slices, to compute attention
+        in several steps. This is useful to save some memory in exchange for a small speed decrease.
+        Args:
+            slice_size (`str` or `int`, *optional*, defaults to `"auto"`):
+                When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
+                `"max"`, maxium amount of memory will be saved by running only one slice at a time. If a number is
+                provided, uses as many slices as `attention_head_dim // slice_size`. In this case, `attention_head_dim`
+                must be a multiple of `slice_size`.
+        """
+        self.set_attention_slice(slice_size)
+
+    def disable_attention_slicing(self):
+        r"""
+        Disable sliced attention computation. If `enable_attention_slicing` was previously invoked, this method will go
+        back to computing attention in one step.
+        """
+        # set slice_size = `None` to disable `attention slicing`
+        self.enable_attention_slicing(None)
+
+    def set_attention_slice(self, slice_size: Optional[int]):
+        module_names, _, _ = self.extract_init_dict(dict(self.config))
+        for module_name in module_names:
+            module = getattr(self, module_name)
+            if isinstance(module, nn.Layer) and hasattr(module, "set_attention_slice"):
+                module.set_attention_slice(slice_size)
 
     @staticmethod
     def _get_signature_keys(obj):

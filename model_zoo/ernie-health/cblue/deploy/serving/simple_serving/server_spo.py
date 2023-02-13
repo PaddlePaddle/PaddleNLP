@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+
 from paddlenlp import SimpleServer
 from paddlenlp.server import BasePostHandler, TokenClsModelHandler
 
@@ -133,7 +134,7 @@ class SPOPostHandler(BasePostHandler):
 
 app = SimpleServer()
 app.register(
-    "cblue_spo",
+    "models/cblue_spo",
     model_path="../../../export",
     tokenizer_name="ernie-health-chinese",
     model_handler=TokenClsModelHandler,

@@ -22,7 +22,7 @@ from diffusers import (
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
-    CLIPVisionModel,
+    CLIPVisionConfig,
     CLIPVisionModelWithProjection,
 )
 from ppdiffusers import (
@@ -164,11 +164,13 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path, output_path=
     )
 
     # 1. vae
-    pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
+    pp_vae = AutoencoderKL.from_config(diffusers_pipe.vae.config)
+
     pp_vae.set_dict(vae_state_dict)
     check_keys(pp_vae, vae_state_dict)
     # 2. unet
-    pp_unet = UNet2DConditionModel(**diffusers_pipe.unet.config)
+    pp_unet = UNet2DConditionModel.from_config(diffusers_pipe.unet.config)
+
     pp_unet.set_dict(unet_state_dict)
     check_keys(pp_unet, unet_state_dict)
 
@@ -177,11 +179,11 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path, output_path=
     safety_checker_config.update({"projection_dim": pp_unet.config.cross_attention_dim})
 
     # 3. image_encoder
-    image_encoder = CLIPVisionModelWithProjection(**vision_config)
+    image_encoder = CLIPVisionModelWithProjection(CLIPVisionConfig.from_dict(vision_config))
     image_encoder.set_dict(image_encoder_state_dict)
     check_keys(image_encoder, image_encoder_state_dict)
     # 4. safety_checker
-    pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionModel(**safety_checker_config))
+    pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionConfig.from_dict(safety_checker_config))
     pp_safety_checker.set_dict(safety_checker_state_dict)
     check_keys(pp_safety_checker, safety_checker_state_dict)
     # 5. scheduler

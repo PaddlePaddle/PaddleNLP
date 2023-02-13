@@ -95,11 +95,12 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     bert_state_dict, bert_config = convert_hf_ldmbert_to_ppnlp_ldmbert(diffusers_pipe.bert)
 
     # 1. vqvae
-    pp_vqvae = AutoencoderKL(**diffusers_pipe.vqvae.config)
+    pp_vqvae = AutoencoderKL.from_config(diffusers_pipe.vqvae.config)
     pp_vqvae.set_dict(vqvae_state_dict)
 
     # 2. unet
-    pp_unet = UNet2DConditionModel(**diffusers_pipe.unet.config)
+    pp_unet = UNet2DConditionModel.from_config(diffusers_pipe.unet.config)
+
     pp_unet.set_dict(unet_state_dict)
 
     # 3. bert

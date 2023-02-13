@@ -27,7 +27,7 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.transformers import PretrainedFastTokenizer, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
@@ -55,6 +55,8 @@ def filter_roberta_detectors(_, pretrained_name: str):
 class TokenizerTesterMixin:
 
     tokenizer_class = None
+    fast_tokenizer_class = None
+    test_fast_tokenizer = False
     space_between_special_tokens = False
     from_pretrained_kwargs = None
     from_pretrained_filter = None
@@ -137,6 +139,9 @@ class TokenizerTesterMixin:
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
+
+    def get_fast_tokenizer(self, **kwargs) -> PretrainedFastTokenizer:
+        return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def tokenizer_integration_test_util(
         self,
@@ -2158,6 +2163,19 @@ class TokenizerTesterMixin:
                 string = tokenizer.convert_tokens_to_string(tokens)
 
                 self.assertIsInstance(string, str)
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 4)
+            self.assertEqual(len(encoding["offset_mapping"]), 4)
 
 
 class TrieTest(unittest.TestCase):

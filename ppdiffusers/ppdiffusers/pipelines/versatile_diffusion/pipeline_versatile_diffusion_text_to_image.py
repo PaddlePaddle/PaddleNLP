@@ -102,39 +102,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
     def remove_unused_weights(self):
         self.register_modules(text_unet=None)
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing with unet->image_unet
-    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
-        r"""
-        Enable sliced attention computation.
-
-        When this option is enabled, the attention module will split the input tensor in slices, to compute attention
-        in several steps. This is useful to save some memory in exchange for a small speed decrease.
-
-        Args:
-            slice_size (`str` or `int`, *optional*, defaults to `"auto"`):
-                When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
-                a number is provided, uses as many slices as `attention_head_dim // slice_size`. In this case,
-                `attention_head_dim` must be a multiple of `slice_size`.
-        """
-        if slice_size == "auto":
-            if isinstance(self.image_unet.config.attention_head_dim, int):
-                # half the attention head size is usually a good trade-off between
-                # speed and memory
-                slice_size = self.image_unet.config.attention_head_dim // 2
-            else:
-                # if `attention_head_dim` is a list, take the smallest head size
-                slice_size = min(self.image_unet.config.attention_head_dim)
-        self.image_unet.set_attention_slice(slice_size)
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.disable_attention_slicing
-    def disable_attention_slicing(self):
-        r"""
-        Disable sliced attention computation. If `enable_attention_slicing` was previously invoked, this method will go
-        back to computing attention in one step.
-        """
-        # set slice_size = `None` to disable `attention slicing`
-        self.enable_attention_slicing(None)
-
     def _encode_text_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
         r"""
         Encodes the prompt into text encoder hidden states.
@@ -167,9 +134,11 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             return_tensors="pd",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="pd").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
 
-        if not paddle.equal_all(text_input_ids, untruncated_ids):
+        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
+            text_input_ids, untruncated_ids
+        ):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
@@ -186,7 +155,7 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         else:
             attention_mask = None
 
-        text_embeddings = self.text_encoder(text_input_ids, attention_mask=attention_mask, return_dict=True)
+        text_embeddings = self.text_encoder(text_input_ids, attention_mask=attention_mask)
         text_embeddings = normalize_embeddings(text_embeddings)
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -229,9 +198,7 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             else:
                 attention_mask = None
 
-            uncond_embeddings = self.text_encoder(
-                uncond_input.input_ids, attention_mask=attention_mask, return_dict=True
-            )
+            uncond_embeddings = self.text_encoder(uncond_input.input_ids, attention_mask=attention_mask)
             uncond_embeddings = normalize_embeddings(uncond_embeddings)
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
@@ -292,8 +259,21 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
         if latents is None:
-            latents = paddle.randn(shape, generator=generator, dtype=dtype)
+            if isinstance(generator, list):
+                shape = [
+                    1,
+                ] + shape[1:]
+                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
+                latents = paddle.concat(latents, axis=0)
+            else:
+                latents = paddle.randn(shape, generator=generator, dtype=dtype)
         else:
             if latents.shape != shape:
                 raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
@@ -313,7 +293,7 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,

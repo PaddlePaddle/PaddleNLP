@@ -13,9 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/normalizers/bert.h"
+
 #include <algorithm>
 #include <codecvt>
 #include <locale>
+
 #include "fast_tokenizer/normalizers/strip.h"
 #include "fast_tokenizer/normalizers/utils.h"
 #include "fast_tokenizer/utils/utils.h"
@@ -106,7 +108,11 @@ void from_json(const nlohmann::json& j, BertNormalizer& bert_normalizer) {
   j.at("clean_text").get_to(bert_normalizer.clean_text_);
   j.at("handle_chinese_chars").get_to(bert_normalizer.handle_chinese_chars_);
   j.at("lowercase").get_to(bert_normalizer.lowercase_);
-  j.at("strip_accents").get_to(bert_normalizer.strip_accents_);
+  if (!j.at("strip_accents").is_null()) {
+    j.at("strip_accents").get_to(bert_normalizer.strip_accents_);
+  } else {
+    bert_normalizer.strip_accents_ = false;
+  }
 }
 
 }  // namespace normalizers

@@ -15,23 +15,22 @@
 This code is rewritten by Paddle based on Jina-ai/discoart.
 https://github.com/jina-ai/discoart/blob/main/discoart/runner.py
 """
-import paddle
 import gc
 import random
+from pathlib import Path
+
 import numpy as np
 import paddle
 import paddle.vision.transforms as T
-
-from PIL import Image
-from pathlib import Path
 from paddle.utils import try_import
+from PIL import Image
+
+from ..image_utils import load_image
 from .losses import range_loss, spherical_dist_loss, tv_loss
 from .make_cutouts import MakeCutoutsDango
+from .perlin_noises import create_perlin_noise, regen_perlin
 from .sec_diff import alpha_sigma_to_t
 from .transforms import Normalize
-from .perlin_noises import create_perlin_noise, regen_perlin
-import random
-from ..image_utils import load_image
 
 __all__ = ["DiscoDiffusionMixin"]
 
@@ -323,8 +322,8 @@ class DiscoDiffusionMixin:
                 t_int = int(t.item()) + 1  # errors on last step without +1, need to find source
                 # when using SLIP Base model the dimensions need to be hard coded to avoid AttributeError: 'VisionTransformer' object has no attribute 'input_resolution'
                 try:
-                    input_resolution = self.vision_model.input_resolution
-                except:
+                    input_resolution = getattr(self, self.base_model_prefix).vision_model.input_resolution
+                except Exception:
                     input_resolution = 224
 
                 cuts = MakeCutoutsDango(
@@ -335,7 +334,7 @@ class DiscoDiffusionMixin:
                     IC_Grey_P=cut_icgray_p[1000 - t_int],
                 )
                 clip_in = normalize(cuts(x_in.add(paddle.to_tensor(1.0)).divide(paddle.to_tensor(2.0))))
-                image_embeds = self.get_image_features(clip_in)
+                image_embeds = getattr(self, self.base_model_prefix).get_image_features(clip_in)
 
                 dists = spherical_dist_loss(
                     image_embeds.unsqueeze(1),
@@ -384,7 +383,7 @@ class DiscoDiffusionMixin:
 
         for _nb in range(n_batches):
             gc.collect()
-            paddle.device.cuda.empty_cache()
+            # paddle.device.cuda.empty_cache()
             cur_t = self.diffusion.num_timesteps - skip_steps - 1
 
             if perlin_init:

@@ -21,9 +21,10 @@ from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipelin
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
+    CLIPTextConfig,
     CLIPTextModel,
     CLIPTokenizer,
-    CLIPVisionModel,
+    CLIPVisionConfig,
 )
 from ppdiffusers import (
     AutoencoderKL,
@@ -131,15 +132,17 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     )
 
     # 1. vae
-    pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
+    pp_vae = AutoencoderKL.from_config(diffusers_pipe.vae.config)
+
     pp_vae.set_dict(vae_state_dict)
 
     # 2. unet
-    pp_unet = UNet2DConditionModel(**diffusers_pipe.unet.config)
+    pp_unet = UNet2DConditionModel.from_config(diffusers_pipe.unet.config)
+
     pp_unet.set_dict(unet_state_dict)
 
     # 3. text_encoder
-    pp_text_encoder = CLIPTextModel(**text_encoder_config)
+    pp_text_encoder = CLIPTextModel(CLIPTextConfig.from_dict(text_encoder_config))
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
     # 4. scheduler
@@ -187,7 +190,7 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
                 diffusers_pipe.safety_checker, is_text_encoder=False
             )
-            pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionModel(**safety_checker_config))
+            pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionConfig.from_dict(safety_checker_config))
             pp_safety_checker.set_dict(safety_checker_state_dict)
             # 8. create ppdiffusers pipe
             paddle_pipe = PPDiffusersStableDiffusionPipeline(

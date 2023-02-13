@@ -17,7 +17,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import paddle
 
@@ -156,7 +156,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: int,
         sample: paddle.Tensor,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[SdeVeOutput, Tuple]:
         """
@@ -211,7 +211,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         self,
         model_output: paddle.Tensor,
         sample: paddle.Tensor,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[SchedulerOutput, Tuple]:
         """

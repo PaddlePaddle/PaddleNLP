@@ -12,15 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import typing
-from typing import Any, List, Optional
 import hashlib
-from fastapi import APIRouter, Request
-from ..base_router import BaseRouterManager
-from ...utils.log import logger
+import typing
+from typing import Optional
 
-from pydantic import BaseModel, Extra
-from pydantic import create_model
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, Extra, create_model
+
+from ...utils.log import logger
+from ..base_router import BaseRouterManager
 
 
 class ResponseBase(BaseModel):
@@ -35,7 +35,7 @@ class HttpRouterManager(BaseRouterManager):
     def register_models_router(self, task_name):
 
         # Url path to register the model
-        paths = [f"/models/{task_name}"]
+        paths = [f"/{task_name}"]
         for path in paths:
             logger.info("   Transformer model request [path]={} is genereated.".format(path))
 
@@ -78,7 +78,7 @@ class HttpRouterManager(BaseRouterManager):
     def register_taskflow_router(self, task_name):
 
         # Url path to register the model
-        paths = [f"/taskflow/{task_name}"]
+        paths = [f"/{task_name}"]
         for path in paths:
             logger.info("   Taskflow  request [path]={} is genereated.".format(path))
 

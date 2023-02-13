@@ -148,7 +148,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: Union[float, paddle.Tensor],
         sample: paddle.Tensor,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[EulerAncestralDiscreteSchedulerOutput, Tuple]:
         """

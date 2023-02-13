@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 import numpy as np
 
-from paddlenlp.data import Stack, Pad, Tuple, Dict
-from common_test import CpuCommonTest
-import util
-import unittest
+from paddlenlp.data import Dict, Pad, Stack, Tuple
+from tests import testing_utils
+from tests.common_test import CpuCommonTest
 
 
 class TestStack(CpuCommonTest):
@@ -84,7 +85,7 @@ class TestTuple(CpuCommonTest):
     def test_tuple_list(self):
         self._test_impl(False)
 
-    @util.assert_raises
+    @testing_utils.assert_raises
     def test_empty_fn(self):
         Tuple([Stack()], Pad(axis=0, pad_val=0))
 

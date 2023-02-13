@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -126,8 +125,8 @@ class TrainCallback(paddle.callbacks.ProgBarLogger):
     def on_train_batch_end(self, step, logs=None):
         # loss and kl weight are not accumulated
         logs["kl weight"] = self.ppl.cross_entropy.kl_weight
-        logs["kl loss"] = self.ppl.cross_entropy.kl_loss.numpy()[0]
-        logs["rec loss"] = self.ppl.cross_entropy.rec_loss.numpy()[0]
+        logs["kl loss"] = float(self.ppl.cross_entropy.kl_loss)
+        logs["rec loss"] = float(self.ppl.cross_entropy.rec_loss)
         super(TrainCallback, self).on_train_batch_end(step, logs)
 
     def on_eval_begin(self, logs=None):
@@ -336,7 +335,7 @@ class VAESeq2SeqInferModel(VAESeq2SeqModel):
             dec_first_cell = [dec_first_cell]
         dec_initial_states = [[h, c] for h, c in zip(dec_first_hidden, dec_first_cell)]
 
-        output_fc = lambda x: F.one_hot(
+        output_fc = lambda x: F.one_hot(  # noqa: E731
             paddle.multinomial(F.softmax(paddle.squeeze(self.decoder.output_fc(x), [1]))), num_classes=self.vocab_size
         )
 

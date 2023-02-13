@@ -14,40 +14,37 @@
 """
 ERNIE pretraining scripts for paddlepaddle static graph mode.
 """
-import argparse
-import math
+import collections
+import json
 import os
 import random
-import time
-import yaml
 import shutil
-import json
-import collections
+import time
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet as fleet
 import paddle.distributed as dist
-from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddle.io import DataLoader, Dataset
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.utils.log import logger
-
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
-
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
-
-from paddlenlp.ops import guard, Topology, get_rng_state_tracker
-from paddlenlp.utils.log import logger
-import paddlenlp.ops as ops
-from visualdl import LogWriter
-
+import paddle.distributed.fleet as fleet
+import yaml
 from args import parse_args
 from data_tools.dataset_utils import build_train_valid_test_datasets
+from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
+from visualdl import LogWriter
+
+from paddlenlp.data import Stack
+from paddlenlp.ops import Topology, get_rng_state_tracker
+from paddlenlp.transformers import (
+    ErnieConfig,
+    ErnieForPretraining,
+    ErniePretrainingCriterion,
+    ErnieTokenizer,
+    LinearAnnealingWithWarmupDecay,
+)
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
+    "ernie": (ErnieConfig, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
 }
 
 
@@ -112,8 +109,8 @@ def create_pretrained_dataset(
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
         out[5] = out[5].reshape([-1, 1])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        _, seq_length = out[0].shape
+        size = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
         if size % 8 != 0:
@@ -372,12 +369,11 @@ def do_train(args):
         log_writer = LogWriter(os.path.join(args.output_dir, default_logdir()))
 
     # Define the input data in the static mode
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
     # load config in checkpoint
     global_step = 0
-    consumed_samples = 0
     checkpoint_dir = os.path.join(args.output_dir, "model_last")
     if os.path.exists(checkpoint_dir):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
@@ -386,7 +382,6 @@ def do_train(args):
                 assert (
                     step_config["global_batch_size"] == args.global_batch_size
                 ), "Please ensure checkpoint global batch size is the same. Folder: {}".format(checkpoint_dir)
-                consumed_samples = step_config["consumed_samples"]
                 global_step = step_config["global_step"]
 
     data_file = get_train_data_file(args)
@@ -433,7 +428,7 @@ def do_train(args):
                 model_config["vocab_size"] += 8 - (model_config["vocab_size"] % 8)
             model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
             model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-            model = model_class(base_class(**model_config))
+            model = model_class(config_class(**model_config))
         else:
             model, _ = model_class.from_pretrained(
                 args.model_name_or_path,
@@ -518,7 +513,7 @@ def do_train(args):
 
     if worker_index == 0:
         # log the model config and args
-        model_config_json = json.dumps(model.get_model_config(), ensure_ascii=False, indent=2)
+        model_config_json = json.dumps(model.config.to_dict(), ensure_ascii=False, indent=2)
         log_writer.add_text("model_config", model_config_json)
         args_dict = {"paddle commit id": str(paddle.version.commit)}
         for arg in vars(args):
@@ -550,7 +545,7 @@ def do_train(args):
                 logger.warning("Sharding should init with static vars")
             else:
                 logger.info("Loading parameters from %s" % dygrah_path)
-                init_static_with_params(model, paddle.load(dygrah_path, return_numpy=True), topo, main_program)
+                # init_static_with_params(model, paddle.load(dygrah_path, return_numpy=True), topo, main_program)
                 flag_loaded = True
 
         if not flag_loaded:

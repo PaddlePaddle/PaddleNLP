@@ -71,6 +71,8 @@ def main():
     trainer = LatentDiffusionTrainer(
         model=model, args=training_args, train_dataset=train_dataset, tokenizer=model.tokenizer
     )
+    # must set recompute after trainer init
+    trainer.model.set_recompute(training_args.recompute)
     params_to_train = itertools.chain(trainer.model.text_encoder.parameters(), trainer.model.unet.parameters())
     trainer.set_optimizer_grouped_parameters(params_to_train)
 

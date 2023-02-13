@@ -48,10 +48,76 @@ __global__ void transpose(T* src,
                           const int size_per_head);
 
 template <typename T>
-void fusedQKV_masked_attention_dispatch_v2(
-  const T* qkv_buf, const T* qkv_bias,
-  T* key_cache, T* value_cache,
-  T* context_buf, const bool* finished, int max_batch_size, int inference_batch_size, 
-  int head_num, int size_per_head, const int step, const int max_seq_len, 
-  const int max_input_len, const int* input_lengths, const int rotary_embedding_dim, cudaStream_t stream);
-}
+void fusedQKV_masked_attention_dispatch_v2(const T* qkv_buf,
+                                           const T* qkv_bias,
+                                           T* key_cache,
+                                           T* value_cache,
+                                           T* context_buf,
+                                           const bool* finished,
+                                           int max_batch_size,
+                                           int inference_batch_size,
+                                           int head_num,
+                                           int size_per_head,
+                                           const int step,
+                                           const int max_seq_len,
+                                           const int max_input_len,
+                                           const int* input_lengths,
+                                           const int rotary_embedding_dim,
+                                           cudaStream_t stream);
+
+template <typename T>
+void masked_attention_dispatch_v2(T* key_buf,
+                                  T* value_buf,
+                                  T* query_buf,
+                                  const T* self_Q_bias,
+                                  T* key_cache,
+                                  const T* self_K_bias,
+                                  T* value_cache,
+                                  const T* self_V_bias,
+                                  T* context_buf,
+                                  const bool* finished,
+                                  int max_batch_size,
+                                  int inference_batch_size,
+                                  int head_num,
+                                  int size_per_head,
+                                  const int step,
+                                  const int max_seq_len,
+                                  cudaStream_t stream,
+                                  const T* relative_attention_bias = nullptr);
+
+template <typename T>
+void fusedQKV_masked_attention_dispatch_v3(
+    const T* qkv_buf,
+    const T* qkv_bias,
+    T* key_cache,
+    T* value_cache,
+    T* context_buf,
+    const bool* finished,
+    int max_batch_size,
+    int inference_batch_size,
+    int head_num,
+    int size_per_head,
+    const int step,
+    const int max_seq_len,
+    cudaStream_t stream,
+    const T* relative_attention_bias = nullptr);
+
+template <typename T>
+void cross_attention_dispatch_v2(T* query_buf,
+                                 const T* Q_bias,
+                                 T* key_cache,
+                                 const T* K_bias,
+                                 T* value_cache,
+                                 const T* V_bias,
+                                 const int* length,
+                                 T* context_buf,
+                                 const bool* finished,
+                                 int batch_size,
+                                 int head_num,
+                                 int size_per_head,
+                                 int step,
+                                 int seq_len,
+                                 cudaStream_t stream,
+                                 const T* relative_attention_bias = nullptr);
+
+}  // namespace fastertransformer

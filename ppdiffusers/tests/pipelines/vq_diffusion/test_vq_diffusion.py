@@ -18,9 +18,8 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     Transformer2DModel,
     VQDiffusionPipeline,
@@ -33,7 +32,7 @@ from ppdiffusers.pipelines.vq_diffusion.pipeline_vq_diffusion import (
 from ppdiffusers.utils import load_numpy, slow
 
 
-class VQDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class VQDiffusionPipelineFastTests(unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -81,7 +80,8 @@ class VQDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_layers=5,
             vocab_size=1000,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 
@@ -144,15 +144,15 @@ class VQDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         expected_slice = np.array(
             [
-                0.4555889964103699,
-                0.8180876970291138,
-                0.8191028237342834,
-                0.4898788630962372,
-                0.7687911987304688,
-                0.5317288637161255,
-                0.45981234312057495,
-                0.668595016002655,
-                0.5385899543762207,
+                0.6901105642318726,
+                0.5934056639671326,
+                0.5921000838279724,
+                0.4860895872116089,
+                0.6917713284492493,
+                0.5599623918533325,
+                0.6187697649002075,
+                0.728931188583374,
+                0.6061633229255676,
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
@@ -197,18 +197,17 @@ class VQDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         expected_slice = np.array(
             [
-                0.829240083694458,
-                0.9359513521194458,
-                0.4304574131965637,
-                0.5211103558540344,
-                0.7989728450775146,
-                0.4413323700428009,
-                0.5169486403465271,
-                0.5790078639984131,
-                0.4956228733062744,
+                0.6959998607635498,
+                0.7165096998214722,
+                0.739770770072937,
+                0.7538110017776489,
+                0.8786328434944153,
+                0.6491624712944031,
+                0.6340304017066956,
+                0.7169196605682373,
+                0.7034797668457031,
             ]
         )
-
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 

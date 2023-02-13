@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 import argparse
+import time
 
 import paddle
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-from paddlenlp.metrics import BLEU, Distinct
 from datasets import load_dataset
+from utils import create_data_loader, print_args, select_response, set_seed
 
-from utils import print_args, set_seed, create_data_loader, select_response
+from paddlenlp.metrics import BLEU, Distinct
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 # yapf: disable
@@ -114,7 +117,7 @@ def infer(args):
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_return_sequences,
             use_fp16_decoding=args.use_fp16_decoding,
-            use_faster=args.faster,
+            use_fast=args.faster,
         )
 
         total_time += time.time() - start_time

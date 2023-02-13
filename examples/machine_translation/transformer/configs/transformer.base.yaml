@@ -82,7 +82,7 @@ alpha: 0.6
 # Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation
 # <https://arxiv.org/abs/1611.08562>`_ for details. Bigger `diversity_rate`
 # would lead to more diversity. if `diversity_rate == 0` is equivalent to naive
-# BeamSearch. **NOTE**: Only works when using FasterTransformer temporarily.
+# BeamSearch. **NOTE**: Only works when using FastGeneration temporarily.
 diversity_rate: 0.0
 # The number of decoded sentences to output.
 n_best: 1

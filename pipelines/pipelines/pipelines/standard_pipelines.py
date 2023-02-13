@@ -14,21 +14,19 @@
 
 import logging
 from abc import ABC
-from copy import deepcopy
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from functools import wraps
+from typing import Any, Dict, List, Optional
 
-from pipelines.schema import Document
-from pipelines.nodes.reader import BaseReader
-from pipelines.nodes.ranker import BaseRanker
-from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
-from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
 from pipelines.nodes.answer_extractor import AnswerExtractor, QAFilter
-from pipelines.nodes.question_generator import QuestionGenerator
-from pipelines.pipelines import Pipeline
 from pipelines.nodes.base import BaseComponent
+from pipelines.nodes.question_generator import QuestionGenerator
+from pipelines.nodes.ranker import BaseRanker
+from pipelines.nodes.reader import BaseReader
+from pipelines.nodes.retriever import BaseRetriever
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
+from pipelines.pipelines import Pipeline
+from pipelines.schema import Document
 
 logger = logging.getLogger(__name__)
 
@@ -320,4 +318,35 @@ class QAGenerationPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        return output
+
+
+class SentaPipeline(BaseStandardPipeline):
+    """
+    Pipeline for document intelligence.
+    """
+
+    def __init__(self, preprocessor: BaseComponent, senta: BaseComponent, visualization: BaseComponent):
+        """
+        :param preprocessor: file preprocessor instance
+        :param senta: senta model instance
+        """
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=preprocessor, name="PreProcessor", inputs=["File"])
+        self.pipeline.add_node(component=senta, name="Senta", inputs=["PreProcessor"])
+        self.pipeline.add_node(component=visualization, name="Visualization", inputs=["Senta"])
+
+    def run(self, meta: dict, params: Optional[dict] = None, debug: Optional[bool] = None):
+        """
+        :param query: the query string.
+        :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+              about their execution. By default these include the input parameters
+              they received and the output they generated.
+              All debug information can then be found in the dict returned
+              by this method under the key "_debug"
+        """
+        output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        if "examples" in output:
+            output.pop("examples")
         return output

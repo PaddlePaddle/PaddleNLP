@@ -47,25 +47,20 @@ def prepare_mask_and_masked_image(image, mask):
     Prepares a pair (image, mask) to be consumed by the Stable Diffusion pipeline. This means that those inputs will be
     converted to ``paddle.Tensor`` with shapes ``batch x channels x height x width`` where ``channels`` is ``3`` for the
     ``image`` and ``1`` for the ``mask``.
-
-    The ``image`` will be converted to ``"float32"`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
-    binarized (``mask > 0.5``) and cast to ``"float32"`` too.
-
+    The ``image`` will be converted to ``paddle.float32`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
+    binarized (``mask > 0.5``) and cast to ``paddle.float32`` too.
     Args:
         image (Union[np.array, PIL.Image, paddle.Tensor]): The image to inpaint.
             It can be a ``PIL.Image``, or a ``height x width x 3`` ``np.array`` or a ``channels x height x width``
-            ``paddle.Tensor`` or a ``batch x channels x height x width`` ``paddle.T'en'so'r``.
+            ``paddle.Tensor`` or a ``batch x channels x height x width`` ``paddle.Tensor``.
         mask (_type_): The mask to apply to the image, i.e. regions to inpaint.
             It can be a ``PIL.Image``, or a ``height x width`` ``np.array`` or a ``1 x height x width``
             ``paddle.Tensor`` or a ``batch x 1 x height x width`` ``paddle.Tensor``.
-
-
     Raises:
         ValueError: ``paddle.Tensor`` images should be in the ``[-1, 1]`` range. ValueError: ``paddle.Tensor`` mask
         should be in the ``[0, 1]`` range. ValueError: ``mask`` and ``image`` should have the same spatial dimensions.
         TypeError: ``mask`` is a ``paddle.Tensor`` but ``image`` is not
             (ot the other way around).
-
     Returns:
         tuple[paddle.Tensor]: The pair (mask, masked_image) as ``paddle.Tensor`` with 4
             dimensions: ``batch x channels x height x width``.
@@ -73,7 +68,6 @@ def prepare_mask_and_masked_image(image, mask):
     if isinstance(image, paddle.Tensor):
         if not isinstance(mask, paddle.Tensor):
             raise TypeError(f"`image` is a paddle.Tensor but `mask` (type: {type(mask)} is not")
-        mask = mask.cast("float32")
 
         # Batch single image
         if image.ndim == 3:
@@ -107,22 +101,37 @@ def prepare_mask_and_masked_image(image, mask):
             raise ValueError("Mask should be in [0, 1] range")
 
         # Binarize mask
-        mask[mask < 0.5] = 0.0
-        mask[mask >= 0.5] = 1.0
+        mask[mask < 0.5] = 0
+        mask[mask >= 0.5] = 1
 
         # Image as float32
-        image = image.cast("float32")
+        image = image.cast(paddle.float32)
     elif isinstance(mask, paddle.Tensor):
         raise TypeError(f"`mask` is a paddle.Tensor but `image` (type: {type(image)} is not")
     else:
-        if isinstance(image, PIL.Image.Image):
-            image = np.array(image.convert("RGB"))
-        image = image[None].transpose(0, 3, 1, 2)
-        image = paddle.to_tensor(image).cast("float32") / 127.5 - 1.0
-        if isinstance(mask, PIL.Image.Image):
-            mask = np.array(mask.convert("L"))
+        # preprocess image
+        if isinstance(image, (PIL.Image.Image, np.ndarray)):
+            image = [image]
+
+        if isinstance(image, list) and isinstance(image[0], PIL.Image.Image):
+            image = [np.array(i.convert("RGB"))[None, :] for i in image]
+            image = np.concatenate(image, axis=0)
+        elif isinstance(image, list) and isinstance(image[0], np.ndarray):
+            image = np.concatenate([i[None, :] for i in image], axis=0)
+
+        image = image.transpose(0, 3, 1, 2)
+        image = paddle.to_tensor(image).cast(paddle.float32) / 127.5 - 1.0
+
+        # preprocess mask
+        if isinstance(mask, (PIL.Image.Image, np.ndarray)):
+            mask = [mask]
+
+        if isinstance(mask, list) and isinstance(mask[0], PIL.Image.Image):
+            mask = np.concatenate([np.array(m.convert("L"))[None, None, :] for m in mask], axis=0)
             mask = mask.astype(np.float32) / 255.0
-        mask = mask[None, None]
+        elif isinstance(mask, list) and isinstance(mask[0], np.ndarray):
+            mask = np.concatenate([m[None, None, :] for m in mask], axis=0)
+
         mask[mask < 0.5] = 0
         mask[mask >= 0.5] = 1
         mask = paddle.to_tensor(mask)
@@ -231,7 +240,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         if is_unet_version_less_0_9_0 and is_unet_sample_size_less_64:
             deprecation_message = (
                 "The configuration file of the unet has set the default `sample_size` to smaller than"
-                " 64 which seems highly unlikely .If you're checkpoint is a fine-tuned version of any of the"
+                " 64 which seems highly unlikely. If your checkpoint is a fine-tuned version of any of the"
                 " following: \n- CompVis/stable-diffusion-v1-4 \n- CompVis/stable-diffusion-v1-3 \n-"
                 " CompVis/stable-diffusion-v1-2 \n- CompVis/stable-diffusion-v1-1 \n- runwayml/stable-diffusion-v1-5"
                 " \n- runwayml/stable-diffusion-inpainting \n you should change 'sample_size' to 64 in the"
@@ -255,39 +264,6 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing
-    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
-        r"""
-        Enable sliced attention computation.
-
-        When this option is enabled, the attention module will split the input tensor in slices, to compute attention
-        in several steps. This is useful to save some memory in exchange for a small speed decrease.
-
-        Args:
-            slice_size (`str` or `int`, *optional*, defaults to `"auto"`):
-                When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
-                a number is provided, uses as many slices as `attention_head_dim // slice_size`. In this case,
-                `attention_head_dim` must be a multiple of `slice_size`.
-        """
-        if slice_size == "auto":
-            if isinstance(self.unet.config.attention_head_dim, int):
-                # half the attention head size is usually a good trade-off between
-                # speed and memory
-                slice_size = self.unet.config.attention_head_dim // 2
-            else:
-                # if `attention_head_dim` is a list, take the smallest head size
-                slice_size = min(self.unet.config.attention_head_dim)
-        self.unet.set_attention_slice(slice_size)
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.disable_attention_slicing
-    def disable_attention_slicing(self):
-        r"""
-        Disable sliced attention computation. If `enable_attention_slicing` was previously invoked, this method will go
-        back to computing attention in one step.
-        """
-        # set slice_size = `None` to disable `attention slicing`
-        self.enable_attention_slicing(None)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
     def _encode_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
@@ -315,9 +291,11 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
             return_tensors="pd",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="pd").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
 
-        if not paddle.equal_all(text_input_ids, untruncated_ids):
+        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
+            text_input_ids, untruncated_ids
+        ):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
@@ -455,8 +433,21 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
         if latents is None:
-            latents = paddle.randn(shape, generator=generator, dtype=dtype)
+            if isinstance(generator, list):
+                shape = [
+                    1,
+                ] + shape[1:]
+                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
+                latents = paddle.concat(latents, axis=0)
+            else:
+                latents = paddle.randn(shape, generator=generator, dtype=dtype)
         else:
             if latents.shape != shape:
                 raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
@@ -477,12 +468,33 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         masked_image = masked_image.cast(dtype)
 
         # encode the mask image into latents space so we can concatenate it to the latents
-        masked_image_latents = self.vae.encode(masked_image).latent_dist.sample(generator=generator)
+        if isinstance(generator, list):
+            masked_image_latents = [
+                self.vae.encode(masked_image[i : i + 1]).latent_dist.sample(generator=generator[i])
+                for i in range(batch_size)
+            ]
+            masked_image_latents = paddle.concat(masked_image_latents, axis=0)
+        else:
+            masked_image_latents = self.vae.encode(masked_image).latent_dist.sample(generator=generator)
         masked_image_latents = 0.18215 * masked_image_latents
 
         # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
-        mask = mask.tile([batch_size, 1, 1, 1])
-        masked_image_latents = masked_image_latents.tile([batch_size, 1, 1, 1])
+        if mask.shape[0] < batch_size:
+            if not batch_size % mask.shape[0] == 0:
+                raise ValueError(
+                    "The passed mask and the required batch size don't match. Masks are supposed to be duplicated to"
+                    f" a total batch size of {batch_size}, but {mask.shape[0]} masks were passed. Make sure the number"
+                    " of masks that you pass is divisible by the total requested batch size."
+                )
+            mask = mask.tile([batch_size // mask.shape[0], 1, 1, 1])
+        if masked_image_latents.shape[0] < batch_size:
+            if not batch_size % masked_image_latents.shape[0] == 0:
+                raise ValueError(
+                    "The passed images and the required batch size don't match. Images are supposed to be duplicated"
+                    f" to a total batch size of {batch_size}, but {masked_image_latents.shape[0]} images were passed."
+                    " Make sure the number of images that you pass is divisible by the total requested batch size."
+                )
+            masked_image_latents = masked_image_latents.tile([batch_size // masked_image_latents.shape[0], 1, 1, 1])
 
         mask = paddle.concat([mask] * 2) if do_classifier_free_guidance else mask
         masked_image_latents = (
@@ -505,7 +517,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -548,7 +560,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents

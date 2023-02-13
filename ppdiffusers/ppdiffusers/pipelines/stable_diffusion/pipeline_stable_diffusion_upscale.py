@@ -36,15 +36,23 @@ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 def preprocess(image):
-    # resize to multiple of 64
-    width, height = image.size
-    width = width - width % 64
-    height = height - height % 64
-    image = image.resize((width, height))
+    if isinstance(image, paddle.Tensor):
+        return image
+    elif isinstance(image, PIL.Image.Image):
+        image = [image]
 
-    image = np.array(image.convert("RGB"))
-    image = image[None].transpose(0, 3, 1, 2)
-    image = paddle.to_tensor(image).cast("float32") / 127.5 - 1.0
+    if isinstance(image[0], PIL.Image.Image):
+        w, h = image[0].size
+        w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 32
+
+        image = [np.array(i.resize((w, h)))[None, :] for i in image]
+        image = np.concatenate(image, axis=0)
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image.transpose(0, 3, 1, 2)
+        image = 2.0 * image - 1.0
+        image = paddle.to_tensor(image)
+    elif isinstance(image[0], paddle.Tensor):
+        image = paddle.concat(image, axis=0)
     return image
 
 
@@ -96,40 +104,6 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
         )
         self.register_to_config(max_noise_level=max_noise_level)
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing
-    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
-        r"""
-        Enable sliced attention computation.
-
-        When this option is enabled, the attention module will split the input tensor in slices, to compute attention
-        in several steps. This is useful to save some memory in exchange for a small speed decrease.
-
-        Args:
-            slice_size (`str` or `int`, *optional*, defaults to `"auto"`):
-                When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
-                a number is provided, uses as many slices as `attention_head_dim // slice_size`. In this case,
-                `attention_head_dim` must be a multiple of `slice_size`.
-        """
-        if slice_size == "auto":
-            if isinstance(self.unet.config.attention_head_dim, int):
-                # half the attention head size is usually a good trade-off between
-                # speed and memory
-                slice_size = self.unet.config.attention_head_dim // 2
-            else:
-                # if `attention_head_dim` is a list, take the smallest head size
-                slice_size = min(self.unet.config.attention_head_dim)
-
-        self.unet.set_attention_slice(slice_size)
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.disable_attention_slicing
-    def disable_attention_slicing(self):
-        r"""
-        Disable sliced attention computation. If `enable_attention_slicing` was previously invoked, this method will go
-        back to computing attention in one step.
-        """
-        # set slice_size = `None` to disable `attention slicing`
-        self.enable_attention_slicing(None)
-
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
     def _encode_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
         r"""
@@ -156,9 +130,11 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
             return_tensors="pd",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="pd").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
 
-        if not paddle.equal_all(text_input_ids, untruncated_ids):
+        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
+            text_input_ids, untruncated_ids
+        ):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
@@ -330,7 +306,7 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -406,10 +382,7 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        image = [image] if isinstance(image, PIL.Image.Image) else image
-        if isinstance(image, list):
-            image = [preprocess(img) for img in image]
-            image = paddle.concat(image, axis=0)
+        image = preprocess(image)
         image = image.cast(text_embeddings.dtype)
 
         # 5. set timesteps

@@ -19,9 +19,8 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -35,7 +34,7 @@ from ppdiffusers.pipelines.stable_diffusion_safe import (
 from ppdiffusers.utils import floats_tensor, slow
 
 
-class SafeDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class SafeDiffusionPipelineFastTests(unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -88,7 +87,8 @@ class SafeDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_layers=5,
             vocab_size=1000,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 
@@ -154,15 +154,15 @@ class SafeDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array(
             [
-                0.7791749835014343,
-                0.8667459487915039,
-                0.5878564715385437,
-                0.5211286544799805,
-                0.2702028155326843,
-                0.27908071875572205,
-                0.6025791168212891,
-                0.3965553045272827,
-                0.521015465259552,
+                0.5384523868560791,
+                0.7189769744873047,
+                0.3174622058868408,
+                0.4472818076610565,
+                0.5456932187080383,
+                0.35453569889068604,
+                0.39105305075645447,
+                0.4643339216709137,
+                0.44654926657676697,
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
@@ -209,15 +209,15 @@ class SafeDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array(
             [
-                0.8557025790214539,
-                0.9620720744132996,
-                0.546848475933075,
-                0.4824812710285187,
-                0.28642088174819946,
-                0.2695998549461365,
-                0.45399513840675354,
-                0.34484896063804626,
-                0.5284963846206665,
+                0.6677020788192749,
+                0.8690440058708191,
+                0.3959217965602875,
+                0.41445955634117126,
+                0.4883394241333008,
+                0.3246898651123047,
+                0.35466185212135315,
+                0.43880611658096313,
+                0.48951300978660583,
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

@@ -13,16 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import csv
-import itertools
-
-from .utils import download_file
-from .utils import TermTree
 from .knowledge_mining import WordTagTask
 from .lexical_analysis import LacTask
 from .utils import Customization
@@ -51,7 +41,7 @@ POS_LABEL_WORDTAG = [
 POS_LABEL_LAC = ["n", "f", "s", "t", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "r", "p", "c", "u", "xc", "w"]
 
 usage = r"""
-          from paddlenlp import Taskflow 
+          from paddlenlp import Taskflow
 
           # WordTag精确模式
           ner = Taskflow("ner")
@@ -100,8 +90,8 @@ class NERWordTagTask(WordTagTask):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.3/model_state.pdparams",
-                "32b4ed27e99d6b2c76e50a24d1a9fd56",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.4/model_state.pdparams",
+                "f035cc909a96817573ae33d8028ff6f8",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
@@ -197,13 +187,11 @@ class NERLACTask(LacTask):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
         """
-        batch_out = []
         lengths = inputs["lens"]
         preds = inputs["result"]
         sents = inputs["text"]
         final_results = []
         for sent_index in range(len(lengths)):
-            single_result = {}
             tags = [self._id2tag_dict[str(index)] for index in preds[sent_index][: lengths[sent_index]]]
             sent = sents[sent_index]
             if self._custom:

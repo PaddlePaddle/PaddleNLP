@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import json
-import functools
-import random
-import time
-import os
 import argparse
+import functools
+import os
+import random
 
 import numpy as np
-
 import paddle
-import paddle.nn.functional as F
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
-from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer, LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
+from paddle.io import BatchSampler, DataLoader
 from trustai.interpretation import FeatureSimilarityModel
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -81,6 +77,7 @@ def read_local_dataset(path):
             else:
                 logger.info(line.strip())
                 raise ValueError("{} should be in fixed format.".format(path))
+    f.close()
 
 
 def preprocess_function(examples, tokenizer, max_seq_length):
@@ -126,11 +123,7 @@ def find_sparse_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
@@ -146,6 +139,7 @@ def find_sparse_data():
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
+    f.close()
 
     train_ds = load_dataset(read_local_dataset, path=train_path, lazy=False)
     dev_ds = load_dataset(read_local_dataset, path=dev_path, lazy=False)
@@ -219,11 +213,7 @@ def find_support_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
@@ -275,9 +265,9 @@ def find_support_data():
         create_n = 1
         aug_percent = 0.1
         if args.aug_strategy == "substitute":
-            aug = WordSubstitute("synonym", create_n=create_n, aug_percent=aug_percent)
+            aug = WordSubstitute("embedding", create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "insert":
-            aug = WordInsert("synonym", create_n=create_n, aug_percent=aug_percent)
+            aug = WordInsert("embedding", create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "delete":
             aug = WordDelete(create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "swap":
@@ -287,6 +277,8 @@ def find_support_data():
             for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
                 augs = aug.augment(data["text"])
+                if not isinstance(augs[0], str):
+                    augs = augs[0]
                 for a in augs:
                     f.write(a + "\t" + data["label"] + "\n")
         f.close()

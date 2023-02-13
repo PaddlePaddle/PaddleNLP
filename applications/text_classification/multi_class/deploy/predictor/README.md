@@ -12,7 +12,7 @@
 
 如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
 ```
-python -m pip install onnxruntime-gpu onnx onnxconverter-common==1.9.0
+python -m pip install onnxruntime-gpu onnx onnxconverter-common==1.9.0 paddle2onnx==1.0.5
 ```
 
 如果基于CPU部署，请使用如下命令安装所需依赖:
@@ -37,6 +37,7 @@ python infer.py \
     --batch_size 32 \
     --dataset_dir "../../data"
 ```
+多语言模型加上`--multilingual`,裁剪后的模型前缀为`--model_path_prefix ../../prune/width_mult_XXXX/pruned_model`。
 
 可支持配置的参数：
 
@@ -50,6 +51,7 @@ python infer.py \
 * `perf`：选择进行模型性能和精度评估；默认为False。
 * `dataset_dir`：本地数据集地址，需包含data.txt, label.txt, test.txt/dev.txt(可选，如果启动模型性能和精度评估)；默认为None。
 * `perf_dataset`：评估数据集，可选'dev'、'test'，选择在开发集或测试集评估模型；默认为"dev"。
+* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
 
 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。可以使用如下命令开启ONNXRuntime的FP16进行推理加速：
 

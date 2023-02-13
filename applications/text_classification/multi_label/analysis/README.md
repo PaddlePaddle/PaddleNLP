@@ -86,17 +86,14 @@ python evaluate.py \
 
 ```text
 [2022-08-12 02:24:48,193] [    INFO] - -----Evaluate model-------
-[2022-08-12 02:24:48,194] [    INFO] - Train dataset size: 14377
 [2022-08-12 02:24:48,194] [    INFO] - Dev dataset size: 1611
 [2022-08-12 02:24:48,194] [    INFO] - Accuracy in dev dataset: 74.24%
 [2022-08-12 02:24:48,194] [    INFO] - Macro avg in dev dataset: precision: 82.96 | recall: 77.59 | F1 score 79.36
 [2022-08-12 02:24:48,194] [    INFO] - Micro avg in dev dataset: precision: 91.50 | recall: 89.66 | F1 score 90.57
 [2022-08-12 02:24:48,195] [    INFO] - Class name: 婚后有子女
-[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 6759(47.0%) | precision: 99.78 | recall: 99.59 | F1 score 99.68
 [2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 784(48.7%) | precision: 97.07 | recall: 97.32 | F1 score 97.20
 [2022-08-12 02:24:48,195] [    INFO] - ----------------------------
 [2022-08-12 02:24:48,195] [    INFO] - Class name: 限制行为能力子女抚养
-[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 4358(30.3%) | precision: 99.36 | recall: 99.56 | F1 score 99.46
 [2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 492(30.5%) | precision: 88.57 | recall: 88.21 | F1 score 88.39
 ...
 ```

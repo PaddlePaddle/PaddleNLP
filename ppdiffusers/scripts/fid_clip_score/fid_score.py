@@ -141,7 +141,6 @@ def get_activations(files, model, batch_size=50, dims=2048, num_workers=1):
 
         # If model output is not scalar, apply global spatial average pooling.
         # This happens if you choose a dimensionality not equal 2048.
-        # import pdb;pdb.set_trace()
         if pred.shape[2] != 1 or pred.shape[3] != 1:
             pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
 

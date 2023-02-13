@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
+from pprint import pprint
 
 import paddle
 
-from pprint import pprint
-
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.ops import FasterUNIMOText
-
+from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -70,19 +68,19 @@ def do_predict(args):
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # attention_mask
             paddle.static.InputSpec(shape=[None, 1, None, None],
-                                    dtype="float64"),
+                                    dtype="float32"),
             # seq_len
             paddle.static.InputSpec(shape=[None], dtype="int64"),
             args.max_dec_len,
             args.min_dec_len,
             args.topk,
             args.topp,
-            args.num_beams,  # num_beams. Used for beam_search. 
+            args.num_beams,  # num_beams. Used for beam_search.
             args.decoding_strategy,
             tokenizer.cls_token_id,  # cls/bos
             tokenizer.mask_token_id,  # mask/eos
             tokenizer.pad_token_id,  # pad
-            args.diversity_rate,  # diversity rate. Used for beam search. 
+            args.diversity_rate,  # diversity rate. Used for beam search.
             args.temperature,
             args.num_return_sequences,
             args.length_penalty,

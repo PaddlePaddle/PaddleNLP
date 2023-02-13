@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import time
-import math
-import numpy as np
+
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.io import DataLoader
-
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-
 from args import parse_args, print_args
 from data import DialogueDataset, select_response
+from paddle.io import DataLoader
+
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 def main(args):
@@ -66,7 +64,7 @@ def infer(model, data_loader, tokenizer):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_samples,
-            use_faster=False,
+            use_fast=False,
         )
 
         total_time += time.time() - start_time

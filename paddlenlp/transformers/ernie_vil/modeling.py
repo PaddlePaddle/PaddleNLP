@@ -13,32 +13,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple, Optional
+from dataclasses import dataclass
+from functools import partial
+from typing import Any, Optional, Tuple, Union
+
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.distributed as dist
-from dataclasses import dataclass
 
-from .. import PretrainedModel, register_base_model
-from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
+from ...utils.initializer import normal_
+from ...utils.log import logger
+from .. import PretrainedModel
+from ..clip.modeling import CLIPVisionTransformer as ErnieViLVisionTransformer
+from ..clip.modeling import clip_loss
+from ..configuration_utils import PretrainedConfig
 from ..ernie.modeling import ErnieModel
-from ..clip.modeling import VisionTransformer, clip_loss
 from ..guided_diffusion_utils import (
     DiscoDiffusionMixin,
     create_gaussian_diffusion,
-    create_unet_model,
     create_secondary_model,
+    create_unet_model,
 )
+from ..model_outputs import (
+    BaseModelOutputWithPooling,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    ModelOutput,
+)
+from ..utils import resolve_cache_dir
+from .configuration import ErnieViLConfig, ErnieViLTextConfig, ErnieViLVisionConfig
 
 __all__ = [
     "ErnieViLModel",
+    "ErnieViLTextModel",
+    "ErnieViLVisionModel",
     "ErnieViLPretrainedModel",
     "ErnieViLForImageGeneration",
 ]
 
+ERNIE_VIL_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    # vit model
+    "PaddlePaddle/ernie_vil-2.0-base-zh",
+    "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
+]
 
-# set attr
+
 def quick_gelu(x):
     return x * F.sigmoid(1.702 * x)
 
@@ -50,21 +69,21 @@ F.quick_gelu = quick_gelu
 class ErnieViLOutput(ModelOutput):
     """
     Args:
-        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `return_loss` is `True`):
+        loss: (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `return_loss` is `True`):
             Contrastive loss for image-text similarity.
-        logits_per_image:(`paddle.Tensor` of shape `(image_batch_size, text_batch_size)`):
+        logits_per_image: (`paddle.Tensor` of shape `(image_batch_size, text_batch_size)`):
             The scaled dot product scores between `image_embeds` and `text_embeds`. This represents the image-text
             similarity scores.
-        logits_per_text:(`paddle.Tensor` of shape `(text_batch_size, image_batch_size)`):
+        logits_per_text: (`paddle.Tensor` of shape `(text_batch_size, image_batch_size)`):
             The scaled dot product scores between `text_embeds` and `image_embeds`. This represents the text-image
             similarity scores.
-        text_embeds(`paddle.Tensor` of shape `(batch_size, output_dim`):
+        text_embeds: (`paddle.Tensor` of shape `(batch_size, output_dim`):
             The text embeddings obtained by applying the projection layer to the pooled output of [`ErnieModel`].
-        image_embeds(`paddle.Tensor` of shape `(batch_size, output_dim`):
-            The image embeddings obtained by applying the projection layer to the pooled output of [`VisionTransformer`].
-        text_model_output(:class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`):
+        image_embeds: (`paddle.Tensor` of shape `(batch_size, output_dim`):
+            The image embeddings obtained by applying the projection layer to the pooled output of [`ErnieViLVisionTransformer`].
+        text_model_output: (:class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`):
             The output of the [`ErnieModel`].
-        vision_model_output(:class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`):
+        vision_model_output: (:class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPooling`):
             The output of the [`VisionTransformer`].
     """
 
@@ -74,7 +93,7 @@ class ErnieViLOutput(ModelOutput):
     text_embeds: paddle.Tensor = None
     image_embeds: paddle.Tensor = None
     text_model_output: BaseModelOutputWithPoolingAndCrossAttentions = None
-    vision_model_output: BaseModelOutputWithPoolingAndCrossAttentions = None
+    vision_model_output: BaseModelOutputWithPooling = None
 
     def to_tuple(self) -> Tuple[Any]:
         return tuple(
@@ -92,101 +111,151 @@ class ErnieViLPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "ernie_vil-2.0-base-zh": {
-            "image_resolution": 224,
-            "vision_layers": 12,
-            "vision_heads": 12,
-            "vision_embed_dim": 768,
-            "vision_patch_size": 16,
-            "vision_mlp_ratio": 4,
-            "vision_hidden_act": "quick_gelu",
-            "vision_epsilon": 1e-6,
-            "vocab_size": 40000,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 2048,
-            "type_vocab_size": 0,
-            "task_type_vocab_size": 3,
-            "hidden_act": "gelu",
-            "task_id": 0,
-            "use_task_id": False,
-            "text_epsilon": 1e-5,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "disco_diffusion_ernie_vil-2.0-base-zh": {
-            "image_resolution": 224,
-            "vision_layers": 12,
-            "vision_heads": 12,
-            "vision_embed_dim": 768,
-            "vision_patch_size": 16,
-            "vision_mlp_ratio": 4,
-            "vision_hidden_act": "quick_gelu",
-            "vision_epsilon": 1e-6,
-            "vocab_size": 40000,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 2048,
-            "type_vocab_size": 0,
-            "task_type_vocab_size": 3,
-            "hidden_act": "gelu",
-            "task_id": 0,
-            "use_task_id": False,
-            "text_epsilon": 1e-5,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ernie_vil-2.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/model_state.pdparams",
-            "disco_diffusion_ernie_vil-2.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/model_state.pdparams",
-        }
-    }
+    config_class = ErnieViLConfig
     base_model_prefix = "ernie_vil"
+    supports_gradient_checkpointing = True
 
-    def init_weights(self, layer):
-        """Initialization hook"""
-        if isinstance(layer, VisionTransformer):
+    def init_weights(self):
+        """
+        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
+        modules properly initialized (such as weight initialization).
+        """
+        self.apply(self._init_weights)
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, nn.TransformerEncoder):
+            module.enable_recompute = value
+
+    def gradient_checkpointing_enable(self):
+        """
+        Activates gradient checkpointing for the current model.
+
+        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
+        activations".
+        """
+        if not self.supports_gradient_checkpointing:
+            raise ValueError(f"{self.__class__.__name__} does not support gradient checkpointing.")
+        self.apply(partial(self._set_gradient_checkpointing, value=True))
+
+    def gradient_checkpointing_disable(self):
+        """
+        Deactivates gradient checkpointing for the current model.
+
+        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
+        activations".
+        """
+        if self.supports_gradient_checkpointing:
+            self.apply(partial(self._set_gradient_checkpointing, value=False))
+
+    def _init_weights(self, layer):
+        """Initialize the weights"""
+        if isinstance(layer, ErnieViLVisionTransformer):
             # find nn.LayerNorm
             for sub_layer in layer.sublayers():
                 if isinstance(sub_layer, nn.LayerNorm):
-                    sub_layer._epsilon = (
-                        self.vision_epsilon
-                        if hasattr(self, "vision_epsilon")
-                        else self.ernie_vil.config["vision_epsilon"]
-                    )
+                    sub_layer._epsilon = layer.config.layer_norm_eps
 
         elif isinstance(layer, ErnieModel):
             # find nn.LayerNorm
             for sub_layer in layer.sublayers():
                 if isinstance(sub_layer, nn.LayerNorm):
-                    sub_layer._epsilon = (
-                        self.text_epsilon if hasattr(self, "text_epsilon") else self.ernie_vil.config["text_epsilon"]
-                    )
+                    sub_layer._epsilon = layer.config.layer_norm_eps
                 elif isinstance(layer, (nn.Linear, nn.Embedding)):
-                    if isinstance(layer.weight, paddle.Tensor):
-                        layer.weight.set_value(
-                            paddle.normal(
-                                mean=0.0,
-                                std=self.initializer_range
-                                if hasattr(self, "initializer_range")
-                                else self.ernie_vil.config["initializer_range"],
-                                shape=layer.weight.shape,
-                            )
-                        )
+                    normal_(layer.weight, mean=0.0, std=layer.config.initializer_range)
+
+    @classmethod
+    def from_pretrained_v2(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
+        load_state_as_np = kwargs.pop("load_state_as_np", False)
+        config = kwargs.pop("config", None)
+        force_download = kwargs.pop("force_download", False)
+        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
+        dtype = kwargs.pop("dtype", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
+        model_kwargs = kwargs
+        # 1. get the PretrainedConfig to init model
+        if not isinstance(config, PretrainedConfig):
+            config_path = config if config is not None else pretrained_model_name_or_path
+            config, model_kwargs = cls.config_class.from_pretrained(
+                config_path,
+                cache_dir=cache_dir,
+                return_unused_kwargs=True,
+                force_download=force_download,
+                from_hf_hub=from_hf_hub,
+                **kwargs,
+            )
+        # Attention! we donot save this config.json
+        # config.save_pretrained(cache_dir)
+
+        # 2. init the model
+        init_args = config["init_args"] or ()
+        model = cls(config, *init_args, **model_kwargs)
+
+        # 3. resolve model_weight file
+        model_weight_file = cls._resolve_model_file_path(
+            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub
+        )
+
+        # 4. loading the state dict
+        model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+
+        loaded_state_dict_keys = list(model_state_dict.keys())
+        # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
+        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
+            model=model,
+            state_dict=model_state_dict,
+            loaded_keys=loaded_state_dict_keys,
+            ignore_mismatched_sizes=ignore_mismatched_sizes,
+            dtype=dtype,
+        )
+
+        if len(unexpected_keys) > 0:
+            logger.warning(
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
+                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
+                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
+                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
+            )
+        else:
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
+
+        if len(missing_keys) > 0:
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
+                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
+            )
+        elif len(mismatched_keys) == 0:
+            logger.info(
+                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
+                " training."
+            )
+        if len(mismatched_keys) > 0:
+            mismatched_warning = "\n".join(
+                [
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
+                    for key, shape1, shape2 in mismatched_keys
+                ]
+            )
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
+                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
+                " to use it for predictions and inference."
+            )
+        if paddle.in_dynamic_mode():
+            return model
+
+        return model, model_state_dict
 
 
-@register_base_model
 class ErnieViLModel(ErnieViLPretrainedModel):
     r"""
     The bare ErnieViL Model outputting logits_per_image and logits_per_text.
@@ -195,157 +264,67 @@ class ErnieViLModel(ErnieViLPretrainedModel):
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+
     Args:
-        image_resolution (int, optional):
-            The size (resolution) of each image.
-            Defaults to `224`.
-        vision_layers (int, optional):
-            Number of hidden layers in the vision model.
-            Defaults to `12`.
-        vision_heads (int, optional):
-            Number of attention heads for each attention layer in the vision model.
-            Defaults to `12`.
-        vision_embed_dim (int, optional):
-            Dimensionality of the embedding layer and encoder layers in vision model.
-            Defaults to `768`.
-        vision_patch_size(int, optional):
-            The size (resolution) of each patch.
-            Defaults to `32`.
-        vision_mlp_ratio(int, optional):
-            The ratio between dim_feedforward and vision_hidden_dim. `radio = dim_feedforward/vision_hidden_dim`
-            Defaults to `4`.
-        vision_hidden_act (str, optional):
-            The non-linear activation function of the ffn layer in the vision model.
-            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"quick_gelu"`.
-        vision_epsilon (float, optional):
-            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
-            Default to `1e-6`.
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `2048`.
-        type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids`.
-            Defaults to `4`.
-        task_type_vocab_size (int, optional):
-            The vocabulary size of the `task_ids`.
-            Defaults to `3`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer of Ernie.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        task_id (int, optional):
-            Task id. Defaults to `0`.
-        use_task_id (bool, optional):
-            Whether or not use task_id. Defaults to `False`.
-        text_epsilon (float, optional):
-            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
-            Default to `1e-5`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer for initializing all weight matrices.
-            Defaults to `0.02`.
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-
+        config (:class:`ErnieViLConfig`):
+            An instance of ErnieViLConfig used to construct ErnieViLModel.
     """
+    config_class = ErnieViLConfig
 
-    def __init__(
-        self,
-        # vision
-        image_resolution: int = 224,
-        vision_layers: int = 12,
-        vision_heads: int = 12,
-        vision_embed_dim: int = 768,
-        vision_patch_size: int = 16,
-        vision_mlp_ratio: int = 4,
-        vision_hidden_act: str = "quick_gelu",
-        vision_epsilon: float = 1e-6,
-        # ernie
-        vocab_size: int = 40000,
-        hidden_size: int = 768,
-        num_hidden_layers: int = 12,
-        num_attention_heads: int = 12,
-        intermediate_size: int = 3072,
-        hidden_dropout_prob: float = 0.1,
-        attention_probs_dropout_prob: float = 0.1,
-        max_position_embeddings: int = 2048,
-        type_vocab_size: int = 4,
-        task_type_vocab_size: int = 3,
-        hidden_act: str = "gelu",
-        task_id: int = 0,
-        use_task_id: bool = False,
-        text_epsilon: float = 1e-5,
-        initializer_range: float = 0.02,
-        pad_token_id: int = 0,
-    ):
-        super().__init__()
-        self.initializer_range = initializer_range
-        self.vision_epsilon = vision_epsilon
-        self.text_epsilon = text_epsilon
-        self.vision_model = VisionTransformer(
-            input_resolution=image_resolution,
-            patch_size=vision_patch_size,
-            width=vision_embed_dim,
-            layers=vision_layers,
-            heads=vision_heads,
-            activation=vision_hidden_act,
-            mlp_ratio=vision_mlp_ratio,
-            normalize_before=True,
-        )
+    def __init__(self, config: ErnieViLConfig):
+        super().__init__(config)
 
-        self.text_model = ErnieModel(
-            vocab_size,
-            hidden_size=hidden_size,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            hidden_act=hidden_act,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            initializer_range=initializer_range,
-            pad_token_id=pad_token_id,
-            task_type_vocab_size=task_type_vocab_size,
-            task_id=task_id,
-            use_task_id=use_task_id,
-        )
+        if not isinstance(config.text_config, ErnieViLTextConfig):
+            raise ValueError(
+                "config.text_config is expected to be of type ErnieViLTextConfig but is of type"
+                f" {type(config.text_config)}."
+            )
+
+        if not isinstance(config.vision_config, ErnieViLVisionConfig):
+            raise ValueError(
+                "config.vision_config is expected to be of type ErnieViLVisionConfig but is of type"
+                f" {type(config.vision_config)}."
+            )
+
+        text_config = config.text_config
+        vision_config = config.vision_config
+
+        self.text_model = ErnieModel(text_config)
+
+        self.vision_model = ErnieViLVisionTransformer(vision_config)
 
         self.temperature = self.create_parameter(
-            shape=(1,), default_initializer=nn.initializer.Constant(2.65926), dtype=paddle.get_default_dtype()
+            shape=(1,),
+            default_initializer=nn.initializer.Constant(config.logit_scale_init_value),
+            dtype=paddle.get_default_dtype(),
         )
 
-        self.apply(self.init_weights)
+        self.init_weights()
 
     def get_image_features(
-        self, pixel_values=None, output_attentions=False, output_hidden_states=False, return_dict=False
-    ):
+        self,
+        pixel_values: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> paddle.Tensor:
         r"""
+        Args:
+            pixel_values (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values. Padding will be ignored by default should you provide it. Pixel values can be obtained using
+                [`ErnieViLFeatureExtractor`]. See [`ErnieViLFeatureExtractor.__call__`] for details.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (`bool`, *optional*):
+                Whether or not to return a [`BaseModelOutputWithPooling`] instead of a plain tuple.
+
         Returns:
             image_features (`paddle.Tensor` of shape `(batch_size, output_dim`): The image embeddings obtained by
-            applying the projection layer to the pooled output of [`VisionTransformer`].
+            applying the projection layer to the pooled output of [`ErnieViLVisionModel`].
 
         Examples:
             .. code-block::
@@ -354,8 +333,8 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 from PIL import Image
                 from paddlenlp.transformers import ErnieViLProcessor, ErnieViLModel
 
-                model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
-                processor = ErnieViLProcessor.from_pretrained("ernie_vil-2.0-base-zh")
+                model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+                processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
 
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
@@ -363,6 +342,12 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 image_features = model.get_image_features(**inputs)
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         vision_outputs = self.vision_model(
             pixel_values,
             output_attentions=output_attentions,
@@ -375,31 +360,69 @@ class ErnieViLModel(ErnieViLPretrainedModel):
     def get_text_features(
         self,
         input_ids,
-        attention_mask=None,
-        position_ids=None,
-        token_type_ids=None,
-        task_type_ids=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        task_type_ids: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
+        Args:
+            input_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide
+                it.
+                Indices can be obtained using [`ErnieViLTokenizer`].
+            attention_mask (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            position_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
+                config.max_position_embeddings - 1]`.
+            token_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+                Its data type should be `int64`. Defaults to `None`, which means we don't add segment embeddings.
+            task_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of tasks of each input sequence tokens in the task embeddings (ErnieModel). Selected in
+                the range ``[0, task_type_vocab_size - 1]``. Defaults to `None`.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (`bool`, *optional*):
+                Whether or not to return a [`BaseModelOutputWithPoolingAndCrossAttentions`] instead of a plain tuple.
+
         Returns:
             text_features (`paddle.Tensor` of shape `(batch_size, output_dim`): The text embeddings obtained by
-            applying the projection layer to the pooled output of [`ErnieModel`].
+            the pooled output of [`ErnieModel`].
 
         Example:
             .. code-block::
 
                 from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
 
-                model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
-                tokenizer = ErnieViLTokenizer.from_pretrained("ernie_vil-2.0-base-zh")
+                model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+                tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
 
                 inputs = tokenizer(["一只猫的照片", "一条狗的照片"], padding=True, return_tensors="pd")
                 text_features = model.get_text_features(**inputs)
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         text_outputs = self.text_model(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -417,15 +440,15 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         self,
         input_ids,
         pixel_values,
-        attention_mask=None,
-        position_ids=None,
-        token_type_ids=None,
-        task_type_ids=None,
-        return_loss=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
-    ):
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        task_type_ids: Optional[paddle.Tensor] = None,
+        return_loss: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, ErnieViLOutput]:
         r"""
         The ErnieViLModel forward method, overrides the `__call__()` special method.
 
@@ -486,8 +509,9 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 from PIL import Image
                 from paddlenlp.transformers import ErnieViLModel, ErnieViLProcessor
 
-                processor = ErnieViLProcessor.from_pretrained('ernie_vil-2.0-base-zh')
-                model = ErnieViLModel.from_pretrained('ernie_vil-2.0-base-zh')
+                processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+                model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+                model.eval()
 
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
@@ -503,6 +527,11 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 probs = F.softmax(logits_per_image, axis=1)  # we can take the softmax to get the label probabilities
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         vision_outputs = self.vision_model(
             pixel_values=pixel_values,
@@ -565,17 +594,215 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         )
 
 
-class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
+class ErnieViLTextModel(ErnieViLPretrainedModel):
     r"""
-    ErnieViLModel with diffusion model on top.
+    The text model from ErnieViL without any head or projection on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
     Args:
-        ernie_vil (:class:`ErnieViLModel`):
-            An instance of ErnieViLModel.
+        config (:class:`ErnieViLTextConfig`):
+            An instance of ErnieViLTextConfig used to construct ErnieViLTextModel.
     """
 
-    def __init__(self, ernie_vil):
-        super().__init__()
-        self.ernie_vil = ernie_vil
+    config_class = ErnieViLTextConfig
+
+    def __init__(self, config: ErnieViLTextConfig):
+        super().__init__(config)
+        self.text_model = ErnieModel(config)
+
+        self.init_weights()
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.text_model.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.text_model.embeddings.word_embeddings = value
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        task_type_ids: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPoolingAndCrossAttentions]:
+        r"""
+        Args:
+            input_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide
+                it.
+                Indices can be obtained using [`ErnieViLTokenizer`].
+            attention_mask (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            position_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
+                config.max_position_embeddings - 1]`.
+            token_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+                Its data type should be `int64`. Defaults to `None`, which means we don't add segment embeddings.
+            task_type_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of tasks of each input sequence tokens in the task embeddings (ErnieModel). Selected in
+                the range ``[0, task_type_vocab_size - 1]``. Defaults to `None`.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (`bool`, *optional*):
+                Whether or not to return a [`BaseModelOutputWithPoolingAndCrossAttentions`] instead of a plain tuple.
+
+        Returns:
+            An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+
+        Examples:
+
+        ```python
+        >>> from paddlenlp.transformers import ErnieViLTokenizer, ErnieViLTextModel
+
+        >>> model = ErnieViLTextModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+        >>> tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+
+        >>> inputs = tokenizer(["一只猫的照片", "一条狗的照片"], padding=True, return_tensors="pd")
+
+        >>> outputs = model(**inputs)
+        >>> last_hidden_state = outputs.last_hidden_state
+        >>> pooled_output = outputs.pooler_output  # pooled (EOS token) states
+        ```
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        return self.text_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            task_type_ids=task_type_ids,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+class ErnieViLVisionModel(ErnieViLPretrainedModel):
+    r"""
+    The vision model from ErnieViL without any head or projection on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        config (:class:`ErnieViLVisionConfig`):
+            An instance of ErnieViLVisionConfig used to construct ErnieViLVisionModel.
+    """
+
+    config_class = ErnieViLVisionConfig
+    main_input_name = "pixel_values"
+
+    def __init__(self, config: ErnieViLVisionConfig):
+        super().__init__(config)
+
+        self.vision_model = ErnieViLVisionTransformer(config)
+
+        self.init_weights()
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.conv1
+
+    def forward(
+        self,
+        pixel_values: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPooling]:
+        r"""
+        Args:
+            pixel_values (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values. Padding will be ignored by default should you provide it. Pixel values can be obtained using
+                [`ErnieViLFeatureExtractor`]. See [`ErnieViLFeatureExtractor.__call__`] for details.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (`bool`, *optional*):
+                Whether or not to return a [`BaseModelOutputWithPooling`] instead of a plain tuple.
+
+        Returns:
+            An instance of :class:`BaseModelOutputWithPooling` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`BaseModelOutputWithPooling`.
+
+        Examples:
+
+        ```python
+        >>> from PIL import Image
+        >>> import requests
+        >>> from paddlenlp.transformers import ErnieViLProcessor, ErnieViLVisionModel
+
+        >>> model = ErnieViLVisionModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+        >>> processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+
+        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        >>> image = Image.open(requests.get(url, stream=True).raw)
+
+        >>> inputs = processor(images=image, return_tensors="pd")
+
+        >>> outputs = model(**inputs)
+        >>> last_hidden_state = outputs.last_hidden_state
+        >>> pooled_output = outputs.pooler_output  # pooled CLS states
+        ```
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        return self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
+    r"""
+    ErnieViL Model with diffusion model on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        config (:class:`ErnieViLConfig`):
+            An instance of ErnieViLConfig used to construct ErnieViLForImageGeneration.
+    """
+
+    config_class = ErnieViLConfig
+
+    def __init__(self, config: ErnieViLConfig):
+        super().__init__(config)
+        self.ernie_vil = ErnieViLModel(config)
         self.unet_model = create_unet_model(
             image_size=512,
             num_channels=256,
@@ -829,7 +1056,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             from paddlenlp.transformers import ErnieViLForImageGeneration, ErnieViLTokenizer
 
             # Initialize the model and tokenizer
-            model_name_or_path = 'disco_diffusion_ernie_vil-2.0-base-zh'
+            model_name_or_path = "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh"
             model = ErnieViLForImageGeneration.from_pretrained(model_name_or_path)
             tokenizer = ErnieViLTokenizer.from_pretrained(model_name_or_path)
             model.eval()
@@ -854,7 +1081,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             predict_xstart=False,
             rescale_timesteps=True,
         )
-        target_text_embeds = self.get_text_features(
+        target_text_embeds = self.ernie_vil.get_text_features(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -903,15 +1130,3 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
         if artist is not None:
             text_prompt += "，由{}所作".format(artist)
         return text_prompt
-
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e

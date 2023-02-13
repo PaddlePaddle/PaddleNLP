@@ -13,25 +13,28 @@
 # limitations under the License.
 
 import argparse
+import copy
+import json
 import os
-import io
 import random
 import time
-import json
-import copy
 from collections import defaultdict
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
-from paddlenlp.transformers import ErnieHealthForTotalPretraining, ElectraModel
-from paddlenlp.transformers import ErnieHealthDiscriminator, ElectraGenerator
-from paddlenlp.transformers import ElectraTokenizer, ErnieHealthPretrainingCriterion
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+from dataset import DataCollatorForErnieHealth, MedicalCorpus, create_dataloader
 from visualdl import LogWriter
 
-from dataset import MedicalCorpus, DataCollatorForErnieHealth, create_dataloader
+from paddlenlp.transformers import (
+    ElectraGenerator,
+    ElectraModel,
+    ElectraTokenizer,
+    ErnieHealthDiscriminator,
+    ErnieHealthForTotalPretraining,
+    ErnieHealthPretrainingCriterion,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
@@ -139,7 +142,6 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-    worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
     model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
@@ -343,7 +345,7 @@ def do_train(args):
                         writer.add_scalar("lr", optimizer.get_lr(), global_step)
                     loss_list = defaultdict(list)
                 else:
-                    local_loss = dict([(k, v.numpy()[0]) for k, v in local_loss.items()])
+                    local_loss = dict([(k, float(v)) for k, v in local_loss.items()])
                     log_str = (
                         "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
                         "avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, "

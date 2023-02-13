@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import os
+import unittest
 
 from paddlenlp.data import SamplerHelper
 from paddlenlp.datasets import load_dataset
-
-from common_test import CpuCommonTest
-import util
-import unittest
+from tests.common_test import CpuCommonTest
+from tests.testing_utils import assert_raises, get_tests_dir
 
 
 def cmp(x, y):
@@ -28,18 +26,18 @@ def cmp(x, y):
 
 
 class TestSampler(CpuCommonTest):
-    def setUp(self):
-        self.config["path"] = "imdb"
-        self.config["splits"] = "train"
-        self.train_ds = load_dataset(**self.config)
+    @classmethod
+    def setUpClass(cls):
+        fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
+        cls.train_ds = load_dataset("clue", "tnews", data_files=[os.path.join(fixture_path, "tnews", "train.json")])
 
     def test_length(self):
         train_batch_sampler = SamplerHelper(self.train_ds)
-        self.check_output_equal(len(train_batch_sampler), 25000)
+        self.check_output_equal(len(train_batch_sampler), 10)
         self.check_output_equal(len(train_batch_sampler), train_batch_sampler.length)
 
-        train_batch_sampler.length = 20
-        self.check_output_equal(len(train_batch_sampler), 20)
+        train_batch_sampler.length = 5
+        self.check_output_equal(len(train_batch_sampler), 5)
 
     def test_iter1(self):
         train_ds_len = len(self.train_ds)
@@ -63,11 +61,7 @@ class TestSampler(CpuCommonTest):
     def test_shuffle_no_buffer_size(self):
         train_batch_sampler = SamplerHelper(self.train_ds)
         shuffle_sampler = train_batch_sampler.shuffle(seed=102)
-        expected_result = {
-            0: 5189,
-            12000: 11777,
-            24999: 10496,
-        }
+        expected_result = {0: 4, 1: 9}
         for i, sample in enumerate(shuffle_sampler):
             if i in expected_result.keys():
                 self.check_output_equal(sample, expected_result[i])
@@ -75,11 +69,7 @@ class TestSampler(CpuCommonTest):
     def test_shuffle_buffer_size(self):
         train_batch_sampler = SamplerHelper(self.train_ds)
         shuffle_sampler = train_batch_sampler.shuffle(buffer_size=10, seed=102)
-        expected_result = {
-            0: 4,
-            12000: 12003,
-            24999: 24997,
-        }
+        expected_result = {0: 4, 1: 9}
         for i, sample in enumerate(shuffle_sampler):
             if i in expected_result.keys():
                 self.check_output_equal(sample, expected_result[i])
@@ -88,12 +78,12 @@ class TestSampler(CpuCommonTest):
         train_ds_len = len(self.train_ds)
         ds_iter = iter(range(train_ds_len - 1, -1, -1))
         train_batch_sampler = SamplerHelper(self.train_ds, ds_iter)
-        sort_sampler = train_batch_sampler.sort(cmp=lambda x, y, dataset: cmp(x, y), buffer_size=12500)
+        sort_sampler = train_batch_sampler.sort(cmp=lambda x, y, dataset: cmp(x, y), buffer_size=5)
         for i, sample in enumerate(sort_sampler):
-            if i < 12500:
-                self.check_output_equal(i + 12500, sample)
+            if i < 5:
+                self.check_output_equal(i + 5, sample)
             else:
-                self.check_output_equal(i - 12500, sample)
+                self.check_output_equal(i - 5, sample)
 
     def test_sort_no_buffer_size(self):
         train_ds_len = len(self.train_ds)
@@ -111,14 +101,16 @@ class TestSampler(CpuCommonTest):
             for j, minibatch in enumerate(sample):
                 self.check_output_equal(i * batch_size + j, minibatch)
 
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_batch_oversize(self):
         train_batch_sampler = SamplerHelper(self.train_ds)
         batch_size = 3
-        key = lambda size_so_far, minibatch_len: max(size_so_far, minibatch_len)
-        batch_size_fn = lambda new, count, sofar, data_source: len(data_source)
 
-        batch_sampler = train_batch_sampler.batch(batch_size, key=key, batch_size_fn=batch_size_fn)
+        batch_sampler = train_batch_sampler.batch(
+            batch_size,
+            key=lambda size_so_far, minibatch_len: max(size_so_far, minibatch_len),
+            batch_size_fn=lambda new, count, sofar, data_source: len(data_source),
+        )
         for i, sample in enumerate(batch_sampler):
             for j, minibatch in enumerate(sample):
                 self.check_output_equal(i * batch_size + j, minibatch)
@@ -143,8 +135,9 @@ class TestSampler(CpuCommonTest):
         train_ds_len = len(self.train_ds)
         ds_iter = iter(range(train_ds_len - 1, -1, -1))
         train_batch_sampler = SamplerHelper(self.train_ds, ds_iter)
-        fn = lambda sampler: SamplerHelper.sort(sampler, cmp=lambda x, y, dataset: cmp(x, y))
-        apply_sampler = train_batch_sampler.apply(fn)
+        apply_sampler = train_batch_sampler.apply(
+            lambda sampler: SamplerHelper.sort(sampler, cmp=lambda x, y, dataset: cmp(x, y))
+        )
         for i, sample in enumerate(apply_sampler):
             self.check_output_equal(i, sample)
 

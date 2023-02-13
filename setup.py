@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import setuptools
 import io
+import os
+
+import setuptools
+
+PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
 def read_requirements_file(filepath):
@@ -22,11 +25,17 @@ def read_requirements_file(filepath):
     return requirements
 
 
+__version__ = "2.5.0.post"
+if os.getenv(PADDLENLP_STABLE_VERSION):
+    __version__ = __version__.replace(".post", "")
+
+
 extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
 extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"]
+extras["autonlp"] = read_requirements_file("paddlenlp/experimental/autonlp/requirements.txt")
+extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"]
 
 
 def read(*names, **kwargs):
@@ -58,20 +67,21 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version="2.4.1.dev",  # modify this for each release
+    version=__version__,
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
     long_description=read("README_en.md"),
     long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PaddleNLP",
+    license_files=("LICENSE",),
     packages=setuptools.find_packages(
         where=".",
-        exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "faster_generation*", "model_zoo*"),
+        exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
     ),
     package_data={
         "paddlenlp.ops": get_package_data_files(
-            "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "faster_transformer", "patches", "optimizer"]
+            "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "fast_transformer", "patches", "optimizer"]
         ),
         "paddlenlp.transformers.layoutxlm": get_package_data_files(
             "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]

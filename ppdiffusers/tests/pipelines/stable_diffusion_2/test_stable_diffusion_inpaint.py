@@ -22,7 +22,12 @@ import paddle
 from PIL import Image
 from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import (
+    CLIPFeatureExtractor,
+    CLIPTextConfig,
+    CLIPTextModel,
+    CLIPTokenizer,
+)
 from ppdiffusers import (
     AutoencoderKL,
     PNDMScheduler,
@@ -32,26 +37,12 @@ from ppdiffusers import (
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 
 
-class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-    def tearDown(self):
-        # clean up the VRAM after each test
-        super().tearDown()
-        gc.collect()
-        paddle.device.cuda.empty_cache()
+class StableDiffusion2InpaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+    pipeline_class = StableDiffusionInpaintPipeline
 
-    @property
-    def dummy_image(self):
-        batch_size = 1
-        num_channels = 3
-        sizes = (32, 32)
-
-        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
-        return image
-
-    @property
-    def dummy_cond_unet_inpaint(self):
+    def get_dummy_components(self):
         paddle.seed(0)
-        model = UNet2DConditionModel(
+        unet = UNet2DConditionModel(
             block_out_channels=(32, 64),
             layers_per_block=2,
             sample_size=32,
@@ -64,12 +55,9 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
             attention_head_dim=(2, 4, 8, 8),
             use_linear_projection=True,
         )
-        return model
-
-    @property
-    def dummy_vae(self):
+        scheduler = PNDMScheduler(skip_prk_steps=True)
         paddle.seed(0)
-        model = AutoencoderKL(
+        vae = AutoencoderKL(
             block_out_channels=[32, 64],
             in_channels=3,
             out_channels=3,
@@ -77,12 +65,9 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
             up_block_types=["UpDecoderBlock2D", "UpDecoderBlock2D"],
             latent_channels=4,
         )
-        return model
 
-    @property
-    def dummy_text_encoder(self):
         paddle.seed(0)
-        config = dict(
+        text_encoder_config = dict(
             text_embed_dim=32,
             text_heads=4,
             text_layers=5,
@@ -91,93 +76,66 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
             text_hidden_act="gelu",
             projection_dim=512,
         )
-        model = CLIPTextModel(**config)
-        model.eval()
-        return model
+        text_encoder_config = CLIPTextConfig.from_dict(text_encoder_config)
+        text_encoder = CLIPTextModel(text_encoder_config)
+        text_encoder.eval()
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
+        feature_extractor = CLIPFeatureExtractor(crop_size=32)
 
-    @property
-    def dummy_extractor(self):
-        def extract(*args, **kwargs):
-            class Out:
-                def __init__(self):
-                    self.pixel_values = paddle.ones([0])
+        components = {
+            "unet": unet,
+            "scheduler": scheduler,
+            "vae": vae,
+            "text_encoder": text_encoder,
+            "tokenizer": tokenizer,
+            "safety_checker": None,
+            "feature_extractor": feature_extractor,
+        }
+        return components
 
-                def to(self, *args, **kwargs):
-                    return self
-
-            return Out()
-
-        return extract
+    def get_dummy_inputs(self, seed=0):
+        # TODO: use tensor inputs instead of PIL, this is here just to leave the old expected_slices untouched
+        image = floats_tensor((1, 3, 32, 32), rng=random.Random(seed))
+        image = image.cpu().transpose([0, 2, 3, 1])[0]
+        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize((64, 64))
+        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((64, 64))
+        generator = paddle.Generator().manual_seed(seed)
+        inputs = {
+            "prompt": "A painting of a squirrel eating a burger",
+            "image": init_image,
+            "mask_image": mask_image,
+            "generator": generator,
+            "num_inference_steps": 2,
+            "guidance_scale": 6.0,
+            "output_type": "numpy",
+        }
+        return inputs
 
     def test_stable_diffusion_inpaint(self):
-        unet = self.dummy_cond_unet_inpaint
-        scheduler = PNDMScheduler(skip_prk_steps=True)
-        vae = self.dummy_vae
-        text_encoder = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
-
-        image_dummy = self.dummy_image.transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image_dummy)).convert("RGB").resize((64, 64))
-        mask_image = Image.fromarray(np.uint8(image_dummy + 4)).convert("RGB").resize((64, 64))
-
-        # make sure here that pndm scheduler skips prk
-        sd_pipe = StableDiffusionInpaintPipeline(
-            unet=unet,
-            scheduler=scheduler,
-            vae=vae,
-            text_encoder=text_encoder,
-            tokenizer=tokenizer,
-            safety_checker=None,
-            feature_extractor=None,
-        )
+        components = self.get_dummy_components()
+        sd_pipe = StableDiffusionInpaintPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
 
-        prompt = "A painting of a squirrel eating a burger"
-        generator = paddle.Generator().manual_seed(0)
-        output = sd_pipe(
-            [prompt],
-            generator=generator,
-            guidance_scale=6.0,
-            num_inference_steps=2,
-            output_type="np",
-            image=init_image,
-            mask_image=mask_image,
-        )
-
-        image = output.images
-
-        generator = paddle.Generator().manual_seed(0)
-        image_from_tuple = sd_pipe(
-            [prompt],
-            generator=generator,
-            guidance_scale=6.0,
-            num_inference_steps=2,
-            output_type="np",
-            image=init_image,
-            mask_image=mask_image,
-            return_dict=False,
-        )[0]
-
+        inputs = self.get_dummy_inputs()
+        image = sd_pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1]
-        image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
             [
-                0.46581971645355225,
-                0.4502384066581726,
-                0.2711679935455322,
-                0.39340725541114807,
-                0.4130115509033203,
-                0.47139889001846313,
-                0.35663333535194397,
-                0.33137619495391846,
-                0.39559948444366455,
+                0.4040220379829407,
+                0.4376600682735443,
+                0.41725587844848633,
+                0.4457714259624481,
+                0.40201932191848755,
+                0.5004723072052002,
+                0.39662542939186096,
+                0.2882365584373474,
+                0.4356308579444885,
             ]
         )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow

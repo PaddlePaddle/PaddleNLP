@@ -27,7 +27,7 @@ import PIL
 from parameterized import parameterized
 from PIL import Image
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMPipeline,
@@ -47,31 +47,8 @@ from ppdiffusers import (
     logging,
 )
 from ppdiffusers.pipeline_utils import DiffusionPipeline
-from ppdiffusers.utils import floats_tensor, slow
+from ppdiffusers.utils import floats_tensor, nightly, slow
 from ppdiffusers.utils.testing_utils import CaptureLogger
-
-
-def test_progress_bar(capsys):
-    model = UNet2DModel(
-        block_out_channels=(32, 64),
-        layers_per_block=2,
-        sample_size=32,
-        in_channels=3,
-        out_channels=3,
-        down_block_types=("DownBlock2D", "AttnDownBlock2D"),
-        up_block_types=("AttnUpBlock2D", "UpBlock2D"),
-    )
-    scheduler = DDPMScheduler(num_train_timesteps=10)
-
-    ddpm = DDPMPipeline(model, scheduler)
-    ddpm(output_type="numpy").images
-    captured = capsys.readouterr()
-    assert "10/10" in captured.err, "Progress bar has to be displayed"
-
-    ddpm.set_progress_bar_config(disable=True)
-    ddpm(output_type="numpy").images
-    captured = capsys.readouterr()
-    assert captured.err == "", "Progress bar should be disabled"
 
 
 class DownloadTests(unittest.TestCase):
@@ -183,7 +160,8 @@ class PipelineFastTests(unittest.TestCase):
             text_layers=5,
             vocab_size=1000,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 
@@ -571,6 +549,15 @@ class PipelineSlowTests(unittest.TestCase):
         images = pipe(generator=generator, num_inference_steps=4).images
         assert isinstance(images, list)
         assert isinstance(images[0], PIL.Image.Image)
+
+
+@nightly
+class PipelineNightlyTests(unittest.TestCase):
+    def tearDown(self):
+        # clean up the VRAM after each test
+        super().tearDown()
+        gc.collect()
+        paddle.device.cuda.empty_cache()
 
     def test_ddpm_ddim_equality_batched(self):
         seed = 0

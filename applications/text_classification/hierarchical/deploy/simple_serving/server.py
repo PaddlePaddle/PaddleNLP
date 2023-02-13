@@ -17,7 +17,7 @@ from paddlenlp.server import CustomModelHandler, MultiLabelClassificationPostHan
 
 app = SimpleServer()
 app.register(
-    "cls_hierarchical",
+    "models/cls_hierarchical",
     model_path="../../export",
     tokenizer_name="ernie-3.0-medium-zh",
     model_handler=CustomModelHandler,

@@ -16,6 +16,12 @@ project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif()
+
 INCLUDE(ExternalProject)
 
 set(CXX_STD "14" CACHE STRING "C++ standard")
@@ -28,6 +34,7 @@ option(WITH_TRANSFORMER "Compiled with Transformer."                            
 option(WITH_GPT         "Compiled with GPT."                                        ON)
 option(WITH_OPT         "Compiled with OPT."                                        ON)
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
+option(WITH_T5          "Compiled with T5."                                         ON)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." OFF)
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
@@ -53,7 +60,7 @@ if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-list(APPEND decoding_op_files cublas_handle.cc)
+list(APPEND decoding_op_files cublas_handle.cc utils.cc)
 
 if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
@@ -68,7 +75,7 @@ if(WITH_OPT)
 endif()
 
 if(WITH_UNIFIED)
-  list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
+  list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu fusion_miro_op.cc fusion_miro_op.cu)
 endif()
 
 if(WITH_ENCODER)
@@ -95,8 +102,12 @@ if(WITH_PEGASUS)
   list(APPEND decoding_op_files fusion_pegasus_decoding_op.cc fusion_pegasus_decoding_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART AND NOT WITH_MBART AND NOT WITH_GPTJ AND NOT WITH_PEGASUS)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON or/and -DWITH_MBART=ON or/and -DWITH_GPTJ=ON or/and -DWITH_PEGASUS=ON must be set to use FasterTransformer. ")
+if(WITH_T5)
+  list(APPEND decoding_op_files fusion_t5_decoding_op.cc fusion_t5_decoding_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART AND NOT WITH_MBART AND NOT WITH_GPTJ AND NOT WITH_PEGASUS AND NOT WITH_T5)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON or/and -DWITH_MBART=ON or/and -DWITH_GPTJ=ON or/and -DWITH_PEGASUS=ON or/and -DWITH_T5=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
@@ -277,6 +288,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common.h common_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common.h common_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common_structure.h common_structure_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common_structure.h common_structure_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
@@ -322,6 +336,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_kernels.cuh trans_kernels_cuh_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/transformer_kernels.cuh trans_kernels_cuh_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_dst)
 
@@ -345,6 +362,10 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/attention_kernels.cuh attention_kernels_cuh_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/attention_kernels.cuh attention_kernels_cuh_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/t5_beamsearch.h t5_bs_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/t5_sampling.h t5_spl_h_src)
+set(ft_dst ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/)
 
 # Encoder patches.
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
@@ -370,6 +391,7 @@ set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
   && cp ${allocator_src} ${allocator_dst}
   && cp ${common_src} ${common_dst}
+  && cp ${common_structure_src} ${common_structure_dst}
   && cp ${cmakelists_src} ${cmakelists_dst}
   && cp ${topk_kernels_src} ${topk_kernels_dst}
   && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
@@ -387,6 +409,8 @@ set(FT_PATCH_COMMAND
   && cp ${opt_h_src} ${opt_h_dst}
   && cp ${gptj_h_src} ${gptj_h_dst}
   && cp ${masked_multihead_attention_h_src} ${masked_multihead_attention_h_dst}
+  && cp ${t5_bs_h_src} ${ft_dst}
+  && cp ${t5_spl_h_src} ${ft_dst}
   && cat blank_lines ${masked_multihead_attention_utils_h_src} >> ${masked_multihead_attention_utils_h_dst}
   && cat blank_lines ${attention_kernels_cu_src} >> ${attention_kernels_cu_dst}
   && cat blank_lines ${attention_kernels_cuh_src} >> ${attention_kernels_cuh_dst}
@@ -398,6 +422,7 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
+  && cat blank_lines ${trans_kernels_cuh_src} >> ${trans_kernels_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
   && sed -i "2091,2119d" ${open_attention_cu_dst}
   && rm blank_lines
@@ -459,4 +484,4 @@ if(ON_INFER AND WITH_GPT AND WITH_SP)
   add_definitions(-DGPT_ON_SENTENCEPIECE)
 endif()
 
-add_subdirectory(faster_transformer)
+add_subdirectory(fast_transformer)

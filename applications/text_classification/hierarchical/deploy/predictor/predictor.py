@@ -13,18 +13,14 @@
 # limitations under the License.
 
 import os
-import json
 import time
 
-import six
 import numpy as np
-import paddle
-import paddle2onnx
 import onnxruntime as ort
+import paddle2onnx
 from sklearn.metrics import f1_score
 
 from paddlenlp.transformers import AutoTokenizer
-import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
 
 
@@ -33,7 +29,7 @@ class InferBackend(object):
         self, model_path_prefix, device="cpu", device_id=0, use_fp16=False, use_quantize=False, num_threads=10
     ):
         logger.info(">>> [InferBackend] Creating Engine ...")
-        onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+        onnx_model = paddle2onnx.export(
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
@@ -50,8 +46,8 @@ class InferBackend(object):
 
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
-                from onnxconverter_common import float16
                 import onnx
+                from onnxconverter_common import float16
 
                 fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
@@ -73,7 +69,7 @@ class InferBackend(object):
                 assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
+                    "The environment for GPU inference is not set properly. "
                     "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                     "Please run the following commands to reinstall: \n "
                     "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -118,7 +114,7 @@ class Predictor(object):
         self.label_list = label_list
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
-
+        self.multilingual = args.multilingual
         self.inference_backend = InferBackend(
             args.model_path_prefix, args.device, args.device_id, args.use_fp16, args.use_quantize, args.num_threads
         )
@@ -133,6 +129,7 @@ class Predictor(object):
             truncation=True,
             return_position_ids=False,
             return_attention_mask=False,
+            return_token_type_ids=not self.multilingual,
         )
         tokenized_data = {}
         for tokenizer_key in data:
@@ -207,7 +204,7 @@ class Predictor(object):
         nums = len(preprocess_result["input_ids"])
 
         start = time.time()
-        infer_result = self.infer_batch(preprocess_result)
+        self.infer_batch(preprocess_result)
         total_time = time.time() - start
         logger.info("sample nums: %s, time: %.2f, latency: %.2f ms" % (nums, total_time, 1000 * total_time / nums))
         return

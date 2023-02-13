@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import time
-import math
+
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.io import DataLoader
-from paddle.optimizer.lr import NoamDecay
-from paddle.optimizer import AdamW
-
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-
 from args import parse_args, print_args
 from data import DialogueDataset
+from paddle.io import DataLoader
+from paddle.optimizer import AdamW
+from paddle.optimizer.lr import NoamDecay
+
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 def save_ckpt(model, tokenizer, save_dir, name):
@@ -129,7 +132,7 @@ def evaluation(model, data_loader):
         logits = model(token_ids, type_ids, pos_ids, generation_mask, tgt_pos)
         loss = F.cross_entropy(logits, tgt_label, reduction="sum")
 
-        total_loss += loss.numpy()[0]
+        total_loss += float(loss.numpy())
         total_tokens += tgt_label.shape[0]
 
     avg_loss = total_loss / total_tokens

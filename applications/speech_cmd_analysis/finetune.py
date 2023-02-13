@@ -13,18 +13,16 @@
 # limitations under the License.
 
 import argparse
-import time
 import os
+import time
 from functools import partial
 
 import paddle
-from paddle.utils.download import get_path_from_url
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.metrics import SpanEvaluator
+from utils import convert_example, create_dataloader, evaluate, reader, set_seed
 
-from model import UIE
-from utils import set_seed, convert_example, reader, MODEL_MAP, evaluate, create_dataloader
+from paddlenlp.datasets import load_dataset
+from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.transformers import UIE, AutoTokenizer
 
 
 def do_train():
@@ -35,15 +33,7 @@ def do_train():
 
     set_seed(args.seed)
 
-    encoding_model = MODEL_MAP[args.model]["encoding_model"]
-    resource_file_urls = MODEL_MAP[args.model]["resource_file_urls"]
-
-    for key, val in resource_file_urls.items():
-        file_path = os.path.join(args.model, key)
-        if not os.path.exists(file_path):
-            get_path_from_url(val, args.model)
-
-    tokenizer = AutoTokenizer.from_pretrained(encoding_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -71,7 +61,6 @@ def do_train():
 
     loss_list = []
     global_step = 0
-    best_step = 0
     best_f1 = 0
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
@@ -123,8 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
-        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. ")
     parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")

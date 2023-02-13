@@ -41,12 +41,12 @@ analysis/
 
 ## 环境准备
 需要可解释性分析和数据优化需要安装相关环境。
-- trustai >= 0.1.7
+- trustai >= 0.1.12
 - interpretdl >= 0.7.0
 
 **安装TrustAI**（可选）如果使用可解释性分析和数据优化中稀疏数据筛选和脏数据清洗需要安装TrustAI。
 ```shell
-pip install trustai==0.1.7
+pip install trustai==0.1.12
 ```
 
 **安装InterpretDL**（可选）如果使用词级别可解释性分析GradShap方法，需要安装InterpretDL
@@ -73,11 +73,10 @@ python evaluate.py \
 可支持配置的参数：
 
 * `device`: 选用什么设备进行训练，可选择cpu、gpu、xpu、npu；默认为"gpu"。
-* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt、dev.txt和label.txt文件;默认为None。
+* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含dev.txt和label.txt文件;默认为None。
 * `params_path`：保存训练模型的目录；默认为"../checkpoint/"。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `train_file`：本地数据集中开发集文件名；默认为"train.txt"。
 * `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 * `bad_case_path`：开发集中预测错误样本保存路径；默认为"/bad_case.txt"。
@@ -86,17 +85,14 @@ python evaluate.py \
 
 ```text
 [2022-08-10 06:28:37,219] [    INFO] - -----Evaluate model-------
-[2022-08-10 06:28:37,219] [    INFO] - Train dataset size: 6931
 [2022-08-10 06:28:37,220] [    INFO] - Dev dataset size: 1955
 [2022-08-10 06:28:37,220] [    INFO] - Accuracy in dev dataset: 81.79%
 [2022-08-10 06:28:37,221] [    INFO] - Top-2 accuracy in dev dataset: 92.48%
 [2022-08-10 06:28:37,222] [    INFO] - Top-3 accuracy in dev dataset: 97.24%
 [2022-08-10 06:28:37,222] [    INFO] - Class name: 病情诊断
-[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in train dataset: 877(12.7%) | precision: 97.14 | recall: 96.92 | F1 score 97.03
 [2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 80.32 | recall: 86.46 | F1 score 83.28
 [2022-08-10 06:28:37,223] [    INFO] - ----------------------------
 [2022-08-10 06:28:37,223] [    INFO] - Class name: 治疗方案
-[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in train dataset: 1750(25.2%) | precision: 96.84 | recall: 99.89 | F1 score 98.34
 [2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 88.46 | recall: 94.08 | F1 score 91.18
 ...
 ```
@@ -338,11 +334,11 @@ cat ../data/train.txt ../data/support.txt > ../data/train_sparse_annotate.txt
 
 ```shell
 python dirty.py \
-    --device "gpu" \
+    --device "gpu:3" \
     --dataset_dir "../data" \
     --max_seq_length 128 \
     --params_path "../checkpoint/" \
-    --batch_size 16 \
+    --batch_size 8 \
     --dirty_num 100 \
     --dirty_file "train_dirty.txt" \
     --rest_file "train_dirty_rest.txt"

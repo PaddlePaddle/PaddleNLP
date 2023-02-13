@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import six
-import json
-import psutil
 import argparse
+import json
+import os
 
 import numpy as np
-
-from paddlenlp.utils.log import logger
-from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-import paddle2onnx
 import onnxruntime as ort
+import paddle2onnx
+import psutil
+import six
+
+from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -63,7 +63,7 @@ class InferBackend(object):
         )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
-        with open(float_onnx_file, "wb") as f:
+        with open(float_onnx_file, "wb", encoding="utf-8") as f:
             f.write(onnx_model)
 
         if device == "gpu":
@@ -71,8 +71,8 @@ class InferBackend(object):
             providers = ["CUDAExecutionProvider"]
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
-                from onnxconverter_common import float16
                 import onnx
+                from onnxconverter_common import float16
 
                 fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
@@ -98,7 +98,7 @@ class InferBackend(object):
                 assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
+                    "The environment for GPU inference is not set properly. "
                     "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                     "Please run the following commands to reinstall: \n "
                     "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -131,7 +131,7 @@ class MultiClassPredictor(object):
     def post_init(self):
         export_path = os.path.dirname(self.args.model_path_prefix)
         template_path = os.path.join(export_path, "template_config.json")
-        with open(template_path, "r") as fp:
+        with open(template_path, "r", encoding="utf-8") as fp:
             prompt = json.load(fp)
             template = AutoTemplate.create_from(prompt, self.tokenizer, self.args.max_length, self.model)
         keywords = template.extract_template_keywords(template.prompt)
@@ -143,7 +143,7 @@ class MultiClassPredictor(object):
         if "encoder" in keywords:
             inputs.append("encoder_ids")
         verbalizer_path = os.path.join(export_path, "verbalizer_config.json")
-        with open(verbalizer_path, "r") as fp:
+        with open(verbalizer_path, "r", encoding="utf-8") as fp:
             label_words = json.load(fp)
             labels = sorted(list(label_words.keys()))
 

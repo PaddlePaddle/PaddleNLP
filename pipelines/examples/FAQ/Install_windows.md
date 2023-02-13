@@ -18,6 +18,13 @@ cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
+
+```
+# 下载pipelines源代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines
+```
+
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 ### 1.2 数据说明
 我们预置了基于[ 8000 多条保险行业问答数据](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)搭建保险FAQ智能问答的代码示例，您可以通过如下命令快速体验智能问答的效果

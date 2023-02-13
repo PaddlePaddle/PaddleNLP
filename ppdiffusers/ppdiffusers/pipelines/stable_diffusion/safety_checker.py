@@ -17,7 +17,11 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import CLIPPretrainedModel, CLIPVisionModel
+from paddlenlp.transformers import (
+    CLIPPretrainedModel,
+    CLIPVisionConfig,
+    CLIPVisionModel,
+)
 
 from ...utils import logging
 
@@ -31,26 +35,24 @@ def cosine_distance(image_embeds, text_embeds):
 
 
 class StableDiffusionSafetyChecker(CLIPPretrainedModel):
-    base_model_class = CLIPVisionModel
+    config_class = CLIPVisionConfig
 
-    def __init__(self, clip):
-        super().__init__()
-        self.clip = clip
-        projection_dim = clip.config["projection_dim"]
-        vision_embed_dim = clip.config["vision_embed_dim"]
+    def __init__(self, config: CLIPVisionConfig):
+        super().__init__(config)
+        self.clip = CLIPVisionModel(config)
         self.vision_projection = paddle.create_parameter(
-            (vision_embed_dim, projection_dim), dtype=paddle.get_default_dtype()
+            (config.hidden_size, config.projection_dim), dtype=paddle.get_default_dtype()
         )
 
-        self.register_buffer("concept_embeds", paddle.ones([17, projection_dim]))
-        self.register_buffer("special_care_embeds", paddle.ones([3, projection_dim]))
+        self.register_buffer("concept_embeds", paddle.ones([17, config.projection_dim]))
+        self.register_buffer("special_care_embeds", paddle.ones([3, config.projection_dim]))
 
         self.register_buffer("concept_embeds_weights", paddle.ones([17]))
         self.register_buffer("special_care_embeds_weights", paddle.ones([3]))
 
     @paddle.no_grad()
     def forward(self, clip_input, images):
-        pooled_output = self.clip.vision_model(clip_input)[1]  # pooled_output
+        pooled_output = self.clip(clip_input)[1]  # pooled_output
         image_embeds = paddle.matmul(pooled_output, self.vision_projection)
 
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
@@ -98,7 +100,7 @@ class StableDiffusionSafetyChecker(CLIPPretrainedModel):
         return images, has_nsfw_concepts
 
     def forward_fastdeploy(self, clip_input: paddle.Tensor, images: paddle.Tensor):
-        pooled_output = self.clip.vision_model(clip_input)[1]  # pooled_output
+        pooled_output = self.clip(clip_input)[1]  # pooled_output
         image_embeds = paddle.matmul(pooled_output, self.vision_projection)
 
         special_cos_dist = cosine_distance(image_embeds, self.special_care_embeds)

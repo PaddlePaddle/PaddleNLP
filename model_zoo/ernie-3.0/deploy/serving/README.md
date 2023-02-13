@@ -1,187 +1,225 @@
-# 基于Paddle Serving的服务化部署
-
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署ERNIE 3.0新闻分类和序列标注模型的pipeline在线服务。
-
-## 目录
-- [环境准备](#环境准备)
-- [模型转换](#模型转换)
-- [部署模型](#部署模型)
-
-## 环境准备
-需要[准备PaddleNLP的运行环境]()和Paddle Serving的运行环境。
-
-### 安装Paddle Serving
-安装指令如下，更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
-```
-# 安装client和serving app，用于向服务发送请求
-pip install paddle_serving_app paddle_serving_client
-
-# 安装serving，用于启动服务
-# CPU server
-pip install paddle_serving_server
-
-# GPU server, 选择跟本地环境一致的命令:
-# CUDA10.2 + Cudnn7 + TensorRT6
-pip install paddle-serving-server-gpu==0.8.3.post102 -i https://pypi.tuna.tsinghua.edu.cn/simple
-# CUDA10.1 + TensorRT6
-pip install paddle-serving-server-gpu==0.8.3.post101 -i https://pypi.tuna.tsinghua.edu.cn/simple
-# CUDA11.2 + TensorRT8
-pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
+# FastDeploy ERNIE 3.0 模型 Serving 部署示例
 
 
-### 安装FastTokenizer文本处理加速库（可选）
-推荐安装fast_tokenizer，可以得到更极致的文本处理效率，进一步提升服务性能。目前fast_tokenizer已支持Windows，Linux x64，Mac x86_64平台。
+在服务化部署前，需确认
+
+- 1. 服务化镜像的软硬件环境要求和镜像拉取命令请参考 [FastDeploy 服务化部署](https://github.com/PaddlePaddle/FastDeploy/blob/develop/serving/README_CN.md)
+
+## 准备模型
+
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 模型在 CLUE Benchmark 的 [AFQMC 数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务以及 [MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的**服务化部署**。按照[ERNIE 3.0 训练文档](../../README.md)分别训练并导出文本分类模型以及序列标注模型，并将导出的模型移动到 models 目录下相应位置。注意：模型与参数文件必须命名为 **model.pdmodel** 和 **model.pdiparams**。
+
+模型移动好之后，文本分类任务的 models 目录结构如下:
 
 ```
-pip install fast-tokenizer-python
+models
+├── ernie_seqcls                      # 分类任务的 pipeline
+│   ├── 1
+│   └── config.pbtxt                  # 通过这个文件组合前后处理和模型推理
+├── ernie_seqcls_model                # 分类任务的模型推理
+│   ├── 1
+│   │   ├── model.pdiparams
+│   │   └── model.pdmodel
+│   └── config.pbtxt
+├── ernie_seqcls_postprocess          # 分类任务后处理
+│   ├── 1
+│   │   └── model.py
+│   └── config.pbtxt
+└── ernie_tokenizer                   # 预处理分词
+    ├── 1
+    │   └── model.py
+    └── config.pbtxt
 ```
 
+序列标注任务的 models 目录结构如下:
 
-## 模型转换
-
-使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
-
-下载ERNIE 3.0的新闻分类、序列标注模型:
-
-```bash
-# 下载并解压新闻分类模型
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
-unzip tnews_pruned_infer_model.zip
-# 下载并解压序列标注模型
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
-unzip msra_ner_pruned_infer_model.zip
+```
+models
+├── ernie_tokencls                      # 序列标注任务的 pipeline
+│   ├── 1
+│   └── config.pbtxt                    # 通过这个文件组合前后处理和模型推理
+├── ernie_tokencls_model                # 序列标注任务的模型推理
+│   ├── 1
+│   │   ├── model.pdiparams
+│   │   └── model.pdmodel
+│   └── config.pbtxt
+├── ernie_tokencls_postprocess          # 序列标注任务后处理
+│   ├── 1
+│   │   └── model.py
+│   └── config.pbtxt
+└── ernie_tokenizer                     # 预处理分词
+    ├── 1
+    │   └── model.py
+    └── config.pbtxt
 ```
 
-用已安装的paddle_serving_client将inference模型转换成serving格式。
+## 拉取并运行镜像
 
-```bash
-# 模型地址根据实际填写即可
-# 转换新闻分类模型
-python -m paddle_serving_client.convert --dirname tnews_pruned_infer_model --model_filename float32.pdmodel --params_filename float32.pdiparams
-
-# 转换序列标注模型
-python -m paddle_serving_client.convert --dirname msra_ner_pruned_infer_model --model_filename float32.pdmodel --params_filename float32.pdiparams
-
-# 可通过命令查参数含义
-python -m paddle_serving_client.convert --help
 ```
-转换成功后的目录如下:
-```
-serving_server
-├── float32.pdiparams
-├── float32.pdmodel
-├── serving_server_conf.prototxt
-└── serving_server_conf.stream.prototxt
+# x.y.z为镜像版本号，需参照 serving 文档替换为数字
+# GPU镜像
+docker pull registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10
+# CPU镜像
+docker pull registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-cpu-only-21.10
+
+# GPU 运行
+nvidia-docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models rregistry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10 bash
+
+# CPU 运行
+docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-cpu-only-21.10 bash
 ```
 
 ## 部署模型
 
-serving目录包含启动pipeline服务和发送预测请求的代码，包括：
+serving 目录包含启动 pipeline 服务的配置和发送预测请求的代码，包括：
 
 ```
-seq_cls_config.yml        # 新闻分类任务启动服务端的配置文件
-seq_cls_rpc_client.py     # 新闻分类任务发送pipeline预测请求的脚本
-seq_cls_service.py        # 新闻分类任务启动服务端的脚本
-
-token_cls_config.yml      # 序列标注任务启动服务端的配置文件
-token_cls_rpc_client.py   # 序列标注任务发送pipeline预测请求的脚本
-token_cls_service.py      # 序列标注任务启动服务端的脚本
+models                    # 服务化启动需要的模型仓库，包含模型和服务配置文件
+seq_cls_rpc_client.py     # AFQMC 分类任务发送 pipeline 预测请求的脚本
+token_cls_rpc_client.py   # 序列标注任务发送 pipeline 预测请求的脚本
 ```
 
+注意:启动服务时，Server 的每个 python 后端进程默认申请 64M 内存，默认启动的 docker 无法启动多个 python 后端节点。有两个解决方案：
 
-### 修改配置文件
-目录中的`seq_cls_config.yml`和`token_cls_config.yml`文件解释了每一个参数的含义，可以根据实际需要修改其中的配置。比如：
+1. 启动容器时设置 shm-size 参数, 比如: docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/serving/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:x.y.z-gpu-cuda11.4-trt8.4-21.10 bash
+
+2. 启动服务时设置 python 后端的 shm-default-byte-size 参数, 设置 python 后端的默认内存为10M： fastdeployserver --model-repository=/models --backend-config=python,shm-default-byte-size=10485760
+
+### 分类任务
+
+在容器内执行下面命令启动服务:
+
 ```
-# 修改模型目录为下载的模型目录或自己的模型目录:
-model_config: no_task_emb/serving_server =>  model_config: erine-3.0-tiny/serving_server
+# 默认启动 models 下所有模型
+fastdeployserver --model-repository=/models
 
-# 修改rpc端口号为9998
-rpc_port: 9998   =>   rpc_port: 9998
+# 可通过参数只启动分类任务
+fastdeployserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_seqcls
+```
 
-# 修改使用GPU推理为使用CPU推理:
-device_type: 1    =>   device_type: 0
+输出打印如下:
+
+```shell
+
+I0209 09:15:49.314029 708 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls_model' version 1
+I0209 09:15:49.314917 708 model_repository_manager.cc:1022] loading: ernie_seqcls:1
+I0209 09:15:49.417014 708 model_repository_manager.cc:1183] successfully loaded 'ernie_seqcls' version 1
+...
+I0209 09:15:49.417394 708 server.cc:549]
++------------+---------------------------------------------------------------+--------+
+| Backend    | Path                                                          | Config |
++------------+---------------------------------------------------------------+--------+
+| python     | /opt/tritonserver/backends/python/libtriton_python.so         | {}     |
+| fastdeploy | /opt/tritonserver/backends/fastdeploy/libtriton_fastdeploy.so | {}     |
++------------+---------------------------------------------------------------+--------+
+
+I0209 09:15:49.417552 708 server.cc:592]
++--------------------------+---------+--------+
+| Model                    | Version | Status |
++--------------------------+---------+--------+
+| ernie_seqcls             | 1       | READY  |
+| ernie_seqcls_model       | 1       | READY  |
+| ernie_seqcls_postprocess | 1       | READY  |
+| ernie_seqcls_tokenizer   | 1       | READY  |
++--------------------------+---------+--------+
+
+```
+
+### 序列标注任务
+
+在容器内执行下面命令启动序列标注服务:
+
+```shell
+fastdeployserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_tokencls --backend-config=python,shm-default-byte-size=10485760
+```
+
+输出打印如下:
+
+```shell
+
+I0209 09:15:49.314029 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls_model' version 1
+I0209 09:15:49.314917 708 model_repository_manager.cc:1022] loading: ernie_tokencls:1
+I0209 09:15:49.417014 708 model_repository_manager.cc:1183] successfully loaded 'ernie_tokencls' version 1
+...
+I0209 09:15:49.417394 708 server.cc:549]
++------------+---------------------------------------------------------------+--------+
+| Backend    | Path                                                          | Config |
++------------+---------------------------------------------------------------+--------+
+| python     | /opt/tritonserver/backends/python/libtriton_python.so         | {}     |
+| fastdeploy | /opt/tritonserver/backends/fastdeploy/libtriton_fastdeploy.so | {}     |
++------------+---------------------------------------------------------------+--------+
+
+I0209 09:15:49.417552 708 server.cc:592]
++----------------------------+---------+--------+
+| Model                      | Version | Status |
++----------------------------+---------+--------+
+| ernie_tokencls             | 1       | READY  |
+| ernie_tokencls_model       | 1       | READY  |
+| ernie_tokencls_postprocess | 1       | READY  |
+| ernie_tokencls_tokenizer   | 1       | READY  |
++----------------------------+---------+--------+
+
+```
+
+## 客户端请求
+
+客户端请求可以在本地执行脚本请求；也可以在容器中执行。
+
+本地执行脚本需要先安装依赖:
+
+```shell
+
+pip install grpcio
+pip install tritonclient[all]
+
+# 如果bash无法识别括号，可以使用如下指令安装:
+pip install tritonclient\[all\]
+
 ```
 
 ### 分类任务
-#### 启动服务
-修改好配置文件后，执行下面命令启动服务:
-```
-python seq_cls_service.py
-```
-输出打印如下:
-```
-[DAG] Succ init
-[PipelineServicer] succ init
---- Running analysis [ir_graph_build_pass]
-......
---- Running analysis [ir_graph_to_program_pass]
-I0515 05:36:48.316895 62364 analysis_predictor.cc:714] ======= optimize end =======
-I0515 05:36:48.320442 62364 naive_executor.cc:98] ---  skip [feed], feed -> token_type_ids
-I0515 05:36:48.320463 62364 naive_executor.cc:98] ---  skip [feed], feed -> input_ids
-I0515 05:36:48.321842 62364 naive_executor.cc:98] ---  skip [linear_113.tmp_1], fetch -> fetch
-[2022-05-15 05:36:49,316] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
-[2022-05-15 05:36:49,317] [    INFO] - Already cached /vdb1/home/heliqi/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_medium_zh_vocab.txt
-[OP Object] init success
+
+注意执行客户端请求时关闭代理，并根据实际情况修改main函数中的ip地址(启动服务所在的机器)
+
+```shell
+python seq_cls_grpc_client.py
 ```
 
-#### 启动client测试
-注意执行客户端请求时关闭代理，并根据实际情况修改init_client函数中的ip地址(启动服务所在的机器)
-```
-python seq_cls_rpc_client.py
-```
 输出打印如下:
-```
-{'label': array([6, 2]), 'confidence': array([0.5543532, 0.9495907], dtype=float32)}acc: 0.5745
+
+```shell
+{'label': array([0, 0]), 'confidence': array([0.54437345, 0.98503494], dtype=float32)}
+acc: 0.7224281742354032
 ```
 
-### 实体识别任务
-#### 启动服务
-修改好配置文件后，执行下面命令启动服务:
-```
-python token_cls_service.py
-```
-输出打印如下:
-```
-[DAG] Succ init
-[PipelineServicer] succ init
---- Running analysis [ir_graph_build_pass]
-......
---- Running analysis [ir_graph_to_program_pass]
-I0515 05:36:48.316895 62364 analysis_predictor.cc:714] ======= optimize end =======
-I0515 05:36:48.320442 62364 naive_executor.cc:98] ---  skip [feed], feed -> token_type_ids
-I0515 05:36:48.320463 62364 naive_executor.cc:98] ---  skip [feed], feed -> input_ids
-I0515 05:36:48.321842 62364 naive_executor.cc:98] ---  skip [linear_113.tmp_1], fetch -> fetch
-[2022-05-15 05:36:49,316] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
-[2022-05-15 05:36:49,317] [    INFO] - Already cached /vdb1/home/heliqi/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_medium_zh_vocab.txt
-[OP Object] init success
+
+### 序列标注任务
+
+注意执行客户端请求时关闭代理，并根据实际情况修改main函数中的ip地址(启动服务所在的机器)
+
+
+```shell
+python token_cls_grpc_client.py
 ```
 
-#### 启动client测试
-注意执行客户端请求时关闭代理，并根据实际情况修改init_client函数中的ip地址(启动服务所在的机器)
-```
-python token_cls_rpc_client.py
-```
 输出打印如下:
-```
+
+```shell
+
 input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
 The model detects all entities:
 entity: 北京   label: LOC   pos: [0, 1]
 entity: 重庆   label: LOC   pos: [6, 7]
 entity: 成都   label: LOC   pos: [12, 13]
------------------------------
-input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
+input data: 乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。
 The model detects all entities:
-entity: 玛雅   label: LOC   pos: [2, 3]
-entity: 华夏   label: LOC   pos: [14, 15]
------------------------------
-PipelineClient::predict pack_data time:1652593013.713769
-PipelineClient::predict before time:1652593013.7141528
-input data: ['从', '首', '都', '利', '隆', '圭', '乘', '车', '向', '湖', '边', '小', '镇', '萨', '利', '马', '进', '发', '时', '，', '不', '到', '１', '０', '０', '公', '里', '的', '道', '路', '上', '坑', '坑', '洼', '洼', '，', '又', '逢', '阵', '雨', '迷', '蒙', '，', '令', '人', '不', '时', '发', '出', '路', '难', '行', '的', '慨', '叹', '。']
-The model detects all entities:
-entity: 利隆圭   label: LOC   pos: [3, 5]
-entity: 萨利马   label: LOC   pos: [13, 15]
------------------------------
+entity: 乔丹   label: PER   pos: [0, 1]
+entity: 科比   label: PER   pos: [3, 4]
+entity: 詹姆斯   label: PER   pos: [6, 8]
+entity: 姚明   label: PER   pos: [10, 11]
+
 ```
+
+## 配置修改
+
+当前分类任务( ernie_seqcls_model/config.pbtxt )默认配置在 CPU上 运行 OpenVINO 引擎; 序列标注任务默认配置在 GPU 上运行 Paddle Inference 引擎。如果要在 CPU/GPU 或其他推理引擎上运行, 需要修改配置，详情请参考[配置文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/serving/docs/zh_CN/model_configuration.md)。

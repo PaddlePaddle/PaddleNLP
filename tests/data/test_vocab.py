@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
+import unittest
+from collections import Counter
 
 from paddlenlp.data import Vocab
-from common_test import CpuCommonTest
-from collections import Counter
-import util
-import unittest
+from tests import testing_utils
+from tests.common_test import CpuCommonTest
 
 
 class TestVocab(CpuCommonTest):
@@ -36,30 +34,30 @@ class TestVocab(CpuCommonTest):
     def setUp(self):
         self.create_counter()
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_invalid_specail_token(self):
         Vocab(wrong_kwarg="")
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_invalid_identifier(self):
         Vocab(counter=self.counter, _special_token="")
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_sort_index_value_error1(self):
         token_to_idx = {"一万七千多": 1, "一万七千余": 2, "IP地址": 3}
-        vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
+        Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_sort_index_value_error2(self):
         token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万七千": 2}
         Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_sort_index_value_error3(self):
         token_to_idx = {"一万七千多": -1, "一万七千余": 2, "一万七千": 3}
         Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
-    @util.assert_raises(ValueError)
+    @testing_utils.assert_raises(ValueError)
     def test_to_token_excess_size(self):
         token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万万": 3}
         vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)

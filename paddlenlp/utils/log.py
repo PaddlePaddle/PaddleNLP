@@ -14,17 +14,12 @@
 # limitations under the License.
 
 import contextlib
-import copy
 import functools
 import logging
-import os
-import sys
-import time
 import threading
-from typing import List
+import time
 
 import colorlog
-from colorama import Fore
 
 loggers = {}
 
@@ -75,6 +70,10 @@ class Logger(object):
 
     def enable(self):
         self._is_enable = True
+
+    def set_level(self, log_level: str):
+        assert log_level in log_config, f"Invalid log level. Choose among {log_config.keys()}"
+        self.logger.setLevel(log_level)
 
     @property
     def is_enable(self) -> bool:

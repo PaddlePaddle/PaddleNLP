@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+
 import paddle
-from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
+
+from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -48,6 +49,8 @@ def aug():
             for line in f1:
                 s, l = line.strip().split("\t")
                 augs = aug.augment(s)
+                if not isinstance(augs[0], str):
+                    augs = augs[0]
                 for a in augs:
                     f2.write(a + "\t" + l + "\n")
         f1.close(), f2.close()
@@ -65,6 +68,8 @@ def aug():
                 for i in range(args.create_n):
                     i = count % len(aug)
                     augs = aug[i].augment(s)
+                    if not isinstance(augs[0], str):
+                        augs = augs[0]
                     count += 1
                     for a in augs:
                         f2.write(a + "\t" + l + "\n")

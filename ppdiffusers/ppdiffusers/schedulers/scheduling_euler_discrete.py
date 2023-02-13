@@ -153,7 +153,7 @@ class EulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
         s_tmin: float = 0.0,
         s_tmax: float = float("inf"),
         s_noise: float = 1.0,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[EulerDiscreteSchedulerOutput, Tuple]:
         """

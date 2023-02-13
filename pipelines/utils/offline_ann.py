@@ -13,13 +13,10 @@
 # limitations under the License.
 
 import argparse
-import os
 
-import paddle
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
 from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever
-from pipelines.utils import launch_es
+from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, launch_es
 
 data_dict = {
     "data/dureader_dev": "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
@@ -28,49 +25,23 @@ data_dict = {
     "data/file_example": "https://paddlenlp.bj.bcebos.com/pipelines/file_examples.zip",
 }
 
+# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--index_name", default="baike_cities", type=str, help="The index name of the ANN search engine")
 parser.add_argument("--doc_dir", default="data/baike/", type=str, help="The doc path of the corpus")
-parser.add_argument(
-    "--search_engine", choices=["elastic", "milvus"], default="elastic", help="The type of ANN search engine."
-)
+parser.add_argument("--search_engine", choices=["elastic", "milvus"], default="elastic", help="The type of ANN search engine.")
 parser.add_argument("--host", type=str, default="127.0.0.1", help="host ip of ANN search engine")
-
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
-
 parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
-
 parser.add_argument("--split_answers", action="store_true", help="whether to split lines into question and answers")
-
-parser.add_argument(
-    "--query_embedding_model",
-    default="rocketqa-zh-nano-query-encoder",
-    type=str,
-    help="The query_embedding_model path",
-)
-
-parser.add_argument(
-    "--passage_embedding_model",
-    default="rocketqa-zh-nano-para-encoder",
-    type=str,
-    help="The passage_embedding_model path",
-)
-
-parser.add_argument(
-    "--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path"
-)
-
-parser.add_argument(
-    "--delete_index", action="store_true", help="Whether to delete existing index while updating index"
-)
-
-parser.add_argument(
-    "--share_parameters",
-    action="store_true",
-    help="Use to control the query and title models sharing the same parameters",
-)
-
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path",)
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-para-encoder", type=str, help="The passage_embedding_model path", )
+parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
+parser.add_argument("--delete_index", action="store_true", help="Whether to delete existing index while updating index")
+parser.add_argument("--share_parameters", action="store_true", help="Use to control the query and title models sharing the same parameters",)
+parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 args = parser.parse_args()
+# yapf: enable
 
 
 def offline_ann(index_name, doc_dir):
@@ -104,13 +75,13 @@ def offline_ann(index_name, doc_dir):
     # 文档数据写入数据库
     document_store.write_documents(dicts)
 
-    ### 语义索引模型
+    # 语义索引模型
     retriever = DensePassageRetriever(
         document_store=document_store,
         query_embedding_model=args.query_embedding_model,
         passage_embedding_model=args.passage_embedding_model,
         params_path=args.params_path,
-        output_emb_size=args.embedding_dim,
+        output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
         share_parameters=args.share_parameters,
         max_seq_len_query=64,
         max_seq_len_passage=256,

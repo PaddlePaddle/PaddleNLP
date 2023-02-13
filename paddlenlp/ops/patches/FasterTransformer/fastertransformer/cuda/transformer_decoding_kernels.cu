@@ -96,6 +96,112 @@ void embeddings_kernel_launcher(T* from_tensor,
 }
 
 template <typename T>
+__global__ void words_embeddings_kernels(T* from_tensor,
+                                   const T* embedding_table,
+                                   const int* word_ids,
+                                   const int batch_size,
+                                   const int hidden_units) {
+  // 1. lookup from embedding table
+  // 2. add the position encoding
+  // 3. add the token type embedding
+  for (int index = blockIdx.x * blockDim.x + threadIdx.x;
+       index < batch_size * hidden_units;
+       index += blockDim.x * gridDim.x) {
+    const int row_index = index / hidden_units;
+    const int col_index = index % hidden_units;
+
+    from_tensor[index] =
+        embedding_table[word_ids[row_index] * hidden_units + col_index];
+  }
+}
+
+template <typename T>
+void words_embeddings_kernel_launcher(T* from_tensor,
+                                const T* embedding_table,
+                                const int* word_ids,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream) {
+  dim3 grid(min(batch_size, 65536));
+  dim3 block(min(hidden_units, 1024));
+
+  words_embeddings_kernels<T><<<grid, block, 0, stream>>>(from_tensor,
+                                                    embedding_table,
+                                                    word_ids,
+                                                    batch_size,
+                                                    hidden_units);
+}
+
+template<typename T>
+__global__ void build_relative_attention_bias_kernel(
+        T* relative_attention_bias,
+        const T* relative_attention_bias_table,
+        const int head_num,
+        const int seq_len,
+        const int num_bucket,
+        const bool is_bidirectional,
+        const int max_distance) {
+    const int head_id = blockIdx.x;
+    for (int seq_id = threadIdx.x; seq_id < seq_len * seq_len; seq_id += blockDim.x) {
+        int row_id = seq_id / seq_len;
+        int col_id = seq_id % seq_len;
+
+        int relative_position = col_id - row_id;
+
+        int relative_buckets = 0;
+        int tmp_num_bucket = num_bucket;
+        if (is_bidirectional) {
+            tmp_num_bucket /= 2;
+            if (relative_position > 0) {
+                relative_buckets += tmp_num_bucket;
+            }
+            else {
+                relative_position *= -1;
+            }
+        }
+        else {
+            relative_position = -min(relative_position, 0);
+        }
+
+        int max_exact = tmp_num_bucket / 2;
+        bool is_small = relative_position < max_exact;
+
+        int relative_position_if_large =
+            max_exact
+            + (int)(logf(relative_position * 1.0f / max_exact) / logf((float)max_distance / max_exact)
+                    * (tmp_num_bucket - max_exact));
+
+        relative_position_if_large = min(relative_position_if_large, tmp_num_bucket - 1);
+
+        relative_buckets += is_small ? relative_position : relative_position_if_large;
+
+        relative_attention_bias[head_id * seq_len * seq_len + seq_id] =
+            relative_attention_bias_table[relative_buckets * gridDim.x + head_id];
+    }
+}
+
+template<typename T>
+void build_relative_attention_bias_launcher(T* relative_attention_bias,
+                                            const T* relative_attention_bias_table,
+                                            const int head_num,
+                                            const int seq_len,
+                                            const int num_bucket,
+                                            const bool is_bidirectional,
+                                            const int max_distance,
+                                            cudaStream_t stream) {
+    dim3 grid(head_num);
+    dim3 block(256);
+    build_relative_attention_bias_kernel<<<grid, block, 0, stream>>>(relative_attention_bias,
+                                                           relative_attention_bias_table,
+                                                           head_num,
+                                                           seq_len,
+                                                           num_bucket,
+                                                           is_bidirectional,
+                                                           max_distance);
+}
+
+
+template <typename T>
 __global__ void start_id_embedding_kernel(T* from_tensor,
                                           const T* embedding_table,
                                           const T* position_encoding_table,
@@ -428,6 +534,38 @@ template void embeddings_kernel_launcher(half* from_tensor,
                                          const int* decoder_role_id,
                                          const half* role_embedding_table,
                                          const int* decoder_position_id);
+
+template void words_embeddings_kernel_launcher(float* from_tensor,
+                                const float* embedding_table,
+                                const int* word_ids,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream);
+
+template void words_embeddings_kernel_launcher(half* from_tensor,
+                                const half* embedding_table,
+                                const int* word_ids,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream);
+
+template void build_relative_attention_bias_launcher(float* relative_attention_bias,
+                                            const float* relative_attention_bias_table,
+                                            const int head_num,
+                                            const int seq_len,
+                                            const int num_bucket,
+                                            const bool is_bidirectional,
+                                            const int max_distance,
+                                            cudaStream_t stream);
+
+template void build_relative_attention_bias_launcher(half* relative_attention_bias,
+                                            const half* relative_attention_bias_table,
+                                            const int head_num,
+                                            const int seq_len,
+                                            const int num_bucket,
+                                            const bool is_bidirectional,
+                                            const int max_distance,
+                                            cudaStream_t stream);
 
 template void start_ids_embeddings_kernel_launcher(float* from_tensor,
                                 const float* embedding_table,

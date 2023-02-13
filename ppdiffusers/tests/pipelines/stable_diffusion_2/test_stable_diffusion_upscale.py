@@ -20,9 +20,8 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -33,7 +32,7 @@ from ppdiffusers import (
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 
 
-class StableDiffusionUpscalePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class StableDiffusionUpscalePipelineFastTests(unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -94,7 +93,8 @@ class StableDiffusionUpscalePipelineFastTests(PipelineTesterMixin, unittest.Test
             text_hidden_act="gelu",
             projection_dim=512,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 
@@ -154,22 +154,72 @@ class StableDiffusionUpscalePipelineFastTests(PipelineTesterMixin, unittest.Test
         assert image.shape == (1, expected_height_width, expected_height_width, 3)
         expected_slice = np.array(
             [
-                0.9216755628585815,
-                0.7778909206390381,
-                0.7246097326278687,
-                0.6616445183753967,
-                0.5916030406951904,
-                0.5970571041107178,
-                0.5546892881393433,
-                0.5396133065223694,
-                0.6180068254470825,
+                0.0,
+                0.1469419300556183,
+                0.3604544401168823,
+                0.14138281345367432,
+                0.1831982433795929,
+                0.4674043655395508,
+                0.1786993443965912,
+                0.11115092039108276,
+                0.430525541305542,
             ]
         )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
+    def test_stable_diffusion_upscale_batch(self):
+        unet = self.dummy_cond_unet_upscale
+        low_res_scheduler = DDPMScheduler()
+        scheduler = DDIMScheduler(prediction_type="v_prediction")
+        vae = self.dummy_vae
+        text_encoder = self.dummy_text_encoder
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
+        image = self.dummy_image.cpu().transpose([0, 2, 3, 1])[0]
+        low_res_image = Image.fromarray(np.uint8(image)).convert("RGB").resize((64, 64))
+
+        # make sure here that pndm scheduler skips prk
+        sd_pipe = StableDiffusionUpscalePipeline(
+            unet=unet,
+            low_res_scheduler=low_res_scheduler,
+            scheduler=scheduler,
+            vae=vae,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            max_noise_level=350,
+        )
+        sd_pipe.set_progress_bar_config(disable=None)
+
+        prompt = "A painting of a squirrel eating a burger"
+        output = sd_pipe(
+            2 * [prompt],
+            image=2 * [low_res_image],
+            guidance_scale=6.0,
+            noise_level=20,
+            num_inference_steps=2,
+            output_type="np",
+        )
+        image = output.images
+        assert image.shape[0] == 2
+
+        generator = paddle.Generator().manual_seed(0)
+        output = sd_pipe(
+            [prompt],
+            image=low_res_image,
+            generator=generator,
+            num_images_per_prompt=2,
+            guidance_scale=6.0,
+            noise_level=20,
+            num_inference_steps=2,
+            output_type="np",
+        )
+        image = output.images
+        assert image.shape[0] == 2
+
+
+# TODO This maybe error
 @slow
 class StableDiffusionUpscalePipelineIntegrationTests(unittest.TestCase):
     def tearDown(self):

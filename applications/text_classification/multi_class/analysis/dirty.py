@@ -12,25 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import json
-import functools
-import random
-import time
-import os
 import argparse
+import functools
+import os
+import random
 
 import numpy as np
-
 import paddle
-import paddle.nn.functional as F
-from paddle.metric import Accuracy
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
+from paddle.io import BatchSampler, DataLoader
+from trustai.interpretation import RepresenterPointModel
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer, LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from trustai.interpretation import RepresenterPointModel
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -117,16 +111,11 @@ def run():
     set_seed(args.seed)
     paddle.set_device(args.device)
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
-
     # Prepare & preprocess dataset
     train_path = os.path.join(args.dataset_dir, args.train_file)
     train_ds = load_dataset(read_local_dataset, path=train_path, lazy=False)

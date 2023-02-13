@@ -13,24 +13,28 @@
 # limitations under the License.
 
 from fractions import Fraction
-from math import ceil
+from math import ceil, pi
 
-from math import pi
-
-import paddle
-import paddle.nn as nn
 import numpy
 import numpy as np
+import paddle
+import paddle.nn as nn
 
 nnModuleWrapped = nn.Layer
 
 
 def set_framework_dependencies(x):
     if type(x) is numpy.ndarray:
-        to_dtype = lambda a: a
+
+        def to_dtype(a):
+            return a
+
         fw = numpy
     else:
-        to_dtype = lambda a: paddle.cast(a, x.dtype)
+
+        def to_dtype(a):
+            return paddle.cast(a, x.dtype)
+
         fw = paddle
     # eps = fw.finfo(fw.float32).eps
     eps = paddle.to_tensor(np.finfo(np.float32).eps)
@@ -271,7 +275,7 @@ def apply_weights(input, field_of_view, weights, dim, n_dims, pad_sz, pad_mode, 
     # values of the neighbors in the 1d field of view. note that we only
     # consider neighbors along the current dim, but such set exists for every
     # multi-dim location, hence the final tensor order is image_dims+1.
-    paddle.device.cuda.empty_cache()
+    # paddle.device.cuda.empty_cache()
     neighbors = tmp_input[field_of_view]
 
     # weights is an order 2 tensor: for each output location along 1d- a list
@@ -382,7 +386,10 @@ def apply_antialiasing_if_needed(interp_method, support_sz, scale_factor, antial
     scale_factor = float(scale_factor)
     if scale_factor >= 1.0 or not antialiasing:
         return interp_method, support_sz
-    cur_interp_method = lambda arg: scale_factor * interp_method(scale_factor * arg)
+
+    def cur_interp_method(arg):
+        return scale_factor * interp_method(scale_factor * arg)
+
     cur_support_sz = support_sz / scale_factor
     return cur_interp_method, cur_support_sz
 

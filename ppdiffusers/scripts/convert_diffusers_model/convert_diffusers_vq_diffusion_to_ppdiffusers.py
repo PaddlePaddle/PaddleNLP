@@ -19,7 +19,7 @@ import paddle
 import torch
 from diffusers import VQDiffusionPipeline as DiffusersVQDiffusionPipeline
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import Transformer2DModel
 from ppdiffusers import VQDiffusionPipeline as PPDiffusersVQDiffusionPipeline
 from ppdiffusers import VQDiffusionScheduler, VQModel
@@ -126,25 +126,25 @@ def convert_diffusers_vq_diffusion_to_ppdiffusers(pretrained_model_name_or_path,
     )
 
     # 1. vqvae
-    pp_vqvae = VQModel(**diffusers_pipe.vqvae.config)
+    pp_vqvae = VQModel.from_config(diffusers_pipe.vqvae.config)
     pp_vqvae.set_dict(vqvae_state_dict)
 
     # 2. transformer
-    pp_transformer = Transformer2DModel(**diffusers_pipe.transformer.config)
+    pp_transformer = Transformer2DModel.from_config(diffusers_pipe.transformer.config)
     pp_transformer.set_dict(transformer_state_dict)
 
     # 3. pp_learned_classifier_free_sampling_embeddings
-    pp_learned_classifier_free_sampling_embeddings = LearnedClassifierFreeSamplingEmbeddings(
-        **diffusers_pipe.learned_classifier_free_sampling_embeddings.config
+    pp_learned_classifier_free_sampling_embeddings = LearnedClassifierFreeSamplingEmbeddings.from_config(
+        diffusers_pipe.learned_classifier_free_sampling_embeddings.config
     )
     pp_learned_classifier_free_sampling_embeddings.set_dict(learned_classifier_free_sampling_embeddings_state_dict)
 
     # 4. text_encoder
-    pp_text_encoder = CLIPTextModel(**text_encoder_config)
+    pp_text_encoder = CLIPTextModel(CLIPTextConfig.from_dict(text_encoder_config))
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
     # 5. scheduler
-    pp_scheduler = VQDiffusionScheduler(**diffusers_pipe.scheduler.config)
+    pp_scheduler = VQDiffusionScheduler.from_config(diffusers_pipe.scheduler.config)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         # 6. tokenizer

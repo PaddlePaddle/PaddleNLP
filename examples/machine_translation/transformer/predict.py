@@ -47,7 +47,7 @@ def parse_args():
         type=str,
         help="The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. ",
     )
-    parser.add_argument("--without_ft", action="store_true", help="Whether to use FasterTransformer to do predict. ")
+    parser.add_argument("--without_ft", action="store_true", help="Whether to use FastGeneration to do predict. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
@@ -125,7 +125,7 @@ def do_predict(args):
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
-    # `TransformerGenerator` automatically chioces using `FasterTransformer`
+    # `TransformerGenerator` automatically chioces using `FastGeneration`
     # (with jit building) or the slower verison `InferTransformerModel`.
     transformer = TransformerGenerator(
         src_vocab_size=args.src_vocab_size,

@@ -13,12 +13,11 @@
 # limitations under the License.
 """Transformer encoder."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 from functools import partial
 
+import paddle
 import paddle.fluid as fluid
 import paddle.fluid.layers as layers
 
@@ -39,7 +38,7 @@ def multi_head_attention(
 ):
     """
     Multi-Head Attention. Note that attn_bias is added to the logit before
-    computing softmax activiation to mask certain selected positions so that
+    computing softmax activation to mask certain selected positions so that
     they will not considered in attention weights.
     """
     keys = queries if keys is None else keys
@@ -77,7 +76,7 @@ def multi_head_attention(
 
     def __split_heads(x, n_head):
         """
-        Reshape the last dimension of inpunt tensor x so that it becomes two
+        Reshape the last dimension of input tensor x so that it becomes two
         dimensions and then transpose. Specifically, input a tensor with shape
         [bs, max_sequence_length, n_head * hidden_dim] then output a tensor
         with shape [bs, n_head, max_sequence_length, hidden_dim].
@@ -93,7 +92,7 @@ def multi_head_attention(
 
     def __combine_heads(x):
         """
-        Transpose and then reshape the last two dimensions of inpunt tensor x
+        Transpose and then reshape the last two dimensions of input tensor x
         so that it becomes one dimension, which is reverse to __split_heads.
         """
         if len(x.shape) == 3:
@@ -111,7 +110,7 @@ def multi_head_attention(
         Scaled Dot-Product Attention
         """
         scaled_q = layers.scale(x=q, scale=d_key**-0.5)
-        product = layers.matmul(x=scaled_q, y=k, transpose_y=True)
+        product = paddle.matmul(x=scaled_q, y=k, transpose_y=True)
         if attn_bias:
             product += attn_bias
         weights = layers.softmax(product)
@@ -119,7 +118,7 @@ def multi_head_attention(
             weights = layers.dropout(
                 weights, dropout_prob=dropout_rate, dropout_implementation="upscale_in_train", is_test=False
             )
-        out = layers.matmul(weights, v)
+        out = paddle.matmul(weights, v)
         return out
 
     q, k, v = __compute_qkv(queries, keys, values, n_head, d_key, d_value)
@@ -180,7 +179,7 @@ def positionwise_feed_forward(x, d_inner_hid, d_hid, dropout_rate, hidden_act, p
 
 def pre_post_process_layer(prev_out, out, process_cmd, dropout_rate=0.0, name=""):
     """
-    Add residual connection, layer normalization and droput to the out tensor
+    Add residual connection, layer normalization and dropout to the out tensor
     optionally according to the value of process_cmd.
     This will be used before or after multi-head attention and position-wise
     feed-forward networks.
@@ -232,10 +231,10 @@ def encoder_layer(
     name="",
 ):
     """The encoder layers that can be stacked to form a deep encoder.
-    This module consits of a multi-head (self) attention followed by
+    This module consists of a multi-head (self) attention followed by
     position-wise feed-forward networks and both the two components companied
     with the post_process_layer to add residual connection, layer normalization
-    and droput.
+    and dropout.
     """
     attn_output = multi_head_attention(
         pre_process_layer(enc_input, preprocess_cmd, prepostprocess_dropout, name=name + "_pre_att"),

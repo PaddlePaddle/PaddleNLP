@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
+import unittest
 
 from paddlenlp.data import JiebaTokenizer, Vocab
-from common_test import CpuCommonTest
-from util import create_test_data
-import unittest
+from tests.common_test import CpuCommonTest
+from tests.testing_utils import create_test_data
 
 
 class TestJiebaTokenizer(CpuCommonTest):

@@ -15,28 +15,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import argparse
+import logging
 import math
 import os
+
 import paddle
-
-from paddle.optimizer import AdamW
 from paddle.amp import GradScaler, auto_cast
-from paddlenlp.transformers import T5ForConditionalGeneration
-
+from paddle.optimizer import AdamW
 from uie.evaluation.sel2record import evaluate_extraction_results
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.utils import (
+    better_print_multi,
     get_scheduler,
+    get_train_dataloader,
     get_writer,
-    set_seed,
+    load_eval_tasks,
     save_checkpoint,
     set_logger,
-    better_print_multi,
-    get_train_dataloader,
-    load_eval_tasks,
+    set_seed,
 )
+
+from paddlenlp.transformers import T5ForConditionalGeneration
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +242,7 @@ def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
             max_length=generate_max_length,
-            use_faster=True,
+            use_fast=True,
         )
 
         # Convert Token id to Token String
@@ -423,7 +423,7 @@ def train(args, model, tokenizer):
         save_checkpoint(tokenizer, model, os.path.join(args.output_dir, f"ckpt_epoch{epoch}"))
         if args.do_eval and paddle.distributed.get_rank() == 0:
 
-            logger.info(f"********** Running evaluating **********")
+            logger.info("********** Running evaluating **********")
             logger.info(f"************* Epoch {epoch} ************")
 
             eval_overall_results, eval_predictions = eval_all_tasks(
@@ -446,7 +446,7 @@ def train(args, model, tokenizer):
             if current_score > best_score:
                 logger.info("********** Saving Model **********")
                 best_score = current_score
-                save_checkpoint(tokenizer, model, os.path.join(args.output_dir, f"best"))
+                save_checkpoint(tokenizer, model, os.path.join(args.output_dir, "best"))
 
     best_ckpt_file = os.path.join(args.output_dir, "best", "model_state.pdparams")
     if os.path.exists(best_ckpt_file):
