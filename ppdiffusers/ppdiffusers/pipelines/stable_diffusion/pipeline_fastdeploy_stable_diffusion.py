@@ -389,7 +389,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
-        scheduler_support_kwagrs=self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input)
+        scheduler_support_kwagrs_scale_input=self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input)
+        scheduler_support_kwagrs_step=self.check_var_kwargs_of_scheduler_func(self.scheduler.step)
+
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -399,7 +401,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                                 width // 8],dtype='float32')
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                if scheduler_support_kwagrs:
+                if scheduler_support_kwagrs_scale_input:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
@@ -417,7 +419,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
                 # compute the previous noisy sample x_t -> x_t-1
-                if scheduler_support_kwagrs:
+                if scheduler_support_kwagrs_step:
                     scheduler_output = self.scheduler.step(
                         noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
                     )

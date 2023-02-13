@@ -108,7 +108,6 @@ def create_paddle_inference_runtime(
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
-    # option.paddle_infer_option.enable_log_info = True
     if device_id == -1:
         option.use_cpu()
     else:
@@ -230,7 +229,7 @@ if __name__ == "__main__":
     text_encoder_shape = {
         "input_ids": {
             "min_shape": [1, 77],
-            "max_shape": [1, 77],
+            "max_shape": [2, 77],
             "opt_shape": [1, 77],
         }
     }
@@ -275,7 +274,6 @@ if __name__ == "__main__":
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
         use_trt = True if args.backend == "paddle_tensorrt" else False
-
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
             args.model_dir,

@@ -156,7 +156,7 @@ def run(args):
 
         print(f"num_training_steps: {num_training_steps}, num_train_epochs: {num_train_epochs}")
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_propotion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
 
