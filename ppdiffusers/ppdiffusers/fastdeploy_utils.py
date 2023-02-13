@@ -26,25 +26,28 @@ from .utils import (
     FASTDEPLOY_MODEL_NAME,
     FASTDEPLOY_WEIGHTS_NAME,
     is_fastdeploy_available,
+    is_paddle_available,
     logging,
 )
 
-if is_fastdeploy_available():
-    import fastdeploy as fd
+if is_paddle_available():
     import paddle
 
+
+if is_fastdeploy_available():
+    import fastdeploy as fd
+
+    def pdtensor2fdtensor(pdtensor: paddle.Tensor, name: str = ""):
+        dltensor = paddle.utils.dlpack.to_dlpack(pdtensor)
+        return fd.C.FDTensor.from_dlpack(name, dltensor)
+
+    def fdtensor2pdtensor(fdtensor: fd.C.FDTensor):
+        dltensor = fdtensor.to_dlpack()
+        pdtensor = paddle.utils.dlpack.from_dlpack(dltensor)
+        return pdtensor
+
+
 logger = logging.get_logger(__name__)
-
-
-def pdtensor2fdtensor(pdtensor: paddle.Tensor, name: str = ""):
-    dltensor = paddle.utils.dlpack.to_dlpack(pdtensor)
-    return fd.C.FDTensor.from_dlpack(name, dltensor)
-
-
-def fdtensor2pdtensor(fdtensor: fd.C.FDTensor):
-    dltensor = fdtensor.to_dlpack()
-    pdtensor = paddle.utils.dlpack.from_dlpack(dltensor)
-    return pdtensor
 
 
 class FastDeployRuntimeModel:

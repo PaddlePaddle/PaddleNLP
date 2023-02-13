@@ -222,7 +222,79 @@ image.save("sks-dog-with-class.png")
 </p>
 
 
+# 使用 LoRA 和 DreamBooth 技术进行模型训练
 
-## 2 参考资料
+[LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) 是微软研究员引入的一项新技术，主要用于处理大模型微调的问题。目前超过数十亿以上参数的具有强能力的大模型 (例如 GPT-3) 通常在为了适应其下游任务的微调中会呈现出巨大开销。LoRA 建议冻结预训练模型的权重并在每个 Transformer 块中注入可训练层 (秩-分解矩阵)。因为不需要为大多数模型权重计算梯度，所以大大减少了需要训练参数的数量并且降低了 GPU 的内存要求。研究人员发现，通过聚焦大模型的 Transformer 注意力块，使用 LoRA 进行的微调质量与全模型微调相当，同时速度更快且需要更少的计算。
+
+简而言之，LoRA允许通过向现有权重添加一对秩分解矩阵，并只训练这些新添加的权重来适应预训练的模型。这有几个优点：
+
+- 保持预训练的权重不变，这样模型就不容易出现灾难性遗忘 [catastrophic forgetting](https://www.pnas.org/doi/10.1073/pnas.1611835114)；
+- 秩分解矩阵的参数比原始模型少得多，这意味着训练的 LoRA 权重很容易移植；
+- LoRA 注意力层允许通过一个 `scale` 参数来控制模型适应新训练图像的程度。
+
+[cloneofsimo](https://github.com/cloneofsimo) 是第一个在 [LoRA GitHub](https://github.com/cloneofsimo/lora) 仓库中尝试使用 LoRA 训练 Stable Diffusion 的人。
+
+## 训练
+
+**___Note: 如果我们使用 [stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2) 进行训练，那么我们需要将 `resolution` 改成 768 .___**
+
+```bash
+export MODEL_NAME="runwayml/stable-diffusion-v1-5"
+export INSTANCE_DIR="path-to-instance-images"
+export OUTPUT_DIR="path-to-save-model"
+
+python train_dreambooth_lora.py \
+  --pretrained_model_name_or_path=$MODEL_NAME  \
+  --instance_data_dir=$INSTANCE_DIR \
+  --output_dir=$OUTPUT_DIR \
+  --instance_prompt="a photo of sks dog" \
+  --resolution=512 \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=1 \
+  --checkpointing_steps=100 \
+  --learning_rate=1e-4 \
+  --report_to="visualdl" \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=0 \
+  --max_train_steps=500 \
+  --validation_prompt="A photo of sks dog in a bucket" \
+  --validation_epochs=50 \
+  --seed=0
+```
+
+**___Note: 当我使用 LoRA 训练模型的时候，我们需要使用更大的学习率，因此我们这里使用 *1e-4* 而不是 *2e-6*.___**
+
+最终经过微调后的 LoRA 权重，我们已经上传到了 [junnyu/lora_dreambooth_dog_example](https://huggingface.co/junnyu/lora_dreambooth_dog_example). **___Note: [最终的权重](https://huggingface.co/junnyu/lora_dreambooth_dog_example/blob/main/paddle_lora_weights.pdparams) 只有 3 MB 的大小.___**
+
+## 推理
+
+经过训练， LoRA 权重可以直接加载到原始的 pipeline 中。
+
+首先我们需要加载原始的 pipeline：
+
+```python
+from ppdiffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+import paddle
+
+pipe = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float16)
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+```
+
+接下来, 我们需要使用 `load_attn_procs` 方法将 `adapter layers` 添加到 UNet 模型中。
+```python
+pipe.unet.load_attn_procs("junnyu/lora_dreambooth_dog_example", from_hf_hub=True)
+```
+
+最终, 我们可以使用模型进行推理预测.
+
+```python
+image = pipe("A picture of a sks dog in a bucket", num_inference_steps=25).images[0]
+image.save("demo.png")
+```
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/50394665/218384517-b89667f4-b5c9-4ecf-afcb-8b667c5532bb.jpg">
+</p>
+
+## 参考资料
 - https://github.com/huggingface/diffusers/tree/main/examples/dreambooth
 - https://github.com/CompVis/stable-diffusion
