@@ -31,6 +31,10 @@ from ...schedulers import (
     LMSDiscreteScheduler,
     PNDMScheduler,
 )
+from ...schedulers.preconfig import (
+    PreconfigEulerAncestralDiscreteScheduler,
+    PreconfigLMSDiscreteScheduler,
+)
 from ...utils import logging
 from . import StableDiffusionPipelineOutput
 
@@ -80,8 +84,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             DDIMScheduler,
             PNDMScheduler,
             LMSDiscreteScheduler,
+            PreconfigLMSDiscreteScheduler,
             EulerDiscreteScheduler,
             EulerAncestralDiscreteScheduler,
+            PreconfigEulerAncestralDiscreteScheduler,
             DPMSolverMultistepScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
@@ -230,8 +236,13 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
-
         return extra_step_kwargs
+
+    def check_var_kwargs_of_scheduler_func(self, scheduler_func):
+        sig = inspect.signature(scheduler_func)
+        params = sig.parameters.values()
+        has_kwargs = any([True for p in params if p.kind == p.VAR_KEYWORD])
+        return has_kwargs
 
     def check_inputs(self, prompt, height, width, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
@@ -367,7 +378,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             latents = paddle.to_tensor(latents)
         # 6. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
-
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -375,7 +385,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                if self.check_var_kwargs_of_scheduler_func(self.scheduler.scale_model_input):
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
                 noise_pred = self.unet.zero_copy_infer(
@@ -385,9 +398,16 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
+                # TODO(wangboyun) need remove synchronize
+                # after fastdeploy support use same stream as paddle
+                paddle.device.cuda.synchronize()
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                if self.check_var_kwargs_of_scheduler_func(self.scheduler.step):
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
                 latents = scheduler_output.prev_sample
 
                 # call the callback, if provided

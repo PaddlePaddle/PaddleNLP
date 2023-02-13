@@ -857,7 +857,7 @@ class AutoTemplate(object):
             config = [x.strip() for x in fp]
             prompt = json.loads(config[0])
             if len(config) > 1:
-                template_class = json.loads(config[1])
+                template_class = json.loads(config[1])["class"]
             else:
                 template_class = None  # Compatible with previous versions
         template = cls.create_from(
