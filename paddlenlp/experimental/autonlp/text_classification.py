@@ -82,6 +82,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
         self.text_column = text_column
         self.label_column = label_column
+        self.id2label = self.kwargs.get("id2label", None)
         if problem_type in ["multi_label", "multi_class"]:
             self.problem_type = problem_type
         else:
@@ -196,24 +197,44 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         ]
 
     def _data_checks_and_inference(self):
-        self.id2label, self.label2id = {}, {}
-        # TODO: support label ids that is already encoded
-        if self.problem_type == "multi_class":
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    label = example[self.label_column]
-                    if label not in self.label2id:
-                        self.label2id[label] = len(self.label2id)
-                        self.id2label[len(self.id2label)] = label
-        # multi_label
-        else:
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    labels = example[self.label_column]
-                    for label in labels:
+        if self.id2label is None:
+            self.id2label, self.label2id = {}, {}
+            # TODO: support label ids that is already encoded
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
                         if label not in self.label2id:
                             self.label2id[label] = len(self.label2id)
                             self.id2label[len(self.id2label)] = label
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                self.label2id[label] = len(self.label2id)
+                                self.id2label[len(self.id2label)] = label
+        else:
+            self.label2id = {}
+            for i in self.id2label:
+                self.label2id[self.id2label[i]] = i
+
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
+                        if label not in self.label2id:
+                            raise ValueError(f"Not found label {label} in id2label: {self.id2label}")
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                raise ValueError(f"Not found label {label} in id2label: {self.id2label}")
 
     def _construct_trainer(self, config) -> Trainer:
         if "EarlyStoppingCallback.early_stopping_patience" in config:
@@ -330,7 +351,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 tokenizer=trainer.tokenizer,
                 max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
             )
-            processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
+            processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
             eval_metrics = trainer.evaluate(processed_eval_dataset)
         else:
             eval_metrics = trainer.evaluate()

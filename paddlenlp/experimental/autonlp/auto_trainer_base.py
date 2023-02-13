@@ -232,8 +232,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             path (str, required): The filepath to load the previous experiments
         """
         logger.info(f"Restoring from {path}")
-        self.training_results = self.tuner.get_results()
         self.tuner = tune.Tuner.restore(path)
+        self.training_results = self.tuner.get_results()
         logger.info("Found existing training results.")
 
     def train(
@@ -287,7 +287,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             for model_candidate in model_candidates:
                 model_candidate.update(hp_overrides)
         search_space = {"candidates": hp.choice("candidates", model_candidates)}
-        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode="max")
+        mode = "max" if self.greater_is_better else "min"
+        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode=mode)
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
