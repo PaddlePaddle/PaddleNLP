@@ -27,7 +27,7 @@ usage = r"""
             from PIL import Image
 
             # multi modal feature_extraction with ernie_vil-2.0-base-zh
-            senta = Taskflow("feature_extraction")
+            vision_language = Taskflow("feature_extraction")
             image_embeds = vision_language([Image.open("demo/000000039769.jpg")])
             print(image_embeds)
             '''
@@ -247,47 +247,6 @@ class MultimodalFeatureExtractionTask(Task):
         self.inference_model_path = self.inference_image_model_path
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
-
-    def _prepare_onnx_mode(self):
-        try:
-            import onnx
-            import onnxruntime as ort
-            import paddle2onnx
-            from onnxconverter_common import float16
-        except ImportError:
-            logger.warning(
-                "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
-            )
-
-        onnx_dir = os.path.join(self._task_path, "onnx", self.mode)
-        if not os.path.exists(onnx_dir):
-            os.makedirs(onnx_dir)
-        float_onnx_file = os.path.join(onnx_dir, "model.onnx")
-        if not os.path.exists(float_onnx_file) or self._param_updated:
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=self._static_model_file,
-                params_file=self._static_params_file,
-                opset_version=13,
-                enable_onnx_checker=True,
-            )
-            with open(float_onnx_file, "wb") as f:
-                f.write(onnx_model)
-        fp16_model_file = os.path.join(onnx_dir, "fp16_model.onnx")
-        if not os.path.exists(fp16_model_file) or self._param_updated:
-            onnx_model = onnx.load_model(float_onnx_file)
-            trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
-            onnx.save_model(trans_model, fp16_model_file)
-        providers = [("CUDAExecutionProvider", {"device_id": self.kwargs["device_id"]})]
-        sess_options = ort.SessionOptions()
-        sess_options.intra_op_num_threads = self._num_threads
-        sess_options.inter_op_num_threads = self._num_threads
-        self.predictor = ort.InferenceSession(fp16_model_file, sess_options=sess_options, providers=providers)
-        assert "CUDAExecutionProvider" in self.predictor.get_providers(), (
-            "The environment for GPU inference is not set properly. "
-            "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-            "Please run the following commands to reinstall: \n "
-            "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-        )
 
     def _get_inference_model(self):
         """

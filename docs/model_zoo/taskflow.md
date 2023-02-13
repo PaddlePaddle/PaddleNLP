@@ -1791,6 +1791,7 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 >>> from PIL import Image
 >>> import paddle.nn.functional as F
+>>> vision_language= Taskflow("feature_extraction")
 # 单条输入
 >>> image_embeds = vision_language(Image.open("demo/000000039769.jpg"))
 >>> image_embeds["features"]
