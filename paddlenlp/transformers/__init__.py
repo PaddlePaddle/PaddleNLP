@@ -60,6 +60,11 @@ from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
+from .blip.modeling import *
+from .blip.modeling_text import *
+from .blip.configuration import *
+from .blip.processing import *
+from .blip.image_processing import *
 from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
