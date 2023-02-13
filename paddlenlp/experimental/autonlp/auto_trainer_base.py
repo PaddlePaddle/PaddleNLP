@@ -74,6 +74,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
         self.language = language
         self.output_dir = output_dir
+        self.kwargs = kwargs
 
     @property
     @abstractmethod
