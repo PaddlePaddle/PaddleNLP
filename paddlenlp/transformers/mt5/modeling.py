@@ -22,10 +22,10 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from configuration import MT5_PRETRAINED_INIT_CONFIGURATION, MT5Config
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
+from paddlenlp.transformers import MT5_PRETRAINED_INIT_CONFIGURATION, MT5Config
 from paddlenlp.transformers.activations import ACT2FN
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutput,
