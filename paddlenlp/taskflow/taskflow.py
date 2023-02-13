@@ -373,7 +373,7 @@ TASKS = {
         },
     },
     "text_classification": {
-        "models": {
+        "modes": {
             "finetune": {
                 "task_class": TextClassificationTask,
                 "task_flag": "text_classification-finetune",
@@ -597,7 +597,7 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        if self.task in ["word_segmentation", "ner"]:
+        if self.task in ["word_segmentation", "ner", "text_classification"]:
             tag = "modes"
             ind_tag = "mode"
             self.model = mode
