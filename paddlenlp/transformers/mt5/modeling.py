@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Mesh TensorFlow authors, mT5 Authors and HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -566,6 +566,7 @@ class MT5PretrainedModel(PretrainedModel):
 
     pretrained_init_configuration = MT5_PRETRAINED_INIT_CONFIGURATION
 
+    # support AutoConverter after fix load_torch function
     @classmethod
     def _get_name_mappings(cls, config: MT5Config) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
