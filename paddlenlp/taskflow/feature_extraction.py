@@ -128,6 +128,58 @@ class MultimodalFeatureExtractionTask(Task):
                 "573ba0466e15cdb5bd423ff7010735ce",
             ],
         },
+        "OFA-Sys/chinese-clip-vit-large-patch14": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/model_state.pdparams",
+                "5c0dde02d68179a9cc566173e53966c0",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/config.json",
+                "a5e35843aa87ab1106e9f60f1e16b96d",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/vocab.txt",
+                "3b5b76c4aef48ecf8cb3abaafe960f09",
+            ],
+            "preprocessor_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/preprocessor_config.json",
+                "ba1fb66c75b18b3c9580ea5120e01ced",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/tokenizer_config.json",
+                "573ba0466e15cdb5bd423ff7010735ce",
+            ],
+        },
+        "OFA-Sys/chinese-clip-vit-large-patch14-336px": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/model_state.pdparams",
+                "ee3eb7f9667cfb06338bea5757c5e0d7",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/config.json",
+                "cb2794d99bea8c8f45901d177e663e1e",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/vocab.txt",
+                "3b5b76c4aef48ecf8cb3abaafe960f09",
+            ],
+            "preprocessor_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/preprocessor_config.json",
+                "c52a0b3abe9bdd1c3c5a3d56797f4a03",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/tokenizer_config.json",
+                "573ba0466e15cdb5bd423ff7010735ce",
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, _static_mode=True, **kwargs):

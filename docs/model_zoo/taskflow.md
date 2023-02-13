@@ -1837,17 +1837,9 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
   | :---: | :--------: | :--------: | :--------: |
   | `PaddlePaddle/ernie_vil-2.0-base-zh` (默认) | ViT | ERNIE | 中文 |
   | `OFA-Sys/chinese-clip-vit-base-patch16`                     | ViT-B/16 |RoBERTa-wwm-Base| 中文 |
-  | `OFA-Sys/chinese-clip-vit-huge-patch14`              | ViT-H/14 |RoBERTa-wwm-Large | 中文 |
   | `OFA-Sys/chinese-clip-vit-large-patch14`            | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
   | `OFA-Sys/chinese-clip-vit-large-patch14-336px`              | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
-  | `openai/clip-vit-base-patch32`             | ViT-B/32 | transformer结构| 英文 |
-  | `openai/clip-vit-base-patch16`              | ViT-B/16| transformer结构 | 英文 |
-  | `openai/clip-vit-large-patch14`              | ViT-L/14 | transformer结构 | 英文 |
-  | `laion/CLIP-ViT-H-14-laion2B-s32B-b79K`              | ViT-H/14 | transformer结构 | 英文 |
-  | `laion/CLIP-ViT-B-32-laion2B-s34B-b79K`              | ViT-B/32 | transformer结构 | 英文 |
-  | `openai/clip-rn50`              | RN50 | transformer结构 | 英文 |
-  | `openai/clip-rn101`              | RN101 | transformer结构 | 英文 |
-  | `openai/clip-rn50x4`              | RN50*4 | transformer结构 | 英文 |
+
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
