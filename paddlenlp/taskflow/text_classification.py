@@ -43,7 +43,7 @@ usage = r"""
         from paddlenlp import Taskflow
         text_cls = Taskflow(
             "text_classification",
-            model="finetune",
+            mode="finetune",
             problem_type="multi_class",
             task_path=<local_saved_dynamic_model>,
             id2label={0: "negative", 1: "positive"}
@@ -62,7 +62,7 @@ usage = r"""
         '''
         text_cls = Taskflow(
             "text_classification",
-            model="prompt",
+            mode="prompt",
             problem_type="multi_label",
             is_static_model=True,
             task_path=<local_saved_static_model>,
@@ -114,15 +114,25 @@ class TextClassificationTask(Task):
 
     Args:
         task (string): The name of task.
-        task_path (string): The local file path to the model path or a pre-trained model.
+        model (string): Mode of the classification, Supports ["prompt", "finetune"].
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+            task_path (string): The local file path to the model path or a pre-trained model.
+            is_static_model (string): Whether the model in task path  is a static model.
+            problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem. Default to "multi_class".
+            multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5.
+            max_length (int): Maximum number of tokens for the model.
+            precision (int): Select among ["fp32", "fp16"]. Default to "fp32".
+            plm_model_name (str): Pretrained langugae model name for PromptModel.
+            input_spec [list]: Specify the tensor information for each input parameter of the forward function.
+            id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+            batch_size(int): The sample number of a mini-batch.
     """
 
     def __init__(self, task: str, model: str = "finetune", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self.problem_type = kwargs.get("problem_type", "multi_class")
-        self.multilabel_threshold = kwargs.get("multilabel_threshold", 0.5)
-        self._max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
+        self.problem_type = self.kwargs.get("problem_type", "multi_class")
+        self.multilabel_threshold = self.kwargs.get("multilabel_threshold", 0.5)
+        self._max_length = self.kwargs.get("max_length", 512)
 
         self._construct_tokenizer()
         if self.model == "prompt":
