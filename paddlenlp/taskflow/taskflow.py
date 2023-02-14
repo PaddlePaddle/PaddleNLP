@@ -23,6 +23,7 @@ from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
+from .feature_extraction import TextFeatureExtractionTask
 from .fill_mask import FillMaskTask
 from .information_extraction import GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
@@ -513,6 +514,16 @@ TASKS = {
             },
         },
         "default": {"model": "utc-large"},
+    },
+    "feature_extraction": {
+        "models": {
+            "rocketqa-zh-dureader-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-dureader-query-encoder",
+                "task_priority_path": "rocketqa-zh-dureader-query-encoder",
+            },
+        },
+        "default": {"model": "rocketqa-zh-dureader-query-encoder"},
     },
 }
 
