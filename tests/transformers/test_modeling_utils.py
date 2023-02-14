@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import os
-import unittest
 import shutil
-from tempfile import TemporaryDirectory
-from tests.testing_utils import slow
+import unittest
 from multiprocessing import Pool
-from paddlenlp.transformers import TinyBertModel, BertModel
+from tempfile import TemporaryDirectory
+
+from paddlenlp.transformers import BertModel, TinyBertModel
 from paddlenlp.utils.env import MODEL_HOME
+from tests.testing_utils import slow
 
 
 def download_bert_model(model_name: str):
@@ -36,6 +37,12 @@ def download_bert_model(model_name: str):
 
 class TestModeling(unittest.TestCase):
     """Test PretrainedModel single time, not in Transformer models"""
+
+    def test_model_from_pretrained_cache_dir(self):
+        model_name = "__internal_testing__/bert"
+        with TemporaryDirectory() as tempdir:
+            BertModel.from_pretrained(model_name, cache_dir=tempdir)
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name)))
 
     @slow
     def test_from_pretrained_with_load_as_state_np_params(self):

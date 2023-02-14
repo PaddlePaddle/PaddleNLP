@@ -731,7 +731,14 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+        kwargs["from_hf_hub"] = from_hf_hub
+        if cache_dir is not None:
+            if from_hf_hub:
+                # hf hub takes care of cache dir
+                kwargs["cache_dir"] = cache_dir
+            else:
+                # cache dir needs to be appended with the model name
+                kwargs["cache_dir"] = os.path.join(cache_dir, pretrained_model_name_or_path)
 
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
@@ -794,7 +801,6 @@ class PretrainedConfig:
 
         # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
         elif is_url(pretrained_model_name_or_path):
-            # cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path) if cache_dir is not None
             resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
