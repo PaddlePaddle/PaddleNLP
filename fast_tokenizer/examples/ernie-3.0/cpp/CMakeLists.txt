@@ -13,6 +13,7 @@ else()
 endif()
 
 # Get FAST_TOKENIZER_INCS and FAST_TOKENIZER_LIBS
+message(STATUS "The fast_tokenizer install dir: ${FAST_TOKENIZER_INSTALL_DIR}")
 include(${FAST_TOKENIZER_INSTALL_DIR}/FastTokenizer.cmake)
 
 include_directories(${FAST_TOKENIZER_INCS})
