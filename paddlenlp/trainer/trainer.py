@@ -160,7 +160,7 @@ class Trainer:
         train_dataset (`paddle.io.Dataset` or `paddle.io.IterableDataset`, *optional*):
             The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
             `model.forward()` method are automatically removed.
-        eval_dataset (Union[`paddle.io.Dataset`, Dict[str, `torch.utils.data.Dataset`]],  *optional*):
+        eval_dataset (Union[`paddle.io.Dataset`, Dict[str, `paddle.io.Dataset`]],  *optional*):
              The dataset to use for evaluation. If it is a [`~datasets.Dataset`], columns not accepted by the
              `model.forward()` method are automatically removed. If it is a dictionary, it will evaluate on each
              dataset prepending the dictionary key to the metric name.
