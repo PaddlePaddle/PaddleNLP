@@ -291,7 +291,9 @@ class ImageProcessingMixin(object):
             )
         else:
             # Assuming from community-contributed pretrained models
-            image_processor_file = COMMUNITY_MODEL_PREFIX + pretrained_model_name_or_path + "/" + IMAGE_PROCESSOR_NAME
+            image_processor_file = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
+            )
             default_root = (
                 os.path.join(cache_dir, pretrained_model_name_or_path)
                 if cache_dir is not None

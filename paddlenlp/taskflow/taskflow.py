@@ -23,6 +23,7 @@ from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
+from .feature_extraction import MultimodalFeatureExtractionTask
 from .fill_mask import FillMaskTask
 from .information_extraction import GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
@@ -513,6 +514,76 @@ TASKS = {
             },
         },
         "default": {"model": "utc-large"},
+    },
+    "feature_extraction": {
+        "models": {
+            "PaddlePaddle/ernie_vil-2.0-base-zh": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-PaddlePaddle/ernie_vil-2.0-base-zh",
+                "task_priority_path": "PaddlePaddle/ernie_vil-2.0-base-zh",
+            },
+            "OFA-Sys/chinese-clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-base-patch16",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-base-patch16",
+            },
+            "OFA-Sys/chinese-clip-vit-huge-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-huge-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-huge-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14-336px": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14-336px",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14-336px",
+            },
+            "openai/clip-vit-base-patch32": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch32",
+                "task_priority_path": "openai/clip-vit-base-patch32",
+            },
+            "openai/clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch16",
+                "task_priority_path": "openai/clip-vit-base-patch16",
+            },
+            "openai/clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-large-patch14",
+                "task_priority_path": "openai/clip-vit-large-patch14",
+            },
+            "laion/CLIP-ViT-H-14-laion2B-s32B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+            },
+            "laion/CLIP-ViT-B-32-laion2B-s34B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+            },
+            "openai/clip-rn50": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50",
+                "task_priority_path": "openai/clip-rn50",
+            },
+            "openai/clip-rn101": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn101",
+                "task_priority_path": "openai/clip-rn101",
+            },
+            "openai/clip-rn50x4": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50x4",
+                "task_priority_path": "openai/clip-rn50x4",
+            },
+        },
+        "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
 }
 
