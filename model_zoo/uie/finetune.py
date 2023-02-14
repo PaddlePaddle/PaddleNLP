@@ -137,7 +137,11 @@ def main():
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
-    data_collator = DataCollatorWithPadding(tokenizer)
+
+    if training_args.device == "npu":
+        data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
+    else:
+        data_collator = DataCollatorWithPadding(tokenizer)
 
     criterion = paddle.nn.BCELoss()
 
