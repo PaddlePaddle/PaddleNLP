@@ -57,7 +57,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         metric_for_best_model: str,
         greater_is_better: bool,
         language: str = "Chinese",
-        output_dir: str = "autpnlp_results",
+        output_dir: str = "autonlp_results",
         **kwargs,
     ):
         if not metric_for_best_model.startswith("eval_"):
