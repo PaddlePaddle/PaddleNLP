@@ -1064,8 +1064,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # 5. download from community or hf-hub
         else:
             # assume that the community-based models, name format: community/model-name
-            community_model_file_path = os.path.join(
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]
+            community_model_file_path = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]]
             )
             assert is_url(community_model_file_path)
 
