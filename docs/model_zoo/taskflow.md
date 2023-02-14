@@ -47,6 +47,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 | [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
+| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |            |          | 集成文本，图片的特征抽取工具       |
 
 ## QuickStart
 
@@ -1777,6 +1778,75 @@ from paddlenlp import Taskflow
 * `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
 * `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
+
+</div></details>
+
+### 模型特征提取
+
+<details><summary>&emsp; 基于百度自研中文图文跨模态预训练模型ERNIE-ViL 2.0</summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+>>> from PIL import Image
+>>> import paddle.nn.functional as F
+>>> vision_language= Taskflow("feature_extraction")
+# 单条输入
+>>> image_embeds = vision_language(Image.open("demo/000000039769.jpg"))
+>>> image_embeds["features"]
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[-0.59475428, -0.69795364,  0.22144008,  0.88066685, -0.58184201,
+# 单条输入
+>>> text_embeds = vision_language("猫的照片")
+>>> text_embeds['features']
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.04250504, -0.41429776,  0.26163983,  0.29910022,  0.39019185,
+         -0.41884750, -0.19893740,  0.44328332,  0.08186490,  0.10953025,
+         ......
+
+# 多条输入
+>>> image_embeds = vision_language([Image.open("demo/000000039769.jpg")])
+>>> image_embeds["features"]
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[-0.59475428, -0.69795364,  0.22144008,  0.88066685, -0.58184201,
+       ......
+# 多条输入
+>>> text_embeds = vision_language(["猫的照片","狗的照片"])
+>>> text_embeds["features"]
+Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.04250504, -0.41429776,  0.26163983, ...,  0.26221892,
+          0.34387422,  0.18779707],
+        [ 0.06672225, -0.41456309,  0.13787819, ...,  0.21791610,
+          0.36693242,  0.34208685]])
+>>> image_features = image_embeds["features"]
+>>> text_features = text_embeds["features"]
+>>> image_features /= image_features.norm(axis=-1, keepdim=True)
+>>> text_features /= text_features.norm(axis=-1, keepdim=True)
+>>> logits_per_image = 100 * image_features @ text_features.t()
+>>> probs = F.softmax(logits_per_image, axis=-1)
+>>> probs
+Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[0.99833173, 0.00166824]])
+```
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  视觉| 文本  | 语言 |
+  | :---: | :--------: | :--------: | :--------: |
+  | `PaddlePaddle/ernie_vil-2.0-base-zh` (默认) | ViT | ERNIE | 中文 |
+  | `OFA-Sys/chinese-clip-vit-base-patch16`                     | ViT-B/16 |RoBERTa-wwm-Base| 中文 |
+  | `OFA-Sys/chinese-clip-vit-large-patch14`            | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
+  | `OFA-Sys/chinese-clip-vit-large-patch14-336px`              | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
+
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `_static_mode`：静态图模式，默认开启。
+* `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
+</div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
 
