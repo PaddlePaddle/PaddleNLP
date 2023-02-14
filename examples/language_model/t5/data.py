@@ -320,12 +320,6 @@ def get_dev_dataloader(tokenizer, args):
 
     batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
-    # batchify_fn = lambda samples, fn=Tuple(
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-    #     Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    # ): fn(samples)
     def batchify_fn(
         samples,
         fn=Tuple(
@@ -367,12 +361,6 @@ def get_mnli_dev_dataloader(tokenizer, args, matched=True):
 
     batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
-    # batchify_fn = lambda samples, fn=Tuple(
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-    #     Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    # ): fn(samples)
     def batchify_fn(
         samples,
         fn=Tuple(

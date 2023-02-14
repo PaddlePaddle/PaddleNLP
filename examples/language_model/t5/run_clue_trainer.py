@@ -18,8 +18,6 @@ from functools import partial
 from typing import Optional
 
 import paddle
-
-# import paddle.nn as nn
 from data import CLUE_PROCESSED
 from utils import CLUE_METRICS, load_pickle, save_pickle
 
@@ -265,9 +263,6 @@ def main():
 
         all_preds = paddle.to_tensor(all_preds).detach()
         all_labels = paddle.to_tensor(all_labels).detach()
-
-        # return (None, all_preds, all_labels)
-        # preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
 
         results = {}
         for metric in metric_list:
