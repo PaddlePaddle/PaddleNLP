@@ -55,7 +55,7 @@ from ppdiffusers.utils import PIL_INTERPOLATION
 
 def unfreeze_params(params):
     for param in params:
-        param.stop_gradient = True
+        param.stop_gradient = False
 
 
 def url_or_path_join(*path_list):
@@ -677,9 +677,6 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if num_processes > 1:
-        text_encoder = paddle.DataParallel(text_encoder)
-
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * num_processes
@@ -704,6 +701,9 @@ def main():
         epsilon=args.adam_epsilon,
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
+
+    if num_processes > 1:
+        text_encoder = paddle.DataParallel(text_encoder)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
@@ -837,9 +837,10 @@ def main():
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     text_encoder=unwrap_model(text_encoder),
+                    tokenizer=tokenizer,
                     paddle_dtype=paddle_dtype,
+                    safety_checker=None,
                 )
-                pipeline.safety_checker = None
                 pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
                 pipeline.set_progress_bar_config(disable=True)
 

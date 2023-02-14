@@ -46,6 +46,11 @@ from .version import VERSION as __version__
 logger = logging.get_logger(__name__)
 
 
+def unfreeze_params(params):
+    for param in params:
+        param.stop_gradient = False
+
+
 def freeze_params(params):
     for param in params:
         param.stop_gradient = True

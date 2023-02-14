@@ -633,9 +633,6 @@ def main():
         power=args.lr_power,
     )
 
-    if num_processes > 1:
-        unet = paddle.DataParallel(unet)
-
     # Optimizer creation
     optimizer = AdamW(
         learning_rate=lr_scheduler,
@@ -646,6 +643,9 @@ def main():
         epsilon=args.adam_epsilon,
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
+
+    if num_processes > 1:
+        unet = paddle.DataParallel(unet)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
@@ -764,8 +764,8 @@ def main():
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     unet=unwrap_model(unet),
+                    safety_checker=None,
                 )
-                pipeline.safety_checker = None
                 pipeline.set_progress_bar_config(disable=True)
 
                 # run inference
@@ -801,8 +801,7 @@ def main():
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
         # Final inference
         # Load previous pipeline
-        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path)
-        pipeline.safety_checker = None
+        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, safety_checker=None)
         pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
         # load attention processors
         pipeline.unet.load_attn_procs(args.output_dir)

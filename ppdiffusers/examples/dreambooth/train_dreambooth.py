@@ -502,8 +502,8 @@ def main():
         if cur_class_images < args.num_class_images:
             pipeline = DiffusionPipeline.from_pretrained(
                 args.pretrained_model_name_or_path,
+                safety_checker=None,
             )
-            pipeline.safety_checker = None
             pipeline.set_progress_bar_config(disable=True)
 
             num_new_images = args.num_class_images - cur_class_images

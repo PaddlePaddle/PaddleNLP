@@ -75,6 +75,9 @@ python -u train_textual_inversion.py \
 > * `--repeats`: 由于图片数量只有3-5张，因此我们需要重复训练图片数据，默认设置为重复`100遍`。
 > * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`text-inversion-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
+> * `--validation_prompt`: 训练过程中评估所使用的prompt文本。
+> * `--validation_epochs`: 每隔多少个epoch评估模型。
+
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
@@ -111,7 +114,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_textual_inversion.
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --seed 42 \
-  --output_dir="textual_inversion_cat"
+  --output_dir="textual_inversion_cat" \
+  --validation_prompt "A <cat-toy> backpack" \
+  --validation_epochs 1
 ```
 
 
