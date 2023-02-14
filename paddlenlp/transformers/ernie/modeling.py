@@ -1336,12 +1336,12 @@ class UTC(ErniePretrainedModel):
 
         batch_size, seq_len, hidden_size = sequence_output.shape
         flat_sequence_output = paddle.reshape(sequence_output, [-1, hidden_size])
-
-        cls_output = paddle.tensor.gather(flat_sequence_output, cls_positions)
-        q = self.linear_q(cls_output)
-
         flat_length = paddle.arange(batch_size) * seq_len
         flat_length = flat_length.unsqueeze(axis=1).astype("int64")
+
+        cls_output = paddle.tensor.gather(flat_sequence_output, cls_positions + flat_length.squeeze(1))
+        q = self.linear_q(cls_output)
+
         option_output = paddle.tensor.gather(flat_sequence_output, paddle.reshape(omask_positions + flat_length, [-1]))
         option_output = paddle.reshape(option_output, [batch_size, -1, hidden_size])
         k = self.linear_k(option_output)

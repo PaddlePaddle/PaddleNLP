@@ -102,10 +102,10 @@ cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
 # CPU 推理
-./token_cls_infer_demo --model_dir ../../../best_models/msra/export --device cpu --backend paddle
+./token_cls_infer_demo --model_dir ../../../best_models/msra_ner/export --device cpu --backend paddle
 
 # GPU 推理
-./token_cls_infer_demo --model_dir ../../../best_models/msra/export --device gpu --backend paddle
+./token_cls_infer_demo --model_dir ../../../best_models/msra_ner/export --device gpu --backend paddle
 
 ```
 
@@ -113,7 +113,7 @@ make -j
 
 ```bash
 
-[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra/export/model.pdmodel, param_path = ../../../best_models/msra/export/model.pdiparams
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra_ner/export/model.pdmodel, param_path = ../../../best_models/msra_ner/export/model.pdiparams
 [INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
 input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
 The model detects all entities:
@@ -138,17 +138,17 @@ entity: 姚明, label: PER, pos: [10, 11]
 ```bash
 
 # 在 GPU 上使用 tensorrt 后端运行量化模型，模型目录可按照实际模型路径设置
-./token_cls_infer_demo --model_dir ../../../best_models/msra/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
+./token_cls_infer_demo --model_dir ../../../best_models/msra_ner/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
 
 # 在 CPU 上使用paddle_inference后端，模型目录可按照实际模型路径设置
-./token_cls_infer_demo --model_dir ../../../best_models/msra/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+./token_cls_infer_demo --model_dir ../../../best_models/msra_ner/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
 
 ```
 
 运行完成后返回的结果如下：
 
 ```bash
-[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra/export/model.pdmodel, param_path = ../../../best_models/msra/export/model.pdiparams
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra_ner/export/model.pdmodel, param_path = ../../../best_models/msra_ner/export/model.pdiparams
 [INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
 input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
 The model detects all entities:
