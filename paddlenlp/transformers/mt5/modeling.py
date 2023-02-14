@@ -38,7 +38,13 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.converter import StateDictNameMapping
 from paddlenlp.utils.log import logger
 
-__all__ = ["MT5Model", "MT5PretrainedModel", "MT5ForConditionalGeneration", "MT5EncoderModel"]
+__all__ = [
+    "MT5Model",
+    "MT5PretrainedModel",
+    "MT5ForConditionalGeneration",
+    "MT5EncoderModel",
+    "MT5_PRETRAINED_MODEL_ARCHIVE_LIST",
+]
 
 MT5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "mt5-small",
