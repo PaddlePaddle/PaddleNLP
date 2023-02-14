@@ -725,7 +725,7 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(args.max_train_steps), disable=is_main_process)
+    progress_bar = tqdm(range(args.max_train_steps), disable=not is_main_process)
     progress_bar.set_description("Train Steps")
     global_step = 0
 
