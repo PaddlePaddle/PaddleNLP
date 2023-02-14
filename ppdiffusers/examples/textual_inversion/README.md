@@ -92,6 +92,7 @@ python -u train_textual_inversion.py \
 > * `--hub_token`: 上传到 `huggingface hub` 所需要使用的 `token`，如果我们已经登录了，那么我们就无需填写。
 > * `--hub_model_id`: 上传到 `huggingface hub` 的模型库名称， 如果为 `None` 的话表示我们将使用 `output_dir` 的名称作为模型库名称。
 
+
 #### 1.2.3 单机多卡训练
 通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。这里我们只训练了`1000step`，因为这里的`1000 step x 4卡`近似于`单卡训练 4000 step`。
 
