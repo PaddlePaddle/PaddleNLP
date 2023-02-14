@@ -44,21 +44,6 @@ python -u train_text_to_image.py \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --output_dir="sd-pokemon-model"
 ```
-或
-```bash
-bash run_single.sh
-```
-| ppdiffusers支持的模型名称    | huggingface对应的模型地址                           | Tips备注                                                     |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       | 原版SD模型，模型使用PNDM scheduler。                 |
-| hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-2的模型，模型使用了DDIM scheduler。         |
-| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了PNDM scheduler。         |
-| naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过60k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
 
 
 `train_text_to_image.py`代码可传入的参数解释如下：
@@ -83,19 +68,24 @@ bash run_single.sh
 > * `--lr_warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
 > * `--train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--center_crop`: 在调整图片宽和高之前是否将裁剪图像居中，默认值为`False`。
-> * `--resolution`: 输入给模型的图片`像素大小`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成`高度为resolution`，`宽度为resolution`的图片，默认值为`512`。
+> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`None`。
+> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`None`。
+> * `--resolution`: 输入给模型图片的`分辨率`，当`高度`或`宽度`为`None`时，我们将会使用`resolution`，默认值为`512`。
+> * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`sd-pokemon-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
-> * `--adam_beta1`: AdamW 优化器时的 beta1 超参数。默认为 `0.9`。
-> * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
-> * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
-> * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--adam_beta1`: `AdamW` 优化器时的 `beta1` 超参数。默认为 `0.9`。
+> * `--adam_beta2`: `AdamW` 优化器时的 `beta2` 超参数。默认为 `0.999`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `weight_decay` 超参数。 默认为`0.02`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `epsilon` 超参数。默认为 `1e-8`。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1` 表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
-
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--push_to_hub`: 是否将模型上传到 `huggingface hub`，默认值为 `False`。
+> * `--hub_token`: 上传到 `huggingface hub` 所需要使用的 `token`，如果我们已经登录了，那么我们就无需填写。
+> * `--hub_model_id`: 上传到 `huggingface hub` 的模型库名称， 如果为 `None` 的话表示我们将使用 `output_dir` 的名称作为模型库名称。
 
 #### 1.2.3 单机多卡训练
 通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。这里我们只训练了`4000step`，因为这里的`4000 step x 4卡`近似于`单卡训练 16000 step`。
@@ -117,10 +107,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_text_to_image.py \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --output_dir="sd-pokemon-model"
 ```
-或
-```bash
-bash run_multi.sh
-```
+
 
 #### 1.2.4 预测生成图片
 
@@ -135,7 +122,7 @@ bash run_multi.sh
         ├── model_state.pdparams
         ├── config.json
     ├── text_encoder # text_encoder权重文件夹
-        ├── model_config.json
+        ├── config.json
         ├── model_state.pdparams
     ├── unet # unet权重文件夹
         ├── model_state.pdparams
@@ -243,7 +230,7 @@ image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
 image.save("pokemon.png")
 ```
 
-## 参考资料
+# 参考资料
 - https://github.com/huggingface/diffusers/tree/main/examples/text_to_image
 - https://github.com/CompVis/stable-diffusion
 - https://huggingface.co/lambdalabs/sd-pokemon-diffusers

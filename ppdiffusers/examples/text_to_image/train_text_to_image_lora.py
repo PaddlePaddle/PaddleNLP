@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from datasets import load_dataset
+from datasets import DatasetDict, load_dataset
 from huggingface_hub import HfFolder, Repository, create_repo, whoami
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -39,6 +39,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
 from paddlenlp.transformers import AutoTokenizer, PretrainedConfig
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 from ppdiffusers import (
     AutoencoderKL,
@@ -52,6 +53,7 @@ from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 
 def url_or_path_join(*path_list):
@@ -286,20 +288,7 @@ def parse_args(input_args=None):
         "--checkpointing_steps",
         type=int,
         default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints can be used both as final"
-            " checkpoints in case they are better than the last checkpoint, and are also suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
-    )
-    parser.add_argument(
-        "--resume_from_checkpoint",
-        type=str,
-        default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
+        help=("Save a checkpoint of the training state every X updates."),
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -343,6 +332,7 @@ def parse_args(input_args=None):
         help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
     )
     parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
+    parser.add_argument("--debug", action="store_true", help="Whether to debug this training script.")
     parser.add_argument(
         "--dataloader_num_workers",
         type=int,
@@ -374,11 +364,7 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--report_to",
-        type=str,
-        default="visualdl",
-        choices=["tensorboard", "visualdl"],
-        help="Log writer type.",
+        "--report_to", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -388,7 +374,6 @@ def parse_args(input_args=None):
     # Sanity checks
     if args.dataset_name is None and args.train_data_dir is None:
         raise ValueError("Need either a dataset name or a training folder.")
-
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
     if args.height is None or args.width is None and args.resolution is not None:
         args.height = args.width = args.resolution
@@ -412,7 +397,6 @@ DATASET_NAME_MAPPING = {
 
 
 def main():
-    paddle_dtype = paddle.float32
     args = parse_args()
     rank = paddle.distributed.get_rank()
     is_main_process = rank == 0
@@ -431,7 +415,6 @@ def main():
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
             else:
                 repo_name = args.hub_model_id
-
             create_repo(repo_name, exist_ok=True, token=args.hub_token)
             repo = Repository(args.output_dir, clone_from=repo_name, token=args.hub_token)
 
@@ -511,24 +494,32 @@ def main():
 
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
+    if args.debug:
+        file_path = get_path_from_url_with_filelock(
+            "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/pokemon-blip-captions.tar.gz",
+            PPDIFFUSERS_CACHE,
         )
+        dataset = DatasetDict.load_from_disk(file_path)
+        args.dataset_name = "lambdalabs/pokemon-blip-captions"
     else:
-        data_files = {}
-        if args.train_data_dir is not None:
-            data_files["train"] = os.path.join(args.train_data_dir, "**")
-        dataset = load_dataset(
-            "imagefolder",
-            data_files=data_files,
-            cache_dir=args.cache_dir,
-        )
-        # See more about loading custom images at
-        # https://huggingface.co/docs/datasets/v2.4.0/en/image_load#imagefolder
+        if args.dataset_name is not None:
+            # Downloading and loading a dataset from the hub.
+            dataset = load_dataset(
+                args.dataset_name,
+                args.dataset_config_name,
+                cache_dir=args.cache_dir,
+            )
+        else:
+            data_files = {}
+            if args.train_data_dir is not None:
+                data_files["train"] = os.path.join(args.train_data_dir, "**")
+            dataset = load_dataset(
+                "imagefolder",
+                data_files=data_files,
+                cache_dir=args.cache_dir,
+            )
+            # See more about loading custom images at
+            # https://huggingface.co/docs/datasets/v2.4.0/en/image_load#imagefolder
 
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
@@ -552,9 +543,9 @@ def main():
             raise ValueError(
                 f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
             )
+
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
-
     def tokenize_captions(examples, is_train=True):
         captions = []
         for caption in examples[caption_column]:
@@ -604,12 +595,12 @@ def main():
     def collate_fn(examples):
         pixel_values = paddle.stack([example["pixel_values"] for example in examples]).cast("float32")
         input_ids = [example["input_ids"] for example in examples]
-        padded_tokens = tokenizer.pad(
+        input_ids = tokenizer.pad(
             {"input_ids": input_ids}, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pd"
-        )
+        ).input_ids
         return {
+            "input_ids": input_ids,
             "pixel_values": pixel_values,
-            "input_ids": padded_tokens.input_ids,
         }
 
     train_sampler = (
@@ -622,15 +613,8 @@ def main():
     )
 
     # Scheduler and math around the number of training steps.
-    overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-        overrode_max_train_steps = True
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
@@ -688,9 +672,9 @@ def main():
     global_step = 0
     vae.eval()
     text_encoder.eval()
+    unet.train()
 
     for epoch in range(args.num_train_epochs):
-        unet.train()
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
@@ -756,8 +740,13 @@ def main():
                 }
                 progress_bar.set_postfix(**logs)
 
-                if global_step % args.checkpointing_steps == 0:
-                    if is_main_process:
+                if is_main_process:
+                    for name, val in logs.items():
+                        if name == "epoch":
+                            continue
+                        writer.add_scalar(f"train/{name}", val, step=global_step)
+
+                    if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         unwrap_model(unet).save_attn_procs(save_path)
                         logger.info(f"Saved lora weights to {save_path}")
@@ -775,9 +764,8 @@ def main():
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     unet=unwrap_model(unet),
-                    safety_checker=None,
-                    paddle_dtype=paddle_dtype,
                 )
+                pipeline.safety_checker = None
                 pipeline.set_progress_bar_config(disable=True)
 
                 # run inference
@@ -795,6 +783,7 @@ def main():
 
                 del pipeline
                 gc.collect()
+                unet.train()
 
     # Save the lora layers
     if is_main_process:
@@ -812,9 +801,8 @@ def main():
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
         # Final inference
         # Load previous pipeline
-        pipeline = DiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path, paddle_dtype=paddle_dtype, safety_checker=None
-        )
+        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path)
+        pipeline.safety_checker = None
         pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
         # load attention processors
         pipeline.unet.load_attn_procs(args.output_dir)

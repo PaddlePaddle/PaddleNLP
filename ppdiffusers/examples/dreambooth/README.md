@@ -36,8 +36,7 @@ python -u train_dreambooth.py \
   --instance_data_dir=$INSTANCE_DIR \
   --output_dir=$OUTPUT_DIR \
   --instance_prompt="a photo of sks dog" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
   --learning_rate=5e-6 \
@@ -45,61 +44,50 @@ python -u train_dreambooth.py \
   --lr_warmup_steps=0 \
   --max_train_steps=400
 ```
-或
-```bash
-bash run_single.sh
-```
-| ppdiffusers支持的模型名称    | huggingface对应的模型地址                           | Tips备注                                                     |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       | 原版SD模型，模型使用PNDM scheduler。                 |
-| hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-2的模型，模型使用了DDIM scheduler。         |
-| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了PNDM scheduler。         |
-| naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过60k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
-
 
 `train_dreambooth.py`代码可传入的参数解释如下：
 > 主要修改的参数
-> * `--pretrained_model_name_or_path`: 所使用的Stable Diffusion模型权重名称或者本地下载的模型路径，目前支持了上表中的8种模型权重，我们可直接替换使用。
+> * `--pretrained_model_name_or_path`: 所使用的 `Stable Diffusion` 模型权重名称或者本地下载的模型路径，目前支持了上表中的8种模型权重，我们可直接替换使用。
 > * `--instance_data_dir`: 实例（物体）图片文件夹地址。
-> * `--instance_prompt`: 带有特定实例（物体）的提示词描述文本，例如『a photo of sks dog』，其中dog代表实例（物体）。
+> * `--instance_prompt`: 带有特定实例（物体）的提示词描述文本，例如`a photo of sks dog`，其中dog代表实例（物体）。
 > * `--class_data_dir`: 类别（class）图片文件夹地址，主要作为先验知识。
-> * `--class_prompt`: 类别（class）提示词文本，该提示器要与实例（物体）是同一种类别，例如『a photo of dog』，主要作为先验知识。
+> * `--class_prompt`: 类别（class）提示词文本，该提示器要与实例（物体）是同一种类别，例如`a photo of dog`，主要作为先验知识。
 > * `--num_class_images`: 事先需要从`class_prompt`中生成多少张图片，主要作为先验知识。
 > * `--prior_loss_weight`: 先验`loss`占比权重。
 > * `--sample_batch_size`: 生成`class_prompt`文本对应的图片所用的批次（batch size），注意，当GPU显卡显存较小的时候需要将这个默认值改成1。
 > * `--with_prior_preservation`: 是否将生成的同类图片（先验知识）一同加入训练，当为`True`的时候，`class_prompt`、`class_data_dir`、`num_class_images`、`sample_batch_size`和`prior_loss_weight`才生效。
 > * `--num_train_epochs`: 训练的轮数，默认值为`1`。
 > * `--max_train_steps`: 最大的训练步数，当我们设置这个值后，它会重新计算所需的`num_train_epochs`轮数。
-> * `--save_steps`: 每间隔多少步`（global step步数）`，保存学习到的`pipe`。
-> * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
+> * `--checkpointing_steps`: 每间隔多少步`（global step步数）`，保存模型权重。
+> * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的 step 中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的 batch_size 。
 > * `--train_text_encoder`: 是否一同训练文本编码器的部分，默认为`False`。
 
 > 可以修改的参数
-> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`512`。
-> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`512`。
+> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`None`。
+> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`None`。
+> * `--resolution`: 输入给模型图片的`分辨率`，当`高度`或`宽度`为`None`时，我们将会使用`resolution`，默认值为`512`。
 > * `--learning_rate`: 学习率。
 > * `--scale_lr`: 是否根据GPU数量，梯度累积步数，以及批量数对学习率进行缩放。缩放公式：`learning_rate * gradient_accumulation_steps * train_batch_size * num_processes`。
 > * `--lr_scheduler`: 要使用的学习率调度策略。默认为 `constant`。
-> * `--lr_warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
+> * `--lr_warmup_steps`: 用于从 0 到 `learning_rate` 的线性 `warmup` 的步数。
 > * `--train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--center_crop`: 在调整图片宽和高之前是否将裁剪图像居中，默认值为`False`。
+> * `--random_flip`: 是否对图片进行随机水平反转，默认值为`False`。
 > * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`dreambooth-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
-> * `--adam_beta1`: AdamW 优化器时的 beta1 超参数。默认为 `0.9`。
-> * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
-> * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
-> * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--adam_beta1`: `AdamW` 优化器时的 `beta1` 超参数。默认为 `0.9`。
+> * `--adam_beta2`: `AdamW` 优化器时的 `beta2` 超参数。默认为 `0.999`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `weight_decay` 超参数。 默认为`0.02`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `epsilon` 超参数。默认为 `1e-8`。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1` 表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--push_to_hub`: 是否将模型上传到 `huggingface hub`，默认值为 `False`。
+> * `--hub_token`: 上传到 `huggingface hub` 所需要使用的 `token`，如果我们已经登录了，那么我们就无需填写。
+> * `--hub_model_id`: 上传到 `huggingface hub` 的模型库名称， 如果为 `None` 的话表示我们将使用 `output_dir` 的名称作为模型库名称。
 
 
 #### 1.2.3 单机多卡训练
@@ -115,18 +103,13 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_dreambooth.py \
   --instance_data_dir=$INSTANCE_DIR \
   --output_dir=$OUTPUT_DIR \
   --instance_prompt="a photo of sks dog" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
   --learning_rate=5e-6 \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --max_train_steps=400
-```
-或
-```bash
-bash run_multi.sh
 ```
 
 #### 1.2.4 预测生成图片
@@ -142,7 +125,7 @@ bash run_multi.sh
         ├── model_state.pdparams
         ├── config.json
     ├── text_encoder # text_encoder权重文件夹
-        ├── model_config.json
+        ├── config.json
         ├── model_state.pdparams
     ├── unet # unet权重文件夹
         ├── model_state.pdparams
@@ -194,8 +177,7 @@ python -u train_dreambooth.py \
   --with_prior_preservation --prior_loss_weight=1.0 \
   --instance_prompt="a photo of sks dog" \
   --class_prompt="a photo of dog" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
   --learning_rate=5e-6 \
@@ -295,6 +277,6 @@ image.save("demo.png")
     <img src="https://user-images.githubusercontent.com/50394665/218384517-b89667f4-b5c9-4ecf-afcb-8b667c5532bb.jpg">
 </p>
 
-## 参考资料
+# 参考资料
 - https://github.com/huggingface/diffusers/tree/main/examples/dreambooth
 - https://github.com/CompVis/stable-diffusion

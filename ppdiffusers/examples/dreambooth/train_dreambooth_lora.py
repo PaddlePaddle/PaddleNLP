@@ -283,20 +283,7 @@ def parse_args(input_args=None):
         "--checkpointing_steps",
         type=int,
         default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints can be used both as final"
-            " checkpoints in case they are better than the last checkpoint, and are also suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
-    )
-    parser.add_argument(
-        "--resume_from_checkpoint",
-        type=str,
-        default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
+        help=("Save a checkpoint of the training state every X updates."),
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -524,7 +511,6 @@ def get_full_repo_name(model_id: str, organization: Optional[str] = None, token:
 
 
 def main():
-    paddle_dtype = paddle.float32
     args = parse_args()
     rank = paddle.distributed.get_rank()
     is_main_process = rank == 0
@@ -546,9 +532,8 @@ def main():
         if cur_class_images < args.num_class_images:
             pipeline = DiffusionPipeline.from_pretrained(
                 args.pretrained_model_name_or_path,
-                paddle_dtype=paddle_dtype,
-                safety_checker=None,
             )
+            pipeline.safety_checker = None
             pipeline.set_progress_bar_config(disable=True)
 
             num_new_images = args.num_class_images - cur_class_images
@@ -686,11 +671,10 @@ def main():
             {"input_ids": input_ids}, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pd"
         ).input_ids
 
-        batch = {
+        return {
             "input_ids": input_ids,
             "pixel_values": pixel_values,
         }
-        return batch
 
     train_sampler = (
         DistributedBatchSampler(train_dataset, batch_size=args.train_batch_size, shuffle=True)
@@ -702,15 +686,8 @@ def main():
     )
 
     # Scheduler and math around the number of training steps.
-    overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-        overrode_max_train_steps = True
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
@@ -850,8 +827,13 @@ def main():
                 }
                 progress_bar.set_postfix(**logs)
 
-                if global_step % args.checkpointing_steps == 0:
-                    if is_main_process:
+                if is_main_process:
+                    for name, val in logs.items():
+                        if name == "epoch":
+                            continue
+                        writer.add_scalar(f"train/{name}", val, step=global_step)
+
+                    if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         unwrap_model(unet).save_attn_procs(save_path)
                         logger.info(f"Saved lora weights to {save_path}")
@@ -869,9 +851,8 @@ def main():
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     unet=unwrap_model(unet),
-                    safety_checker=None,
-                    paddle_dtype=paddle_dtype,
                 )
+                pipeline.safety_checker = None
                 pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
                 pipeline.set_progress_bar_config(disable=True)
 
@@ -907,9 +888,8 @@ def main():
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
         # Final inference
         # Load previous pipeline
-        pipeline = DiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path, paddle_dtype=paddle_dtype, safety_checker=None
-        )
+        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path)
+        pipeline.safety_checker = None
         pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
         # load attention processors
         pipeline.unet.load_attn_procs(args.output_dir)
