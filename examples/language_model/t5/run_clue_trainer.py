@@ -226,21 +226,6 @@ def main():
     train_dataset = get_train_dataset(tokenizer, data_args)
     eval_dataset = get_dev_dataset(tokenizer, data_args)
 
-    # def batchify_fn(
-    #     samples,
-    #     fn=BatchDict(
-    #         {
-    #             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-    #             "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-    #             "labels": Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-    #             "decoder_attention_mask": Pad(
-    #                 axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-    #             ),  # decoder_attention_mask
-    #         }
-    #     ),
-    # ):
-    #     return fn(samples)
-
     data_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, model=model, pad_to_multiple_of=8 if training_args.fp16 else None
     )

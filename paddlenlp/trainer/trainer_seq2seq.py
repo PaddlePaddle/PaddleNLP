@@ -184,11 +184,7 @@ class Seq2SeqTrainer(Trainer):
         # prepare generation inputs
         # some encoder-decoder models can have varying encoder's and thus
         # varying model input names
-        if (
-            hasattr(self.model, "encoder")
-            and hasattr(self.model.encoder, "main_input_name")
-            and self.model.encoder.main_input_name != self.model.main_input_name
-        ):
+        if hasattr(self.model, "encoder") and self.model.encoder.main_input_name != self.model.main_input_name:
             generation_inputs = inputs[self.model.encoder.main_input_name]
         else:
             generation_inputs = inputs[self.model.main_input_name]
@@ -197,6 +193,7 @@ class Seq2SeqTrainer(Trainer):
             generation_inputs,
             **gen_kwargs,
         )
+        # different from hf returns: tuple[Tensor]: It is a tuple contains two elements: ids and scores.
         if isinstance(generated_tokens, tuple):
             generated_tokens = generated_tokens[0]
         # in case the batch is shorter than max length, the output should be padded
@@ -209,15 +206,12 @@ class Seq2SeqTrainer(Trainer):
 
         with paddle.no_grad():
             if has_labels:
-                if hasattr(self, "compute_loss_context_manager"):
-                    with self.compute_loss_context_manager():
-                        outputs = model(**inputs)
-                    if self.label_smoother is not None:
-                        loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
-                    else:
-                        loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
+                with self.autocast_smart_context_manager():
+                    outputs = model(**inputs)
+                if self.label_smoother is not None:
+                    loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
                 else:
-                    loss = None
+                    loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
             else:
                 loss = None
 
