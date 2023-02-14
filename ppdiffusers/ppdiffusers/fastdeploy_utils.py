@@ -78,17 +78,12 @@ class FastDeployRuntimeModel:
         for inputs_name, inputs_tensor in prebinded_inputs.items():
             input_fdtensor = pdtensor2fdtensor(inputs_tensor, inputs_name, share_with_raw_ptr=share_with_raw_ptr)
             self.model.bind_input_tensor(inputs_name, input_fdtensor)
+
         for outputs_name, outputs_tensor in prebinded_outputs.items():
             output_fdtensor = pdtensor2fdtensor(outputs_tensor, outputs_name, share_with_raw_ptr=share_with_raw_ptr)
             self.model.bind_output_tensor(outputs_name, output_fdtensor)
 
             self.model.zero_copy_infer()
-
-        # outputs = []
-
-        # for i in range(self.model.num_outputs()):
-        #     outputs += [fdtensor2pdtensor(self.model.get_output_tensor(self.model.get_output_info(i).name))]
-        # return outputs
 
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}

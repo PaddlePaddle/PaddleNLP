@@ -113,7 +113,9 @@ def create_paddle_inference_runtime(
     else:
         option.use_gpu(device_id)
     if paddle_stream is not None:
-        option._option.set_external_raw_stream(paddle_stream)
+        option.set_external_raw_stream(paddle_stream)
+    for pass_name in disable_paddle_pass:
+        option.paddle_infer_option.delete_pass(pass_name)
     if use_trt:
         option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
         option.paddle_infer_option.enable_trt = True
