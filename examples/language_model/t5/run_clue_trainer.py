@@ -110,15 +110,12 @@ def get_train_dataset(tokenizer, args):
         ds = load_pickle(filename)
     else:
         ds = load_dataset("clue", args.task_name, splits="train")
-
-        print(ds[0])
         ds.map(
             partial(trans_func, tokenizer=tokenizer, args=args),
             batched=False,
             lazy=False,
         )
         save_pickle(ds, filename)
-    print(ds[0])
     return ds
 
 
@@ -293,6 +290,7 @@ def main():
 
         return results
 
+    training_args.predict_with_generate = True
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -300,7 +298,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+        compute_metrics=compute_metrics,
     )
 
     checkpoint = None
