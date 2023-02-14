@@ -731,15 +731,7 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        kwargs["from_hf_hub"] = from_hf_hub
-        if cache_dir is not None:
-            if from_hf_hub:
-                # hf hub takes care of cache dir
-                kwargs["cache_dir"] = cache_dir
-            else:
-                # cache dir needs to be appended with the model name
-                kwargs["cache_dir"] = os.path.join(cache_dir, pretrained_model_name_or_path)
-
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         return cls.from_dict(config_dict, **kwargs)
@@ -761,6 +753,15 @@ class PretrainedConfig:
 
         """
         original_kwargs = copy.deepcopy(kwargs)
+        cache_dir = kwargs.get("cache_dir", None)
+        if cache_dir is not None:
+            if kwargs.get("from_hf_hub", False):
+                # hf hub takes care of cache dir
+                kwargs["cache_dir"] = cache_dir
+            else:
+                # cache dir needs to be appended with the model name
+                kwargs["cache_dir"] = os.path.join(cache_dir, pretrained_model_name_or_path)
+
         # Get config dict associated with the base config file
         config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
 
