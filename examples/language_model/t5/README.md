@@ -1,7 +1,9 @@
 # T5
+
 [Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer](https://arxiv.org/pdf/1910.10683v3.pdf)
 
 ## 摘要
+
 迁移学习在自然语言处理(NLP)中已经成为一种强大的技术。迁移学习首先在数据丰富的任务上进行预训练，然后在下游任务上进行调整。迁移学习的有效性引起了不同的方法、方法和实践。在本文中，我们通过引入一个统一的框架，将所有基于文本的语言问题转换为文本到文本的格式，来探索自然语言处理的迁移学习技术。我们的系统研究比较了数十项语言理解任务的训练前目标、架构、未标记数据集、迁移方法和其他因素。通过将我们的探索与规模和我们的新"Colossal Clean Crawled Corpus"数据集相结合，我们在摘要、问答、文本分类等许多基准测试中取得了最先进的结果。为了促进NLP迁移学习的未来工作，我们发布了我们的数据集、预训练模型和代码。
 
 本项目是T5在 Paddle 2.x上的开源实现，包含了`模型权重`转换代码和`GLUE任务`的微调代码。
@@ -31,7 +33,9 @@ python run_glue.py \
     --scheduler_type linear \
     --output_dir outputs/rte/
 ```
+
 其中参数释义如下：
+
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录的地址。
 - `task_name` GLUE任务名称，可从选["cola","sst-2","mrpc","sts-b","qqp","mnli", "rte", "qnli"]选择。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
@@ -47,6 +51,7 @@ python run_glue.py \
 - `output_dir` 表示模型保存路径。
 
 使用trainer进行Fine-tuning:
+
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
     --model_name_or_path t5-base \
@@ -64,7 +69,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
     --logging_steps 20 \
     --save_steps 200 \
     --save_total_limit 3 \
-    --metric_for_best_model "eval_accuarcy" \
+    --metric_for_best_model "eval_accuracy" \
     --fp16 false \
     --fp16_opt_level "O1" \
     --recompute true \
@@ -73,34 +78,77 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
     --disable_tqdm true \
     --output_dir outputs/rte/
 ```
+
 具体参数含义请参见: https://paddlenlp.readthedocs.io/zh/latest/trainer.html
 
 ###### t5-base模型在GLUE开发集上的结果：
-| Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   | mean |
-|--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|-------|
-|                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |         |
+
+| Model          | cola  | sst-2 | mrpc  | sts-b   | qqp   | mnli  | qnli  | rte   | mean    |
+| -------------- | ----- | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ------- |
+|                | mcc   | acc   | acc   | pearson | acc   | acc   | acc   | acc   |         |
 | T5-base-Paddle | 61.74 | 95.18 | 90.44 | 90.09   | 91.60 | 87.18 | 93.56 | 81.95 | 86.4675 |
 
 ###### t5_v1_1-base模型在GLUE开发集上的结果：
+
 使用`run_glue_trainer.py`运行，由于`t5_v1_1-base`没有在glue任务上进行训练过，直接生成label的策略需要的训练时间需要更长。
-| Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   |
-|--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|
-|                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |
+
+| Model               | cola    | sst-2 | mrpc  | sts-b   | qqp   | mnli  | qnli   | rte   |
+| ------------------- | ------- | ----- | ----- | ------- | ----- | ----- | ------ | ----- |
+|                     | mcc     | acc   | acc   | pearson | acc   | acc   | acc    | acc   |
 | T5-v1_1-base Paddle | 47.6845 | 94.38 | 84.31 | 87.74   | 88.05 | 85.39 | 90.518 | 65.70 |
-| epoch | 100 | 10 | 100 | 100   | 3 | 3 | 10 | 100 |
+| epoch               | 100     | 10    | 100   | 100     | 3     | 3     | 10     | 100   |
 
 注：
+
 - 直接生成label的finetune方式难度较大，前期基本学习如何正确生成label标签，后期才学习分类任务。
 - 生成的label标签设计，标签差异大一些，效果会更好一些。
 - `qqp`,`mnli`数据集适当增大训练epoch数，可以取得更好效果。
+
+### CLUE任务
+
+使用trainer进行Fine-tuning:
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2,3" run_clue_trainer.py \
+    --model_name_or_path Langboat/mengzi-t5-base-mt \
+    --task_name cluewsc2020 \
+    --max_seq_length 512 \
+    --do_train \
+    --do_eval \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 64 \
+    --learning_rate 1e-4 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.1 \
+    --num_train_epochs 100 \
+    --eval_steps 200 \
+    --logging_steps 20 \
+    --save_steps 200 \
+    --save_total_limit 3 \
+    --metric_for_best_model "eval_accuracy" \
+    --fp16 false \
+    --fp16_opt_level "O1" \
+    --recompute true \
+    --sharding "stage1" \
+    --overwrite_output_dir \
+    --disable_tqdm true \
+    --output_dir outputs/clue/cluewsc2020
+```
+
+###### Langboat/mengzi-t5-base-mt模型在CLUE开发集上的结果：
+
+| Model                      | afqmc | tnews | iflytek | cmnli | ocnli | cluewsc2020 | csl   |
+| :------------------------- | :---- | :---- | :------ | :---- | :---- | :---------- | :---- |
+|                            | acc   | acc   | acc     | acc   | acc   | acc         | acc   |
+| Langboat/mengzi-t5-base-mt | 74.44 | 58.47 | 61.14   | 80.97 | 75.76 | 79.61       | 84.47 |
+| epoch                      | 10    | 10    | 10      | 10    | 10    | 100         | 10    |
+
+
 
 ### GLUE Demo测试
 
 ```sh
 python glue_demo.py
-```
-
-```
 input text: sst2 sentence: contains no wit , only labored gags
 label: negative
 ==================================================
@@ -123,17 +171,19 @@ label: positive
 ```sh
 python zero_shot_demo.py
 ```
+
 当前**zero shot**时输入的构造方法如下表所示。
-| **任务类型**     | **prompt构造（其中{s}代表句子输**入）                                                                                                    |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **实体抽取**     | “{s}”找出上述句子中的实体和他们对应的类别                                                                                |
-| **语义相似度**  | “{s1}”和“{s2}”这两句话是在说同一件事吗?                                                                                   |
-| **金融关系抽取** | “{s}”中的“{e1}”和“{e2}”是什么关系？答:                                                                                   |
-| **广告文案生成** | 请根据以下产品信息设计广告文案。商品信息:{s}                                                                               |
+
+| **任务类型**         | **prompt构造（其中{s}代表句子输**入）                        |
+| -------------------- | ------------------------------------------------------------ |
+| **实体抽取**         | “{s}”找出上述句子中的实体和他们对应的类别                    |
+| **语义相似度**       | “{s1}”和“{s2}”这两句话是在说同一件事吗?                      |
+| **金融关系抽取**     | “{s}”中的“{e1}”和“{e2}”是什么关系？答:                       |
+| **广告文案生成**     | 请根据以下产品信息设计广告文案。商品信息:{s}                 |
 | **医学领域意图分类** | 问题:“{s}”。此问题的医学意图是什么？选项：病情诊断，病因分析，治疗方案，就医建议，指标解读，疾病描述，后果表述，注意事项，功效作用，医疗费用。 |
-| **评论情感分类** | 评论:{s}。请判断该条评论所属类别(积极或消极)并填至空格处。回答：                                                  |
-| **评论对象抽取** | 评论:{s}.这条评论的评价对象是谁？                                                                                                |
-| **新闻分类**     | “{s}”是什么新闻频道写的？选项：故事，文化，娱乐，体育，财经，房产，汽车，教育，科技，军事，旅游，国际，股票，农业，电竞。答： |
+| **评论情感分类**     | 评论:{s}。请判断该条评论所属类别(积极或消极)并填至空格处。回答： |
+| **评论对象抽取**     | 评论:{s}.这条评论的评价对象是谁？                            |
+| **新闻分类**         | “{s}”是什么新闻频道写的？选项：故事，文化，娱乐，体育，财经，房产，汽车，教育，科技，军事，旅游，国际，股票，农业，电竞。答： |
 
 ```
 input_text: “导致泗水的砭石受到追捧，价格突然上涨。而泗水县文化市场综合执法局颜鲲表示，根据监控”找出上述句子中的实体和他们对应的类别
@@ -175,8 +225,6 @@ output: 农业
   pages   = {1-67},
   url     = {http://jmlr.org/papers/v21/20-074.html}
 }
-```
-```bibtex
 @inproceedings{wolf-etal-2020-transformers,
     title = "Transformers: State-of-the-Art Natural Language Processing",
     author = "Thomas Wolf and Lysandre Debut and Victor Sanh and Julien Chaumond and Clement Delangue and Anthony Moi and Pierric Cistac and Tim Rault and Rémi Louf and Morgan Funtowicz and Joe Davison and Sam Shleifer and Patrick von Platen and Clara Ma and Yacine Jernite and Julien Plu and Canwen Xu and Teven Le Scao and Sylvain Gugger and Mariama Drame and Quentin Lhoest and Alexander M. Rush",

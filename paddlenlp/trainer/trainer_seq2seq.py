@@ -193,6 +193,9 @@ class Seq2SeqTrainer(Trainer):
             generation_inputs,
             **gen_kwargs,
         )
+        # different from hf returns: tuple[Tensor]: It is a tuple contains two elements: ids and scores.
+        if isinstance(generated_tokens, tuple):
+            generated_tokens = generated_tokens[0]
         # in case the batch is shorter than max length, the output should be padded
         if gen_kwargs.get("max_length") is not None and generated_tokens.shape[-1] < gen_kwargs["max_length"]:
             generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_kwargs["max_length"])
@@ -203,7 +206,7 @@ class Seq2SeqTrainer(Trainer):
 
         with paddle.no_grad():
             if has_labels:
-                with self.compute_loss_context_manager():
+                with self.autocast_smart_context_manager():
                     outputs = model(**inputs)
                 if self.label_smoother is not None:
                     loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
