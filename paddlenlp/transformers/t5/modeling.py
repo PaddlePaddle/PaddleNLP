@@ -23,7 +23,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.amp.auto_cast import amp_state
+
+try:
+    from paddle.amp.auto_cast import amp_state
+except ImportError:
+    from paddle.fluid.dygraph.amp.auto_cast import amp_state
 from paddle.distributed.fleet.utils import recompute
 
 from ...utils.converter import StateDictNameMapping
