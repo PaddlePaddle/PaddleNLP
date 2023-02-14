@@ -84,7 +84,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         dygraph_taskflow = MultimodalFeatureExtractionTask(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
-            _static_mode=False,
+            is_static_model=False,
             return_tensors=False,
         )
         dygraph_results = dygraph_taskflow(input_text)
@@ -94,7 +94,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         static_taskflow = MultimodalFeatureExtractionTask(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
-            _static_mode=True,
+            is_static_model=True,
             return_tensors=False,
             device_id=0,
         )
@@ -123,7 +123,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         # dygraph test
         dygraph_taskflow = Taskflow(
             task="feature_extraction",
-            _static_mode=False,
+            is_static_model=False,
             return_tensors=False,
         )
         dygraph_results = dygraph_taskflow(input_text)
@@ -133,7 +133,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         # static test
         static_taskflow = Taskflow(
             task="feature_extraction",
-            _static_mode=True,
+            is_static_model=True,
             return_tensors=False,
         )
         static_results = static_taskflow(input_text)

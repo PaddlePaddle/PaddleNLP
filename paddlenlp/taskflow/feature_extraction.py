@@ -182,7 +182,7 @@ class MultimodalFeatureExtractionTask(Task):
         },
     }
 
-    def __init__(self, task, model, batch_size=1, _static_mode=True, return_tensors=True, **kwargs):
+    def __init__(self, task, model, batch_size=1, is_static_model=True, return_tensors=True, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
@@ -191,14 +191,14 @@ class MultimodalFeatureExtractionTask(Task):
         self.return_tensors = return_tensors
         self._check_task_files()
         self._construct_tokenizer()
-        self._static_mode = _static_mode
+        self.is_static_model = is_static_model
         self._config_map = {}
         self.predictor_map = {}
         self.input_names_map = {}
         self.input_handles_map = {}
         self.output_handle_map = {}
         self._check_predictor_type()
-        if self._static_mode:
+        if self.is_static_model:
             self._get_inference_model()
         else:
             self._construct_model(model)
@@ -228,7 +228,7 @@ class MultimodalFeatureExtractionTask(Task):
             else:
                 batch_texts = None
                 batch_images = batch_examples
-            if self._static_mode:
+            if self.is_static_model:
                 tokenized_inputs = self._processor(
                     text=batch_texts, images=batch_images, return_tensors="np", padding="max_length", truncation=True
                 )
@@ -287,7 +287,7 @@ class MultimodalFeatureExtractionTask(Task):
         Run the task model from the outputs of the `_preprocess` function.
         """
         all_feats = []
-        if self._static_mode:
+        if self.is_static_model:
             with static_mode_guard():
                 for batch_inputs in inputs["batches"]:
                     if self._predictor_type == "paddle-inference":
