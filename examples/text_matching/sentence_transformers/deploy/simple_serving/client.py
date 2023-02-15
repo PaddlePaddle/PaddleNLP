@@ -22,7 +22,7 @@ if __name__ == "__main__":
             "text_pair": text_pair,
         },
         "parameters": {"max_seq_len": args.max_seq_len, 
-                        "batch_size": args.batch_size
+                        "batch_size": args.batch_size,
                         "prob_limit": args.prob_limit},
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))

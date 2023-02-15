@@ -4,7 +4,7 @@ from paddlenlp.data import Pad, Tuple
 import numpy as np
 from scipy.special import softmax
 
-class TextMatchingPreHandler(BaseModelHandler):
+class TextMatchingModelHandler(BaseModelHandler):
     def __init__(self):
         super().__init__()
 
@@ -112,7 +112,7 @@ app.register(
     task_name="models/text_matching",
     model_path="../../export_model",
     tokenizer_name="ernie-3.0-medium-zh",
-    model_handler=TextMatchingPreHandler,
+    model_handler=TextMatchingModelHandler,
     post_handler=TextMatchingPostHandler,
     precision="fp32",
     device_id=0)

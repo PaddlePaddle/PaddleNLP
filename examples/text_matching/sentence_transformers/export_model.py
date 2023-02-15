@@ -83,3 +83,7 @@ if __name__ == "__main__":
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "float32")
     paddle.jit.save(model, save_path)
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 9dfb8a45 (enhancement: update simpleServing for sentence transformers)
