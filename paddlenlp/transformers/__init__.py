@@ -163,6 +163,7 @@ from .optimization import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+from .auto.processing import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *

@@ -27,10 +27,13 @@ from ppdiffusers import (
 from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
 
 
-def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_path: str, sample: bool = False):
+def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
+    model_path: str, output_path: str, sample: bool = False, height: int = None, width: int = None
+):
     pipeline = StableDiffusionPipeline.from_pretrained(model_path, safety_checker=None, feature_extractor=None)
     output_path = Path(output_path)
-
+    latent_height = height // 8 if height is not None else None
+    latent_width = width // 8 if width is not None else None
     # get arguments
     cross_attention_dim = pipeline.unet.config.cross_attention_dim  # 768 or 1024 or 1280
     unet_channels = pipeline.unet.config.in_channels  # 4 or 9
@@ -56,8 +59,10 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_
     unet = paddle.jit.to_static(
         pipeline.unet,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, unet_channels, None, None], dtype="float32", name="sample"),  # sample
-            paddle.static.InputSpec(shape=[1], dtype="int64", name="timestep"),  # timestep
+            paddle.static.InputSpec(
+                shape=[None, unet_channels, latent_height, latent_width], dtype="float32", name="sample"
+            ),  # sample
+            paddle.static.InputSpec(shape=[1], dtype="float32", name="timestep"),  # timestep
             paddle.static.InputSpec(
                 shape=[None, None, cross_attention_dim], dtype="float32", name="encoder_hidden_states"
             ),  # encoder_hidden_states
@@ -85,7 +90,9 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_
         vae_encoder,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None, vae_in_channels, None, None], dtype="float32", name="sample"  # N, C, H, W
+                shape=[None, vae_in_channels, latent_height, latent_width],
+                dtype="float32",
+                name="sample",  # N, C, H, W
             ),  # latent
         ],
     )
@@ -105,7 +112,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_
         vae_decoder,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None, vae_latent_channels, None, None], dtype="float32", name="latent_sample"
+                shape=[None, vae_latent_channels, latent_height, latent_width], dtype="float32", name="latent_sample"
             ),  # latent_sample
         ],
     )
@@ -148,8 +155,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sample", action="store_true", default=False, help="Export the vae encoder in mode or sample"
     )
+    parser.add_argument("--height", type=int, default=None, help="The height of output images. Default: None")
+    parser.add_argument("--width", type=int, default=None, help="The width of output images. Default: None")
     args = parser.parse_args()
 
     convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-        args.pretrained_model_name_or_path, args.output_path, args.sample
+        args.pretrained_model_name_or_path, args.output_path, args.sample, args.height, args.width
     )
