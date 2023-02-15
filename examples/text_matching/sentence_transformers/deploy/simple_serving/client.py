@@ -6,7 +6,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization.")
 parser.add_argument("--batch_size", default=1, type=int, help="Batch size per GPU/CPU for predicting.")
 parser.add_argument("--prob_limit", default=0.5, type=int, help="probability limit.")
-
 args = parser.parse_args()
 
 url = "http://0.0.0.0:8189/models/text_matching"

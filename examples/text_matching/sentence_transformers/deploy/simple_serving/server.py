@@ -72,7 +72,6 @@ class TextMatchingModelHandler(BaseModelHandler):
 
         return out_dict
 
-
 class TextMatchingPostHandler(BasePostHandler):
     def __init__(self):
         super().__init__()
@@ -105,7 +104,6 @@ class TextMatchingPostHandler(BasePostHandler):
             
         out_dict = {"label": labels, "similarity": probs}
         return out_dict
-
 
 app = SimpleServer()
 app.register(
