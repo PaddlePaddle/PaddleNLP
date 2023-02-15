@@ -42,7 +42,17 @@
   | ---     | --- | --- |
 | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737269-0fe175c9-7b87-40b3-8249-1c6378e4a5e9.jpg">  | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/211800602-2790c799-0823-4f91-8ce3-7b4a45896b41.gif"> | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/211800645-bc274593-26a4-4ed0-a258-c0615fcafce1.jpg"> |  
 
-5. 点击 APP 右上角的设置选项，可以跳转到设置页。在设置页，您可以选择不同的模型和不同的推理精度，即是否开启 FP16 和 Int8 推理，两种推理精度只能二选一。FP32各模型都支持的，只要设置项中的 FP16 和 Int8 选项都为 false 时，即使用FP32进行推理。各模型FP16和Int8推理的支持情况为：  
+如果您使用的是较旧版本的Android Studio时遇到gradle版本兼容的问题，可以修改[build.gradle](./build.gradle) 中的gradle版本号为您当前使用的版本。  
+```gradle
+buildscript {
+    // ...
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.2.2' // 修改为您当前使用的版本
+    }
+}
+```
+
+5. 点击 APP 右上角的设置选项，可以跳转到设置页。在设置页，您可以选择不同的模型和不同的推理精度，即是否开启 FP16 和 Int8 推理，两种推理精度只能二选一。所有模型均支持FP32推理，当设置项中的 FP16 和 Int8 选项都为 false 或 不设置 时，即使用了FP32进行推理。各模型FP16和Int8推理的支持情况为：  
 
 |模型选项|模型名称|FP16|Int8|  
 |---|---|---|---|  

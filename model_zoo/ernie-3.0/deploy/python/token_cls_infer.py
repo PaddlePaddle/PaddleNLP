@@ -142,6 +142,8 @@ class ErnieForTokenClassificationPredictor(object):
                     entity = input_data[batch][start : i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
+                    if len(entity) == 0:
+                        break
                     items.append(
                         {
                             "pos": [start, i - 2],

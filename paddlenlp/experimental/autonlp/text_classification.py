@@ -54,11 +54,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        language (string, required): language of the text
         metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
         greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
-        output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+            language (string, required): language of the text.
+            output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results".
+            id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+
     """
 
     def __init__(
@@ -82,12 +85,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
         self.text_column = text_column
         self.label_column = label_column
+        self.id2label = self.kwargs.get("id2label", None)
         if problem_type in ["multi_label", "multi_class"]:
             self.problem_type = problem_type
         else:
             raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
+
+    @property
+    def supported_languages(self) -> List[str]:
+        return ["Chinese", "English"]
 
     @property
     def _default_training_argument(self) -> TrainingArguments:
@@ -129,17 +137,40 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "ernie-3.0-nano-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
             ],
         )
+        english_models = hp.choice(
+            "models",
+            [
+                # add deberta-v3 when we have it
+                "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
+                "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
+                "distilroberta-base",  # 6-layer, 768-hidden, 12-heads, 66M parameters. Case-sensitive
+                "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
+                "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
+                "distilbert-base-uncased",  # 6-layer, 768-hidden, 12-heads, 66M parameters
+            ],
+        )
         return [
             # fast learning: high LR, small early stop patience
             {
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 2,
+                "EarlyStoppingCallback.early_stopping_patience": 5,
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
                 "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.learning_rate": 3e-5,
+            },
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             # slow learning: small LR, large early stop patience
@@ -154,28 +185,62 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.model_name_or_path": chinese_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_models,
+                "TrainingArguments.learning_rate": 5e-6,
+            },
             # Note: prompt tuning candidates not included for now due to lack of inference capability
         ]
 
     def _data_checks_and_inference(self):
-        self.id2label, self.label2id = {}, {}
-        # TODO: support label ids that is already encoded
-        if self.problem_type == "multi_class":
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    label = example[self.label_column]
-                    if label not in self.label2id:
-                        self.label2id[label] = len(self.label2id)
-                        self.id2label[len(self.id2label)] = label
-        # multi_label
-        else:
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    labels = example[self.label_column]
-                    for label in labels:
+        if self.id2label is None:
+            self.id2label, self.label2id = {}, {}
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
                         if label not in self.label2id:
                             self.label2id[label] = len(self.label2id)
                             self.id2label[len(self.id2label)] = label
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                self.label2id[label] = len(self.label2id)
+                                self.id2label[len(self.id2label)] = label
+        else:
+            self.label2id = {}
+            for i in self.id2label:
+                self.label2id[self.id2label[i]] = i
+
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
+                        if label not in self.label2id:
+                            raise ValueError(
+                                f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
+                            )
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                raise ValueError(
+                                    f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
+                                )
 
     def _construct_trainer(self, config) -> Trainer:
         if "EarlyStoppingCallback.early_stopping_patience" in config:
@@ -292,7 +357,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 tokenizer=trainer.tokenizer,
                 max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
             )
-            processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
+            processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
             eval_metrics = trainer.evaluate(processed_eval_dataset)
         else:
             eval_metrics = trainer.evaluate()
@@ -372,5 +437,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         else:
             exported_model_path = os.path.join(model_result.log_dir, self.export_path)
             return Taskflow(
-                "text_classification", model=self.problem_type, task_path=exported_model_path, id2label=self.id2label
+                "text_classification",
+                mode="finetune",
+                problem_type=self.problem_type,
+                task_path=exported_model_path,
+                id2label=self.id2label,
             )

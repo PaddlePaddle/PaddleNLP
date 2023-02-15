@@ -230,6 +230,37 @@ def text_to_image_search(
     return results, response
 
 
+def image_text_search(query, filters={}, top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a query to the REST API and parse the answer.
+    Returns both a ready-to-use representation of the results and the raw JSON.
+    """
+
+    url = f"{API_ENDPOINT}/{DOC_REQUEST}"
+    params = {"filters": filters, "Retriever": {"top_k": top_k_retriever}}
+    req = {"query": query, "params": params}
+    response_raw = requests.post(url, json=req)
+
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+
+    # Format response
+    results = []
+    answers = response["documents"]
+    for answer in answers:
+        results.append(
+            {
+                "context": answer["content"],
+                "relevance": round(answer["meta"]["es_ann_score"] * 100, 2),
+            }
+        )
+    return results, response
+
+
 def text_to_qa_pair_search(query, is_filter=True) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Send a prompt text and corresponding parameters to the REST API
