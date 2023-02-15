@@ -257,7 +257,11 @@ class Trainer:
         self.compute_metrics = compute_metrics
         self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
         self.optimizer, self.lr_scheduler = optimizers
-
+        # Label smoothing
+        # if self.args.label_smoothing_factor != 0:
+        #     self.label_smoother = LabelSmoother(epsilon=self.args.label_smoothing_factor)
+        # else:
+        self.label_smoother = None
         self.state = TrainerState()
         self.control = TrainerControl()
         self._signature_columns = None

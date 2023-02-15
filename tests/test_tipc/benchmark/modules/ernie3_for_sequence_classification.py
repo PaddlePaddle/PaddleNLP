@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 from functools import partial
 
 import paddle
-from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+from paddle.io import DataLoader, DistributedBatchSampler
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
@@ -26,15 +24,68 @@ from paddlenlp.utils.log import logger
 
 from .model_base import BenchmarkBase
 
-sys.path.insert(
-    0,
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "model_zoo", "ernie-3.0")
-    ),
-)
 
+# Data pre-process function for clue benchmark datatset
+def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512, **kwargs):
+    """convert a glue example into necessary features"""
+    is_test = False
+    if "label" not in example.keys():
+        is_test = True
 
-from utils import seq_convert_example  # noqa: E402
+    if not is_test:
+        # `label_list == None` is for regression task
+        label_dtype = "int64" if label_list else "float32"
+        # Get the label
+        example["label"] = int(example["label"]) if label_dtype != "float32" else float(example["label"])
+        label = example["label"]
+    # Convert raw text to feature
+    if "keyword" in example:  # CSL
+        sentence1 = " ".join(example["keyword"])
+        example = {"sentence1": sentence1, "sentence2": example["abst"], "label": example["label"]}
+    elif "target" in example:  # wsc
+        text, query, pronoun, query_idx, pronoun_idx = (
+            example["text"],
+            example["target"]["span1_text"],
+            example["target"]["span2_text"],
+            example["target"]["span1_index"],
+            example["target"]["span2_index"],
+        )
+        text_list = list(text)
+        assert text[pronoun_idx : (pronoun_idx + len(pronoun))] == pronoun, "pronoun: {}".format(pronoun)
+        assert text[query_idx : (query_idx + len(query))] == query, "query: {}".format(query)
+        if pronoun_idx > query_idx:
+            text_list.insert(query_idx, "_")
+            text_list.insert(query_idx + len(query) + 1, "_")
+            text_list.insert(pronoun_idx + 2, "[")
+            text_list.insert(pronoun_idx + len(pronoun) + 2 + 1, "]")
+        else:
+            text_list.insert(pronoun_idx, "[")
+            text_list.insert(pronoun_idx + len(pronoun) + 1, "]")
+            text_list.insert(query_idx + 2, "_")
+            text_list.insert(query_idx + len(query) + 2 + 1, "_")
+        text = "".join(text_list)
+        example["sentence"] = text
+
+    if tokenizer is None:
+        return example
+    if "sentence" in example:
+        example = tokenizer(example["sentence"], max_length=max_seq_length, truncation=True, padding="max_length")
+    elif "sentence1" in example:
+        example = tokenizer(
+            example["sentence1"],
+            text_pair=example["sentence2"],
+            max_length=max_seq_length,
+            padding="max_length",
+            truncation=True,
+        )
+
+    if not is_test:
+        if "token_type_ids" in example:
+            return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"], "labels": label}
+        else:
+            return {"input_ids": example["input_ids"], "labels": label}
+    else:
+        return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"]}
 
 
 class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
@@ -68,18 +119,20 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         args.task_name = args.task_name.lower()
 
         tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
-        train_ds, dev_ds = load_dataset("clue", args.task_name, splits=("train", "dev"))
+        train_ds, _ = load_dataset("clue", args.task_name, splits=("train", "dev"))
+
         trans_func = partial(
             seq_convert_example, label_list=train_ds.label_list, tokenizer=tokenizer, max_seq_len=args.max_seq_length
         )
 
-        train_ds = train_ds.map(trans_func, lazy=True)
+        train_ds = train_ds.map(trans_func, lazy=False)
+        repeat_data = []
+        for i in range(10):
+            repeat_data.extend(train_ds.new_data)
+        train_ds.new_data = repeat_data
         train_batch_sampler = DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True
         )
-
-        dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False, drop_last=True)
 
         batchify_fn = DataCollatorWithPadding(tokenizer)
 
@@ -88,14 +141,11 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
             batch_sampler=train_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=4,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
-            return_list=True,
         )
-        dev_loader = DataLoader(
-            dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=4, return_list=True
-        )
+
         self.num_batch = len(train_loader)
 
-        return train_loader, dev_loader
+        return train_loader, None
 
     def build_model(self, args, **kwargs):
         train_ds = load_dataset("clue", args.task_name, splits="train")

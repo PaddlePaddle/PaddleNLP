@@ -44,7 +44,7 @@ MODEL_REGISTRY = {
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
     "ernie_tiny": ErnieTinyBenchmark,
-    "ernie-3.0_for_sequence_classification": Ernie3ForSequenceClassificationBenchmark,
+    "ernie3_for_sequence_classification": Ernie3ForSequenceClassificationBenchmark,
     "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
     "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
     "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
