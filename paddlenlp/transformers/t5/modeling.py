@@ -823,9 +823,9 @@ class T5PretrainedModel(PretrainedModel):
         return shifted_input_ids
 
 
-class T5Stack(nn.Layer):
+class T5Stack(T5PretrainedModel):
     def __init__(self, config: T5Config, embed_tokens: Optional[nn.Embedding] = None):
-        super().__init__()
+        super().__init__(config)
         self.is_decoder = config.is_decoder
         self.embed_tokens = embed_tokens
         self.block = nn.LayerList(

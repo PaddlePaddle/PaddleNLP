@@ -295,7 +295,9 @@ class ImageProcessingMixin(object):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
             )
             default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                os.path.join(cache_dir, pretrained_model_name_or_path)
+                if cache_dir is not None
+                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             )
             try:
                 # Load from local folder or from cache or download from model Hub and cache
