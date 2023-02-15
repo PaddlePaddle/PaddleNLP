@@ -17,7 +17,6 @@ import argparse
 import contextlib
 import gc
 import hashlib
-import itertools
 import math
 import os
 import sys
@@ -25,6 +24,7 @@ import warnings
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -45,9 +45,12 @@ from ppdiffusers import (
     AutoencoderKL,
     DDPMScheduler,
     DiffusionPipeline,
+    DPMSolverMultistepScheduler,
     UNet2DConditionModel,
 )
+from ppdiffusers.loaders import AttnProcsLayers
 from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
 from ppdiffusers.optimization import get_scheduler
 
 
@@ -55,13 +58,33 @@ def url_or_path_join(*path_list):
     return os.path.join(*path_list) if os.path.isdir(os.path.join(*path_list)) else "/".join(path_list)
 
 
-class Lambda(BaseTransform):
-    def __init__(self, fn, keys=None):
-        super().__init__(keys)
-        self.fn = fn
+def save_model_card(repo_name, images=None, base_model=str, prompt=str, repo_folder=None):
+    img_str = ""
+    for i, image in enumerate(images):
+        image.save(os.path.join(repo_folder, f"image_{i}.png"))
+        img_str += f"![img_{i}](./image_{i}.png)\n"
 
-    def _apply_image(self, img):
-        return self.fn(img)
+    yaml = f"""
+---
+license: creativeml-openrail-m
+base_model: {base_model}
+instance_prompt: {prompt}
+tags:
+- stable-diffusion
+- stable-diffusion-ppdiffusers
+- text-to-image
+- ppdiffusers
+- lora
+inference: false
+---
+    """
+    model_card = f"""
+# LoRA DreamBooth - {repo_name}
+These are LoRA adaption weights for {base_model}. The weights were trained on {prompt} using [DreamBooth](https://dreambooth.github.io/). You can find some example images in the following. \n
+{img_str}
+"""
+    with open(os.path.join(repo_folder, "README.md"), "w") as f:
+        f.write(yaml + model_card)
 
 
 def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: str):
@@ -96,18 +119,13 @@ def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: st
         raise ValueError(f"{model_class} is not supported.")
 
 
-def set_recompute(model, value=False):
-    def fn(layer):
-        # ldmbert
-        if hasattr(layer, "enable_recompute"):
-            layer.enable_recompute = value
-            print("Set", layer.__class__, "recompute", layer.enable_recompute)
-        # unet
-        if hasattr(layer, "gradient_checkpointing"):
-            layer.gradient_checkpointing = value
-            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+class Lambda(BaseTransform):
+    def __init__(self, fn, keys=None):
+        super().__init__(keys)
+        self.fn = fn
 
-    model.apply(fn)
+    def _apply_image(self, img):
+        return self.fn(img)
 
 
 def get_report_to(args):
@@ -125,7 +143,7 @@ def get_report_to(args):
 
 
 def parse_args(input_args=None):
-    parser = argparse.ArgumentParser(description="Simple example of a training dreambooth script.")
+    parser = argparse.ArgumentParser(description="Simple example of a training dreambooth lora script.")
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
@@ -167,6 +185,24 @@ def parse_args(input_args=None):
         help="The prompt to specify images in the same class as provided instance images.",
     )
     parser.add_argument(
+        "--validation_prompt", type=str, default=None, help="A prompt that is sampled during training for inference."
+    )
+    parser.add_argument(
+        "--num_validation_images",
+        type=int,
+        default=4,
+        help="Number of images that should be generated during validation with `validation_prompt`.",
+    )
+    parser.add_argument(
+        "--validation_epochs",
+        type=int,
+        default=50,
+        help=(
+            "Run dreambooth validation every X epochs. Dreambooth validation consists of running the prompt"
+            " `args.validation_prompt` multiple times: `args.num_validation_images`."
+        ),
+    )
+    parser.add_argument(
         "--with_prior_preservation",
         default=False,
         action="store_true",
@@ -185,7 +221,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="./dreambooth-model",
+        default="lora-dreambooth-model",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
@@ -231,11 +267,6 @@ def parse_args(input_args=None):
         help="whether to randomly flip images horizontally",
     )
     parser.add_argument(
-        "--train_text_encoder",
-        action="store_true",
-        help="Whether to train the text encoder. If set, the text encoder should be float32 precision.",
-    )
-    parser.add_argument(
         "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
     )
     parser.add_argument(
@@ -247,6 +278,12 @@ def parse_args(input_args=None):
         type=int,
         default=None,
         help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
+    )
+    parser.add_argument(
+        "--checkpointing_steps",
+        type=int,
+        default=500,
+        help=("Save a checkpoint of the training state every X updates."),
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -262,7 +299,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=5e-6,
+        default=5e-4,
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument(
@@ -327,13 +364,6 @@ def parse_args(input_args=None):
         choices=["tensorboard", "visualdl"],
         help="Log writer type.",
     )
-    parser.add_argument(
-        "--checkpointing_steps",
-        type=int,
-        default=500,
-        help=("Save a checkpoint of the training state every X updates."),
-    )
-
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -573,13 +603,43 @@ def main():
         subfolder="unet",
     )
 
+    # We only train the additional adapter LoRA layers
     freeze_params(vae.parameters())
-    if not args.train_text_encoder:
-        freeze_params(text_encoder.parameters())
-    if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
-        if args.train_text_encoder:
-            set_recompute(text_encoder, True)
+    freeze_params(text_encoder.parameters())
+    freeze_params(unet.parameters())
+
+    # now we will add new LoRA weights to the attention layers
+    # It's important to realize here how many attention weights will be added and of which sizes
+    # The sizes of the attention layers consist only of two different variables:
+    # 1) - the "hidden_size", which is increased according to `unet.config.block_out_channels`.
+    # 2) - the "cross attention size", which is set to `unet.config.cross_attention_dim`.
+
+    # Let's first see how many attention processors we will have to set.
+    # For Stable Diffusion, it should be equal to:
+    # - down blocks (2x attention layers) * (2x transformer layers) * (3x down blocks) = 12
+    # - mid blocks (2x attention layers) * (1x transformer layers) * (1x mid blocks) = 2
+    # - up blocks (2x attention layers) * (3x transformer layers) * (3x down blocks) = 18
+    # => 32 layers
+
+    # Set correct lora layers
+    lora_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = unet.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = unet.config.block_out_channels[block_id]
+
+        lora_attn_procs[name] = LoRACrossAttnProcessor(
+            hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
+        )
+
+    unet.set_attn_processor(lora_attn_procs)
+    lora_layers = AttnProcsLayers(unet.attn_processors)
 
     # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(
@@ -632,15 +692,6 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if num_processes > 1:
-        unet = paddle.DataParallel(unet)
-        if args.train_text_encoder:
-            text_encoder = paddle.DataParallel(text_encoder)
-
-    params_to_optimize = (
-        itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder else unet.parameters()
-    )
-
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * num_processes
@@ -654,16 +705,20 @@ def main():
         num_cycles=args.lr_num_cycles,
         power=args.lr_power,
     )
-    # Initialize the optimizer
+
+    # Optimizer creation
     optimizer = AdamW(
         learning_rate=lr_scheduler,
-        parameters=params_to_optimize,
+        parameters=lora_layers.parameters(),
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
         epsilon=args.adam_epsilon,
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
+
+    if num_processes > 1:
+        unet = paddle.DataParallel(unet)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
@@ -688,16 +743,11 @@ def main():
     progress_bar = tqdm(range(args.max_train_steps), disable=not is_main_process)
     progress_bar.set_description("Train Steps")
     global_step = 0
-
-    # Keep vae in eval model as we don't train these
     vae.eval()
-    if args.train_text_encoder:
-        text_encoder.train()
-    else:
-        text_encoder.eval()
-    unet.train()
+    text_encoder.eval()
 
     for epoch in range(args.num_train_epochs):
+        unet.train()
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
@@ -720,61 +770,50 @@ def main():
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
                 unet_ctx_manager = unet.no_sync()
-                if args.train_text_encoder:
-                    text_encoder_ctx_manager = text_encoder.no_sync()
-                else:
-                    text_encoder_ctx_manager = (
-                        contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
-                    )
             else:
                 unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
-                text_encoder_ctx_manager = (
-                    contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
-                )
 
-            with text_encoder_ctx_manager:
-                # Get the text embedding for conditioning
-                if use_attention_mask:
-                    attention_mask = (batch["input_ids"] != tokenizer.pad_token_id).cast("int64")
+            if use_attention_mask:
+                attention_mask = (batch["input_ids"] != tokenizer.pad_token_id).cast("int64")
+            else:
+                attention_mask = None
+            encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
+
+            with unet_ctx_manager:
+                # Predict the noise residual / sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                # Get the target for loss depending on the prediction type
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
-                    attention_mask = None
-                encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-                with unet_ctx_manager:
-                    # Predict the noise residual / sample
-                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                if args.with_prior_preservation:
+                    # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
+                    model_pred, model_pred_prior = model_pred.chunk(2, axis=0)
+                    target, target_prior = target.chunk(2, axis=0)
 
-                    # Get the target for loss depending on the prediction type
-                    if noise_scheduler.config.prediction_type == "epsilon":
-                        target = noise
-                    elif noise_scheduler.config.prediction_type == "v_prediction":
-                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                    else:
-                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    # Compute instance loss
+                    loss = F.mse_loss(model_pred, target, reduction="mean")
 
-                    if args.with_prior_preservation:
-                        # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
-                        model_pred, model_pred_prior = model_pred.chunk(2, axis=0)
-                        target, target_prior = target.chunk(2, axis=0)
+                    # Compute prior loss
+                    prior_loss = F.mse_loss(model_pred_prior, target_prior, reduction="mean")
 
-                        # Compute instance loss
-                        loss = F.mse_loss(model_pred, target, reduction="mean")
+                    # Add the prior loss to the instance loss.
+                    loss = loss + args.prior_loss_weight * prior_loss
+                else:
+                    loss = F.mse_loss(model_pred, target, reduction="mean")
 
-                        # Compute prior loss
-                        prior_loss = F.mse_loss(model_pred_prior, target_prior, reduction="mean")
-
-                        # Add the prior loss to the instance loss.
-                        loss = loss + args.prior_loss_weight * prior_loss
-                    else:
-                        loss = F.mse_loss(model_pred, target, reduction="mean")
-
-                    if args.gradient_accumulation_steps > 1:
-                        loss = loss / args.gradient_accumulation_steps
-                    loss.backward()
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
+                loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
-                    fused_allreduce_gradients(params_to_optimize, None)
+                    fused_allreduce_gradients(lora_layers.parameters(), None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -796,26 +835,79 @@ def main():
 
                     if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        unwrap_model(unet).save_pretrained(os.path.join(save_path, "unet"))
-                        if args.train_text_encoder:
-                            unwrap_model(text_encoder).save_pretrained(os.path.join(save_path, "text_encoder"))
+                        unwrap_model(unet).save_attn_procs(save_path)
+                        logger.info(f"Saved lora weights to {save_path}")
 
                 if global_step >= args.max_train_steps:
                     break
 
-    # Create the pipeline using the trained modules and save it.
+        if is_main_process:
+            if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
+                logger.info(
+                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
+                    f" {args.validation_prompt}."
+                )
+                # create pipeline
+                pipeline = DiffusionPipeline.from_pretrained(
+                    args.pretrained_model_name_or_path,
+                    unet=unwrap_model(unet),
+                    safety_checker=None,
+                )
+                pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+                pipeline.set_progress_bar_config(disable=True)
+
+                # run inference
+                generator = paddle.Generator().manual_seed(args.seed) if args.seed else None
+                images = [
+                    pipeline(args.validation_prompt, num_inference_steps=25, generator=generator).images[0]
+                    for _ in range(args.num_validation_images)
+                ]
+                np_images = np.stack([np.asarray(img) for img in images])
+
+                if args.report_to == "tensorboard":
+                    writer.add_images("test", np_images, epoch, dataformats="NHWC")
+                else:
+                    writer.add_image("test", np_images, epoch, dataformats="NHWC")
+
+                del pipeline
+                gc.collect()
+
+    # Save the lora layers
     if is_main_process:
-        writer.close()
-        # Create the pipeline using using the trained modules and save it.
-        pipeline = DiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
-            unet=unwrap_model(unet),
-            text_encoder=unwrap_model(text_encoder),
-        )
-        pipeline.save_pretrained(args.output_dir)
+        unet = unwrap_model(unet)
+        unet.save_attn_procs(args.output_dir)
 
         if args.push_to_hub:
+            save_model_card(
+                repo_name,
+                images=images,
+                base_model=args.pretrained_model_name_or_path,
+                prompt=args.instance_prompt,
+                repo_folder=args.output_dir,
+            )
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
+        # Final inference
+        # Load previous pipeline
+        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, safety_checker=None)
+        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+        # load attention processors
+        pipeline.unet.load_attn_procs(args.output_dir)
+
+        # run inference
+        if args.validation_prompt and args.num_validation_images > 0:
+            generator = paddle.Generator().manual_seed(args.seed) if args.seed else None
+            images = [
+                pipeline(args.validation_prompt, num_inference_steps=25, generator=generator).images[0]
+                for _ in range(args.num_validation_images)
+            ]
+            np_images = np.stack([np.asarray(img) for img in images])
+
+            if args.report_to == "tensorboard":
+                writer.add_images("test", np_images, epoch, dataformats="NHWC")
+            else:
+                writer.add_image("test", np_images, epoch, dataformats="NHWC")
+
+        writer.close()
 
 
 if __name__ == "__main__":
