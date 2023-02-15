@@ -13,40 +13,36 @@
 # limitations under the License.
 
 import atexit
-import collections
-import io
-import math
-import os
-import warnings
-import sys
 import inspect
-from collections import namedtuple
-from multiprocess import Pool, RLock
+import os
 import time
-import paddlenlp
+import warnings
+from collections import namedtuple
+
 import datasets
+from multiprocess import Pool, RLock
+
+import paddlenlp
 
 try:
     import paddle.distributed as dist
-except Exception as e:
-    import warnings
-
+except Exception:
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
-from paddle.io import Dataset, IterableDataset
-from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url, _get_unique_endpoints
-from paddlenlp.utils.env import DATA_HOME
-from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
 from functools import partial
+
+from paddle.io import Dataset, IterableDataset
+from paddle.utils.download import _get_unique_endpoints
+
+from paddlenlp.utils.env import DATA_HOME
 
 __all__ = ["MapDataset", "DatasetBuilder", "IterDataset", "load_dataset"]
 
 DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
 # Patch for intranet
-from datasets import load_dataset as origin_load_dataset
+from datasets import load_dataset as origin_load_dataset  # noqa: E402
 
 
 def load_from_ppnlp(path, *args, **kwargs):
@@ -111,8 +107,8 @@ def import_main_class(module_path):
 
 
 def load_from_hf(path, name=None, splits=None, **kwargs):
-    from datasets import load_dataset as load_hf_dataset
     from datasets import DatasetDict
+    from datasets import load_dataset as load_hf_dataset
     from datasets.features import ClassLabel
 
     try:
@@ -216,7 +212,7 @@ def load_dataset(path_or_read_func, name=None, data_files=None, splits=None, laz
                 selected_splits += [splits]
 
             for split_name in selected_splits:
-                if split_name not in split_names and split_name != None:
+                if split_name not in split_names and split_name is not None:
                     raise ValueError('Invalid split "{}". Should be one of {}.'.format(split_name, list(split_names)))
 
             datasets = reader_instance.read_datasets(data_files=data_files, splits=splits)
