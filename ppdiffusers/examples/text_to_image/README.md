@@ -202,16 +202,26 @@ export OUTPUT_DIR="sd-pokemon-model-lora"
 
 python train_text_to_image_lora.py \
   --pretrained_model_name_or_path=$MODEL_NAME \
-  --dataset_name=$DATASET_NAME --caption_column="text" \
-  --resolution=512 --random_flip \
+  --dataset_name=$DATASET_NAME \
+  --dataloader_num_workers=8 \
+  --resolution=512 --center_crop --random_flip \
   --train_batch_size=1 \
-  --num_train_epochs=100 --checkpointing_steps=5000 \
-  --learning_rate=1e-04 --lr_scheduler="constant" --lr_warmup_steps=0 \
-  --seed=42 \
-  --output_dir=$OUTPUT_DIR \
-  --validation_prompt="cute dragon creature" --report_to="visualdl"
+  --gradient_accumulation_steps=4 \
+  --max_train_steps=15000 \
+  --learning_rate=1e-04 \
+  --max_grad_norm=1 \
+  --lr_scheduler="cosine" --lr_warmup_steps=0 \
+  --output_dir=${OUTPUT_DIR} \
+  --report_to=visualdl \
+  --checkpointing_steps=500 \
+  --validation_prompt="Totoro" \
+  --seed=1337 \
+  --validation_epochs 10
 ```
 **___Note: 当我使用 LoRA 训练模型的时候，我们需要使用更大的学习率，因此我们这里使用 *1e-4* 而不是 *1e-5*.___**
+
+最终经过微调后的 LoRA 权重，我们已经上传到了 [junnyu/sd-model-finetuned-lora-a100](https://huggingface.co/junnyu/sd-model-finetuned-lora-a100). **___Note: [最终的权重](https://huggingface.co/junnyu/sd-model-finetuned-lora-a100/blob/main/paddle_lora_weights.pdparams) 只有 3 MB 的大小.___**
+
 
 ## 推理
 
@@ -221,14 +231,18 @@ python train_text_to_image_lora.py \
 from ppdiffusers import StableDiffusionPipeline
 import paddle
 
-model_path = "sayakpaul/sd-model-finetuned-lora-t4"
+model_path = "junnyu/sd-model-finetuned-lora-a100"
 pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float32)
-pipe.unet.load_attn_procs(model_path)
+# 注意：如果我们想从 HF Hub 加载权重，那么我们需要设置 from_hf_hub=True
+pipe.unet.load_attn_procs(model_path, from_hf_hub=True)
 
-prompt = "A pokemon with green eyes and red legs."
+prompt = "Totoro"
 image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
-image.save("pokemon.png")
+image.save("Totoro.png")
 ```
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/50394665/218942887-a036c605-6ef4-495a-af83-39e4ce3e0055.png">
+</p>
 
 # 参考资料
 - https://github.com/huggingface/diffusers/tree/main/examples/text_to_image
