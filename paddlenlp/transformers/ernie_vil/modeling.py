@@ -23,6 +23,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ...utils.initializer import normal_
+from ...utils.log import logger
 from .. import PretrainedModel
 from ..clip.modeling import CLIPVisionTransformer as ErnieViLVisionTransformer
 from ..clip.modeling import clip_loss
@@ -707,6 +708,10 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
 
     def __init__(self, config: ErnieViLConfig):
         super().__init__(config)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self.ernie_vil = ErnieViLModel(config)
         self.unet_model = create_unet_model(
             image_size=512,
