@@ -443,7 +443,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def to_taskflow(self, trial_id=None, batch_size=1, max_length=512):
+    def to_taskflow(self, trial_id=None, batch_size=1, max_length=512, precision="fp32"):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
@@ -451,6 +451,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
             max_length (int): Maximum number of tokens for the model. Defaults to 512.
             batch_size(int): The sample number of a mini-batch. Defaults to 1.
+            precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
@@ -468,4 +469,5 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             multilabel_threshold=self.multilabel_threshold,
             batch_size=batch_size,
             max_length=max_length,
+            precision=precision,
         )
