@@ -1,8 +1,24 @@
-from paddlenlp import SimpleServer
-from paddlenlp.server import BaseModelHandler, BasePostHandler
-from paddlenlp.data import Pad, Tuple
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import numpy as np
 from scipy.special import softmax
+
+from paddlenlp import SimpleServer
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.server import BaseModelHandler, BasePostHandler
+
 
 class TextMatchingModelHandler(BaseModelHandler):
     def __init__(self):
@@ -10,7 +26,7 @@ class TextMatchingModelHandler(BaseModelHandler):
 
     @classmethod
     def process(cls, predictor, tokenizer, data, parameters):
-      
+
         max_seq_len = 128
         batch_size = 1
         if "max_seq_len" not in parameters:
@@ -37,14 +53,14 @@ class TextMatchingModelHandler(BaseModelHandler):
         examples = []
         for idx, _ in enumerate(text):
             if has_pair:
-                text_a = tokenizer(text=text[idx] ,max_length=max_seq_len)
-                text_b = tokenizer(text=text_pair[idx] ,max_length=max_seq_len)
+                text_a = tokenizer(text=text[idx], max_length=max_seq_len)
+                text_b = tokenizer(text=text_pair[idx], max_length=max_seq_len)
 
             examples.append((text_a["input_ids"], text_b["input_ids"]))
 
         # Seperates data into some batches.
-        batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]      
-        
+        batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
+
         def batchify_fn(samples):
             return Tuple(
                 Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
@@ -62,15 +78,16 @@ class TextMatchingModelHandler(BaseModelHandler):
                 for i, out in enumerate(output):
                     results[i].append(out)
         print(results)
-        
+
         # Resolve the logits result and get the predict label and confidence
         results_concat = []
         for i in range(0, len(results)):
             results_concat.append(np.concatenate(results[i], axis=0))
-        
+
         out_dict = {"logits": results_concat[0].tolist(), "data": data}
 
         return out_dict
+
 
 class TextMatchingPostHandler(BasePostHandler):
     def __init__(self):
@@ -83,14 +100,14 @@ class TextMatchingPostHandler(BasePostHandler):
                 "The output of model handler do not include the 'logits', "
                 " please check the model handler output. The model handler output:\n{}".format(data)
             )
-        
+
         prob_limit = 0.5
         if "prob_limit" in parameters:
             prob_limit = parameters["prob_limit"]
         logits = data["logits"]
         # softmax for probs
         logits = softmax(logits, axis=-1)
-        
+
         print(logits)
 
         labels = []
@@ -101,9 +118,10 @@ class TextMatchingPostHandler(BasePostHandler):
             else:
                 labels.append(0)
             probs.append(logit[1])
-            
+
         out_dict = {"label": labels, "similarity": probs}
         return out_dict
+
 
 app = SimpleServer()
 app.register(
@@ -113,4 +131,5 @@ app.register(
     model_handler=TextMatchingModelHandler,
     post_handler=TextMatchingPostHandler,
     precision="fp32",
-    device_id=0)
+    device_id=0,
+)
