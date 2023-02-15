@@ -29,8 +29,10 @@ from paddlenlp.utils.downloader import (
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoBackbone",
@@ -114,6 +116,9 @@ MAPPING_NAMES = OrderedDict(
         ("Pegasus", "pegasus"),
         ("DPT", "dpt"),
         ("Bit", "bit"),
+        ("BlipText", "blip"),
+        ("BlipVision", "blip"),
+        ("Blip", "blip"),
     ]
 )
 
@@ -201,7 +206,8 @@ class _BaseAutoModelClass:
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
-        init_class = init_class[:-5] if init_class.endswith("Model") else init_class
+        init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
+        model_name = None
         if init_class:
             for model_flag, name in MAPPING_NAMES.items():
                 if model_flag in init_class:
@@ -213,6 +219,10 @@ class _BaseAutoModelClass:
                 if name in pretrained_model_name_or_path.lower():
                     model_name = model_flag + "Model"
                     break
+        if model_name is None:
+            raise AttributeError(
+                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
+            )
         init_class = cls._name_mapping[model_name + "_Import_Class"]
         class_name = cls._name_mapping[init_class]
         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
@@ -233,12 +243,16 @@ class _BaseAutoModelClass:
             )
 
     @classmethod
-    def _from_pretrained(cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, *model_args, **kwargs):
+    def _from_pretrained(
+        cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, subfolder=None, *model_args, **kwargs
+    ):
         if task:
             if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print("We only support task choice for AutoModel.")
+        cache_dir = kwargs.get("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         all_model_names = []
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
@@ -251,7 +265,8 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.model_config_file,
-                    cache_dir=HF_CACHE_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -260,7 +275,8 @@ class _BaseAutoModelClass:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=cls.legacy_model_config_file,
-                    cache_dir=HF_CACHE_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -314,7 +330,9 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            default_root = (
+                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            )
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )

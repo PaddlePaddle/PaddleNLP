@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import numpy as np
 from paddle.nn import Layer
-from ..albert.modeling import ACT2FN
+
+from paddlenlp.utils.env import CONFIG_NAME
 
 from .. import PretrainedModel, register_base_model
+from ..albert.modeling import ACT2FN
+from .configuration import (
+    GAUAlPHA_PRETRAINED_INIT_CONFIGURATION,
+    GAUAlPHA_PRETRAINED_RESOURCE_FILES_MAP,
+    GAUAlphaConfig,
+)
 
 __all__ = [
     "GAUAlphaModel",
@@ -94,37 +101,26 @@ class GatedAttentionUnit(Layer):
     https://github.com/ZhuiyiTechnology/GAU-alpha/blob/ea15e08a85d35652775c360218090cbaed98da18/models.py#L6-L85
     """
 
-    def __init__(
-        self,
-        hidden_size=768,
-        intermediate_size=1536,
-        attention_key_size=128,
-        activation="swish",
-        use_bias=False,
-        normalization="softmax_plus",
-        attention_scale=True,
-        attention_dropout=0.1,
-        max_position_embeddings=512,
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super().__init__()
-        self.activation = ACT2FN[activation]
-        self.intermediate_size = intermediate_size
-        self.attention_key_size = attention_key_size
-        self.use_bias = use_bias
-        self.normalization = normalization
-        self.attention_scale = attention_scale
-        self.attention_dropout = attention_dropout
+        self.activation = ACT2FN[config.activation]
+        self.intermediate_size = config.intermediate_size
+        self.attention_key_size = config.attention_key_size
+        self.use_bias = config.use_bias
+        self.normalization = config.normalization
+        self.attention_scale = config.attention_scale
+        self.attention_dropout = config.attention_probs_dropout_prob
 
         self.i_dense = nn.Linear(
-            hidden_size,
-            2 * intermediate_size + attention_key_size,
+            config.hidden_size,
+            2 * config.intermediate_size + config.attention_key_size,
             bias_attr=self.use_bias,
         )
-        self.o_dense = nn.Linear(intermediate_size, hidden_size, bias_attr=self.use_bias)
+        self.o_dense = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=self.use_bias)
 
-        self.q_scaleoffset = ScaleOffset(attention_key_size, offset=self.use_bias)
-        self.k_scaleoffset = ScaleOffset(attention_key_size, offset=self.use_bias)
-        self.rotary = RotaryPositionEmbedding(attention_key_size, max_position_embeddings)
+        self.q_scaleoffset = ScaleOffset(config.attention_key_size, offset=self.use_bias)
+        self.k_scaleoffset = ScaleOffset(config.attention_key_size, offset=self.use_bias)
+        self.rotary = RotaryPositionEmbedding(config)
 
     def forward(self, hidden_states, attention_mask=None):
         x = self.i_dense(hidden_states)
@@ -157,34 +153,11 @@ class GatedAttentionUnit(Layer):
 
 
 class GAULayer(Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        intermediate_size=1536,
-        attention_key_size=128,
-        activation="swish",
-        use_bias=False,
-        normalization="softmax_plus",
-        attention_scale=True,
-        attention_dropout=0.1,
-        hidden_dropout=0.1,
-        norm_eps=1e-12,
-        max_position_embeddings=512,
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super().__init__()
-        self.gau = GatedAttentionUnit(
-            hidden_size,
-            intermediate_size,
-            attention_key_size,
-            activation,
-            use_bias,
-            normalization,
-            attention_scale,
-            attention_dropout,
-            max_position_embeddings,
-        )
-        self.norm = Norm(norm_eps)
-        self.hidden_dropout = hidden_dropout
+        self.gau = GatedAttentionUnit(config)
+        self.norm = Norm(config.norm_eps)
+        self.hidden_dropout = config.hidden_dropout_prob
 
     def forward(self, hidden_states, attention_mask=None):
         gau_output = self.gau(hidden_states, attention_mask=attention_mask)
@@ -212,10 +185,16 @@ def initializer(tensor, num_hidden_layers=12, order=2, gain=1.0):
 
 
 class RotaryPositionEmbedding(Layer):
-    def __init__(self, dim, max_position_embeddings=512):
+    def __init__(self, config: GAUAlphaConfig):
         super().__init__()
-        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
-        t = paddle.arange(max_position_embeddings, dtype=paddle.get_default_dtype())
+        inv_freq = 1.0 / (
+            10000
+            ** (
+                paddle.arange(0, config.attention_key_size, 2, dtype=paddle.get_default_dtype())
+                / config.attention_key_size
+            )
+        )
+        t = paddle.arange(config.max_position_embeddings, dtype=paddle.get_default_dtype())
         freqs = paddle.matmul(t.unsqueeze(1), inv_freq.unsqueeze(0))
         self.register_buffer("sin", freqs.sin(), persistable=False)
         self.register_buffer("cos", freqs.cos(), persistable=False)
@@ -243,31 +222,13 @@ class GAUAlphaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "chinese_GAU-alpha-char_L-24_H-768": {
-            "vocab_size": 12000,
-            "hidden_size": 768,
-            "intermediate_size": 1536,
-            "num_hidden_layers": 24,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "attention_key_size": 128,
-            "norm_eps": 1e-12,
-            "pad_token_id": 0,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "swish",
-            "use_bias": False,
-            "normalization": "softmax_plus",
-            "attention_scale": True,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "chinese_GAU-alpha-char_L-24_H-768": "https://bj.bcebos.com/paddlenlp/models/transformers/gau_alpha/chinese_GAU-alpha-char_L-24_H-768/model_state.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = GAUAlphaConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "gau_alpha"
+
+    pretrained_init_configuration = GAUAlPHA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = GAUAlPHA_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -275,12 +236,7 @@ class GAUAlphaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                num_hidden_layers = (
-                    self.num_hidden_layers
-                    if hasattr(self, "num_hidden_layers")
-                    else self.gau_alpha.config["num_hidden_layers"]
-                )
-                initializer(layer.weight, num_hidden_layers, order=2, gain=1.0)
+                initializer(layer.weight, self.config.num_hidden_layers, order=2, gain=1.0)
             if isinstance(layer, nn.Linear):
                 use_bias = self.use_bias if hasattr(self, "use_bias") else self.gau_alpha.config["use_bias"]
                 if layer.bias is not None and not use_bias:
@@ -345,55 +301,30 @@ class GAUAlphaModel(GAUAlphaPretrainedModel):
             Defaults to `True`.
     """
 
-    def __init__(
-        self,
-        vocab_size=12000,
-        hidden_size=768,
-        intermediate_size=1536,
-        num_hidden_layers=24,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        attention_key_size=128,
-        norm_eps=1e-12,
-        pad_token_id=0,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        hidden_act="swish",
-        use_bias=False,
-        normalization="softmax_plus",
-        attention_scale=True,
-    ):
-        super(GAUAlphaModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.norm_eps = norm_eps
-        self.num_hidden_layers = num_hidden_layers
-        self.use_bias = use_bias
-        self.embeddings = GAUAlphaEmbeddings(
-            vocab_size,
-            hidden_size,
-            hidden_dropout_prob,
-            type_vocab_size,
-            norm_eps,
-        )
+    def __init__(self, config: GAUAlphaConfig):
+        super(GAUAlphaModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.norm_eps = config.norm_eps
+        self.num_hidden_layers = config.num_hidden_layers
+        self.use_bias = config.use_bias
+        self.embeddings = GAUAlphaEmbeddings(config)
 
-        self.encoder = GAUAlphaEncoder(
-            num_hidden_layers,
-            hidden_size,
-            intermediate_size,
-            attention_key_size,
-            hidden_act,
-            use_bias,
-            normalization,
-            attention_scale,
-            attention_probs_dropout_prob,
-            hidden_dropout_prob,
-            norm_eps,
-            max_position_embeddings,
-        )
+        self.encoder = GAUAlphaEncoder(config)
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None):
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+    ):
         r"""
         The GAUAlphaModel forward method, overrides the `__call__()` special method.
 
@@ -464,19 +395,12 @@ class GAUAlphaEmbeddings(Layer):
     Include embeddings from word and token_type embeddings
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        type_vocab_size=2,
-        norm_eps=1e-12,
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super(GAUAlphaEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.norm = Norm(norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.norm = Norm(config.norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None):
         if token_type_ids is None:
@@ -492,40 +416,9 @@ class GAUAlphaEmbeddings(Layer):
 
 
 class GAUAlphaEncoder(Layer):
-    def __init__(
-        self,
-        num_hidden_layers,
-        hidden_size,
-        intermediate_size,
-        attention_key_size,
-        hidden_act,
-        use_bias,
-        normalization,
-        attention_scale,
-        attention_probs_dropout_prob,
-        hidden_dropout_prob,
-        norm_eps,
-        max_position_embeddings,
-    ):
+    def __init__(self, config: GAUAlphaConfig):
         super().__init__()
-        self.layer = nn.LayerList(
-            [
-                GAULayer(
-                    hidden_size=hidden_size,
-                    intermediate_size=intermediate_size,
-                    attention_key_size=attention_key_size,
-                    activation=hidden_act,
-                    use_bias=use_bias,
-                    normalization=normalization,
-                    attention_scale=attention_scale,
-                    attention_dropout=attention_probs_dropout_prob,
-                    hidden_dropout=hidden_dropout_prob,
-                    norm_eps=norm_eps,
-                    max_position_embeddings=max_position_embeddings,
-                )
-                for _ in range(num_hidden_layers)
-            ]
-        )
+        self.layer = nn.LayerList([GAULayer(config) for _ in range(config.num_hidden_layers)])
 
     def forward(self, hidden_states, attention_mask=None):
         for layer_module in self.layer:
@@ -550,11 +443,13 @@ class GAUAlphaForQuestionAnswering(GAUAlphaPretrainedModel):
             instance `gau_alpha`. Defaults to `None`.
     """
 
-    def __init__(self, gau_alpha, dropout=None):
-        super(GAUAlphaForQuestionAnswering, self).__init__()
-        self.gau_alpha = gau_alpha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gau_alpha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.gau_alpha.config["hidden_size"], 2)
+    def __init__(self, config: GAUAlphaConfig):
+        super(GAUAlphaForQuestionAnswering, self).__init__(config)
+        self.gau_alpha = GAUAlphaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -614,7 +509,7 @@ class GAUAlphaForSequenceClassification(GAUAlphaPretrainedModel):
     Args:
         gau_alpha (`GAUAlphaModel`):
             An instance of `paddlenlp.transformers.GAUAlphaModel`.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Default to `2`.
         dropout (float, optional):
             The dropout probability for output of GAUAlpha.
@@ -622,12 +517,14 @@ class GAUAlphaForSequenceClassification(GAUAlphaPretrainedModel):
             of `paddlenlp.transformers.GAUAlphaModel` instance. Defaults to `None`.
     """
 
-    def __init__(self, gau_alpha, num_classes=2, dropout=None):
-        super(GAUAlphaForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.gau_alpha = gau_alpha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gau_alpha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.gau_alpha.config["hidden_size"], num_classes)
+    def __init__(self, config: GAUAlphaConfig):
+        super(GAUAlphaForSequenceClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.gau_alpha = GAUAlphaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -642,7 +539,7 @@ class GAUAlphaForSequenceClassification(GAUAlphaPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -674,7 +571,7 @@ class GAUAlphaForTokenClassification(GAUAlphaPretrainedModel):
     Args:
         gau_alpha (`GAUAlphaModel`):
             An instance of `paddlenlp.transformers.GAUAlphaModel`.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Default to `2`.
         dropout (float, optional):
             The dropout probability for output of GAUAlpha.
@@ -682,12 +579,14 @@ class GAUAlphaForTokenClassification(GAUAlphaPretrainedModel):
             of `paddlenlp.transformers.GAUAlphaModel` instance. Defaults to `None`.
     """
 
-    def __init__(self, gau_alpha, num_classes=2, dropout=None):
-        super(GAUAlphaForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.gau_alpha = gau_alpha  # allow gau_alpha to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gau_alpha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.gau_alpha.config["hidden_size"], num_classes)
+    def __init__(self, config: GAUAlphaConfig):
+        super(GAUAlphaForTokenClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.gau_alpha = GAUAlphaModel(config)  # allow gau_alpha to be config
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -702,7 +601,7 @@ class GAUAlphaForTokenClassification(GAUAlphaPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -741,12 +640,14 @@ class GAUAlphaForMultipleChoice(GAUAlphaPretrainedModel):
             instance `gau_alpha`. Defaults to None.
     """
 
-    def __init__(self, gau_alpha, num_choices=2, dropout=None):
-        super(GAUAlphaForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.gau_alpha = gau_alpha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gau_alpha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.gau_alpha.config["hidden_size"], 1)
+    def __init__(self, config: GAUAlphaConfig):
+        super(GAUAlphaForMultipleChoice, self).__init__(config)
+        self.num_choices = config.num_choices
+        self.gau_alpha = GAUAlphaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -831,17 +732,21 @@ class GAUAlphaForMultipleChoice(GAUAlphaPretrainedModel):
 
 
 class GAUAlphaLMPredictionHead(Layer):
-    def __init__(self, hidden_size, vocab_size, embedding_weights=None, use_bias=False):
+    def __init__(
+        self,
+        config: GAUAlphaConfig,
+        embedding_weights=None,
+    ):
         super(GAUAlphaLMPredictionHead, self).__init__()
-        self.use_bias = use_bias
+        self.use_bias = config.use_bias
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype)
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype)
             if embedding_weights is None
             else embedding_weights
         )
-        if use_bias:
+        if self.use_bias:
             self.decoder_bias = self.create_parameter(
-                shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+                shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
             )
 
     def forward(self, hidden_states):
@@ -862,14 +767,15 @@ class GAUAlphaForMaskedLM(GAUAlphaPretrainedModel):
 
     """
 
-    def __init__(self, gau_alpha):
-        super(GAUAlphaForMaskedLM, self).__init__()
-        self.gau_alpha = gau_alpha
+    def __init__(
+        self,
+        config: GAUAlphaConfig,
+    ):
+        super(GAUAlphaForMaskedLM, self).__init__(config)
+        self.gau_alpha = GAUAlphaModel(config)
         self.cls = GAUAlphaLMPredictionHead(
-            self.gau_alpha.config["hidden_size"],
-            self.gau_alpha.config["vocab_size"],
+            config=config,
             embedding_weights=self.gau_alpha.embeddings.word_embeddings.weight,
-            use_bias=self.gau_alpha.config["use_bias"],
         )
 
         self.apply(self.init_weights)

@@ -60,6 +60,12 @@ from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
+from .blip.modeling import *
+from .blip.modeling_text import *
+from .blip.configuration import *
+from .blip.processing import *
+from .blip.image_processing import *
+from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
 from .convbert.modeling import *
@@ -150,12 +156,14 @@ from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
+from .gau_alpha.configuration import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+from .auto.processing import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *

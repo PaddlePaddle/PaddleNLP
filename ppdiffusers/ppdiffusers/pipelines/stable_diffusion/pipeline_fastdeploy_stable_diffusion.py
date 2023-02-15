@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import inspect
+import time
 from typing import Callable, List, Optional, Union
 
 import numpy as np
@@ -30,6 +31,10 @@ from ...schedulers import (
     EulerDiscreteScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
+)
+from ...schedulers.preconfig import (
+    PreconfigEulerAncestralDiscreteScheduler,
+    PreconfigLMSDiscreteScheduler,
 )
 from ...utils import logging
 from . import StableDiffusionPipelineOutput
@@ -80,8 +85,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             DDIMScheduler,
             PNDMScheduler,
             LMSDiscreteScheduler,
+            PreconfigLMSDiscreteScheduler,
             EulerDiscreteScheduler,
             EulerAncestralDiscreteScheduler,
+            PreconfigEulerAncestralDiscreteScheduler,
             DPMSolverMultistepScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
@@ -153,7 +160,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
         text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
-
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance:
             uncond_tokens: List[str]
@@ -213,12 +219,22 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
     def decode_latents(self, latents):
         latents = 1 / 0.18215 * latents
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
+        latents_shape = latents.shape
+        vae_output_shape = [latents_shape[0], 3, latents_shape[2] * 8, latents_shape[3] * 8]
+        images_vae = paddle.zeros(vae_output_shape, dtype="float32")
+
+        vae_input_name = self.vae_decoder.model.get_input_info(0).name
+        vae_output_name = self.vae_decoder.model.get_output_info(0).name
+
+        self.vae_decoder.zero_copy_infer(
+            prebinded_inputs={vae_input_name: latents},
+            prebinded_outputs={vae_output_name: images_vae},
+            share_with_raw_ptr=True,
         )
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose([0, 2, 3, 1])
-        return image
+
+        images_vae = paddle.clip(images_vae / 2 + 0.5, 0, 1)
+        images = images_vae.transpose([0, 2, 3, 1])
+        return images.numpy()
 
     def prepare_extra_step_kwargs(self, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
@@ -230,8 +246,13 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
-
         return extra_step_kwargs
+
+    def check_var_kwargs_of_scheduler_func(self, scheduler_func):
+        sig = inspect.signature(scheduler_func)
+        params = sig.parameters.values()
+        has_kwargs = any([True for p in params if p.kind == p.VAR_KEYWORD])
+        return has_kwargs
 
     def check_inputs(self, prompt, height, width, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
@@ -344,13 +365,13 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
+        start_time_encode_prompt = time.perf_counter()
         text_embeddings = self._encode_prompt(
             prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
         )
-
+        print("_encode_prompt latency:", time.perf_counter() - start_time_encode_prompt)
         # 4. Prepare timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps.numpy()
+        timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
         num_channels_latents = 4
@@ -363,46 +384,69 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             generator,
             latents,
         )
+        if isinstance(latents, np.ndarray):
+            latents = paddle.to_tensor(latents)
         # 6. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
-
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        scheduler_support_kwagrs_scale_input = self.check_var_kwargs_of_scheduler_func(
+            self.scheduler.scale_model_input
+        )
+        scheduler_support_kwagrs_step = self.check_var_kwargs_of_scheduler_func(self.scheduler.step)
+
+        unet_output_name = self.unet.model.get_output_info(0).name
+        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
-                tensor_t = paddle.to_tensor(t)
+                noise_pred_unet = paddle.zeros(
+                    [2 * batch_size * num_images_per_prompt, 4, height // 8, width // 8], dtype="float32"
+                )
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
-                latent_model_input = latent_model_input.numpy()
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                if scheduler_support_kwagrs_scale_input:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(
-                    sample=latent_model_input.astype(np.float32),
-                    timestep=np.array([t], dtype=np.int64),
-                    encoder_hidden_states=text_embeddings.astype(np.float32),
-                )[0]
-
+                self.unet.zero_copy_infer(
+                    prebinded_inputs={
+                        unet_input_names[0]: latent_model_input,
+                        unet_input_names[1]: t,
+                        unet_input_names[2]: text_embeddings,
+                    },
+                    prebinded_outputs={unet_output_name: noise_pred_unet},
+                    share_with_raw_ptr=True,
+                )
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
+                    noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), tensor_t, paddle.to_tensor(latents), **extra_step_kwargs
-                )
-                latents = scheduler_output.prev_sample.numpy()
-
+                if scheduler_support_kwagrs_step:
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
+                if i == num_inference_steps - 1:
+                    # sync for accuracy it/s measure
+                    paddle.device.cuda.synchronize()
                 # call the callback, if provided
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                if i == num_inference_steps - 1 or (
+                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
+                ):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
         # 8. Post-processing
+        time_start_decoder = time.perf_counter()
         image = self.decode_latents(latents)
-
+        print("decoder latency:", time.perf_counter() - time_start_decoder)
         # 9. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 

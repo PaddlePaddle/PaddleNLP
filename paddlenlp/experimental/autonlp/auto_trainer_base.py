@@ -56,8 +56,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         eval_dataset: Dataset,
         metric_for_best_model: str,
         greater_is_better: bool,
-        language: str,
-        output_dir: str = None,
+        language: str = "Chinese",
+        output_dir: str = "autonlp_results",
         **kwargs,
     ):
         if not metric_for_best_model.startswith("eval_"):
@@ -67,8 +67,21 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.greater_is_better = greater_is_better
+        if language not in self.supported_languages:
+            raise ValueError(
+                f"'{language}' is not supported. Please choose among the following: {self.supported_languages}"
+            )
+
         self.language = language
         self.output_dir = output_dir
+        self.kwargs = kwargs
+
+    @property
+    @abstractmethod
+    def supported_languages(self) -> List[str]:
+        """
+        Override to store the supported languages for each auto trainer class
+        """
 
     @property
     @abstractmethod
@@ -220,8 +233,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             path (str, required): The filepath to load the previous experiments
         """
         logger.info(f"Restoring from {path}")
-        self.training_results = self.tuner.get_results()
         self.tuner = tune.Tuner.restore(path)
+        self.training_results = self.tuner.get_results()
         logger.info("Found existing training results.")
 
     def train(
@@ -275,7 +288,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             for model_candidate in model_candidates:
                 model_candidate.update(hp_overrides)
         search_space = {"candidates": hp.choice("candidates", model_candidates)}
-        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode="max")
+        mode = "max" if self.greater_is_better else "min"
+        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode=mode)
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}

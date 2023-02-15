@@ -20,14 +20,31 @@ import inspect
 import json
 import os
 import re
+import tempfile
 from collections import OrderedDict
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 from requests import HTTPError
 
 from .download_utils import ppdiffusers_bos_download
-from .utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE, DummyObject, deprecate, logging
+from .utils import (
+    DOWNLOAD_SERVER,
+    HF_CACHE,
+    PPDIFFUSERS_CACHE,
+    DummyObject,
+    deprecate,
+    logging,
+)
 from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
@@ -132,6 +149,68 @@ class ConfigMixin:
 
         self.to_json_file(output_config_file)
         logger.info(f"Configuration saved in {output_config_file}")
+
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this config to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            commit_message (str, optional): The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional): The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional): Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save config
+            self.save_config(save_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=root_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     @classmethod
     def from_config(cls, config: Union[FrozenDict, Dict[str, Any]] = None, return_unused_kwargs=False, **kwargs):
@@ -251,8 +330,14 @@ class ConfigMixin:
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
         """
-        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        if from_hf_hub:
+            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
+        else:
+            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         subfolder = kwargs.pop("subfolder", None)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -277,9 +362,17 @@ class ConfigMixin:
                 raise EnvironmentError(
                     f"Error no file named {cls.config_name} found in directory {pretrained_model_name_or_path}."
                 )
+        elif from_hf_hub:
+            config_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.config_name,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PPDiffusers",
+                library_version=__version__,
+            )
         else:
             try:
-                # Load from URL or cache if already cached
                 config_file = ppdiffusers_bos_download(
                     pretrained_model_name_or_path,
                     filename=cls.config_name,
