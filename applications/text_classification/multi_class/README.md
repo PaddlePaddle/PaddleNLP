@@ -231,7 +231,6 @@ python -m paddle.distributed.launch --gpus 0,1 train.py \
 - `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](#数据准备)。
 - `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `train_path`: 训练集路径，默认为"./data/train.txt"。
 - `dev_path`: 开发集集路径，默认为"./data/dev.txt"。
@@ -254,8 +253,8 @@ checkpoint/
 ```
 
 **NOTE:**
-* 中文训练任务（文本支持含部分英文）推荐使用"ernie-1.0-large-zh-cw","ernie-3.0-tiny-base-v2-zh","ernie-3.0-tiny-medium-v2-zh","ernie-3.0-tiny-micro-v2-zh","ernie-3.0-tiny-mini-v2-zh","ernie-3.0-tiny-nano-v2-zh","ernie-3.0-tiny-pico-v2-zh"。
-* 英文训练任务推荐使用"ernie-3.0-tiny-mini-v2-en", "ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 中文训练任务（文本支持含部分英文）推荐使用"ernie-1.0-large-zh-cw"、"ernie-3.0-tiny-base-v2-zh"、"ernie-3.0-tiny-medium-v2-zh"、"ernie-3.0-tiny-micro-v2-zh"、"ernie-3.0-tiny-mini-v2-zh"、"ernie-3.0-tiny-nano-v2-zh"、"ernie-3.0-tiny-pico-v2-zh"。
+* 英文训练任务推荐使用"ernie-3.0-tiny-mini-v2-en"、 "ernie-2.0-base-en"、"ernie-2.0-large-en"。
 * 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 
 #### 2.4.2 训练评估
