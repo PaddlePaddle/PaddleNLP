@@ -254,7 +254,7 @@ checkpoint/
 ```
 
 **NOTE:**
-
+* 中文训练任务（文本支持含部分英文）推荐使用"ernie-1.0-large-zh-cw","ernie-3.0-tiny-base-v2-zh","ernie-3.0-tiny-medium-v2-zh","ernie-3.0-tiny-micro-v2-zh","ernie-3.0-tiny-mini-v2-zh","ernie-3.0-tiny-nano-v2-zh","ernie-3.0-tiny-pico-v2-zh"。
 * 英文训练任务推荐使用"ernie-3.0-tiny-mini-v2-en", "ernie-2.0-base-en"、"ernie-2.0-large-en"。
 * 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 
@@ -297,7 +297,7 @@ python train.py \
 使用裁剪功能需要安装 paddleslim：
 
 ```shell
-pip install paddleslim >= 2.4.1
+pip install paddleslim == 2.4.1
 ```
 
 开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
