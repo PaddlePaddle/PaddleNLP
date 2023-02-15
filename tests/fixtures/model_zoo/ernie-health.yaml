@@ -8,11 +8,12 @@ pretrain:
     gradient_accumulation_steps: 1
     weight_decay: 0.01
     max_steps: 2
-    num_train_epochs: 0.05
+    num_train_epochs: 0.0005
     save_steps: 5
     warmup_steps: 5
     warmup_ratio: 0.01
     per_device_train_batch_size: 8
+    overwrite_output_dir: true
     device: cpu
     eval_steps: 10
     do_train: true

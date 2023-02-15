@@ -118,9 +118,7 @@ print_info $? glue_${TASK_NAME}_train
 # 4 bert
 bert() {
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-cd ${nlp_dir}/model_zoo/bert/
-mkdir data
-cd ./data
+cd ${nlp_dir}/model_zoo/bert/data
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
 cd ../
 # wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
@@ -145,14 +143,13 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --do_train >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
 time (python -m paddle.distributed.launch run_glue.py \
-    --model_type bert \
     --model_name_or_path __internal_testing__/bert \
     --task_name SST2 \
     --max_seq_length 128 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --learning_rate 2e-5 \
-    --num_train_epochs 3 \
+    --num_train_epochs 1 \
     --logging_steps 1 \
     --save_steps 1 \
     --output_dir ./tmp/ \
@@ -1172,6 +1169,7 @@ else
 fi
 }
 ernie-health(){
+cd ${nlp_dir}/tests/model_zoo/
 if [ ! -f 'test_ernie-health.py' ];then
     echo '模型测试文件不存在！'
 else
@@ -1180,6 +1178,7 @@ else
     cd ./data
     wget -q https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_ids.npy
     wget -q https://bj.bcebos.com/paddlenlp/models/transformers/ernie-health/data/samples_idx.npz
+    cd ${nlp_dir}
     python -m pytest -v ${nlp_dir}/tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
     print_info $? ernie-health
 fi

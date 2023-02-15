@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import copy
 import json
 import os
 import random
@@ -145,39 +144,27 @@ def do_train(args):
 
     # Loads or initialize a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
-    pretrained_models.append("__internal_testing__/ernie-health-chinese")
 
-    if args.model_name_or_path in pretrained_models:
+    if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
+        # Load checkpoint
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+        with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
+            config_dict = json.load(f)
+            model_name = config_dict["model_name"]
+        if model_name in pretrained_models:
+            model = model_class.from_pretrained(args.model_name_or_path)
+            model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
+        else:
+            raise ValueError(
+                "initialize a model from ckpt need model_name "
+                "in model_config_file. The supported model_name "
+                "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
+            )
+    else:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
         model_config = config_class()
         model = model_class(model_config)
         args.init_from_ckpt = False
-    else:
-        if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-            # Load checkpoint
-            tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
-                config_dict = json.load(f)
-                model_name = config_dict["model_name"]
-            if model_name in pretrained_models:
-                model = model_class.from_pretrained(args.model_name_or_path)
-                model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
-            else:
-                raise ValueError(
-                    "initialize a model from ckpt need model_name "
-                    "in model_config_file. The supported model_name "
-                    "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
-                )
-        else:
-            raise ValueError(
-                "initialize a model need identifier or the "
-                "directory of storing model. if use identifier, the supported model "
-                "identifiers are as follows: {}, if use directory, "
-                "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
-            )
-
-    model_config.gen_weight = model.gen_weight
-    criterion = criterion_class(model_config)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -259,12 +246,12 @@ def do_train(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
-                    gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
-                        input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
+                    all_loss = model(
+                        input_ids=masked_input_ids,
+                        raw_input_ids=input_ids,
+                        generator_labels=gen_labels,
                     )
-                    loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                        gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
-                    )
+                    (loss, gen_loss, rtd_loss, mts_loss, csp_loss) = all_loss
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
@@ -275,12 +262,12 @@ def do_train(args):
                 t_loss["csp"] += csp_loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
-                    input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
+                all_loss = model(
+                    input_ids=masked_input_ids,
+                    raw_input_ids=input_ids,
+                    generator_labels=gen_labels,
                 )
-                loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                    gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
-                )
+                (loss, gen_loss, rtd_loss, mts_loss, csp_loss) = all_loss
                 loss.backward()
                 t_loss["loss"] += loss.detach()
                 t_loss["gen"] += gen_loss.detach()
@@ -371,8 +358,8 @@ def do_train(args):
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config.__dict__)
-                    if "self" in "self" in config_to_save:
+                    config_to_save = model_to_save.discriminator.electra.config.to_dict()
+                    if "self" in config_to_save:
                         del config_to_save["self"]
                     run_states = {
                         "model_name": model_name if args.init_from_ckpt else args.model_name_or_path,

@@ -268,6 +268,8 @@ class ElectraConfig(PretrainedConfig):
         pad_token_id: int = 0,
         layer_norm_eps: float = 1e-12,
         num_choices: int = 2,
+        gen_weight: float = 1.0,
+        disc_weight: float = 50.0,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -287,3 +289,5 @@ class ElectraConfig(PretrainedConfig):
         self.pad_token_id = pad_token_id
         self.layer_norm_eps = layer_norm_eps
         self.num_choices = num_choices
+        self.gen_weight = gen_weight
+        self.disc_weight = disc_weight

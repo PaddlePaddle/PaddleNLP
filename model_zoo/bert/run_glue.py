@@ -20,7 +20,14 @@ from paddle.metric import Accuracy
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    BertForSequenceClassification,
+    BertTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+)
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -43,6 +50,11 @@ task_to_keys = {
     "sst2": ("sentence", None),
     "stsb": ("sentence1", "sentence2"),
     "wnli": ("sentence1", "sentence2"),
+}
+
+MODEL_CLASSES = {
+    "bert": (BertForSequenceClassification, BertTokenizer),
+    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
 }
 
 

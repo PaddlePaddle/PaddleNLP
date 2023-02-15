@@ -1196,7 +1196,18 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         else:
             attention_mask = attention_mask.astype("bool")
 
-        return generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+        loss = None
+        gen_loss = None
+        rtd_loss = None
+        mts_loss = None
+        csp_loss = None
+        if generator_labels is not None:
+            loss_fct = ErnieHealthPretrainingCriterion(self.config)
+            loss, gen_loss, rtd_loss, mts_loss, csp_loss = loss_fct(
+                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+            )
+
+        return loss, gen_loss, rtd_loss, mts_loss, csp_loss
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):

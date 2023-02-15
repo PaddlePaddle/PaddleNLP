@@ -30,12 +30,11 @@ from paddlenlp.transformers import (
     ElectraConfig,
     ElectraTokenizer,
     ErnieHealthForTotalPretraining,
-    ErnieHealthPretrainingCriterion,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ErnieHealthPretrainingCriterion, ElectraTokenizer),
+    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ElectraTokenizer),
 }
 
 
@@ -115,22 +114,13 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
+    config_class, model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
-    pretrained_models.append("__internal_testing__/ernie-health-chinese")
+    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
-    if model_args.model_name_or_path in pretrained_models:
-        if model_args.model_name_or_path == "__internal_testing__/ernie-health-chinese":
-            tokenizer = ElectraTokenizer.from_pretrained("__internal_testing__/ernie-health-chinese")
-        else:
-            tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
-
-        model_config = config_class()
-        model = model_class(model_config)
-    else:
-        raise ValueError("Only support %s" % (", ".join(pretrained_models)))
+    model_config = config_class()
+    model = model_class(model_config)
 
     # Loads dataset.
     tic_load_data = time.time()
@@ -147,37 +137,8 @@ def main():
         return_dict=True,
     )
 
-    class CriterionWrapper(paddle.nn.Layer):
-        """ """
-
-        def __init__(self):
-            """CriterionWrapper"""
-            super(CriterionWrapper, self).__init__()
-            model_config.gen_weight = model.gen_weight
-            self.criterion = criterion_class(model_config)
-
-        def forward(self, output, labels):
-            """forward function
-
-            Args:
-                output (tuple): generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, mask
-                labels (tuple): generator_labels
-
-            Returns:
-                Tensor: final loss.
-            """
-            generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = output
-            generator_labels = labels
-
-            loss, gen_loss, rtd_loss, mts_loss, csp_loss = self.criterion(
-                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
-            )
-
-            return loss
-
     trainer = Trainer(
         model=model,
-        criterion=CriterionWrapper(),
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,
