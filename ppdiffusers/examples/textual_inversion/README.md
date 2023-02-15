@@ -90,6 +90,7 @@ bash run_single.sh
 > * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`512`。
 > * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`512`。
 > * `--repeats`: 由于图片数量只有3-5张，因此我们需要重复训练图片数据，默认设置为重复`100遍`。
+> * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`text-inversion-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
 
 > 基本无需修改的参数
@@ -98,9 +99,9 @@ bash run_single.sh
 > * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
 > * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
 > * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1`表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
 
 #### 1.2.3 单机多卡训练
 通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。这里我们只训练了`1000step`，因为这里的`1000 step x 4卡`近似于`单卡训练 4000 step`。
@@ -164,7 +165,7 @@ model_path = "CompVis/stable-diffusion-v1-4"
 pipe = StableDiffusionPipeline.from_pretrained(model_path)
 
 # 需要加载的风格或物体的权重
-learned_embeded_path = "./textual_inversion_cat/learned_embeds.pdparams"
+learned_embeded_path = "./textual_inversion_cat/learned_embeds-steps-1000.pdparams"
 for token, embeds in paddle.load(learned_embeded_path).items():
     pipe.tokenizer.add_tokens(token)
     pipe.text_encoder.resize_token_embeddings(len(pipe.tokenizer))
@@ -269,7 +270,7 @@ model_path = "CompVis/stable-diffusion-v1-4"
 pipe = StableDiffusionPipeline.from_pretrained(model_path)
 
 # 需要加载的风格或物体的权重
-learned_embeded_path = "./huang_guang_jian_style/learned_embeds.pdparams"
+learned_embeded_path = "./huang_guang_jian_style/learned_embeds-steps-1000.pdparams"
 for token, embeds in paddle.load(learned_embeded_path).items():
     pipe.tokenizer.add_tokens(token)
     pipe.text_encoder.resize_token_embeddings(len(pipe.tokenizer))

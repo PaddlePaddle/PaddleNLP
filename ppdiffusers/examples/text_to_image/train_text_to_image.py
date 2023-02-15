@@ -15,6 +15,8 @@
 
 import argparse
 import contextlib
+import copy
+import itertools
 import math
 import os
 import random
@@ -34,17 +36,63 @@ from paddle.vision import BaseTransform, transforms
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
-from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 from ppdiffusers import (
     AutoencoderKL,
     DDPMScheduler,
-    StableDiffusionPipeline,
+    DiffusionPipeline,
     UNet2DConditionModel,
 )
 from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import main_process_first
+
+
+def url_or_path_join(*path_list):
+    return os.path.join(*path_list) if os.path.isdir(os.path.join(*path_list)) else "/".join(path_list)
+
+
+def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: str):
+    pipeline_config = DiffusionPipeline.load_config(pretrained_model_name_or_path)
+    model_class = pipeline_config.get("text_encoder", pipeline_config.get("bert"))[-1]
+
+    if model_class == "CLIPTextModel":
+        from paddlenlp.transformers import CLIPTextModel
+
+        return CLIPTextModel
+    elif model_class == "RobertaSeriesModelWithTransformation":
+        from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
+            RobertaSeriesModelWithTransformation,
+        )
+
+        return RobertaSeriesModelWithTransformation
+    elif model_class == "LDMBertModel":
+        from ppdiffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import (
+            LDMBertModel,
+        )
+
+        return LDMBertModel
+    elif model_class == "BertModel":
+        from paddlenlp.transformers import BertModel
+
+        return BertModel
+    else:
+        raise ValueError(f"{model_class} is not supported.")
+
+
+def set_recompute(model, value=False):
+    def fn(layer):
+        # ldmbert
+        if hasattr(layer, "enable_recompute"):
+            layer.enable_recompute = value
+            print("Set", layer.__class__, "recompute", layer.enable_recompute)
+        # unet
+        if hasattr(layer, "gradient_checkpointing"):
+            layer.gradient_checkpointing = value
+            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+
+    model.apply(fn)
 
 
 class Lambda(BaseTransform):
@@ -56,26 +104,43 @@ class Lambda(BaseTransform):
         return self.fn(img)
 
 
-def get_writer(args):
-    if args.writer_type == "visualdl":
+def get_report_to(args):
+    if args.report_to == "visualdl":
         from visualdl import LogWriter
 
         writer = LogWriter(logdir=args.logging_dir)
-    elif args.writer_type == "tensorboard":
+    elif args.report_to == "tensorboard":
         from tensorboardX import SummaryWriter
 
         writer = SummaryWriter(logdir=args.logging_dir)
     else:
-        raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
+        raise ValueError("report_to must be in ['visualdl', 'tensorboard']")
     return writer
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training a text to image model script.")
     parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=500,
+        help="Save pipe every X updates steps.",
+    )
+    parser.add_argument(
+        "--tokenizer_name",
+        type=str,
+        default=None,
+        help="Pretrained tokenizer name or path if not the same as model_name",
+    )
+    parser.add_argument(
+        "--train_text_encoder",
+        action="store_true",
+        help="Whether to train the text encoder. If set, the text encoder should be float32 precision.",
+    )
+    parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="CompVis/stable-diffusion-v1-4",
+        default=None,
         required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
@@ -200,13 +265,19 @@ def parse_args():
     parser.add_argument(
         "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
     )
-
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA model.")
+    parser.add_argument(
+        "--lr_num_cycles",
+        type=int,
+        default=1,
+        help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
+    )
+    parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
     parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+    parser.add_argument("--max_grad_norm", default=-1, type=float, help="Max gradient norm.")
 
     parser.add_argument(
         "--logging_dir",
@@ -218,7 +289,7 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
+        "--report_to", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
 
     args = parser.parse_args()
@@ -235,6 +306,8 @@ dataset_name_mapping = {
     "lambdalabs/pokemon-blip-captions": ("image", "text"),
 }
 
+# Adapted from torch-ema https://github.com/fadel/pytorch_ema/blob/master/torch_ema/ema.py#L14
+
 
 class EMAModel:
     """
@@ -245,32 +318,26 @@ class EMAModel:
         parameters = list(parameters)
         self.shadow_params = [p.clone().detach() for p in parameters]
 
+        self.collected_params = None
+
         self.decay = decay
-
         self.optimization_step = 0
-
-    def get_decay(self, optimization_step):
-        """
-        Compute the decay factor for the exponential moving average.
-        """
-        value = (1 + optimization_step) / (10 + optimization_step)
-        return 1 - min(self.decay, value)
 
     @paddle.no_grad()
     def step(self, parameters):
         parameters = list(parameters)
 
         self.optimization_step += 1
-        self.decay = self.get_decay(self.optimization_step)
+
+        # Compute the decay factor for the exponential moving average.
+        value = (1 + self.optimization_step) / (10 + self.optimization_step)
+        one_minus_decay = 1 - min(self.decay, value)
 
         for s_param, param in zip(self.shadow_params, parameters):
             if not param.stop_gradient:
-                s_param.copy_(s_param - self.decay * (s_param - param), True)
+                s_param.copy_(s_param - one_minus_decay * (s_param - param), True)
             else:
                 s_param.copy_(param, True)
-
-        if paddle.is_compiled_with_cuda():
-            paddle.device.cuda.empty_cache()
 
     def copy_to(self, parameters) -> None:
         """
@@ -285,40 +352,113 @@ class EMAModel:
         for s_param, param in zip(self.shadow_params, parameters):
             param.copy_(s_param, True)
 
+    def to(self, device=None, dtype=None) -> None:
+        r"""Move internal buffers of the ExponentialMovingAverage to `device`.
+        Args:
+            device: like `device` argument to `paddle.Tensor.to`
+        """
+        # ._to() on the tensors handles None correctly
+        self.shadow_params = [
+            p._to(device=device, dtype=dtype) if p.is_floating_point() else p._to(device=device)
+            for p in self.shadow_params
+        ]
+
+    def state_dict(self) -> dict:
+        r"""
+        Returns the state of the ExponentialMovingAverage as a dict.
+        This method is used by accelerate during checkpointing to save the ema state dict.
+        """
+        # Following PyTorch conventions, references to tensors are returned:
+        # "returns a reference to the state and not its copy!" -
+        # https://pytorch.org/tutorials/beginner/saving_loading_models.html#what-is-a-state-dict
+        return {
+            "decay": self.decay,
+            "optimization_step": self.optimization_step,
+            "shadow_params": self.shadow_params,
+            "collected_params": self.collected_params,
+        }
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        r"""
+        Loads the ExponentialMovingAverage state.
+        This method is used by accelerate during checkpointing to save the ema state dict.
+        Args:
+            state_dict (dict): EMA state. Should be an object returned
+                from a call to :meth:`state_dict`.
+        """
+        # deepcopy, to be consistent with module API
+        state_dict = copy.deepcopy(state_dict)
+
+        self.decay = state_dict["decay"]
+        if self.decay < 0.0 or self.decay > 1.0:
+            raise ValueError("Decay must be between 0 and 1")
+
+        self.optimization_step = state_dict["optimization_step"]
+        if not isinstance(self.optimization_step, int):
+            raise ValueError("Invalid optimization_step")
+
+        self.shadow_params = state_dict["shadow_params"]
+        if not isinstance(self.shadow_params, list):
+            raise ValueError("shadow_params must be a list")
+        if not all(isinstance(p, paddle.Tensor) for p in self.shadow_params):
+            raise ValueError("shadow_params must all be Tensors")
+
+        self.collected_params = state_dict["collected_params"]
+        if self.collected_params is not None:
+            if not isinstance(self.collected_params, list):
+                raise ValueError("collected_params must be a list")
+            if not all(isinstance(p, paddle.Tensor) for p in self.collected_params):
+                raise ValueError("collected_params must all be Tensors")
+            if len(self.collected_params) != len(self.shadow_params):
+                raise ValueError("collected_params and shadow_params must have the same length")
+
 
 def main():
     args = parse_args()
     rank = paddle.distributed.get_rank()
+    is_main_process = rank == 0
     num_processes = paddle.distributed.get_world_size()
     if num_processes > 1:
         paddle.distributed.init_parallel_env()
 
     # If passed along, set the training seed now.
     if args.seed is not None:
-        seed = args.seed + rank
-        set_seed(seed)
+        set_seed(args.seed)
 
-    if args.output_dir is not None:
-        os.makedirs(args.output_dir, exist_ok=True)
+    if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
 
-    # Load models and create wrapper for stable diffusion
-    tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
-
-    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
-        model_cls = BertModel
+    # Load the tokenizer
+    if args.tokenizer_name:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
+    elif args.pretrained_model_name_or_path:
+        # support windows "\"
+        tokenizer = AutoTokenizer.from_pretrained(url_or_path_join(args.pretrained_model_name_or_path, "tokenizer"))
+    # Load scheduler and models
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    text_encoder_cls = import_model_class_from_model_name_or_path(args.pretrained_model_name_or_path)
+    text_encoder = text_encoder_cls.from_pretrained(
+        url_or_path_join(args.pretrained_model_name_or_path, "text_encoder")
+    )
+    text_config = text_encoder.config if isinstance(text_encoder.config, dict) else text_encoder.config.to_dict()
+    if text_config.get("use_attention_mask", None) is not None and text_config["use_attention_mask"]:
+        use_attention_mask = True
     else:
-        model_cls = CLIPTextModel
-    text_encoder = model_cls.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
+        use_attention_mask = False
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae")
     unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
-
-    # Freeze vae and text_encoder
     freeze_params(vae.parameters())
-    freeze_params(text_encoder.parameters())
+    if not args.train_text_encoder:
+        freeze_params(text_encoder.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
+        if args.train_text_encoder:
+            set_recompute(text_encoder, True)
 
+    if args.use_ema:
+        ema_unet = EMAModel(unet.parameters())
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * num_processes
@@ -329,23 +469,26 @@ def main():
         learning_rate=args.learning_rate,
         num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
         num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
+        num_cycles=args.lr_num_cycles,
+        power=args.lr_power,
     )
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
+        if args.train_text_encoder:
+            text_encoder = paddle.DataParallel(text_encoder)
 
+    params_to_optimize = (
+        itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder else unet.parameters()
+    )
     # Initialize the optimizer
     optimizer = AdamW(
         learning_rate=lr_scheduler,
-        parameters=unet.parameters(),
+        parameters=params_to_optimize,
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
         epsilon=args.adam_epsilon,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm is not None else None,
-    )
-
-    noise_scheduler = DDPMScheduler(
-        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
+        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
@@ -418,9 +561,11 @@ def main():
         )
         return inputs.input_ids
 
+    interpolation = "bicubic"
+    # Preprocessing the datasets.
     train_transforms = transforms.Compose(
         [
-            transforms.Resize((args.resolution, args.resolution), interpolation="bilinear"),
+            transforms.Resize((args.resolution, args.resolution), interpolation=interpolation),
             transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
             transforms.RandomHorizontalFlip() if args.random_flip else Lambda(lambda x: x),
             transforms.ToTensor(),
@@ -432,7 +577,6 @@ def main():
         images = [image.convert("RGB") for image in examples[image_column]]
         examples["pixel_values"] = [train_transforms(image) for image in images]
         examples["input_ids"] = tokenize_captions(examples)
-
         return examples
 
     with main_process_first():
@@ -443,7 +587,7 @@ def main():
 
     def collate_fn(examples):
         pixel_values = paddle.stack([example["pixel_values"] for example in examples])
-        pixel_values = pixel_values.astype("float32")
+        pixel_values = pixel_values.cast("float32")
         input_ids = [example["input_ids"] for example in examples]
         padded_tokens = tokenizer.pad(
             {"input_ids": input_ids}, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pd"
@@ -467,9 +611,6 @@ def main():
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
 
-    if args.use_ema:
-        ema_unet = EMAModel(unet.parameters())
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
@@ -477,12 +618,12 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if rank == 0:
+    if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
         for arg, value in sorted(vars(args).items()):
             logger.info("%s: %s" % (arg, value))
         logger.info("------------------------------------------------")
-        writer = get_writer(args)
+        writer = get_report_to(args)
 
     # Train!
     total_batch_size = args.train_batch_size * num_processes * args.gradient_accumulation_steps
@@ -496,13 +637,16 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(args.max_train_steps), disable=rank > 0)
-    progress_bar.set_description("Steps")
+    progress_bar = tqdm(range(args.max_train_steps), disable=not is_main_process)
+    progress_bar.set_description("Train Steps")
     global_step = 0
 
     # Keep vae and text_encoder in eval model as we don't train these
     vae.eval()
-    text_encoder.eval()
+    if args.train_text_encoder:
+        text_encoder.train()
+    else:
+        text_encoder.eval()
     unet.train()
 
     for epoch in range(args.num_train_epochs):
@@ -522,29 +666,54 @@ def main():
             # (this is the forward diffusion process)
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-            # Get the text embedding for conditioning
-            attention_mask = paddle.ones_like(batch["input_ids"])
-            encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
-
             if num_processes > 1 and (
                 args.gradient_checkpointing or ((step + 1) % args.gradient_accumulation_steps != 0)
             ):
                 # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
-                ctx_manager = unet.no_sync()
+                unet_ctx_manager = unet.no_sync()
+                if args.train_text_encoder:
+                    text_encoder_ctx_manager = text_encoder.no_sync()
+                else:
+                    text_encoder_ctx_manager = (
+                        contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                    )
             else:
-                ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                text_encoder_ctx_manager = (
+                    contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                )
+            if not args.train_text_encoder:
+                text_encoder_ctx_manager = (
+                    contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                )
 
-            with ctx_manager:
-                # Predict the noise residual and compute loss
-                noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
-                loss = F.mse_loss(noise_pred, noise, reduction="mean")
+            with text_encoder_ctx_manager:
+                # Get the text embedding for conditioning
+                if use_attention_mask:
+                    attention_mask = (batch["input_ids"] != tokenizer.pad_token_id).cast("int64")
+                else:
+                    attention_mask = None
+                encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
 
-                train_loss += loss.item()
-                if args.gradient_accumulation_steps > 1:
-                    loss = loss / args.gradient_accumulation_steps
-                loss.backward()
+                with unet_ctx_manager:
+                    # Predict the noise residual / sample
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                    # Get the target for loss depending on the prediction type
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        target = noise
+                    elif noise_scheduler.config.prediction_type == "v_prediction":
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+
+                    loss = F.mse_loss(model_pred, target, reduction="mean")
+                    train_loss += loss.item()
+                    if args.gradient_accumulation_steps > 1:
+                        loss = loss / args.gradient_accumulation_steps
+                    loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
@@ -554,36 +723,47 @@ def main():
                 optimizer.clear_grad()
                 progress_bar.update(1)
                 global_step += 1
+                step_loss = loss.item() * args.gradient_accumulation_steps
 
                 if args.use_ema:
                     ema_unet.step(unet.parameters())
                 logs = {
                     "epoch": str(epoch).zfill(4),
-                    "train_loss": "{0:.10f}".format(train_loss),
-                    "step_loss": "{0:.10f}".format(loss.item() * args.gradient_accumulation_steps),
-                    "lr": lr_scheduler.get_lr(),
+                    "train_loss": "{0:.5f}".format(train_loss),
+                    "step_loss": "{0:.5f}".format(step_loss),
+                    "lr": "{0:.5f}".format(lr_scheduler.get_lr()),
                 }
                 progress_bar.set_postfix(**logs)
                 train_loss = 0.0
-                if rank == 0:
+                if is_main_process:
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
                         writer.add_scalar(f"train/{name}", val, step=global_step)
 
+                    if global_step % args.save_steps == 0:
+                        # Create the pipeline using using the trained modules and save it.
+                        pipeline = DiffusionPipeline.from_pretrained(
+                            args.pretrained_model_name_or_path,
+                            unet=unwrap_model(unet),
+                            text_encoder=unwrap_model(text_encoder),
+                        )
+                        output_dir = os.path.join(args.output_dir, f"ckpt-{global_step}")
+                        os.makedirs(output_dir, exist_ok=True)
+                        pipeline.save_pretrained(output_dir)
             if global_step >= args.max_train_steps:
                 break
-
-    if rank == 0:
+    # Create the pipeline using the trained modules and save it.
+    if is_main_process:
         writer.close()
         unet = unwrap_model(unet)
         if args.use_ema:
             ema_unet.copy_to(unet.parameters())
         # Create the pipeline using using the trained modules and save it.
-        pipeline = StableDiffusionPipeline.from_pretrained(
+        pipeline = DiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unet,
-            safety_checker=None,
+            text_encoder=unwrap_model(text_encoder),
         )
         pipeline.save_pretrained(args.output_dir)
 
