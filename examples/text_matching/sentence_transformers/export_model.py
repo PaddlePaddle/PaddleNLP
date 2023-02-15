@@ -3,7 +3,6 @@ import os
 
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 parser = argparse.ArgumentParser()
