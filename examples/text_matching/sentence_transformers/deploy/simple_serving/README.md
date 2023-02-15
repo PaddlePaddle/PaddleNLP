@@ -22,7 +22,6 @@ paddlenlp server server:app --host 0.0.0.0 --port 8189
 python client.py
 ```
 
-
 ## 其他参数设置
 可以在client端设置 `max_seq_len`, `batch_size`, `prob_limit` 参数
 ```python
