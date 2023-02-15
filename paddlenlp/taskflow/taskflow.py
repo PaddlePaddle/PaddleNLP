@@ -522,6 +522,21 @@ TASKS = {
                 "task_flag": "feature_extraction-rocketqa-zh-dureader-query-encoder",
                 "task_priority_path": "rocketqa-zh-dureader-query-encoder",
             },
+            "rocketqa-zh-base-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-query-encoder",
+                "task_priority_path": "rocketqa-zh-base-query-encoder",
+            },
+            "rocketqa-zh-nano-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-query-encoder",
+                "task_priority_path": "rocketqa-zh-nano-query-encoder",
+            },
+            "rocketqa-zh-nano-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-para-encoder",
+                "task_priority_path": "rocketqa-zh-nano-para-encoder",
+            },
         },
         "default": {"model": "rocketqa-zh-dureader-query-encoder"},
     },

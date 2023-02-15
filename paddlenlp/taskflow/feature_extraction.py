@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from typing import Optional
+
 import numpy as np
 import paddle
 
@@ -22,18 +25,93 @@ from .utils import static_mode_guard
 
 
 class TextFeatureExtractionTask(Task):
-    def __init__(self, task, model, batch_size=1, _static_mode=True, return_tensors=True, **kwargs):
+
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "config": "config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
+    }
+
+    resource_files_urls = {
+        "rocketqa-zh-dureader-query-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-dureader-query-encoder/model_state.pdparams",
+                "6125930530fd55ed715b0595e65789aa",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-dureader-query-encoder/config.json",
+                "efc1280069bb22b5bd06dc44b780bc6a",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-dureader-query-encoder/vocab.txt",
+                "062f696cad47bb62da86d8ae187b0ef4",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-dureader-query-encoder/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-dureader-query-encoder/tokenizer_config.json",
+                "3a50349b8514e744fed72e59baca51b5",
+            ],
+        },
+        "rocketqa-zh-base-query-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-base-query-encoder/model_state.pdparams",
+                "3bb1a7870792146c6dd2fa47a45e15cc",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-base-query-encoder/config.json",
+                "be88115dd8a00e9de6b44f8c9a055e1a",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-base-query-encoder/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-base-query-encoder/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/feature_extraction/rocketqa-zh-base-query-encoder/tokenizer_config.json",
+                "be86466f6769fde498690269d099ea7c",
+            ],
+        },
+    }
+
+    def __init__(
+        self,
+        task: str = None,
+        model: str = None,
+        batch_size: int = 1,
+        max_seq_len: int = 128,
+        _static_mode: bool = True,
+        return_tensors: bool = True,
+        reinitialize: bool = False,
+        share_parameters: bool = False,
+        output_emb_size: Optional[int] = None,
+        **kwargs
+    ):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
+        self.max_seq_len = max_seq_len
         self.model = model
         self._static_mode = _static_mode
         self.return_tensors = return_tensors
+
+        self.reinitialize = reinitialize
+        self.share_parameters = share_parameters
+        self.output_emb_size = output_emb_size
+
         # self._check_task_files()
         self._check_predictor_type()
         self._construct_tokenizer()
+        self._get_inference_model()
         if self._static_mode:
             self._get_inference_model()
         else:
@@ -43,7 +121,13 @@ class TextFeatureExtractionTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        self._model = ErnieDualEncoder(self.model)
+        # self._model = ErnieDualEncoder(self._task_path)
+        self._model = ErnieDualEncoder(
+            query_model_name_or_path=self.model,
+            output_emb_size=self.output_emb_size,
+            reinitialize=self.reinitialize,
+            share_parameters=self.share_parameters,
+        )
         self._model.eval()
 
     def _construct_tokenizer(self):
@@ -69,11 +153,19 @@ class TextFeatureExtractionTask(Task):
         def _parse_batch(batch_examples):
             if self._static_mode:
                 tokenized_inputs = self._tokenizer(
-                    text=batch_examples, return_tensors="np", padding="max_length", truncation=True
+                    text=batch_examples,
+                    return_tensors="np",
+                    padding="max_length",
+                    truncation=True,
+                    max_seq_len=self.max_seq_len,
                 )
             else:
                 tokenized_inputs = self._tokenizer(
-                    text=batch_examples, return_tensors="pd", padding="max_length", truncation=True
+                    text=batch_examples,
+                    return_tensors="pd",
+                    padding="max_length",
+                    truncation=True,
+                    max_seq_len=self.max_seq_len,
                 )
             return tokenized_inputs
 
