@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import distutils.util
 import os
 import random
 import time
@@ -24,6 +23,7 @@ from data import create_data_loader
 from model import BiGruCrf
 
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.log import logger
 
 parser = argparse.ArgumentParser(__doc__)
@@ -48,7 +48,7 @@ parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in w
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 parser.add_argument("--logging_steps", type=int, default=10, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
+parser.add_argument("--do_eval", type=strtobool, default=True, help="To evaluate the model if True.")
 
 
 def set_seed(seed):
