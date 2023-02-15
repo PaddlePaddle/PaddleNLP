@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import functools
+import json
 import os
 import shutil
 from typing import Any, Callable, Dict, List
@@ -40,6 +41,7 @@ from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
     PretrainedTokenizer,
+    export_model,
 )
 
 from .auto_trainer_base import AutoTrainerBase
@@ -61,6 +63,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             language (string, required): language of the text.
             output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results".
             id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+            multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5.
 
     """
 
@@ -86,6 +89,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         self.text_column = text_column
         self.label_column = label_column
         self.id2label = self.kwargs.get("id2label", None)
+        self.multilabel_threshold = self.kwargs.get("multilabel_threshold", 0.5)
         if problem_type in ["multi_label", "multi_class"]:
             self.problem_type = problem_type
         else:
@@ -321,12 +325,28 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trainer = self._construct_trainer(config)
             trainer.train()
             eval_metrics = trainer.evaluate()
+
+            # save static model
             if config["trainer_type"] == "PromptTrainer":
-                # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
-                # We directly export a static model instead of a dynamic model
                 trainer.export_model(self.export_path)
             else:
                 trainer.save_model(self.export_path)
+                if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
+                    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
+                else:
+                    input_spec = [
+                        paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                        paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                    ]
+                export_model(model=trainer.model, input_spec=input_spec, path=self.export_path)
+
+            # save tokenizer
+            trainer.tokenizer.save_pretrained(self.export_path)
+
+            # save id2label
+            with open(os.path.join(self.export_path, "id2label.json"), "w", encoding="utf-8") as f:
+                json.dump(self.id2label, f, ensure_ascii=False)
+
             if os.path.exists(self.training_path):
                 logger.info("Removing training checkpoints to conserve disk space")
                 shutil.rmtree(self.training_path)
@@ -384,7 +404,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _compute_multi_label_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         pred_probs = sigmoid(eval_preds.predictions)
-        pred_ids = pred_probs > 0.5
+        pred_ids = pred_probs > self.multilabel_threshold
         metrics = {}
         # In multilabel classification, this function computes subset accuracy:
         # the set of labels predicted for a sample must exactly match the corresponding set of labels in y_true.
@@ -423,23 +443,29 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def to_taskflow(self, trial_id=None):
+    def to_taskflow(self, trial_id=None, batch_size=1, max_length=512):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            max_length (int): Maximum number of tokens for the model. Defaults to 512.
+            batch_size(int): The sample number of a mini-batch. Defaults to 1.
         """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         if model_config["trainer_type"] == "PromptTrainer":
-            raise NotImplementedError("'Taskflow' inference does not support models trained with PromptTrainer yet.")
+            mode = "prompt"
         else:
-            exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-            return Taskflow(
-                "text_classification",
-                mode="finetune",
-                problem_type=self.problem_type,
-                task_path=exported_model_path,
-                id2label=self.id2label,
-            )
+            mode = "finetune"
+        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
+        return Taskflow(
+            "text_classification",
+            mode=mode,
+            is_static_model=True,
+            problem_type=self.problem_type,
+            task_path=exported_model_path,
+            multilabel_threshold=self.multilabel_threshold,
+            batch_size=batch_size,
+            max_length=max_length,
+        )
