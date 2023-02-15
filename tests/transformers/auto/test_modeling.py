@@ -20,6 +20,7 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import AutoModel, BertModel
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHT_FILE_NAME
 
 
 class AutoModelTest(unittest.TestCase):
@@ -61,4 +62,5 @@ class AutoModelTest(unittest.TestCase):
         model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:
             AutoModel.from_pretrained(model_name, cache_dir=tempdir)
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))

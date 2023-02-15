@@ -19,7 +19,7 @@ from multiprocessing import Pool
 from tempfile import TemporaryDirectory
 
 from paddlenlp.transformers import BertModel, TinyBertModel
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHT_FILE_NAME
 from tests.testing_utils import slow
 
 
@@ -38,11 +38,20 @@ def download_bert_model(model_name: str):
 class TestModeling(unittest.TestCase):
     """Test PretrainedModel single time, not in Transformer models"""
 
-    def test_model_from_pretrained_cache_dir(self):
+    def test_from_pretrained_cache_dir_community_model(self):
         model_name = "__internal_testing__/bert"
         with TemporaryDirectory() as tempdir:
             BertModel.from_pretrained(model_name, cache_dir=tempdir)
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+
+    @slow
+    def test_from_pretrained_cache_dir_pretrained_init(self):
+        model_name = "bert-base-uncased"
+        with TemporaryDirectory() as tempdir:
+            BertModel.from_pretrained(model_name, cache_dir=tempdir)
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
 
     @slow
     def test_from_pretrained_with_load_as_state_np_params(self):
