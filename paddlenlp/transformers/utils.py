@@ -211,7 +211,11 @@ def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cac
         cache_dir (str): cache_dir for models
     """
     if cache_dir is not None:
-        return cache_dir
+        # hf hub library takes care of appending the model name
+        if from_hf_hub:
+            return cache_dir
+        else:
+            return os.path.join(cache_dir, pretrained_model_name_or_path)
 
     if os.path.isdir(pretrained_model_name_or_path):
         return pretrained_model_name_or_path
