@@ -384,7 +384,7 @@ TASKS = {
                 "task_flag": "text_classification-prompt",
             },
         },
-        "default": {"model": "finetune"},
+        "default": {"mode": "finetune"},
     },
     "text_to_image": {
         "models": {
