@@ -732,7 +732,6 @@ class PretrainedConfig:
         assert unused_kwargs == {"foo": False}
         ```"""
         kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
-
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         return cls.from_dict(config_dict, **kwargs)
@@ -754,11 +753,18 @@ class PretrainedConfig:
 
         """
         original_kwargs = copy.deepcopy(kwargs)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
         # Get config dict associated with the base config file
-        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls._get_config_dict(
+            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub, **kwargs
+        )
 
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
+            original_kwargs["cache_dir"] = cache_dir
             configuration_file = get_configuration_file(config_dict["configuration_files"])
             config_dict, kwargs = cls._get_config_dict(
                 pretrained_model_name_or_path, _configuration_file=configuration_file, **original_kwargs
@@ -773,7 +779,6 @@ class PretrainedConfig:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         subfolder = kwargs.pop("subfolder", None)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
