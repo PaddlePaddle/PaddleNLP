@@ -16,16 +16,8 @@ import argparse
 
 import paddle
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.log import logger
-
-
-def str2bool(v):
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def parse_args(MODEL_CLASSES):
@@ -41,7 +33,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the training logs and checkpoints will be written.")
     parser.add_argument("--split", type=str, default='949,50,1', help="Train/valid/test data split.")
 
-    parser.add_argument("--binary_head", type=str2bool, default=True, help="True for NSP task.")
+    parser.add_argument("--binary_head", type=strtobool, default=True, help="True for NSP task.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--micro_batch_size", default=8, type=int, help="Batch size per device for one step training.", )
     parser.add_argument("--global_batch_size", default=None, type=int, help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size.")
@@ -69,17 +61,17 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--eval_iters", type=int, default=10, help="Evaluate the model use X steps data.")
 
     # Config for 4D Parallelism
-    parser.add_argument("--use_sharding", type=str2bool, nargs='?', const=False, help="Use sharding Parallelism to training.")
+    parser.add_argument("--use_sharding", type=strtobool, nargs='?', const=False, help="Use sharding Parallelism to training.")
     parser.add_argument("--sharding_degree", type=int, default=1, help="Sharding degree. Share the parameters to many cards.")
     parser.add_argument("--dp_degree", type=int, default=1, help="Data Parallelism degree.")
     parser.add_argument("--mp_degree", type=int, default=1, help="Model Parallelism degree. Spliting the linear layers to many cards.")
     parser.add_argument("--pp_degree", type=int, default=1, help="Pipeline Parallelism degree. Spliting the the model layers to different parts.")
-    parser.add_argument("--use_recompute", type=str2bool, nargs='?', const=False, help="Using the recompute to save the memory.")
+    parser.add_argument("--use_recompute", type=strtobool, nargs='?', const=False, help="Using the recompute to save the memory.")
 
     # AMP config
-    parser.add_argument("--use_amp", type=str2bool, nargs='?', const=False, help="Enable mixed precision training.")
+    parser.add_argument("--use_amp", type=strtobool, nargs='?', const=False, help="Enable mixed precision training.")
     parser.add_argument("--fp16_opt_level", type=str, default="O2", help="Mixed precision training optimization level.")
-    parser.add_argument("--enable_addto", type=str2bool, nargs='?', const=True, default=True, help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.")
+    parser.add_argument("--enable_addto", type=strtobool, nargs='?', const=True, default=True, help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.")
     parser.add_argument("--scale_loss", type=float, default=32768, help="The value of scale_loss for fp16. This is only used for AMP training.")
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
     parser.add_argument("--attention_probs_dropout_prob", type=float, default=0.1, help="The attention probs dropout prob.")
@@ -87,15 +79,15 @@ def parse_args(MODEL_CLASSES):
     # Other config
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization.")
     parser.add_argument("--num_workers", type=int, default=2, help="Num of workers for DataLoader.")
-    parser.add_argument("--check_accuracy", type=str2bool, nargs='?', const=False, help="Check accuracy for training process.")
+    parser.add_argument("--check_accuracy", type=strtobool, nargs='?', const=False, help="Check accuracy for training process.")
     parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "mlu", "npu"], help="select cpu, gpu, xpu, npu devices.")
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
-    parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
+    parser.add_argument("--share_folder", type=strtobool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
     # Argument for bert/ernie
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
-    parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")
+    parser.add_argument("--favor_longer_ngram", type=strtobool, default=False, help="Short sequence prob.")
     parser.add_argument("--max_ngrams", type=int, default=3, help="Short sequence prob.")
 
     # yapf: enable
