@@ -44,21 +44,6 @@ python -u train_text_to_image.py \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --output_dir="sd-pokemon-model"
 ```
-或
-```bash
-bash run_single.sh
-```
-| ppdiffusers支持的模型名称    | huggingface对应的模型地址                           | Tips备注                                                     |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       | 原版SD模型，模型使用PNDM scheduler。                 |
-| hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-2的模型，模型使用了DDIM scheduler。         |
-| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了PNDM scheduler。         |
-| naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过60k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
 
 
 `train_text_to_image.py`代码可传入的参数解释如下：
@@ -83,19 +68,24 @@ bash run_single.sh
 > * `--lr_warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
 > * `--train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--center_crop`: 在调整图片宽和高之前是否将裁剪图像居中，默认值为`False`。
-> * `--resolution`: 输入给模型的图片`像素大小`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成`高度为resolution`，`宽度为resolution`的图片，默认值为`512`。
+> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`None`。
+> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`None`。
+> * `--resolution`: 输入给模型图片的`分辨率`，当`高度`或`宽度`为`None`时，我们将会使用`resolution`，默认值为`512`。
+> * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`sd-pokemon-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
-> * `--adam_beta1`: AdamW 优化器时的 beta1 超参数。默认为 `0.9`。
-> * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
-> * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
-> * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--adam_beta1`: `AdamW` 优化器时的 `beta1` 超参数。默认为 `0.9`。
+> * `--adam_beta2`: `AdamW` 优化器时的 `beta2` 超参数。默认为 `0.999`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `weight_decay` 超参数。 默认为`0.02`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `epsilon` 超参数。默认为 `1e-8`。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1` 表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
-
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--push_to_hub`: 是否将模型上传到 `huggingface hub`，默认值为 `False`。
+> * `--hub_token`: 上传到 `huggingface hub` 所需要使用的 `token`，如果我们已经登录了，那么我们就无需填写。
+> * `--hub_model_id`: 上传到 `huggingface hub` 的模型库名称， 如果为 `None` 的话表示我们将使用 `output_dir` 的名称作为模型库名称。
 
 #### 1.2.3 单机多卡训练
 通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。这里我们只训练了`4000step`，因为这里的`4000 step x 4卡`近似于`单卡训练 16000 step`。
@@ -117,10 +107,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_text_to_image.py \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --output_dir="sd-pokemon-model"
 ```
-或
-```bash
-bash run_multi.sh
-```
+
 
 #### 1.2.4 预测生成图片
 
@@ -135,7 +122,7 @@ bash run_multi.sh
         ├── model_state.pdparams
         ├── config.json
     ├── text_encoder # text_encoder权重文件夹
-        ├── model_config.json
+        ├── config.json
         ├── model_state.pdparams
     ├── unet # unet权重文件夹
         ├── model_state.pdparams
@@ -192,7 +179,72 @@ python -u train_text_to_image.py \
   --output_dir="sd-custom-model"
 ```
 
-## 2 参考资料
+# 使用 LoRA 和 DreamBooth 技术进行模型训练
+
+[LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) 是微软研究员引入的一项新技术，主要用于处理大模型微调的问题。目前超过数十亿以上参数的具有强能力的大模型 (例如 GPT-3) 通常在为了适应其下游任务的微调中会呈现出巨大开销。LoRA 建议冻结预训练模型的权重并在每个 Transformer 块中注入可训练层 (秩-分解矩阵)。因为不需要为大多数模型权重计算梯度，所以大大减少了需要训练参数的数量并且降低了 GPU 的内存要求。研究人员发现，通过聚焦大模型的 Transformer 注意力块，使用 LoRA 进行的微调质量与全模型微调相当，同时速度更快且需要更少的计算。
+
+简而言之，LoRA允许通过向现有权重添加一对秩分解矩阵，并只训练这些新添加的权重来适应预训练的模型。这有几个优点：
+
+- 保持预训练的权重不变，这样模型就不容易出现灾难性遗忘 [catastrophic forgetting](https://www.pnas.org/doi/10.1073/pnas.1611835114)；
+- 秩分解矩阵的参数比原始模型少得多，这意味着训练的 LoRA 权重很容易移植；
+- LoRA 注意力层允许通过一个 `scale` 参数来控制模型适应新训练图像的程度。
+
+[cloneofsimo](https://github.com/cloneofsimo) 是第一个在 [LoRA GitHub](https://github.com/cloneofsimo/lora) 仓库中尝试使用 LoRA 训练 Stable Diffusion 的人。
+
+## 训练
+
+**___Note: 如果我们使用 [stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2) 进行训练，那么我们需要将 `resolution` 改成 768 .___**
+
+```bash
+export MODEL_NAME="runwayml/stable-diffusion-v1-5"
+export DATASET_NAME="lambdalabs/pokemon-blip-captions"
+export OUTPUT_DIR="sd-pokemon-model-lora"
+
+python train_text_to_image_lora.py \
+  --pretrained_model_name_or_path=$MODEL_NAME \
+  --dataset_name=$DATASET_NAME \
+  --dataloader_num_workers=8 \
+  --resolution=512 --center_crop --random_flip \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=4 \
+  --max_train_steps=15000 \
+  --learning_rate=1e-04 \
+  --max_grad_norm=1 \
+  --lr_scheduler="cosine" --lr_warmup_steps=0 \
+  --output_dir=${OUTPUT_DIR} \
+  --report_to=visualdl \
+  --checkpointing_steps=500 \
+  --validation_prompt="Totoro" \
+  --seed=1337 \
+  --validation_epochs 10
+```
+**___Note: 当我使用 LoRA 训练模型的时候，我们需要使用更大的学习率，因此我们这里使用 *1e-4* 而不是 *1e-5*.___**
+
+最终经过微调后的 LoRA 权重，我们已经上传到了 [junnyu/sd-model-finetuned-lora-a100](https://huggingface.co/junnyu/sd-model-finetuned-lora-a100). **___Note: [最终的权重](https://huggingface.co/junnyu/sd-model-finetuned-lora-a100/blob/main/paddle_lora_weights.pdparams) 只有 3 MB 的大小.___**
+
+
+## 推理
+
+经过训练， LoRA 权重可以直接加载到原始的 pipeline 中。
+
+```python
+from ppdiffusers import StableDiffusionPipeline
+import paddle
+
+model_path = "junnyu/sd-model-finetuned-lora-a100"
+pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float32)
+# 注意：如果我们想从 HF Hub 加载权重，那么我们需要设置 from_hf_hub=True
+pipe.unet.load_attn_procs(model_path, from_hf_hub=True)
+
+prompt = "Totoro"
+image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
+image.save("Totoro.png")
+```
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/50394665/218942887-a036c605-6ef4-495a-af83-39e4ce3e0055.png">
+</p>
+
+# 参考资料
 - https://github.com/huggingface/diffusers/tree/main/examples/text_to_image
 - https://github.com/CompVis/stable-diffusion
 - https://huggingface.co/lambdalabs/sd-pokemon-diffusers

@@ -299,6 +299,38 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 for candidate in model_candidates:
                     self.assertEqual(candidate["language"], language)
 
+    def test_id2label_label_not_found(self):
+        with TemporaryDirectory() as temp_dir:
+            train_ds = copy.deepcopy(self.multi_class_train_ds)
+            # multi class
+            dev_ds = copy.deepcopy(self.multi_class_dev_ds)
+            auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
+                label_column="label_desc",
+                text_column="sentence",
+                language="Chinese",
+                output_dir=temp_dir,
+                id2label={0: "negative", 1: "positive"},
+                problem_type="multi_class",
+            )
+            with self.assertRaises(ValueError):
+                auto_trainer._data_checks_and_inference()
+            # multi label
+            dev_ds = copy.deepcopy(self.multi_label_dev_ds)
+            auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
+                label_column="label_desc",
+                text_column="sentence",
+                language="Chinese",
+                output_dir=temp_dir,
+                id2label={0: "negative", 1: "positive"},
+                problem_type="multi_label",
+            )
+            with self.assertRaises(ValueError):
+                auto_trainer._data_checks_and_inference()
+
 
 if __name__ == "__main__":
     unittest.main()
