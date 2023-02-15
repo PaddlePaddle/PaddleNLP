@@ -524,7 +524,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
 
-        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = (
+            os.path.join(cache_dir, pretrained_model_name_or_path)
+            if cache_dir is not None
+            else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        )
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -983,7 +987,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
 
         2. when it is url:
-            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-mame` or `HF_CACHE_HOME` + `model-mame`)
+            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-name` or `HF_CACHE_HOME` + `model-mame`)
 
         3. when it is local dir:
             check whether the file<local_dir + weight_file> exist
@@ -997,7 +1001,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             str: the model weight file path
         """
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
         # 0. when it is local file
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
