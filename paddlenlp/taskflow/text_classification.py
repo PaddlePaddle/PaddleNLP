@@ -217,28 +217,36 @@ class TextClassificationTask(Task):
 
     def _construct_id2label(self):
         if "id2label" in self.kwargs:
-            self.id2label = self.kwargs["id2label"]
+            id2label = self.kwargs["id2label"]
         elif os.path.exists(os.path.join(self._task_path, "id2label.json")):
             id2label_path = os.path.join(self._task_path, "id2label.json")
             with open(id2label_path) as fb:
-                self.id2label = json.load(fb)
+                id2label = json.load(fb)
             logger.info(f"Load id2label from {id2label_path}.")
         elif self.model == "prompt" and os.path.exists(os.path.join(self._task_path, "verbalizer_config.json")):
             label_list = sorted(list(self._verbalizer.label_words.keys()))
-            self.id2label = {}
+            id2label = {}
             for i, l in enumerate(label_list):
-                self.id2label[i] = l
+                id2label[i] = l
             logger.info("Load id2label from verbalizer.")
         elif self.model == "finetune" and os.path.exists(os.path.join(self._task_path, CONFIG_NAME)):
             config_path = os.path.join(self._task_path, CONFIG_NAME)
             with open(config_path) as fb:
-                id2label = json.load(fb)["id2label"]
+                config = json.load(fb)
+                if "id2label" in config:
+                    id2label = config["id2label"]
+                    logger.info(f"Load id2label from {config_path}.")
+                else:
+                    id2label = None
+        else:
+            id2label = None
+
+        if id2label is None:
+            self.id2label = id2label
+        else:
             self.id2label = {}
             for i in id2label:
                 self.id2label[int(i)] = id2label[i]
-            logger.info(f"Load id2label from {config_path}.")
-        else:
-            self.id2label = None
 
     def _preprocess(self, inputs: Union[str, List[str]]) -> Dict[str, Any]:
         """
