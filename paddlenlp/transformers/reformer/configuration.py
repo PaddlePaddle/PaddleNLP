@@ -20,7 +20,7 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["REFORMER_PRETRAINED_INIT_CONFIGURATION", "REFORMERConfig", "REFORMER_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["REFORMER_PRETRAINED_INIT_CONFIGURATION", "ReformerConfig", "REFORMER_PRETRAINED_RESOURCE_FILES_MAP"]
 
 REFORMER_PRETRAINED_INIT_CONFIGURATION = {
         "reformer-enwik8": {
