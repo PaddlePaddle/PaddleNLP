@@ -298,9 +298,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
             experiment_name = datetime.datetime.now().strftime("%s")
 
         if verbosity >= 1:
-            ray.init()
+            ray.init(ignore_reinit_error=True)
         else:
-            ray.init(log_to_driver=False)
+            ray.init(log_to_driver=False, ignore_reinit_error=True)
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
