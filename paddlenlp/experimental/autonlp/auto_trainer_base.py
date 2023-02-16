@@ -80,7 +80,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.output_dir = output_dir
         self.kwargs = kwargs
         # use log_to_driver to control verbosity
-        print("verbosity", verbosity)
         ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >= 1 else False)
 
     @property
