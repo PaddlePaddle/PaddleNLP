@@ -232,7 +232,6 @@ class DataCollatorIntegrationTest(unittest.TestCase):
 
         masked_tokens = batch["input_ids"] == tokenizer.mask_token_id
         self.assertTrue(paddle.any(masked_tokens))
-        # breakpoint()
         self.assertTrue(all(x == -100 for x in batch["labels"][~masked_tokens].tolist()))
 
         data_collator = DataCollatorForLanguageModeling(tokenizer, pad_to_multiple_of=8)
