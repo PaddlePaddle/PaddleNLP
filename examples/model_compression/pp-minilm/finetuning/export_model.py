@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import os
 import sys
-import argparse
-import distutils.util
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import PPMiniLMForSequenceClassification
 
 sys.path.append("../")
-from data import METRIC_CLASSES
+from data import METRIC_CLASSES  # noqa: E402
 
 
 def parse_args():
@@ -41,7 +41,7 @@ def parse_args():
     )
     parser.add_argument(
         "--save_inference_model_with_tokenizer",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=True,
         help="Whether to save inference model with tokenizer.",
     )

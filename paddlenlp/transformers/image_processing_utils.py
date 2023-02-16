@@ -291,9 +291,13 @@ class ImageProcessingMixin(object):
             )
         else:
             # Assuming from community-contributed pretrained models
-            image_processor_file = COMMUNITY_MODEL_PREFIX + pretrained_model_name_or_path + "/" + IMAGE_PROCESSOR_NAME
+            image_processor_file = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
+            )
             default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                os.path.join(cache_dir, pretrained_model_name_or_path)
+                if cache_dir is not None
+                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             )
             try:
                 # Load from local folder or from cache or download from model Hub and cache
@@ -515,8 +519,8 @@ def get_size_dict(
     if not isinstance(size, dict):
         size_dict = convert_to_size_dict(size, max_size, default_to_square, height_width_order)
         logger.info(
-            "{param_name} should be a dictionary on of the following set of keys: {VALID_SIZE_DICT_KEYS}, got {size}."
-            " Converted to {size_dict}.",
+            f"{param_name} should be a dictionary on of the following set of keys: {VALID_SIZE_DICT_KEYS}, got {size}."
+            f" Converted to {size_dict}.",
         )
     else:
         size_dict = size

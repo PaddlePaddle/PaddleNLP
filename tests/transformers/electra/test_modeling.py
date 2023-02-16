@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
 import unittest
-from parameterized import parameterized_class
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     ElectraForMaskedLM,
@@ -29,8 +28,14 @@ from paddlenlp.transformers import (
     ElectraModel,
     ElectraPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class ElectraModelTester:

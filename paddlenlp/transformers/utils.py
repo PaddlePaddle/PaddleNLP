@@ -210,16 +210,19 @@ def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cac
         from_hf_hub (bool): if load from huggingface hub
         cache_dir (str): cache_dir for models
     """
-    if cache_dir is not None:
-        return cache_dir
-
     if os.path.isdir(pretrained_model_name_or_path):
         return pretrained_model_name_or_path
 
+    # hf hub library takes care of appending the model name so we don't append the model name
     if from_hf_hub:
-        return os.path.join(HF_CACHE_HOME, pretrained_model_name_or_path)
-
-    return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        if cache_dir is not None:
+            return cache_dir
+        else:
+            return HF_CACHE_HOME
+    else:
+        if cache_dir is not None:
+            return os.path.join(cache_dir, pretrained_model_name_or_path)
+        return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 
 
 def find_transformer_model_type(model_class: Type) -> str:

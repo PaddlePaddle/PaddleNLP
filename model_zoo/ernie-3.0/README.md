@@ -1602,7 +1602,7 @@ C++ 部署请参考：[C++ 部署指南](./deploy/cpp/README.md)
 
 ### 服务化部署
 
-- [Triton Inference Server 服务化部署指南](./deploy/triton_serving/README.md)
+- [FastDeploy Serving 高性能服务化部署指南](./deploy/serving/README.md)
 - [PaddleNLP SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
 
 

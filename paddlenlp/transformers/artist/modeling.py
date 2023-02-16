@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import paddle
 import paddle.nn.functional as F
 
+from ...utils.log import logger
 from ..dallebart.modeling import VQGanDetokenizer
 from ..gpt.modeling import GPTLMHead, GPTLMHeadModel, GPTModel
 
@@ -171,6 +173,10 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
 
     def __init__(self, gpt, image_vocab_size=16384):
         super().__init__(gpt)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self.vqgan_detokenizer = VQGanDetokenizer(image_vocab_size, 256)
 
     @paddle.no_grad()

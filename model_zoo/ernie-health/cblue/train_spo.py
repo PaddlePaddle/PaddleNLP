@@ -12,23 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
-import distutils.util
+from functools import partial
 
-from tqdm import tqdm
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Dict, Pad, Tuple
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ElectraTokenizer
-
-from utils import convert_example_spo, create_dataloader, SPOChunkEvaluator, LinearDecayWithWarmup
 from model import ElectraForSPO
+from tqdm import tqdm
+from utils import (
+    LinearDecayWithWarmup,
+    SPOChunkEvaluator,
+    convert_example_spo,
+    create_dataloader,
+)
+
+from paddlenlp.data import Dict, Pad
+from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import ElectraTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -46,7 +51,7 @@ parser.add_argument('--logging_steps', default=10, type=int, help='The interval 
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
 parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--use_amp', default=False, type=distutils.util.strtobool, help='Enable mixed precision training.')
+parser.add_argument('--use_amp', default=False, type=strtobool, help='Enable mixed precision training.')
 parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
 args = parser.parse_args()
@@ -75,7 +80,6 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in tqdm(data_loader):
         input_ids, token_type_ids, position_ids, masks, ent_label, spo_label = batch
-        max_batch_len = input_ids.shape[-1]
         ent_mask = paddle.unsqueeze(masks, axis=2)
         spo_mask = paddle.matmul(ent_mask, ent_mask, transpose_y=True)
         spo_mask = paddle.unsqueeze(spo_mask, axis=1)
@@ -219,7 +223,6 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, position_ids, masks, ent_label, spo_label = batch
-            max_batch_len = input_ids.shape[-1]
             ent_mask = paddle.unsqueeze(masks, axis=2)
             spo_mask = paddle.matmul(ent_mask, ent_mask, transpose_y=True)
             spo_mask = paddle.unsqueeze(spo_mask, axis=1)
