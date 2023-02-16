@@ -41,6 +41,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     PretrainedTokenizer,
 )
+from paddlenlp.utils.log import logger
 
 from .auto_trainer_base import AutoTrainerBase
 
@@ -313,10 +314,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self) -> Callable:
         def trainable(config):
-            # import is required for proper pickling
-            from paddlenlp.utils.log import logger
-
-            self.set_log_level()
             config = config["candidates"]
             trainer = self._construct_trainer(config)
             trainer.train()

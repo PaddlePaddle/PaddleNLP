@@ -214,12 +214,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
             )
 
-    def set_log_level(self):
-        if self.verbosity > 0:
-            logger.set_level("WARNING")
-        else:
-            logger.set_level("INFO")
-
     def show_training_results(self):
         if hasattr(self, "training_results"):
             return self.training_results.get_dataframe()
@@ -276,9 +270,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
-        # Changing logger verbosity here doesn't work. Need to change in the worker's code via the _construct_trainable method.
-        self.verbosity = verbosity
-
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting the existing Tuner and any previous training results")
 
@@ -306,7 +297,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
 
-        ray.init(log_to_driver=False)
+        if verbosity >= 1:
+            ray.init()
+        else:
+            ray.init(log_to_driver=False)
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
