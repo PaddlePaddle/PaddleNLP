@@ -33,7 +33,7 @@ finetune_model_candidate = {
 }
 multiclass_prompt_model_candidate = {
     "trainer_type": "PromptTrainer",
-    "template.prompt": "“{'text': 'label_desc'}”这句话是关于{'mask'}的",
+    "template.prompt": "“{'text': 'sentence'}”这句话是关于{'mask'}的",
     "PromptTuningArguments.max_steps": 5,
     "PromptTuningArguments.per_device_train_batch_size": 2,
     "PromptTuningArguments.per_device_eval_batch_size": 2,

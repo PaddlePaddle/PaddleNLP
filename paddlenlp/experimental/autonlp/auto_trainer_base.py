@@ -13,12 +13,10 @@
 # limitations under the License.
 import copy
 import datetime
-import json
 import os
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
-import paddle
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -29,7 +27,7 @@ from ray.tune.search.hyperopt import HyperOptSearch
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers import PretrainedTokenizer, export_model
+from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -140,47 +138,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
 
-        model_result = self._get_model_result(trial_id=trial_id)
-        model_config = model_result.metrics["config"]["candidates"]
-        trial_id = model_result.metrics["trial_id"]
-
-        if export_path is None:
-            export_path = os.path.join(self.export_path, trial_id)
-        if os.path.exists(export_path):
-            logger.info(
-                f"Export path for {trial_id} already exists: ({export_path}). The model parameter files will be overwritten."
-            )
-
-        # construct trainer
-        trainer = self._construct_trainer(model_config)
-        trainer.load_state_dict_from_checkpoint(
-            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
-        )
-
-        # save static model
-        if model_config["trainer_type"] == "PromptTrainer":
-            trainer.export_model(export_path)
-            mode = "prompt"
-        else:
-            if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
-                input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
-            else:
-                input_spec = [
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                ]
-            export_model(model=trainer.model, input_spec=input_spec, path=export_path)
-            mode = "finetune"
-        # save tokenizer
-        trainer.tokenizer.save_pretrained(export_path)
-
-        # save id2label
-        with open(os.path.join(export_path, "id2label.json"), "w", encoding="utf-8") as f:
-            json.dump(self.id2label, f, ensure_ascii=False)
-
-        logger.info(f"Exported {trial_id} to {export_path}")
-
-        return export_path, mode
+        raise NotImplementedError
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
