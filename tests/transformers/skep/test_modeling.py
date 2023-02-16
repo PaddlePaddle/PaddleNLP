@@ -14,21 +14,23 @@
 # limitations under the License.
 
 import unittest
-from typing import Optional, Tuple, Dict, Any
+from dataclasses import Field, dataclass, fields
+from typing import Any, Dict, Optional, Tuple
+
 import paddle
 from paddle import Tensor
 from parameterized import parameterized_class
 
-from dataclasses import dataclass, asdict, fields, Field
 from paddlenlp.transformers import (
-    SkepPretrainedModel,
-    SkepModel,
+    SkepCrfForTokenClassification,
     SkepForSequenceClassification,
     SkepForTokenClassification,
-    SkepCrfForTokenClassification,
+    SkepModel,
+    SkepPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 @dataclass
@@ -393,8 +395,6 @@ class SkepModelIntegrationTest(unittest.TestCase):
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
-
-        past_key_value = output.past_key_values[0][0]
 
         expected_shape = [1, 11, 1024]
         self.assertEqual(output[0].shape, expected_shape)
