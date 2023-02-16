@@ -68,7 +68,7 @@ service.register_taskflow("taskflow/utc", [utc1, utc2])
 ```
 
 * `schema`：定义任务标签候选集合。
-* `model`：选择任务使用的模型，默认为`utc-large`, 可选有`utc-xbase`, `utc-base`, `utc-medium`, `utc-micro`, `utc-mini`, `utc-nano`, `utc-pico`。
+* `model`：选择任务使用的模型，默认为`utc-base`, 可选有`utc-xbase`, `utc-base`, `utc-medium`, `utc-micro`, `utc-mini`, `utc-nano`, `utc-pico`。
 * `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。
