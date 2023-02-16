@@ -26,8 +26,8 @@ from visualdl import LogWriter
 from paddlenlp.ops import Topology
 from paddlenlp.transformers import (
     GPTChineseTokenizer,
+    GPTConfig,
     GPTForPretraining,
-    GPTModel,
     GPTPretrainingCriterion,
     GPTTokenizer,
 )
@@ -132,7 +132,7 @@ def do_train(args):
         model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-        model = GPTForPretraining(GPTModel(**model_config))
+        model = GPTForPretraining(GPTConfig(**model_config))
     else:
         model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,

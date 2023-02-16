@@ -241,6 +241,9 @@ struct ErnieForTokenClassificationPredictor {
             start >= 0) {
           // Convert the unicode character offset to byte offset.
           convertor.convert({start, j - 1}, &curr_offset);
+          if (curr_offset.first >= texts[i].length()) {
+            break;
+          }
           items.emplace_back(typename TokenClsResult::TokenResult{
               label_name,
               texts[i].substr(curr_offset.first,

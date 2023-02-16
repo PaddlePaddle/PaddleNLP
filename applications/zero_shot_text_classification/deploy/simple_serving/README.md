@@ -41,15 +41,15 @@ schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就�
 
 ```python
 # Default task_path
-utc = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
+utc = Taskflow("zero_shot_text_classification", model="utc-base", task_path="../../checkpoint/model_best/plm", schema=schema)
 ```
 
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码
 
 ```python
-utc1 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
-utc2 = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
+utc1 = Taskflow("zero_shot_text_classification", model="utc-base", task_path="../../checkpoint/model_best/plm", schema=schema)
+utc2 = Taskflow("zero_shot_text_classification", model="utc-base", task_path="../../checkpoint/model_best/plm", schema=schema)
 service.register_taskflow("taskflow/utc", [utc1, utc2])
 ```
 
@@ -60,7 +60,7 @@ service.register_taskflow("taskflow/utc", [utc1, utc2])
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
 >>> utc = Taskflow("zero_shot_text_classification",
                    schema=schema,
-                   model="utc-large",
+                   model="utc-base",
                    max_seq_len=512,
                    batch_size=1,
                    pred_threshold=0.5,
@@ -68,7 +68,7 @@ service.register_taskflow("taskflow/utc", [utc1, utc2])
 ```
 
 * `schema`：定义任务标签候选集合。
-* `model`：选择任务使用的模型，默认为`utc-large`, 可选有`utc-large`。
+* `model`：选择任务使用的模型，默认为`utc-large`, 可选有`utc-xbase`, `utc-base`, `utc-medium`, `utc-micro`, `utc-mini`, `utc-nano`, `utc-pico`。
 * `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。

@@ -13,31 +13,21 @@
 # limitations under the License.
 
 import argparse
-import logging
+import json
+import math
 import os
 import sys
-import math
-import random
-import time
-import json
-from functools import partial
-import distutils.util
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
 from paddle.common_ops_import import core
-
-from paddlenlp.transformers import PPMiniLMModel
-from paddlenlp.utils.log import logger
-
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
-from paddleslim.nas.ofa.layers import BaseBlock
+
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import PPMiniLMModel
 
 sys.path.append("../")
-from data import MODEL_CLASSES, METRIC_CLASSES
+from data import METRIC_CLASSES, MODEL_CLASSES  # noqa: E402
 
 
 def ppminilm_forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -115,7 +105,7 @@ def parse_args():
     parser.add_argument("--depth_mult", type=float, default=1.0, help="depth mult you want to export")
     parser.add_argument(
         "--use_faster_tokenizer",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=True,
         help="Whether to use FasterTokenizer to accelerate training or further inference.",
     )
@@ -209,7 +199,7 @@ def do_export(args):
     model_to_save = origin_model_new
     model_to_save.save_pretrained(output_dir)
 
-    if args.static_sub_model != None:
+    if args.static_sub_model is not None:
         origin_model_new.to_static(
             args.static_sub_model, use_faster_tokenizer=args.use_faster_tokenizer, is_text_pair=is_text_pair
         )
