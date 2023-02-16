@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle import nn
 
 from ...utils.initializer import normal_, ones_, zeros_
+from ...utils.log import logger
 from ..guided_diffusion_utils import (
     DiscoDiffusionMixin,
     create_gaussian_diffusion,
@@ -1466,7 +1467,12 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin, StableDif
     config_class = CLIPConfig
 
     def __init__(self, config: CLIPConfig):
+
         super().__init__(config)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self.clip = CLIPModel(config)
         self.diffusion_type = diffusion_type = config.diffusion_type if hasattr(config, "diffusion_type") else "disco"
         self.scheduler_type = scheduler_type = config.scheduler_type if hasattr(config, "scheduler_type") else "pndm"
