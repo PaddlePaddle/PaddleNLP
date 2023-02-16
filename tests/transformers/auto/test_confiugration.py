@@ -24,7 +24,6 @@ from paddlenlp.transformers import AutoConfig
 
 
 class AutoConfigTest(unittest.TestCase):
-
     def test_built_in_model_class_config(self):
         config = AutoConfig.from_pretrained("bert-base-uncased")
         number = random.randint(0, 10000)

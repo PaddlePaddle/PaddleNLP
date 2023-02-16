@@ -78,7 +78,9 @@ class AutoConfig(PretrainedConfig):
     config_file = "config.json"
 
     @classmethod
-    def _get_config_class_from_config(cls, pretrained_model_name_or_path: str, config_file_path: str) -> PretrainedConfig:
+    def _get_config_class_from_config(
+        cls, pretrained_model_name_or_path: str, config_file_path: str
+    ) -> PretrainedConfig:
         with io.open(config_file_path, encoding="utf-8") as f:
             config = json.load(f)
 
