@@ -1,5 +1,5 @@
 ===========================train_params===========================
-model_name:ernie-3.0_for_sequence_classification
+model_name:ernie3_for_sequence_classification
 python:python3.7
 gpu_list:0|0,1
 null:null
@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:test_tipc/train.py --amp_level O2 --model ernie-3.0_for_sequence_classification --optimizer adamw --lr_scheduler linear_decay_with_warmup --learning_rate 2e-5 --max_grad_norm 1.0 --model_name_or_path ernie-3.0-base-zh --pad_to_max_seq_len --max_seq_len 128 --logging_steps 1 --task_name tnews
+norm_train:test_tipc/train.py --model ernie3_for_sequence_classification --optimizer adamw --lr_scheduler linear_decay_with_warmup --learning_rate 2e-5 --max_grad_norm 1.0 --model_name_or_path ernie-3.0-base-zh --pad_to_max_seq_len --max_seq_len 128 --logging_steps 10 --seed 42 --task_name tnews
 pact_train:null
 fpgm_train:null
 distill_train:null
@@ -51,9 +51,9 @@ null:null
 null:null
 ===========================to_static_train_benchmark_params===========================
 to_static_train:--to_static
-===========================disable_train_benchmark==========================
+===========================train_benchmark_params==========================
 batch_size:32
 fp_items:fp32|fp16
-max_steps:1000
+max_steps:500
 --profiler_options:batch_range=[10,20];state=GPU;tracer_option=Default;profile_path=model.profile  
 flags:FLAGS_eager_delete_tensor_gb=0.0;FLAGS_fraction_of_gpu_memory_to_use=0.98;FLAGS_conv_workspace_size_limit=4096

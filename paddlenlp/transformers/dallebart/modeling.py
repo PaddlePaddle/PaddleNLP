@@ -1661,6 +1661,10 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
 
     def __init__(self, dallebart):
         super().__init__(dallebart)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self.vqgan_detokenizer = VQGanDetokenizer(2**14, 256)
 
     @paddle.no_grad()

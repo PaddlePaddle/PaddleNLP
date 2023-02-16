@@ -17,16 +17,6 @@ import argparse
 import json
 
 
-def str2bool(v):
-    """Support bool type for argparse."""
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Unsupported value encountered.")
-
-
 class Args(dict):
     """Arguments class
 

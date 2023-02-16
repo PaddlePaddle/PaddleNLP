@@ -1483,7 +1483,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = (
+            os.path.join(cache_dir, pretrained_model_name_or_path)
+            if cache_dir is not None
+            else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        )
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):

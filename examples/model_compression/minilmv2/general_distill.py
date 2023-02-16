@@ -16,27 +16,25 @@ import argparse
 import os
 import random
 import time
-from functools import partial
-import distutils.util
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-from paddlenlp.utils.log import logger
-from paddlenlp.data import Tuple, Pad
-from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
-    TinyBertForPretraining,
-    TinyBertTokenizer,
     BertForSequenceClassification,
     BertTokenizer,
+    LinearDecayWithWarmup,
+    TinyBertForPretraining,
     TinyBertModel,
+    TinyBertTokenizer,
 )
-
-from paddlenlp.transformers.distill_utils import to_distill, calc_minilm_loss
+from paddlenlp.transformers.distill_utils import calc_minilm_loss, to_distill
+from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import TimeCostAverage
 
 MODEL_CLASSES = {
     "tinybert": (TinyBertForPretraining, TinyBertTokenizer),
@@ -74,7 +72,7 @@ def parse_args():
     )
     parser.add_argument(
         "--init_from_student",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=False,
         help="Whether to use the parameters of student model to initialize.",
     )
@@ -273,7 +271,6 @@ def do_train(args):
     student = to_distill(student, return_qkv=True, layer_index=args.student_layer_index)
 
     global_step = 0
-    tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f)
@@ -301,8 +298,6 @@ def do_train(args):
                 (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
             ]
 
-        previous_file = data_file
-
         train_data_loader, _ = create_pretraining_dataset(data_file, args, worker_init, tokenizer)
 
         # TODO(guosheng): better way to process single file
@@ -320,7 +315,6 @@ def do_train(args):
                 data_file = files[
                     (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
                 ]
-            previous_file = data_file
             dataset_future = pool.submit(create_pretraining_dataset, data_file, args, worker_init, tokenizer)
 
             kl_loss_func = paddle.nn.KLDivLoss("sum")

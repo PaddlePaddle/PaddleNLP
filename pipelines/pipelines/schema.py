@@ -14,38 +14,44 @@
 # limitations under the License.
 
 from __future__ import annotations
+
 import typing
-from typing import Any, Optional, Dict, List, Union, Optional
 from dataclasses import asdict
+from typing import Any, Dict, List, Optional, Union
 
 try:
     from typing import Literal
 except ImportError:
     from typing_extensions import Literal  # type: ignore
 
-# We are using Pydantic dataclasses instead of vanilla Python's
-# See #1598 for the reasons behind this choice & performance considerations
-from pydantic.dataclasses import dataclass
 
 if typing.TYPE_CHECKING:
     from dataclasses import dataclass  # type: ignore
+else:
+    # We are using Pydantic dataclasses instead of vanilla Python's
+    # See #1598 for the reasons behind this choice & performance considerations
+    from pydantic.dataclasses import dataclass
 
-from pydantic.json import pydantic_encoder
-from pathlib import Path
-from uuid import uuid4
-import mmh3
-import numpy as np
+import ast
+import json
 import logging
 import time
-import json
+from pathlib import Path
+from uuid import uuid4
+
+import mmh3
+import numpy as np
 import pandas as pd
-import ast
+from pydantic import BaseConfig
+from pydantic.json import pydantic_encoder
 
 logger = logging.getLogger(__name__)
 
-from pydantic import BaseConfig
-
 BaseConfig.arbitrary_types_allowed = True
+
+#: Types of content_types supported
+ContentTypes = Literal["text", "image"]
+FilterType = Dict[str, Union[Dict[str, Any], List[Any], str, int, float, bool]]
 
 
 @dataclass
@@ -101,7 +107,7 @@ class Document:
         """
 
         if content is None:
-            raise ValueError(f"Can't create 'Document': Mandatory 'content' field is None")
+            raise ValueError("Can't create 'Document': Mandatory 'content' field is None")
 
         self.content = content
         self.content_type = content_type
@@ -143,7 +149,7 @@ class Document:
 
         if final_hash_key == "":
             raise ValueError(
-                f"Cant't create 'Document': 'id_hash_keys' must contain at least one of ['content', 'meta']"
+                "Cant't create 'Document': 'id_hash_keys' must contain at least one of ['content', 'meta']"
             )
 
         return "{:02x}".format(mmh3.hash128(final_hash_key, signed=False))
@@ -253,10 +259,10 @@ class Span:
     start: int
     end: int
     """
-    Defining a sequence of characters (Text span) or cells (Table span) via start and end index. 
-    For extractive QA: Character where answer starts/ends  
+    Defining a sequence of characters (Text span) or cells (Table span) via start and end index.
+    For extractive QA: Character where answer starts/ends
     For TableQA: Cell where the answer starts/ends (counted from top left to bottom right of table)
-    
+
     :param start: Position where the span starts
     :param end:  Position where the spand ends
     """
@@ -277,24 +283,24 @@ class Answer:
     For example, it's used within some Nodes like the Reader, but also in the REST API.
 
     :param answer: The answer string. If there's no possible answer (aka "no_answer" or "is_impossible) this will be an empty string.
-    :param type: One of ("generative", "extractive", "other"): Whether this answer comes from an extractive model 
-                 (i.e. we can locate an exact answer string in one of the documents) or from a generative model 
-                 (i.e. no pointer to a specific document, no offsets ...). 
+    :param type: One of ("generative", "extractive", "other"): Whether this answer comes from an extractive model
+                 (i.e. we can locate an exact answer string in one of the documents) or from a generative model
+                 (i.e. no pointer to a specific document, no offsets ...).
     :param score: The relevance score of the Answer determined by a model (e.g. Reader or Generator).
                   In the range of [0,1], where 1 means extremely relevant.
     :param context: The related content that was used to create the answer (i.e. a text passage, part of a table, image ...)
     :param offsets_in_document: List of `Span` objects with start and end positions of the answer **in the
                                 document** (as stored in the document store).
-                                For extractive QA: Character where answer starts => `Answer.offsets_in_document[0].start 
+                                For extractive QA: Character where answer starts => `Answer.offsets_in_document[0].start
                                 For TableQA: Cell where the answer starts (counted from top left to bottom right of table) => `Answer.offsets_in_document[0].start
-                                (Note that in TableQA there can be multiple cell ranges that are relevant for the answer, thus there can be multiple `Spans` here) 
+                                (Note that in TableQA there can be multiple cell ranges that are relevant for the answer, thus there can be multiple `Spans` here)
     :param offsets_in_context: List of `Span` objects with start and end positions of the answer **in the
                                 context** (i.e. the surrounding text/table of a certain window size).
-                                For extractive QA: Character where answer starts => `Answer.offsets_in_document[0].start 
+                                For extractive QA: Character where answer starts => `Answer.offsets_in_document[0].start
                                 For TableQA: Cell where the answer starts (counted from top left to bottom right of table) => `Answer.offsets_in_document[0].start
-                                (Note that in TableQA there can be multiple cell ranges that are relevant for the answer, thus there can be multiple `Spans` here) 
+                                (Note that in TableQA there can be multiple cell ranges that are relevant for the answer, thus there can be multiple `Spans` here)
     :param document_id: ID of the document that the answer was located it (if any)
-    :param meta: Dict that can be used to associate any kind of custom meta data with the answer. 
+    :param meta: Dict that can be used to associate any kind of custom meta data with the answer.
                  In extractive QA, this will carry the meta data of the document where the answer was found.
     """
 
@@ -423,12 +429,12 @@ class Label:
         # If an Answer is provided we need to make sure that it's consistent with the `no_answer` value
         # TODO: reassess if we want to enforce Span.start=0 and Span.end=0 for no_answer=True
         if self.answer is not None:
-            if no_answer == True:
+            if no_answer is True:
                 if self.answer.answer != "" or self.answer.context:
                     raise ValueError(
                         f"Got no_answer == True while there seems to be an possible Answer: {self.answer}"
                     )
-            elif no_answer == False:
+            elif no_answer is False:
                 if self.answer.answer == "":
                     raise ValueError(
                         f"Got no_answer == False while there seems to be no possible Answer: {self.answer}"
@@ -524,13 +530,13 @@ class MultiLabel:
         # drop duplicate labels and remove negative labels if needed.
         labels = list(set(labels))
         if drop_negative_labels:
-            is_positive_label = lambda l: (l.is_correct_answer and l.is_correct_document) or (
+            is_positive_label = lambda l: (l.is_correct_answer and l.is_correct_document) or (  # noqa: E731
                 l.answer is None and l.is_correct_document
             )
             labels = [l for l in labels if is_positive_label(l)]
 
         if drop_no_answers:
-            labels = [l for l in labels if l.no_answer == False]
+            labels = [l for l in labels if l.no_answer is False]
 
         self.labels = labels
 
