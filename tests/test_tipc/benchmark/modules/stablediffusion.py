@@ -83,7 +83,7 @@ class StableDiffusion(nn.Layer):
         else:
             raise ValueError(f"Unknown prediction type {self.noise_scheduler.config.prediction_type}")
 
-        loss = F.mse_loss(model_pred, target, reduction="mean")
+        loss = F.mse_loss(model_pred.cast(paddle.float32), target.cast(paddle.float32), reduction="mean")
         return loss
 
 
