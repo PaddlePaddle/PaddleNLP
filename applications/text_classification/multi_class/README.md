@@ -8,7 +8,7 @@
     - [2.2 代码结构](#代码结构)
     - [2.3 数据准备](#数据准备)
     - [2.4 模型训练](#模型训练)
-    - [2.5 模型部署](#模型部署)
+    - [2.5 模型预测](#模型预测)
     - [2.6 模型效果](#模型效果)
 
 
@@ -33,11 +33,11 @@
 
 **更多选择：**
 
-对于大多数多分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
+对于大多数多分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多分类项目中还提供通用文本分类(UTC)和语义索引的两种方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
 
-- 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习多分类方案](./few-shot#readme)
+- 【零样本、小样本场景】 👉 [通用文本分类(UTC)方案](../../zero_shot_text_classification)
 
-- 【标签类别不固定场景、标签类别众多】 👉 [语义索引多分类方案](./retrieval_based#readme)
+- 【标签类别不固定、标签类别众多】 👉 [语义索引分类方案](./retrieval_based)
 
 
 <a name="快速开始"></a>
@@ -68,7 +68,7 @@ rm -rf KUAKE_QIC.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.4.8
+- paddlenlp >= 2.5.1
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -78,15 +78,14 @@ rm -rf KUAKE_QIC.tar.gz
 
 **安装PaddleNLP：**
 
-安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 ```shell
-python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
+pip install --upgrade paddlenlp
 ```
 
 
 **安装sklearn：**
 ```shell
-python3 -m  pip install scikit-learn==1.0.2
+pip install scikit-learn
 ```
 
 <a name="代码结构"></a>
@@ -99,14 +98,10 @@ multi_class/
 ├── retrieval_based # 语义索引方案
 ├── analysis # 分析模块
 ├── deploy # 部署
-│   └── predictor # 离线部署
-│   ├── paddle_serving # PaddleServing在线服务化部署
-│   └── triton_serving # Triton在线服务化部署
-├── train.py # 训练评估脚本
-├── predict.py # 预测脚本
-├── export_model.py # 静态图模型导出脚本
+│   ├── simple_serving # SimpleServing服务化部署
+│   └── triton_serving # Triton服务化部署
+├── train.py # 训练、评估、裁剪脚本
 ├── utils.py # 工具函数脚本
-├── prune.py # 裁剪脚本
 └── README.md # 多分类使用说明
 ```
 
@@ -120,9 +115,7 @@ multi_class/
 data/
 ├── train.txt # 训练数据集文件
 ├── dev.txt # 开发数据集文件
-├── test.txt # 可选，测试数据集文件
-├── label.txt # 分类标签文件
-└── data.txt # 待预测数据文件
+└── label.txt # 分类标签文件
 ```
 
 **训练、开发、测试数据集** 文件中文本与标签类别名用tab符`'\t'`分隔开，文本中避免出现tab符`'\t'`。
@@ -163,27 +156,11 @@ label.txt(分类标签文件)记录数据集中所有标签集合，每一行为
 ...
 ```
 
-**待预测数据**
-
-data.txt(待预测数据文件)，需要预测标签的文本数据。
-- data.txt 文件格式：
-```text
-<文本>
-<文本>
-...
-```
-- data.txt 文件样例：
-```text
-黑苦荞茶的功效与作用及食用方法
-交界痣会凸起吗
-检查是否能怀孕挂什么科
-鱼油怎么吃咬破吃还是直接咽下去
-...
-```
-
 <a name="模型训练"></a>
 
 ### 2.4 模型训练
+
+我们推荐使用 Trainer API 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
 #### 2.4.1 预训练模型微调
 
@@ -191,20 +168,22 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 使用CPU/GPU训练，默认为GPU训练。使用CPU训练只需将设备参数配置改为`--device cpu`，可以使用`--device gpu:0`指定GPU卡号：
 ```shell
 python train.py \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --data_dir ./data/ \
-    --output_dir checkpoint \
-    --device gpu \
-    --learning_rate 3e-5 \
-    --early_stopping_patience 4 \
-    --max_seq_length 128 \
-    --per_device_eval_batch_size 32 \
-    --per_device_train_batch_size 32 \
-    --num_train_epochs 100 \
     --do_train \
     --do_eval \
+    --do_export \
+    --model_name_or_path ernie-3.0-tiny-medium-v2-zh \
+    --output_dir checkpoint \
+    --device gpu \
+    --num_train_epochs 100 \
+    --early_stopping True \
+    --early_stopping_patience 5 \
+    --learning_rate 3e-5 \
+    --max_length 128 \
+    --per_device_eval_batch_size 32 \
+    --per_device_train_batch_size 32 \
     --metric_for_best_model accuracy \
     --load_best_model_at_end \
+    --logging_steps 5 \
     --evaluation_strategy epoch \
     --save_strategy epoch \
     --save_total_limit 1
@@ -215,222 +194,132 @@ python train.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus 0,1 train.py \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --data_dir ./data/ \
-    --output_dir checkpoint \
-    --device gpu \
-    --learning_rate 3e-5 \
-    --max_seq_length 128 \
-    --per_device_eval_batch_size 32 \
-    --per_device_train_batch_size 32 \
-    --num_train_epochs 100 \
-    --early_stopping_patience 4 \
     --do_train \
     --do_eval \
+    --do_export \
+    --model_name_or_path ernie-3.0-tiny-medium-v2-zh \
+    --output_dir checkpoint \
+    --device gpu \
+    --num_train_epochs 100 \
+    --early_stopping True \
+    --early_stopping_patience 5 \
+    --learning_rate 3e-5 \
+    --max_length 128 \
+    --per_device_eval_batch_size 32 \
+    --per_device_train_batch_size 32 \
     --metric_for_best_model accuracy \
     --load_best_model_at_end \
+    --logging_steps 5 \
     --evaluation_strategy epoch \
     --save_strategy epoch \
     --save_total_limit 1
 ```
 
 主要的配置的参数为：
-- `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
-- `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
-- `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
-- `num_train_epochs`: 训练轮次，使用早停法时可以选择100
-- `early_stopping_patience`: 在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
-- `learning_rate`: 预训练语言模型参数基础学习率大小，将与learning rate scheduler产生的值相乘作为当前学习率。
 - `do_train`: 是否进行训练。
 - `do_eval`: 是否进行评估。
+- `debug`: 与`do_eval`配合使用，是否开启debug模型，对每一个类别进行评估。
+- `do_export`: 训练结束后是否导出静态图。
+- `do_compress`: 训练结束后是否进行模型裁剪。
+- `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-tiny-medium-v2-zh`。
+- `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `device`: 使用的设备，默认为`gpu`。
+- `num_train_epochs`: 训练轮次，使用早停法时可以选择100。
+- `early_stopping`: 是否使用早停法，也即一定轮次后评估指标不再增长则停止训练。
+- `early_stopping_patience`: 在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
+- `learning_rate`: 预训练语言模型参数基础学习率大小，将与learning rate scheduler产生的值相乘作为当前学习率。
+- `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
-
+- `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
+- `train_path`: 训练集路径，默认为"./data/train.txt"。
+- `dev_path`: 开发集集路径，默认为"./data/dev.txt"。
+- `test_path`: 测试集路径，默认为"./data/dev.txt"。
+- `label_path`: 标签路径，默认为"./data/label.txt"。
+- `bad_case_path`: 错误样本保存路径，默认为"./data/bad_case.txt"。
+- `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
 训练脚本支持所有`TraingArguments`的参数，更多参数介绍可参考[TrainingArguments 参数介绍](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
 
 ```text
 checkpoint/
-├── checkpoint-xxx
-├── checkpoint-xxx
-├── config.json # 模型配置文件，paddlenlp 2.4.5以前为model_config.json
+├── export # 静态图模型
+├── config.json # 模型配置文件
 ├── model_state.pdparams # 模型参数文件
 ├── tokenizer_config.json # 分词器配置文件
 ├── vocab.txt
-└── ...
+└── special_tokens_map.json
 ```
 
 **NOTE:**
-
-* 如需恢复模型训练，则可以设置 `resume_from_checkpoint` ， 如 `resume_from_checkpoint=./checkpoints/checkpoint-217` 。
-* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name_or_path` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 中文训练任务（文本支持含部分英文）推荐使用"ernie-1.0-large-zh-cw"、"ernie-3.0-tiny-base-v2-zh"、"ernie-3.0-tiny-medium-v2-zh"、"ernie-3.0-tiny-micro-v2-zh"、"ernie-3.0-tiny-mini-v2-zh"、"ernie-3.0-tiny-nano-v2-zh"、"ernie-3.0-tiny-pico-v2-zh"。
+* 英文训练任务推荐使用"ernie-3.0-tiny-mini-v2-en"、 "ernie-2.0-base-en"、"ernie-2.0-large-en"。
 * 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 
-#### 2.4.2 训练评估与模型优化
-
-文本分类预测过程中常会遇到诸如"模型为什么会预测出错误的结果"，"如何提升模型的表现"等问题。[Analysis模块](./analysis) 提供了**模型评估、可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/63761690/195241942-70068989-df17-4f53-9f71-c189d8c5c88d.png" width="600">
-</div>
-
-**模型评估：** 训练后的模型我们可以使用 [Analysis模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
+#### 2.4.2 训练评估
+训练后的模型我们可以开启`debug`模式，对每个类别分别进行评估，并打印错误预测样本保存在`bad_case.txt`。默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_file "bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
+python train.py \
+    --do_eval \
+    --debug True \
+    --device gpu \
+    --model_name_or_path checkpoint \
+    --output_dir checkpoint \
+    --per_device_eval_batch_size 32 \
+    --max_length 128 \
+    --test_path './data/dev.txt'
 ```
 
 输出打印示例：
 
 ```text
-[2022-08-10 06:28:37,219] [    INFO] - -----Evaluate model-------
-[2022-08-10 06:28:37,220] [    INFO] - Dev dataset size: 1955
-[2022-08-10 06:28:37,220] [    INFO] - Accuracy in dev dataset: 81.79%
-[2022-08-10 06:28:37,221] [    INFO] - Top-2 accuracy in dev dataset: 92.48%
-[2022-08-10 06:28:37,222] [    INFO] - Top-3 accuracy in dev dataset: 97.24%
-[2022-08-10 06:28:37,222] [    INFO] - Class name: 病情诊断
-[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 80.32 | recall: 86.46 | F1 score 83.28
-[2022-08-10 06:28:37,223] [    INFO] - ----------------------------
-[2022-08-10 06:28:37,223] [    INFO] - Class name: 治疗方案
-[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 88.46 | recall: 94.08 | F1 score 91.18
+[2023-02-14 12:35:03,470] [    INFO] - -----Evaluate model-------
+[2023-02-14 12:35:03,471] [    INFO] - Dev dataset size: 1955
+[2023-02-14 12:35:03,471] [    INFO] - Accuracy in dev dataset: 81.74%
+[2023-02-14 12:35:03,471] [    INFO] - Macro average | precision: 77.39 | recall: 79.89 | F1 score 78.32
+[2023-02-14 12:35:03,471] [    INFO] - Class name: 病情诊断
+[2023-02-14 12:35:03,471] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 85.22 | recall: 86.11 | F1 score 85.66
+[2023-02-14 12:35:03,471] [    INFO] - ----------------------------
+[2023-02-14 12:35:03,471] [    INFO] - Class name: 治疗方案
+[2023-02-14 12:35:03,471] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 91.72 | recall: 90.09 | F1 score 90.90
 ...
 ```
 
-预测错误的样本保存在bad_case.txt文件中：
+文本分类预测过程中常会遇到诸如"模型为什么会预测出错误的结果"，"如何提升模型的表现"等问题。[Analysis模块](./analysis) 提供了**可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
 
-```text
-Text	Label	Prediction
-您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？	其他	注意事项
-输卵管粘连的基本检查	其他	就医建议
-会是胎动么？	其他	病情诊断
-经常干呕恶心，这是生病了吗	其他	病情诊断
-菏泽哪个医院治疗白癜风比较好?怎么治好	就医建议	治疗方案
-...
-```
-
-**可解释性分析：** 基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)提供单词和句子级别的模型可解释性分析，帮助理解模型预测结果，用于错误样本（bad case）分析，细节详见[训练评估与模型优化指南](analysis/README.md)。
-
-- 单词级别可解释性分析，也即分析待预测样本中哪一些单词对模型预测结果起重要作用。以下图为例，用颜色深浅表示单词对预测结果的重要性。
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/63761690/195086276-6ee16e96-4ec3-4a0f-821f-37546d21746b.png" width="1000">
-</div>
-
-- 句子级别可解释性分析 ，也即分析对待预测样本的模型预测结果与训练集中中哪些样本有重要关系。下面的例子表明句子级别可解释性分析可以帮助理解待预测样本的预测结果与训练集中样本之间的关联。
-```text
-text: 您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？
-predict label: 注意事项
-label: 其他
-examples with positive influence
-support1 text: 感冒期间钙产品要继续服用吗? 钙尔奇就可以，也可以吃婴儿吃的乳钙	label: 注意事项	score: 0.96602
-support2 text: 打喷嚏可以吃布洛芬缓释胶囊么	label: 注意事项	score: 0.95687
-support3 text: 孕后期可以足疗吗	label: 注意事项	score: 0.94021
-...
-```
-
-**数据优化：** 结合[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化策略，从多角度优化训练数据提升模型效果，策略细节详见[训练评估与模型优化指南](analysis/README.md)。
-
-- 稀疏数据筛选主要是解决数据不均衡、训练数据覆盖不足的问题，通过数据增强和数据标注两种方式解决这一问题。
-- 脏数据清洗可以帮助开发者筛选训练集中错误标注的数据，对这些数据重新进行人工标注，得到标注正确的数据再重新进行训练。
-- 数据增强策略提供多种数据增强方案，可以快速扩充数据，提高模型泛化性和鲁棒性。
-
-#### 2.4.3 模型预测
-训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
-
-```shell
-python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_dir "data"
-```
-
-可支持配置的参数：
-
-* `device`: 选用什么设备进行预测，可选cpu、gpu、xpu、npu；默认为gpu。
-* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含data.txt和label.txt文件;默认为None。
-* `params_path`：待预测模型的目录；默认为"./checkpoint/"。
-* `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
-* `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
-* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
-
-<a name="模型部署"></a>
-
-### 2.5 模型部署
-#### 2.5.1 静态图导出
-
-使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
-
-```shell
-python export_model.py --params_path ./checkpoint/ --output_path ./export
-```
-
-如果使用多语言模型 ERNIE M作为预训练模型，运行方式：
-```shell
-python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
-```
-
-可支持配置的参数：
-* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
-* `output_path`：静态图图保存的参数路径；默认为"./export"。
-
-程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
-
-```text
-export/
-├── float32.pdiparams
-├── float32.pdiparams.info
-└── float32.pdmodel
-```
-
- 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
-
-#### 2.5.2 模型裁剪
+#### 2.4.3 模型裁剪(可选)
 
 如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md), 一行命令即可启动模型裁剪。
 
 使用裁剪功能需要安装 paddleslim：
 
 ```shell
-pip install paddleslim==2.4.1
+pip install paddleslim == 2.4.1
 ```
 
 开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
-python prune.py \
-    --device "gpu" \
-    --dataset_dir "data" \
-    --output_dir "prune" \
+python train.py \
+    --do_compress \
+    --device gpu \
+    --data_dir data \
+    --model_name_or_path checkpoint \
+    --output_dir checkpoint/prune \
     --learning_rate 3e-5 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
-    --num_train_epochs 10 \
-    --max_seq_length 128 \
+    --num_train_epochs 1 \
+    --max_length 128 \
     --logging_steps 5 \
     --save_steps 100 \
     --width_mult_list '3/4' '2/3' '1/2'
 ```
-
-
-可支持配置的参数：
-* `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
-* `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
-* `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `learning_rate`：训练最大学习率；默认为5e-5。
-* `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
-* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
-* `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
-* `seed`：随机种子，默认为3。
-* `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
-* `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
-* `max_seq_length`：模型使用的最大序列长度，建议与训练过程保持一致, 若出现显存不足，请适当调低这一参数；默认为128。
-* `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-
-程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
+保存模型文件结构如下所示：
 
 ```text
-prune/
+checkpoint/prune/
 ├── width_mult_0.75
 │   ├── pruned_model.pdiparams
 │   ├── pruned_model.pdiparams.info
@@ -439,21 +328,43 @@ prune/
 │   └── config.json
 └── ...
 ```
-
 **NOTE:**
 
-1. 目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级。 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `per_device_train_batch_size`、`learning_rate`、`num_train_epochs`、`max_seq_length` 等超参进行网格搜索（grid search）。
+1. 目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级。 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `per_device_train_batch_size`、`learning_rate`、`max_length` 等超参进行网格搜索（grid search）。
 
-2. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
+2. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署。
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
+<a name="模型预测"></a>
 
-#### 2.5.3 部署方案
+### 2.5 模型预测
+我们推荐使用taskflow进行模型预测。
+```
+from paddlenlp import Taskflow
 
-- 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
+# 模型预测
+cls = Taskflow("text_classification", task_path='checkpoint/export', is_static_model=True)
+cls(["黑苦荞茶的功效与作用及食用方法","幼儿挑食的生理原因是"])
+# [{'predictions': [{'label': '功效作用', 'score': 0.9683999621710758}], 'text': '黑苦荞茶的功效与作用及食用方法'}, {'predictions': [{'label': '病因分析', 'score': 0.5204789523701855}], 'text': '幼儿挑食的生理原因是'}]
 
-- 在线服务化部署搭建请参考 [PaddleNLP SimpleServing部署指南](deploy/simple_serving/README.md) 或 [Triton部署指南](deploy/triton_serving/README.md)。
+# 裁剪模型预测
+cls = Taskflow("text_classification", task_path='checkpoint/prune/width_mult_0.67', is_static_model=True)
+cls(["黑苦荞茶的功效与作用及食用方法","幼儿挑食的生理原因是"])
+# [{'predictions': [{'label': '功效作用', 'score': 0.964693000149321}], 'text': '黑苦荞茶的功效与作用及食用方法'}, {'predictions': [{'label': '病因分析', 'score': 0.4915921440237312}], 'text': '幼儿挑食的生理原因是'}]
+```
+
+#### 可配置参数说明
+* `task_path`：自定义任务路径，默认为None。
+* `is_static_model`：task_path中是否为静态图模型参数，默认为False。
+* `max_length`：最长输入长度，包括所有标签的长度，默认为512。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `id2label`：标签映射字典，如果`task_path`中包含id2label.json或加载动态图参数无需定义。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
+
+在线服务化部署搭建请参考：
+- 【简单易用】 👉 [Simple Serving部署指南](deploy/simple_serving)
+- 【低时延】 👉 [Triton部署指南](deploy/triton_serving)。
 
 
 <a name="模型效果"></a>

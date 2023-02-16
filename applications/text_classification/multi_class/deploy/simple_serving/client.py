@@ -12,28 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import requests
 import json
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization.")
-parser.add_argument("--batch_size", default=1, type=int, help="Batch size per GPU/CPU for predicting.")
-args = parser.parse_args()
-# yapf: enable
+import requests
 
-url = "http://0.0.0.0:8189/models/cls_multi_class"
+url = "http://0.0.0.0:8189/taskflow/cls"
 headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
     texts = ["黑苦荞茶的功效与作用及食用方法", "交界痣会凸起吗", "检查是否能怀孕挂什么科", "鱼油怎么吃咬破吃还是直接咽下去", "幼儿挑食的生理原因是"]
-    data = {
-        "data": {
-            "text": texts,
-        },
-        "parameters": {"max_seq_len": args.max_seq_len, "batch_size": args.batch_size},
-    }
+    data = {"data": {"text": texts}}
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     result_json = json.loads(r.text)
-    print(result_json)
+    print(result_json["result"])
