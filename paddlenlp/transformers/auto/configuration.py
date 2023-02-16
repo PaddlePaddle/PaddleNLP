@@ -33,11 +33,12 @@ __all__ = [
 
 
 def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
-    """load the mapping of <model-name>: [<class-name>, <class-name>, ...]
+    """load the configurations of PretrainedConfig mapping: {<model-name>: [<class-name>, <class-name>, ...], }
 
     Returns:
-        dict[str, str]: the mapping of
+        dict[str, str]: the mapping of model-name to model-classes
     """
+    # 1. search the subdir<model-name> to find model-names
     transformers_dir = os.path.dirname(os.path.dirname(__file__))
     exclude_models = ["auto"]
 
@@ -50,6 +51,7 @@ def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
         if not os.path.isdir(model_dir):
             continue
 
+        # 2. find the `configuration.py` file as the identifier of PretrainedConfig class
         configuration_path = os.path.join(model_dir, "configuration.py")
         if not os.path.exists(configuration_path):
             continue
@@ -69,12 +71,14 @@ class AutoConfig(PretrainedConfig):
     base PretrainedConfig classes when created with the AutoConfig.from_pretrained() classmethod.
     """
 
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES: Dict[str, List[Type[PretrainedConfig]]] = get_configurations()
+
+    # cache the builtin pretrained-model-name to Model Class
     name2class = None
     config_file = "config.json"
 
     @classmethod
-    def _get_config_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
+    def _get_config_class_from_config(cls, pretrained_model_name_or_path: str, config_file_path: str) -> PretrainedConfig:
         with io.open(config_file_path, encoding="utf-8") as f:
             config = json.load(f)
 
@@ -108,7 +112,7 @@ class AutoConfig(PretrainedConfig):
         return cls(**config)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, **kwargs):
         """
         Creates an instance of `AutoConfig`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
