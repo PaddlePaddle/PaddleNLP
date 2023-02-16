@@ -130,11 +130,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             "models",
             [
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
-                "ernie-3.0-base-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
-                "ernie-3.0-medium-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
-                "ernie-3.0-mini-zh",  # 6-layer, 384-hidden, 12-heads, 27M parameters
-                "ernie-3.0-micro-zh",  # 4-layer, 384-hidden, 12-heads, 23M parameters
-                "ernie-3.0-nano-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
+                "ernie-3.0-tiny-base-v2-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+                "ernie-3.0-tiny-medium-v2-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
+                "ernie-3.0-tiny-mini-v2-zh",  # 6-layer, 384-hidden, 12-heads, 27M parameters
+                "ernie-3.0-tiny-micro-v2-zh",  # 4-layer, 384-hidden, 12-heads, 23M parameters
+                "ernie-3.0-tiny-nano-v2-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
+                "ernie-3.0-tiny-pico-v2-zh",  # 3-layer, 128-hidden, 2-heads, 5.9M parameters.
             ],
         )
         english_models = hp.choice(
@@ -144,9 +145,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
                 "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
                 "distilroberta-base",  # 6-layer, 768-hidden, 12-heads, 66M parameters. Case-sensitive
+                "ernie-3.0-tiny-mini-v2-en",  # 6-layer, 384-hidden, 12-heads, 27M parameters
                 "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
                 "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
-                "distilbert-base-uncased",  # 6-layer, 768-hidden, 12-heads, 66M parameters
             ],
         )
         return [
