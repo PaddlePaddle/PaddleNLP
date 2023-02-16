@@ -20,12 +20,17 @@ import os
 from collections import defaultdict
 from typing import Dict, List, Type
 
+from huggingface_hub import hf_hub_download
+
+from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
+
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoConfig",
@@ -114,7 +119,7 @@ class AutoConfig(PretrainedConfig):
         return cls(**config)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, from_hf_hub=False, **kwargs):
         """
         Creates an instance of `AutoConfig`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -144,9 +149,14 @@ class AutoConfig(PretrainedConfig):
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """
+        subfolder = kwargs.pop("subfolder", None)
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path, from_hf_hub=from_hf_hub, cache_dir=kwargs.pop("cache_dir", None)
+        )
+
         if not cls.name2class:
             cls.name2class = {}
-            for module_name, model_classes in cls.MAPPING_NAMES.items():
+            for model_classes in cls.MAPPING_NAMES.values():
                 for model_class in model_classes:
                     cls.name2class.update(
                         {model_name: model_class for model_name in model_class.pretrained_init_configuration.keys()}
@@ -170,6 +180,18 @@ class AutoConfig(PretrainedConfig):
                 return cls.from_file(config_file)
             return config_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
+        elif from_hf_hub:
+            file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.config_file,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PaddleNLP",
+                library_version=__version__,
+            )
+            # from local dir path
+            return cls.from_pretrained(os.path.dirname(file))
+
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file])
@@ -180,11 +202,11 @@ class AutoConfig(PretrainedConfig):
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
-                    f"Can't load processor for '{pretrained_model_name_or_path}'.\n"
+                    f"Can't load Config for '{pretrained_model_name_or_path}'.\n"
                     f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
                     "- a correct model-identifier of built-in pretrained models,\n"
                     "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant processor files.\n"
+                    "- or the correct path to a directory containing relevant config files.\n"
                 )
 
             if os.path.exists(resolved_config_file):
