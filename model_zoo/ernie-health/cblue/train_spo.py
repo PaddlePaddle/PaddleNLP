@@ -33,6 +33,7 @@ from utils import (
 
 from paddlenlp.data import Dict, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import ElectraTokenizer
 
 parser = argparse.ArgumentParser()

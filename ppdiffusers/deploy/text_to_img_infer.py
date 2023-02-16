@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 import time
 
@@ -21,6 +20,7 @@ import numpy as np
 import paddle
 from fastdeploy import ModelFormat
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     FastDeployRuntimeModel,
@@ -69,7 +69,7 @@ def parse_arguments():
     parser.add_argument(
         "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
     )
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
