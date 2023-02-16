@@ -28,6 +28,7 @@ from utils import LinearDecayWithWarmup, convert_example, create_dataloader
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import AccuracyAndF1, MultiLabelsMetric
+from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 
 METRIC_CLASSES = {
     "KUAKE-QIC": Accuracy,
