@@ -35,7 +35,13 @@ def load_config(config_file_path, task_name, dataset_name, model_args, data_args
 
 def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length: List[int]) -> int:
     """get max_length by examples which you can change it by examples in batch"""
-    cur_length = len(examples["input_ids"])
+    # if the input is a batch of examples
+    if isinstance(examples["input_ids"][0], list):
+        cur_length = max([len(i) for i in examples["input_ids"]])
+    # if the input is a single example
+    else:
+        cur_length = len(examples["input_ids"])
+
     max_length = default_max_length
     for max_length_option in sorted(dynamic_max_length):
         if cur_length <= max_length_option:
