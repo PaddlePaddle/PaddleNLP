@@ -13,29 +13,25 @@
 # limitations under the License.
 
 import argparse
-import collections
-import itertools
 import os
 import random
 import time
-import h5py
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-import distutils.util
-
 import paddle
 import paddle.distributed.fleet as fleet
-from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers.bert.configuration import BertConfig
+from dataset import create_data_holder, create_pretraining_dataset
 
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    BertForPretraining,
+    BertPretrainingCriterion,
+    BertTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
-from paddlenlp.transformers import BertTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from dataset import create_data_holder, create_pretraining_dataset
 
 MODEL_CLASSES = {"bert": (BertForPretraining, BertTokenizer)}
 
@@ -97,19 +93,15 @@ def parse_args():
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument(
         "--enable_addto",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=False,
         help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.",
     )
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--use_pure_fp16", type=distutils.util.strtobool, default=False, help="Whether to use pure fp16 training."
-    )
+    parser.add_argument("--use_pure_fp16", type=strtobool, default=False, help="Whether to use pure fp16 training.")
     parser.add_argument("--device", type=str, default="gpu", help="Device for selecting for the training.")
     parser.add_argument(
         "--gradient_merge_steps",
@@ -127,7 +119,7 @@ def parse_args():
     )
     parser.add_argument(
         "--fuse_transformer",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=False,
         help="Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not.",
     )
@@ -280,7 +272,10 @@ def do_train(args):
     )
 
     # Define the dynamic learing_reate scheduler and optimizer
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
+    # BUG: train_data_loader is undefined variable here hence the noqa: F821
+    num_training_steps = (
+        args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs  # noqa: F821
+    )
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps)
 
@@ -313,7 +308,6 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
-    tic_train = time.time()
     epoch = 0
     while True:
         files = [
@@ -322,7 +316,6 @@ def do_train(args):
             if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in f
         ]
         files.sort()
-        num_files = len(files)
         random.Random(args.seed + epoch).shuffle(files)
         f_start_id = 0
 
@@ -352,7 +345,6 @@ def do_train(args):
                 train_reader_cost = time.time() - batch_start
                 reader_cost_avg.record(train_reader_cost)
                 global_step += 1
-                train_start = time.time()
                 loss_return = exe.run(main_program, feed=batch, fetch_list=[loss])
                 total_samples += args.batch_size
                 # In the new 2.0 api, must call this function to change the learning_rate
@@ -391,7 +383,6 @@ def do_train(args):
                         paddle.static.save(main_program, os.path.join(output_dir, "model_state"))
                         tokenizer.save_pretrained(output_dir)
                 if global_step >= args.max_steps:
-                    reader_start = time.time()
                     del train_data_loader
                     return
                 batch_start = time.time()

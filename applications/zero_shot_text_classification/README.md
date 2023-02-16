@@ -88,7 +88,7 @@ python label_studio.py \
 
 推荐使用 PromptTrainer API 对模型进行微调，该 API 封装了提示定义功能，且继承自 [Trainer API ](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md) 。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
-使用下面的命令，使用 `utc-large` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
+使用下面的命令，使用 `utc-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
 
 单卡启动：
 
@@ -99,7 +99,7 @@ python run_train.py  \
     --save_steps 100 \
     --eval_steps 100 \
     --seed 1000 \
-    --model_name_or_path utc-large \
+    --model_name_or_path utc-base \
     --output_dir ./checkpoint/model_best \
     --dataset_path ./data/ \
     --max_seq_length 512  \
@@ -129,7 +129,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
     --save_steps 100 \
     --eval_steps 100 \
     --seed 1000 \
-    --model_name_or_path utc-large \
+    --model_name_or_path utc-base \
     --output_dir ./checkpoint/model_best \
     --dataset_path ./data/ \
     --max_seq_length 512  \
@@ -158,7 +158,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
 * `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
 * `eval_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
 * `seed`：全局随机种子，默认为 42。
-* `model_name_or_path`：进行 few shot 训练使用的预训练模型。默认为 "utc-large"。
+* `model_name_or_path`：进行 few shot 训练使用的预训练模型。默认为 "utc-base", 可选"utc-xbase", "utc-base", "utc-medium", "utc-mini", "utc-micro", "utc-nano", "utc-pico"。
 * `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
 * `dataset_path`：数据集文件所在目录；默认为 `./data/` 。
 * `train_file`：训练集后缀；默认为 `train.txt` 。
@@ -210,7 +210,7 @@ python run_eval.py \
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
->>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best/plm', precision="fp16")
+>>> my_cls = Taskflow("zero_shot_text_classification", model="utc-base", schema=schema, task_path='./checkpoint/model_best/plm', precision="fp16")
 >>> pprint(my_cls("中性粒细胞比率偏低"))
 ```
 
@@ -226,6 +226,7 @@ from paddlenlp import SimpleServer, Taskflow
 
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
+               model="utc-base",
                schema=schema,
                task_path="../../checkpoint/model_best/plm",
                precision="fp32")
@@ -244,13 +245,14 @@ paddlenlp server server:app --host 0.0.0.0 --port 8990
 
 ### 2.7 实验指标
 
-医疗意图分类数据集 KUAKE-QIC 验证集实验指标：
+医疗意图分类数据集 KUAKE-QIC 验证集 zero-shot 实验指标：
 
-  |          |  Accuracy  | Micro F1   | Macro F1   |
-  | :------: | :--------: | :--------: | :--------: |
-  | 0-shot   | 28.69 | 87.03 | 60.90 |
-  | 5-shot   | 64.75 | 93.34 | 80.33 |
-  | 10-shot  | 65.88 | 93.76 | 81.34 |
-  | full-set | 81.81 | 96.65 | 89.87 |
-
-其中 k-shot 表示每个标签有 k 条标注样本用于训练。
+  |            | Macro F1   | Micro F1   |
+  | :--------: | :--------: | :--------: |
+  | utc-xbase  | 66.30 | 89.67 |
+  | utc-base   | 64.13 | 89.06 |
+  | utc-medium | 69.62 | 89.15 |
+  | utc-micro  | 60.31 | 79.14 |
+  | utc-mini   | 65.82 | 89.82 |
+  | utc-nano   | 62.03 | 80.92 |
+  | utc-pico   | 53.63 | 83.57 |

@@ -46,6 +46,11 @@ from .version import VERSION as __version__
 logger = logging.get_logger(__name__)
 
 
+def unfreeze_params(params):
+    for param in params:
+        param.stop_gradient = False
+
+
 def freeze_params(params):
     for param in params:
         param.stop_gradient = True
@@ -316,7 +321,7 @@ class ModelMixin(nn.Layer):
 
         model_file = None
         if model_file is None:
-            model_file = cls._get_model_file(
+            model_file = _get_model_file(
                 pretrained_model_name_or_path,
                 weights_name=WEIGHTS_NAME,
                 cache_dir=cache_dir,
@@ -388,71 +393,6 @@ class ModelMixin(nn.Layer):
             return model, loading_info
 
         return model
-
-    @classmethod
-    def _get_model_file(
-        cls,
-        pretrained_model_name_or_path,
-        *,
-        weights_name,
-        subfolder,
-        cache_dir,
-        from_hf_hub,
-    ):
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        if os.path.isdir(pretrained_model_name_or_path):
-            if os.path.isfile(os.path.join(pretrained_model_name_or_path, weights_name)):
-                # Load from a PyTorch checkpoint
-                model_file = os.path.join(pretrained_model_name_or_path, weights_name)
-            elif subfolder is not None and os.path.isfile(
-                os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
-            ):
-                model_file = os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
-            else:
-                raise EnvironmentError(
-                    f"Error no file named {weights_name} found in directory {pretrained_model_name_or_path}."
-                )
-            return model_file
-        elif from_hf_hub:
-            model_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=WEIGHTS_NAME,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-                library_name="PPDiffusers",
-                library_version=__version__,
-            )
-            return model_file
-        else:
-            try:
-                # Load from URL or cache if already cached
-                model_file = ppdiffusers_bos_download(
-                    pretrained_model_name_or_path,
-                    filename=WEIGHTS_NAME,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                )
-            except HTTPError as err:
-                raise EnvironmentError(
-                    "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}"
-                )
-            except ValueError:
-                raise EnvironmentError(
-                    f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
-                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
-                    f" directory containing a file named {WEIGHTS_NAME} or"
-                    " \nCheckout your internet connection or see how to run the library in"
-                    " offline mode at 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
-                )
-            except EnvironmentError:
-                raise EnvironmentError(
-                    f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
-                    "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a file named {WEIGHTS_NAME}"
-                )
-            return model_file
 
     @classmethod
     def _load_pretrained_model(
@@ -614,3 +554,66 @@ def unwrap_model(model: nn.Layer) -> nn.Layer:
         return unwrap_model(model._layers)
     else:
         return model
+
+
+def _get_model_file(
+    pretrained_model_name_or_path,
+    *,
+    weights_name,
+    subfolder,
+    cache_dir,
+    from_hf_hub,
+):
+    pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+    if os.path.isdir(pretrained_model_name_or_path):
+        if os.path.isfile(os.path.join(pretrained_model_name_or_path, weights_name)):
+            # Load from a PyTorch checkpoint
+            model_file = os.path.join(pretrained_model_name_or_path, weights_name)
+        elif subfolder is not None and os.path.isfile(
+            os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
+        ):
+            model_file = os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
+        else:
+            raise EnvironmentError(
+                f"Error no file named {weights_name} found in directory {pretrained_model_name_or_path}."
+            )
+        return model_file
+    elif from_hf_hub:
+        model_file = hf_hub_download(
+            repo_id=pretrained_model_name_or_path,
+            filename=weights_name,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            library_name="PPDiffusers",
+            library_version=__version__,
+        )
+        return model_file
+    else:
+        try:
+            # Load from URL or cache if already cached
+            model_file = ppdiffusers_bos_download(
+                pretrained_model_name_or_path,
+                filename=weights_name,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
+            )
+        except HTTPError as err:
+            raise EnvironmentError(
+                "There was a specific connection error when trying to load" f" {pretrained_model_name_or_path}:\n{err}"
+            )
+        except ValueError:
+            raise EnvironmentError(
+                f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
+                f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
+                f" directory containing a file named {weights_name} or"
+                " \nCheckout your internet connection or see how to run the library in"
+                " offline mode at 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
+            )
+        except EnvironmentError:
+            raise EnvironmentError(
+                f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
+                "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
+                f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
+                f"containing a file named {weights_name}"
+            )
+        return model_file
