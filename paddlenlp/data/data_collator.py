@@ -43,7 +43,7 @@ __all__ = [
 InputDataClass = NewType("InputDataClass", Any)
 """
 A DataCollator is a function that takes a list of samples from a Dataset and collate them into a batch, as a dictionary
-of Pypaddle/TensorFlow tensors or NumPy arrays.
+of PaddlePaddle tensors or NumPy arrays.
 """
 DataCollator = NewType("DataCollator", Callable[[List[InputDataClass]], Dict[str, Any]])
 
@@ -233,7 +233,7 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
             This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
             7.5 (Volta).
         label_pad_token_id (`int`, *optional*, defaults to -100):
-            The id to use when padding the labels (-100 will be automatically ignore by Pypaddle loss functions).
+            The id to use when padding the labels (-100 will be automatically ignore by PaddlePaddle loss functions).
         return_tensors (`str`):
             The type of Tensor to return. Allowable values are "np", "pt" and "tf".
     """
@@ -335,7 +335,7 @@ class DataCollatorForSeq2Seq:
             This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
             7.5 (Volta).
         label_pad_token_id (`int`, *optional*, defaults to -100):
-            The id to use when padding the labels (-100 will be automatically ignored by Pypaddle loss functions).
+            The id to use when padding the labels (-100 will be automatically ignored by PaddlePaddle loss functions).
         return_tensors (`str`):
             The type of Tensor to return. Allowable values are "np", "pt" and "tf".
     """
