@@ -92,6 +92,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ChineseCLIPTokenizer", "chineseclip"),
         ("ErnieViLTokenizer", "ernie_vil"),
         ("PegasusChineseTokenizer", "pegasus"),
+        ("BloomTokenizer", "bloom"),
     ]
 )
 

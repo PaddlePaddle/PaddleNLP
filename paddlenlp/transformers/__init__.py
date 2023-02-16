@@ -186,6 +186,9 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .bloom.modeling import *
+from .bloom.configuration import *
+from .bloom.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

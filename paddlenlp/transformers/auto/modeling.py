@@ -119,6 +119,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlipText", "blip"),
         ("BlipVision", "blip"),
         ("Blip", "blip"),
+        ("Bloom", "bloom"),
     ]
 )
 
