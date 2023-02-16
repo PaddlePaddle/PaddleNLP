@@ -13,7 +13,6 @@
 # limitations under the License.
 import copy
 import functools
-import json
 import os
 import shutil
 from typing import Any, Callable, Dict, List
@@ -41,7 +40,6 @@ from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
     PretrainedTokenizer,
-    export_model,
 )
 
 from .auto_trainer_base import AutoTrainerBase
@@ -325,27 +323,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trainer = self._construct_trainer(config)
             trainer.train()
             eval_metrics = trainer.evaluate()
-
-            # save static model
-            if config["trainer_type"] == "PromptTrainer":
-                trainer.export_model(self.export_path)
-            else:
-                trainer.save_model(self.export_path)
-                if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
-                    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
-                else:
-                    input_spec = [
-                        paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                        paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                    ]
-                export_model(model=trainer.model, input_spec=input_spec, path=self.export_path)
-
-            # save tokenizer
-            trainer.tokenizer.save_pretrained(self.export_path)
-
-            # save id2label
-            with open(os.path.join(self.export_path, "id2label.json"), "w", encoding="utf-8") as f:
-                json.dump(self.id2label, f, ensure_ascii=False)
+            trainer.save_model(self.save_path)
 
             if os.path.exists(self.training_path):
                 logger.info("Removing training checkpoints to conserve disk space")
@@ -365,19 +343,21 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
-        if model_config["trainer_type"] == "PromptTrainer":
-            raise NotImplementedError(
-                "'PromptTrainer' models do not support 'evaluate' yet because dygraph save model has not been implemented."
-            )
-        model_config["TrainingArguments.model_name_or_path"] = os.path.join(model_result.log_dir, self.export_path)
         trainer = self._construct_trainer(model_config)
+        trainer.load_state_dict_from_checkpoint(
+            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
+        )
+
         if eval_dataset is not None:
-            trans_func = functools.partial(
-                self._preprocess_fn,
-                tokenizer=trainer.tokenizer,
-                max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
-            )
-            processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
+            if model_config["trainer_type"] == "PromptTrainer":
+                processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(self._preprocess_labels, lazy=False)
+            else:
+                trans_func = functools.partial(
+                    self._preprocess_fn,
+                    tokenizer=trainer.tokenizer,
+                    max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
+                )
+                processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
             eval_metrics = trainer.evaluate(processed_eval_dataset)
         else:
             eval_metrics = trainer.evaluate()
@@ -443,29 +423,25 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def to_taskflow(self, trial_id=None, batch_size=1, max_length=512, precision="fp32"):
+    def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, max_length=512, precision="fp32"):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            export_path (str, required): the filepath to export to
             max_length (int): Maximum number of tokens for the model. Defaults to 512.
             batch_size(int): The sample number of a mini-batch. Defaults to 1.
             precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
-        model_result = self._get_model_result(trial_id=trial_id)
-        model_config = model_result.metrics["config"]["candidates"]
-        if model_config["trainer_type"] == "PromptTrainer":
-            mode = "prompt"
-        else:
-            mode = "finetune"
-        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
+        task_path, mode = self.export(export_path=export_path, trial_id=trial_id)
+
         return Taskflow(
             "text_classification",
             mode=mode,
             is_static_model=True,
             problem_type=self.problem_type,
-            task_path=exported_model_path,
+            task_path=task_path,
             multilabel_threshold=self.multilabel_threshold,
             batch_size=batch_size,
             max_length=max_length,

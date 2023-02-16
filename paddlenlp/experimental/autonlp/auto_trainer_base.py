@@ -13,11 +13,12 @@
 # limitations under the License.
 import copy
 import datetime
+import json
 import os
-import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import paddle
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -28,7 +29,7 @@ from ray.tune.search.hyperopt import HyperOptSearch
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer, export_model
 from paddlenlp.utils.log import logger
 
 
@@ -46,8 +47,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
     """
 
-    training_path = "training"
-    export_path = "exported_model"
+    training_path = "autonlp_training"
+    save_path = "checkpoint"
+    export_path = "autonlp_export"
     results_filename = "experiment_results.csv"
 
     def __init__(
@@ -129,7 +131,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    def export(self, export_path, trial_id=None):
+    def export(self, export_path=None, trial_id=None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
@@ -137,10 +139,48 @@ class AutoTrainerBase(metaclass=ABCMeta):
             export_path (str, required): the filepath to export to
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
+
         model_result = self._get_model_result(trial_id=trial_id)
-        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-        shutil.copytree(exported_model_path, export_path)
-        logger.info(f"Exported to {export_path}")
+        model_config = model_result.metrics["config"]["candidates"]
+        trial_id = model_result.metrics["trial_id"]
+
+        if export_path is None:
+            export_path = os.path.join(self.export_path, trial_id)
+        if os.path.exists(export_path):
+            logger.info(
+                f"Export path for {trial_id} already exists: ({export_path}). The model parameter files will be overwritten."
+            )
+
+        # construct trainer
+        trainer = self._construct_trainer(model_config)
+        trainer.load_state_dict_from_checkpoint(
+            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
+        )
+
+        # save static model
+        if model_config["trainer_type"] == "PromptTrainer":
+            trainer.export_model(export_path)
+            mode = "prompt"
+        else:
+            if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
+                input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
+            else:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                ]
+            export_model(model=trainer.model, input_spec=input_spec, path=export_path)
+            mode = "finetune"
+        # save tokenizer
+        trainer.tokenizer.save_pretrained(export_path)
+
+        # save id2label
+        with open(os.path.join(export_path, "id2label.json"), "w", encoding="utf-8") as f:
+            json.dump(self.id2label, f, ensure_ascii=False)
+
+        logger.info(f"Exported {trial_id} to {export_path}")
+
+        return export_path, mode
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
