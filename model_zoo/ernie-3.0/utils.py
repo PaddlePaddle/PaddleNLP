@@ -44,7 +44,7 @@ def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length
     return max_length
 
 
-def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Optional[List[int]] = None):
+def prepare_train_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -52,12 +52,14 @@ def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Option
     contexts = examples["context"]
     questions = examples["question"]
 
-    if dynamic_max_length is not None:
+    if args.dynamic_max_length is not None:
         tokenized_examples = tokenizer(
             questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
         )
         max_length = get_dynamic_max_length(
-            examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
+            examples=tokenized_examples,
+            default_max_length=args.max_seq_length,
+            dynamic_max_length=args.dynamic_max_length,
         )
         # always pad to max_length
         tokenized_examples = tokenizer(
@@ -127,7 +129,7 @@ def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Option
     return tokenized_examples
 
 
-def prepare_validation_features(examples, tokenizer, args, dynamic_max_length: Optional[List[int]] = None):
+def prepare_validation_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -136,12 +138,14 @@ def prepare_validation_features(examples, tokenizer, args, dynamic_max_length: O
     contexts = examples["context"]
     questions = examples["question"]
 
-    if dynamic_max_length is not None:
+    if args.dynamic_max_length is not None:
         tokenized_examples = tokenizer(
             questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
         )
         max_length = get_dynamic_max_length(
-            examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
+            examples=tokenized_examples,
+            default_max_length=args.max_seq_length,
+            dynamic_max_length=args.dynamic_max_length,
         )
         # always pad to max_length
         tokenized_examples = tokenizer(
