@@ -166,7 +166,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
 
         # pre_temb_act_fun opt
-        self.resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity
+        self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
         if act_fn == "swish":
             self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
         elif act_fn == "mish":
