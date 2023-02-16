@@ -18,6 +18,7 @@ from paddlenlp.transformers import BertModel, BertTokenizer
 
 from ..data import Pad, Tuple
 from ..transformers import ErnieCrossEncoder, ErnieTokenizer
+from ..utils.log import logger
 from .task import Task
 from .utils import static_mode_guard
 
@@ -36,6 +37,16 @@ usage = r"""
          [{'text1': '光眼睛大就好看吗', 'text2': '眼睛好看吗？', 'similarity': 0.74502707}, {'text1': '小蝌蚪找妈妈怎么样', 'text2': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
          '''
          """
+MATCH_TYPE = {
+    "rocketqa-zh-dureader-cross-encoder": "matching",
+    "rocketqa-base-cross-encoder": "matching",
+    "rocketqa-medium-cross-encoder": "matching",
+    "rocketqa-mini-cross-encoder": "matching",
+    "rocketqa-micro-cross-encoder": "matching",
+    "rocketqa-nano-cross-encoder": "matching",
+    "rocketqav2-en-marco-cross-encoder": "matching_v2",
+    "ernie-search-large-cross-encoder-marco-en": "matching_v3",
+}
 
 
 class TextSimilarityTask(Task):
@@ -268,3 +279,27 @@ class TextSimilarityTask(Task):
             result["similarity"] = float(similarity)
             final_results.append(result)
         return final_results
+
+    def _convert_dygraph_to_static(self):
+        """
+        Convert the dygraph model to static model.
+        """
+        assert (
+            self._model is not None
+        ), "The dygraph model must be created before converting the dygraph model to static model."
+        assert (
+            self._input_spec is not None
+        ), "The input spec must be created before converting the dygraph model to static model."
+        logger.info("Converting to the inference model cost a little time.")
+        if self.model in MATCH_TYPE:
+            if MATCH_TYPE[self.model] == "matching":
+                static_model = paddle.jit.to_static(self._model.matching, input_spec=self._input_spec)
+            elif MATCH_TYPE[self.model] == "matching_v2":
+                static_model = paddle.jit.to_static(self._model.matching_v2, input_spec=self._input_spec)
+            elif MATCH_TYPE[self.model] == "matching_v3":
+                static_model = paddle.jit.to_static(self._model.matching_v3, input_spec=self._input_spec)
+        else:
+            static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
+
+        paddle.jit.save(static_model, self.inference_model_path)
+        logger.info("The inference model save in the path:{}".format(self.inference_model_path))
