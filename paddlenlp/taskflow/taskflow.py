@@ -513,7 +513,7 @@ TASKS = {
                 "task_flag": "zero_shot_text_classification-utc-pico",
             },
         },
-        "default": {"model": "utc-large"},
+        "default": {"model": "utc-base"},
     },
     "feature_extraction": {
         "models": {
