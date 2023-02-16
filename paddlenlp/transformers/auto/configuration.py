@@ -88,10 +88,8 @@ class AutoConfig(PretrainedConfig):
         assert inspect.isclass(model_class) and issubclass(
             model_class, PretrainedModel
         ), f"<{model_class}> should be a PretarinedModel class, but <{type(model_class)}>"
-        assert (
-            model_class.config_class is not None
-        ), f"{model_class} do not support PretrainedConfig or there is no `config_class` attribute in model class"
-        return model_class.config_class
+
+        return cls if model_class.config_class is None else model_class.config_class
 
     @classmethod
     def from_file(cls, config_file: str, **kwargs) -> AutoConfig:
@@ -187,6 +185,6 @@ class AutoConfig(PretrainedConfig):
                 config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, resolved_config_file)
                 logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
                 if config_class is cls:
-                    return cls.from_file(config_file, **kwargs)
+                    return cls.from_file(resolved_config_file, **kwargs)
 
                 return config_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

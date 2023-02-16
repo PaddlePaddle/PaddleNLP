@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import tempfile
 import unittest
 
@@ -23,9 +24,12 @@ from paddlenlp.transformers import AutoConfig
 
 
 class AutoConfigTest(unittest.TestCase):
+
     def test_built_in_model_class_config(self):
         config = AutoConfig.from_pretrained("bert-base-uncased")
+        number = random.randint(0, 10000)
         assert config.hidden_size == 768
+        config.hidden_size = number
 
         with tempfile.TemporaryDirectory() as tempdir:
             config.save_pretrained(tempdir)
@@ -38,4 +42,20 @@ class AutoConfigTest(unittest.TestCase):
 
             # but it can load it as the PretrainedConfig class
             auto_config = AutoConfig.from_pretrained(tempdir)
-            assert auto_config.hidden_size == 11
+            assert auto_config.hidden_size == number
+
+    def test_community_model_class(self):
+        # OPT model do not support PretrainedConfig, but can load it as the AutoConfig object
+        config = AutoConfig.from_pretrained("facebook/opt-125m")
+
+        assert config.hidden_size == 768
+
+        number = random.randint(0, 10000)
+        config.hidden_size = number
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config.save_pretrained(tempdir)
+
+            # but it can load it as the PretrainedConfig class
+            auto_config = AutoConfig.from_pretrained(tempdir)
+            assert auto_config.hidden_size == number
