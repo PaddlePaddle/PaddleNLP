@@ -215,7 +215,7 @@ class DataCollatorIntegrationTest(unittest.TestCase):
             # Expect error due to padding token missing
             data_collator(pad_features)
 
-        set_seed(42)  # For reproducibility
+        set_seed(3)  # For reproducibility
         tokenizer = BertTokenizer(self.vocab_file)
         data_collator = DataCollatorForLanguageModeling(tokenizer)
         batch = data_collator(no_pad_features)
@@ -232,6 +232,7 @@ class DataCollatorIntegrationTest(unittest.TestCase):
 
         masked_tokens = batch["input_ids"] == tokenizer.mask_token_id
         self.assertTrue(paddle.any(masked_tokens))
+        # breakpoint()
         self.assertTrue(all(x == -100 for x in batch["labels"][~masked_tokens].tolist()))
 
         data_collator = DataCollatorForLanguageModeling(tokenizer, pad_to_multiple_of=8)
