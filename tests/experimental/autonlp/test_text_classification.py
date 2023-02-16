@@ -84,7 +84,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
         [
             (finetune_model_candidate, {"TrainingArguments.max_steps": 2}),
             (finetune_model_candidate, None),
-            # (multiclass_prompt_model_candidate, None),
+            (multiclass_prompt_model_candidate, None),
         ]
     )
     def test_multiclass(self, custom_model_candidate, hp_overrides):
@@ -163,7 +163,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
         [
             (finetune_model_candidate, {"TrainingArguments.max_steps": 2}),
             (finetune_model_candidate, None),
-            # (multilabel_prompt_model_candidate, None),
+            (multilabel_prompt_model_candidate, None),
         ]
     )
     def test_multilabel(self, custom_model_candidate, hp_overrides):
