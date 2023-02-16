@@ -18,7 +18,7 @@ import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
-import ray
+# import ray
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -243,7 +243,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
         experiment_name: str = None,
-        verbosity: int = 0,
+        verbosity: int = 1,
         hp_overrides: Dict[str, Any] = None,
         custom_model_candidates: List[Dict[str, Any]] = None,
     ) -> ResultGrid:
@@ -260,8 +260,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
-            verbosity: (int, optional): controls the verbosity of the logger. Defaults to 0, which set the logger level at INFO. To reduce the amount of logs,
-                use verbosity > 0 to set the logger level to WARNINGS
+            verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
+                use verbosity > 0 to set stop the workers from logging to the driver.
             hp_overrides: (dict[str, Any], optional): Advanced users only.
                 override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
@@ -297,10 +297,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
 
-        if verbosity >= 1:
-            ray.init(ignore_reinit_error=True)
-        else:
-            ray.init(log_to_driver=False, ignore_reinit_error=True)
+        # ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >=1 else False)
+
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
@@ -312,4 +310,5 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.show_training_results().to_csv(
             path_or_buf=os.path.join(self.output_dir, experiment_name, self.results_filename), index=False
         )
+
         return self.training_results
