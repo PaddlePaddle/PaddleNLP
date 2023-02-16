@@ -14,23 +14,24 @@
 # limitations under the License.
 
 import unittest
+from dataclasses import Field, dataclass, fields
 from typing import Optional, Tuple
-from dataclasses import dataclass, fields, Field
-from parameterized import parameterized_class
 
 import paddle
 from paddle import Tensor
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    TinyBertModel,
+    TinyBertForMultipleChoice,
+    TinyBertForPretraining,
     TinyBertForQuestionAnswering,
     TinyBertForSequenceClassification,
-    TinyBertForPretraining,
-    TinyBertForMultipleChoice,
+    TinyBertModel,
     TinyBertPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 @dataclass
@@ -175,34 +176,6 @@ class TinyBertModelTester:
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.num_choices])
-
-    def create_and_check_for_masked_lm(
-        self,
-        config,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        input_mask: Tensor,
-        sequence_labels: Tensor,
-        token_labels: Tensor,
-        choice_labels: Tensor,
-    ):
-        model = TinyBertForMaskedLM(TinyBertModel(**config))
-        model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-            labels=token_labels,
-            return_dict=self.parent.return_dict,
-        )
-        if not self.parent.return_dict and token_labels is None:
-            self.parent.assertTrue(paddle.is_tensor(result))
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
-
-        self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.seq_length, self.vocab_size])
 
     def create_and_check_for_question_answering(
         self,
@@ -431,7 +404,6 @@ class TinyBertModelIntegrationTest(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
-        past_key_value = output.past_key_values[0][0]
         expected_shape = [1, 11, 312]
         self.assertEqual(output[0].shape, expected_shape)
         expected_slice = paddle.to_tensor(
