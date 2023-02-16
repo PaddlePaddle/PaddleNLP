@@ -18,6 +18,7 @@ import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import ray
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -75,6 +76,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.language = language
         self.output_dir = output_dir
         self.kwargs = kwargs
+        # disable JSON, CSV and TensorBoardX logger callbacks
+        os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
 
     @property
     @abstractmethod
@@ -303,6 +306,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
 
+        ray.init(log_to_driver=False)
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
