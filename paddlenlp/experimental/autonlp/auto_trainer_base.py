@@ -18,7 +18,7 @@ import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
-# import ray
+import ray
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -45,6 +45,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
         greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+        verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
+                use verbosity > 0 to set stop the workers from logging to the driver.
     """
 
     training_path = "training"
@@ -59,6 +61,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         greater_is_better: bool,
         language: str = "Chinese",
         output_dir: str = "autonlp_results",
+        verbosity: int = 1,
         **kwargs,
     ):
         if not metric_for_best_model.startswith("eval_"):
@@ -76,8 +79,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.language = language
         self.output_dir = output_dir
         self.kwargs = kwargs
-        # disable JSON, CSV and TensorBoardX logger callbacks
-        os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
+        # use log_to_driver to control verbosity
+        print("verbosity", verbosity)
+        ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >= 1 else False)
 
     @property
     @abstractmethod
@@ -243,7 +247,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
         experiment_name: str = None,
-        verbosity: int = 1,
         hp_overrides: Dict[str, Any] = None,
         custom_model_candidates: List[Dict[str, Any]] = None,
     ) -> ResultGrid:
@@ -260,8 +263,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
-            verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
-                use verbosity > 0 to set stop the workers from logging to the driver.
             hp_overrides: (dict[str, Any], optional): Advanced users only.
                 override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
@@ -297,13 +298,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
 
-        # ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >=1 else False)
-
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
             run_config=RunConfig(
-                name=experiment_name, log_to_file=True, local_dir=self.output_dir if self.output_dir else None
+                name=experiment_name,
+                log_to_file=True,  # TODO: log_to_file doesn't stream logger output to file for some reason
+                local_dir=self.output_dir if self.output_dir else None,
+                callbacks=[tune.logger.CSVLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
