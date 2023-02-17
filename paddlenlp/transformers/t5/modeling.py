@@ -23,6 +23,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+
+try:
+    from paddle.amp.auto_cast import amp_state
+except ImportError:
+    from paddle.fluid.dygraph.amp.auto_cast import amp_state
 from paddle.distributed.fleet.utils import recompute
 
 from ...utils.converter import StateDictNameMapping
@@ -90,7 +95,7 @@ class T5LayerNorm(nn.Layer):
         hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
 
         # convert into float16 if necessary
-        if self.weight.dtype == paddle.float16:
+        if amp_state() or self.weight.dtype == paddle.float16:
             hidden_states = hidden_states.astype(paddle.float16)
         return self.weight * hidden_states
 
@@ -502,7 +507,7 @@ class T5Block(nn.Layer):
         attention_outputs = self_attention_outputs[2:]  # Keep self-attention outputs and relative position weights
 
         # clamp inf values to enable fp16 training
-        if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+        if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
             # TODO finfo
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
@@ -529,7 +534,7 @@ class T5Block(nn.Layer):
             hidden_states = cross_attention_outputs[0]
 
             # clamp inf values to enable fp16 training
-            if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+            if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
                 clamp_value = finfo(hidden_states.dtype).max - 1000
                 hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
 
@@ -544,7 +549,7 @@ class T5Block(nn.Layer):
         hidden_states = self.layer[-1](hidden_states)
 
         # clamp inf values to enable fp16 training
-        if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+        if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
 
@@ -1115,7 +1120,7 @@ class T5Stack(T5PretrainedModel):
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze([1, 2])
         encoder_extended_attention_mask = encoder_extended_attention_mask.astype(self.dtype)  # fp16 compatibility
 
-        if self.dtype == paddle.float16:
+        if amp_state() or self.dtype == paddle.float16:
             encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4
         elif self.dtype == paddle.float32:
             encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4

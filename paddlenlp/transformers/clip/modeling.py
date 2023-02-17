@@ -803,6 +803,23 @@ class CLIPVisionTransformer(nn.Layer):
             attentions=encoder_outputs.attentions,
         )
 
+    def forward_pre(self, x):
+        x = self.conv1(x)  # shape = [*, width, grid, grid]
+        x = x.reshape([x.shape[0], x.shape[1], -1])  # shape = [*, width, grid ** 2]
+        x = x.transpose((0, 2, 1))  # shape = [*, grid ** 2, width]
+        # t = self.class_embedding.weight + paddle.zeros([x.shape[0], 1, x.shape[-1]], dtype=x.dtype)
+        t = self.class_embedding.unsqueeze([0, 1]).expand([x.shape[0], -1, -1]) + paddle.zeros(
+            [x.shape[0], 1, x.shape[-1]], dtype=x.dtype
+        )
+        x = paddle.concat([t, x], axis=1)  # shape = [*, grid ** 2 + 1, width]
+        x = x + self.positional_embedding.weight
+        x = self.ln_pre(x)
+        return x
+
+    def forward_post(self, x):
+        x = self.ln_post(x)
+        return
+
 
 class CLIPVisionModel(CLIPPretrainedModel):
     r"""

@@ -17,6 +17,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ..initializer import normal_, zeros_
+
 
 class CrossAttention(nn.Layer):
     r"""
@@ -178,6 +180,73 @@ class CrossAttnProcessor:
 
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
+        # dropout
+        hidden_states = attn.to_out[1](hidden_states)
+
+        return hidden_states
+
+
+class LoRALinearLayer(nn.Layer):
+    def __init__(self, in_features, out_features, rank=4):
+        super().__init__()
+
+        if rank > min(in_features, out_features):
+            raise ValueError(f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}")
+
+        self.down = nn.Linear(in_features, rank, bias_attr=False)
+        self.up = nn.Linear(rank, out_features, bias_attr=False)
+        self.scale = 1.0
+
+        normal_(self.down.weight, std=1 / rank)
+        zeros_(self.up.weight)
+
+    def forward(self, hidden_states):
+        orig_dtype = hidden_states.dtype
+        dtype = self.down.weight.dtype
+
+        down_hidden_states = self.down(hidden_states.cast(dtype))
+        up_hidden_states = self.up(down_hidden_states)
+
+        return up_hidden_states.cast(orig_dtype)
+
+
+class LoRACrossAttnProcessor(nn.Layer):
+    def __init__(self, hidden_size, cross_attention_dim=None, rank=4):
+        super().__init__()
+
+        self.to_q_lora = LoRALinearLayer(hidden_size, hidden_size)
+        self.to_k_lora = LoRALinearLayer(cross_attention_dim or hidden_size, hidden_size)
+        self.to_v_lora = LoRALinearLayer(cross_attention_dim or hidden_size, hidden_size)
+        self.to_out_lora = LoRALinearLayer(hidden_size, hidden_size)
+
+    def __call__(
+        self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None, scale=1.0
+    ):
+        batch_size, sequence_length, _ = hidden_states.shape
+        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+        attention_mask = (
+            attention_mask.reshape([batch_size, attn.num_heads, -1, attention_mask.shape[-1]])
+            if attention_mask is not None
+            else None
+        )
+
+        query = attn.to_q(hidden_states) + scale * self.to_q_lora(hidden_states)
+        query = attn.head_to_batch_dim(query)
+
+        encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+
+        key = attn.to_k(encoder_hidden_states) + scale * self.to_k_lora(encoder_hidden_states)
+        value = attn.to_v(encoder_hidden_states) + scale * self.to_v_lora(encoder_hidden_states)
+
+        key = attn.head_to_batch_dim(key)
+        value = attn.head_to_batch_dim(value)
+
+        attention_probs = attn.get_attention_scores(query, key, attention_mask)
+        hidden_states = paddle.matmul(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+
+        # linear proj
+        hidden_states = attn.to_out[0](hidden_states) + scale * self.to_out_lora(hidden_states)
         # dropout
         hidden_states = attn.to_out[1](hidden_states)
 

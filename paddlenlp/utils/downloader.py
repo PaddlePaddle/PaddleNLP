@@ -174,8 +174,7 @@ def _download(url, path, md5sum=None):
     url (str): download url
     path (str): download to given path
     """
-    if not osp.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
     fname = osp.split(url)[-1]
     fullname = osp.join(path, fname)

@@ -12,14 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp import SimpleServer
-from paddlenlp.server import CustomModelHandler, MultiClassificationPostHandler
+from paddlenlp import SimpleServer, Taskflow
 
+cls = Taskflow("text_classification", task_path="../../checkpoint/export", is_static_model=True)
 app = SimpleServer()
-app.register(
-    "models/cls_multi_class",
-    model_path="../../export",
-    tokenizer_name="ernie-3.0-medium-zh",
-    model_handler=CustomModelHandler,
-    post_handler=MultiClassificationPostHandler,
-)
+app.register_taskflow("taskflow/cls", cls)
