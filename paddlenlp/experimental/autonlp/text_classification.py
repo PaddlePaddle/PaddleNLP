@@ -61,6 +61,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             language (string, required): language of the text.
             output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results".
             id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+            verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
+                use verbosity > 0 to set stop the workers from logging to the driver.
 
     """
 
@@ -317,7 +319,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             # import is required for proper pickling
             from paddlenlp.utils.log import logger
 
-            self.set_log_level()
             config = config["candidates"]
             trainer = self._construct_trainer(config)
             trainer.train()
