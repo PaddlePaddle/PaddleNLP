@@ -247,6 +247,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
+        id2label_path = os.path.join(self.output_dir, "id2label.json")
+        with open(id2label_path, "w", encoding="utf-8") as f:
+            json.dump(self.id2label, f, ensure_ascii=False)
+        logger.info(f"Exported id2label to {id2label_path}")
 
     def _construct_trainer(self, config, eval_dataset=None) -> Trainer:
         if "EarlyStoppingCallback.early_stopping_patience" in config:
@@ -427,27 +431,39 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
-            export_path (str, required): the filepath to export to
+            trial_id (int): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            export_path (str): the filepath to export to
             max_length (int): Maximum number of tokens for the model. Defaults to 512.
             batch_size(int): The sample number of a mini-batch. Defaults to 1.
             precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
-        task_path, mode = self.export(export_path=export_path, trial_id=trial_id)
+        model_result = self._get_model_result(trial_id=trial_id)
+        model_config = model_result.metrics["config"]["candidates"]
+        trial_id = model_result.metrics["trial_id"]
+
+        if export_path is None:
+            export_path = os.path.join(self.export_path, trial_id)
+
+        self.export(export_path=export_path, trial_id=trial_id)
+
+        if model_config["trainer_type"] == "PromptTrainer":
+            mode = "prompt"
+        else:
+            mode = "finetune"
 
         return Taskflow(
             "text_classification",
             mode=mode,
             is_static_model=True,
             problem_type=self.problem_type,
-            task_path=task_path,
+            task_path=export_path,
             multilabel_threshold=self.multilabel_threshold,
             batch_size=batch_size,
             max_length=max_length,
             precision=precision,
         )
 
-    def export(self, export_path=None, trial_id=None):
+    def export(self, export_path, trial_id=None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
@@ -460,8 +476,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         model_config = model_result.metrics["config"]["candidates"]
         trial_id = model_result.metrics["trial_id"]
 
-        if export_path is None:
-            export_path = os.path.join(self.export_path, trial_id)
         if os.path.exists(export_path):
             logger.info(
                 f"Export path for {trial_id} already exists: ({export_path}). The model parameter files will be overwritten."
@@ -477,7 +491,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if model_config["trainer_type"] == "PromptTrainer":
             trainer.export_model(export_path)
             trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
-            mode = "prompt"
         else:
             if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
                 input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
@@ -487,14 +500,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
                 ]
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
-            mode = "finetune"
         # save tokenizer
         trainer.tokenizer.save_pretrained(export_path)
 
         # save id2label
-        with open(os.path.join(export_path, "id2label.json"), "w", encoding="utf-8") as f:
-            json.dump(self.id2label, f, ensure_ascii=False)
+        shutil.copyfile(os.path.join(self.output_dir, "id2label.json"), os.path.join(export_path, "id2label.json"))
 
         logger.info(f"Exported {trial_id} to {export_path}")
-
-        return export_path, mode

@@ -151,7 +151,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             )
 
             # test taskflow
-            taskflow = auto_trainer.to_taskflow()
+            taskflow = auto_trainer.to_taskflow(export_path=temp_export_path)
             test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
             test_results = taskflow(test_inputs)
             self.assertEqual(len(test_results), len(test_inputs))
@@ -231,7 +231,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
-            taskflow = auto_trainer.to_taskflow()
+            taskflow = auto_trainer.to_taskflow(export_path=temp_export_path)
             test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
             test_results = taskflow(test_inputs)
             self.assertEqual(len(test_results), len(test_inputs))

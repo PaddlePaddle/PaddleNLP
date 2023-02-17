@@ -48,9 +48,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 use verbosity > 0 to set stop the workers from logging to the driver.
     """
 
-    training_path = "autonlp_training"
-    save_path = "checkpoint"
-    export_path = "autonlp_export"
+    training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
+    save_path = "trained_model"  # filepath for the trained dygraph model
+    export_path = "exported_model"  # filepath for the exported static model
     results_filename = "experiment_results.csv"
 
     def __init__(
@@ -135,7 +135,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    def export(self, export_path=None, trial_id=None):
+    def export(self, export_path, trial_id=None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
