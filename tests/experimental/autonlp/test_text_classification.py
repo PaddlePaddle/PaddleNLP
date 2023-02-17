@@ -126,6 +126,15 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     result_hp_key = f"config/candidates/{hp_key}"
                     self.assertEqual(results_df[result_hp_key][0], hp_value)
 
+            # test save
+            self.assertTrue(os.path.exists(os.path.join(auto_trainer.output_dir, "id2label.json")))
+            save_path = os.path.join(auto_trainer._get_model_result().log_dir, auto_trainer.save_path)
+            self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
+            self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
+                self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
+                self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
+
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
@@ -158,6 +167,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             for test_result in test_results:
                 for prediction in test_result["predictions"]:
                     self.assertIn(prediction["label"], auto_trainer.label2id)
+
+            # test training_path
+            self.assertFalse(os.path.exists(os.path.join(auto_trainer.training_path)))
 
     @parameterized.expand(
         [
@@ -205,6 +217,15 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     result_hp_key = f"config/candidates/{hp_key}"
                     self.assertEqual(results_df[result_hp_key][0], hp_value)
 
+            # test save
+            self.assertTrue(os.path.exists(os.path.join(auto_trainer.output_dir, "id2label.json")))
+            save_path = os.path.join(auto_trainer._get_model_result().log_dir, auto_trainer.save_path)
+            self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
+            self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
+                self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
+                self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
+
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
@@ -239,6 +260,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 for prediction in test_result["predictions"]:
                     self.assertIn(prediction["label"], auto_trainer.label2id)
                     self.assertGreater(prediction["score"], taskflow.task_instance.multilabel_threshold)
+
+            # test training_path
+            self.assertFalse(os.path.exists(os.path.join(auto_trainer.training_path)))
 
     def test_untrained_auto_trainer(self):
         with TemporaryDirectory() as temp_dir:
