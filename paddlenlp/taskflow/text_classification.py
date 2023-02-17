@@ -266,7 +266,11 @@ class TextClassificationTask(Task):
             collator = PromptDataCollatorWithPadding(
                 self._tokenizer, padding=True, return_tensors="np", return_attention_mask=True
             )
-            template_inputs = [self._template({"text_a": x}) for x in inputs]
+            part_text = "text"
+            for part in self._template.prompt:
+                if "text" in part:
+                    part_text = part["text"]
+            template_inputs = [self._template({part_text: x}) for x in inputs]
             batches = [template_inputs[idx : idx + batch_size] for idx in range(0, len(template_inputs), batch_size)]
         else:
             raise NotImplementedError(
