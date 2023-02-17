@@ -22,7 +22,6 @@ from parameterized import parameterized
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tests.testing_utils import get_tests_dir
 
 finetune_model_candidate = {
@@ -34,7 +33,7 @@ finetune_model_candidate = {
 }
 multiclass_prompt_model_candidate = {
     "trainer_type": "PromptTrainer",
-    "template.prompt": "“{'text': 'label_desc'}”这句话是关于{'mask'}的",
+    "template.prompt": "“{'text': 'sentence'}”这句话是关于{'mask'}的",
     "PromptTuningArguments.max_steps": 5,
     "PromptTuningArguments.per_device_train_batch_size": 2,
     "PromptTuningArguments.per_device_eval_batch_size": 2,
@@ -101,6 +100,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 text_column="sentence",
                 language="Chinese",
                 output_dir=temp_dir_path,
+                problem_type="multi_class",
             )
             auto_trainer.train(
                 num_cpus=1,
@@ -129,46 +129,35 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            if custom_model_candidate["trainer_type"] == "PromptTrainer":
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-            else:  # finetune_test
-                reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
-                reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
-                input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
-                model_outputs = reloaded_model(**input_features)
-                self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "id2label.json")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
-            # test evaluate
             if custom_model_candidate["trainer_type"] == "PromptTrainer":
-                with self.assertRaises(NotImplementedError):
-                    auto_trainer.evaluate()
-            else:
-                copy_dev_ds = copy.deepcopy(self.multi_class_dev_ds)
-                eval_metrics1 = auto_trainer.evaluate()
-                eval_metrics2 = auto_trainer.evaluate(eval_dataset=copy_dev_ds)
-                self.assertEqual(
-                    eval_metrics1[auto_trainer.metric_for_best_model],
-                    eval_metrics2[auto_trainer.metric_for_best_model],
-                )
+                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
 
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
             with self.assertRaises(LookupError):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
+            # test evaluate
+            copy_dev_ds = copy.deepcopy(self.multi_class_dev_ds)
+            eval_metrics1 = auto_trainer.evaluate()
+            eval_metrics2 = auto_trainer.evaluate(eval_dataset=copy_dev_ds)
+            self.assertEqual(
+                eval_metrics1[auto_trainer.metric_for_best_model],
+                eval_metrics2[auto_trainer.metric_for_best_model],
+            )
+
             # test taskflow
-            if custom_model_candidate["trainer_type"] == "PromptTrainer":
-                with self.assertRaises(NotImplementedError):
-                    auto_trainer.to_taskflow()
-            else:
-                taskflow = auto_trainer.to_taskflow()
-                test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
-                test_results = taskflow(test_inputs)
-                self.assertEqual(len(test_results), len(test_inputs))
-                for test_result in test_results:
-                    for prediction in test_result["predictions"]:
-                        self.assertIn(prediction["label"], auto_trainer.label2id)
+            taskflow = auto_trainer.to_taskflow(export_path=temp_export_path)
+            test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
+            test_results = taskflow(test_inputs)
+            self.assertEqual(len(test_results), len(test_inputs))
+            for test_result in test_results:
+                for prediction in test_result["predictions"]:
+                    self.assertIn(prediction["label"], auto_trainer.label2id)
 
     @parameterized.expand(
         [
@@ -177,7 +166,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             (multilabel_prompt_model_candidate, None),
         ]
     )
-    def test_multilabel_finetune(self, custom_model_candidate, hp_overrides):
+    def test_multilabel(self, custom_model_candidate, hp_overrides):
         with TemporaryDirectory() as temp_dir_path:
             train_ds = copy.deepcopy(self.multi_label_train_ds)
             dev_ds = copy.deepcopy(self.multi_label_dev_ds)
@@ -219,15 +208,22 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "id2label.json")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
+
             if custom_model_candidate["trainer_type"] == "PromptTrainer":
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
                 self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-            else:  # finetune_test
-                reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
-                reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
-                input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
-                model_outputs = reloaded_model(**input_features)
-                self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
+                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
+
+            # test evaluate
+            copy_dev_ds = copy.deepcopy(self.multi_label_dev_ds)
+            eval_metrics1 = auto_trainer.evaluate()
+            eval_metrics2 = auto_trainer.evaluate(eval_dataset=copy_dev_ds)
+            self.assertEqual(
+                eval_metrics1[auto_trainer.metric_for_best_model],
+                eval_metrics2[auto_trainer.metric_for_best_model],
+            )
 
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
@@ -235,18 +231,14 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
-            if custom_model_candidate["trainer_type"] == "PromptTrainer":
-                with self.assertRaises(NotImplementedError):
-                    auto_trainer.to_taskflow()
-            else:
-                taskflow = auto_trainer.to_taskflow()
-                test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
-                test_results = taskflow(test_inputs)
-                self.assertEqual(len(test_results), len(test_inputs))
-                for test_result in test_results:
-                    for prediction in test_result["predictions"]:
-                        self.assertIn(prediction["label"], auto_trainer.label2id)
-                        self.assertGreater(prediction["score"], taskflow.task_instance.multilabel_threshold)
+            taskflow = auto_trainer.to_taskflow(export_path=temp_export_path)
+            test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
+            test_results = taskflow(test_inputs)
+            self.assertEqual(len(test_results), len(test_inputs))
+            for test_result in test_results:
+                for prediction in test_result["predictions"]:
+                    self.assertIn(prediction["label"], auto_trainer.label2id)
+                    self.assertGreater(prediction["score"], taskflow.task_instance.multilabel_threshold)
 
     def test_untrained_auto_trainer(self):
         with TemporaryDirectory() as temp_dir:
