@@ -139,20 +139,46 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --device gpu \
     --use_amp False >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
+
+# cd ${nlp_dir}/model_zoo/bert/data
+# wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
+# cd ../
+
+# pretrain （Trainer）
+# time (python -m paddle.distributed.launch run_pretrain_trainer.py \
+#     --model_type bert \
+#     --model_name_or_path "bert" \
+#     --max_predictions_per_seq 20 \
+#     --per_device_train_batch_size 32  \
+#     --learning_rate 1e-4 \
+#     --weight_decay 1e-2 \
+#     --adam_epsilon 1e-6 \
+#     --warmup_steps 10000 \
+#     --input_dir data/ \
+#     --output_dir pretrained_models/ \
+#     --logging_steps 1 \
+#     --save_steps 1 \
+#     --max_steps 1 \
+#     --device gpu \
+#     --fp16 False \
+#     --do_train >${log_path}/bert_pretrain_trainer) >>${log_path}/bert_pretrain_trainer 2>&1
+# print_info $? bert_pretrain_trainer
+
 time (python -m paddle.distributed.launch run_glue.py \
-    --model_type bert \
-    --model_name_or_path bert-base-uncased \
+    --model_name_or_path __internal_testing__/bert \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
     --learning_rate 2e-5 \
-    --num_train_epochs 3 \
+    --num_train_epochs 1 \
     --logging_steps 1 \
     --save_steps 1 \
-    --max_steps 1 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
+    --fp16 False \
+    --do_train \
+    --do_eval >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
 print_info $? bert_fintune
 time (python -u ./export_model.py \
     --model_type bert \
@@ -163,10 +189,9 @@ time (python -u ./predict_glue.py \
     --task_name SST2 \
     --model_type bert \
     --model_path ./infer_model/model \
-    --batch_size 32 \
     --max_seq_length 128 >${log_path}/bert_predict) >>${log_path}/bert_predict 2>&1
 print_info $? bert_predict
- }
+}
 # 5 skep (max save 不可控 内置)
 skep () {
 cd ${nlp_dir}/examples/sentiment_analysis/skep/
@@ -1172,6 +1197,14 @@ else
     python -m pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
     print_info $? ernie-health
 fi
+# cd ${nlp_dir}/tests/model_zoo/
+# if [ ! -f 'test_ernie-health.py' ];then
+#     echo '模型测试文件不存在！'
+# else
+#     cd ${nlp_dir}
+#     python -m pytest -v tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
+#     print_info $? ernie-health
+# fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
