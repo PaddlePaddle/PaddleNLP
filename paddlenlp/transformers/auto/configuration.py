@@ -85,6 +85,8 @@ class AutoConfig(PretrainedConfig):
     # cache the builtin pretrained-model-name to Model Class
     name2class = None
     config_file = "config.json"
+
+    # TODO(wj-Mcat): the supporting should be removed after v2.6
     legacy_config_file = "config.json"
 
     @classmethod
