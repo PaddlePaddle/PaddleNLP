@@ -17,6 +17,7 @@ from typing import Optional
 import numpy as np
 import paddle
 
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoTokenizer, ErnieDualEncoder
 
 from ..utils.log import logger
@@ -135,6 +136,11 @@ class TextFeatureExtractionTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
+        # Fix windows dtype bug
+        if self._static_mode:
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
+        else:
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
 
     def _construct_input_spec(self):
         """
@@ -154,7 +160,6 @@ class TextFeatureExtractionTask(Task):
             if self._static_mode:
                 tokenized_inputs = self._tokenizer(
                     text=batch_examples,
-                    return_tensors="np",
                     padding="max_length",
                     truncation=True,
                     max_seq_len=self.max_seq_len,
@@ -162,7 +167,6 @@ class TextFeatureExtractionTask(Task):
             else:
                 tokenized_inputs = self._tokenizer(
                     text=batch_examples,
-                    return_tensors="pd",
                     padding="max_length",
                     truncation=True,
                     max_seq_len=self.max_seq_len,
@@ -198,6 +202,7 @@ class TextFeatureExtractionTask(Task):
         if self._static_mode:
             with static_mode_guard():
                 for batch_inputs in inputs["batches"]:
+                    batch_inputs = self._collator(batch_inputs)
                     if self._predictor_type == "paddle-inference":
                         if "input_ids" in batch_inputs:
                             self.input_handles[0].copy_from_cpu(batch_inputs["input_ids"])
@@ -216,6 +221,7 @@ class TextFeatureExtractionTask(Task):
 
         else:
             for batch_inputs in inputs["batches"]:
+                batch_inputs = self._collator(batch_inputs)
                 text_features = self._model.get_pooled_embedding(
                     input_ids=batch_inputs["input_ids"], token_type_ids=batch_inputs["token_type_ids"]
                 )
