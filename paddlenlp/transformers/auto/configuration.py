@@ -25,7 +25,11 @@ from huggingface_hub import hf_hub_download
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url,
+    url_file_exists,
+)
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
@@ -81,6 +85,7 @@ class AutoConfig(PretrainedConfig):
     # cache the builtin pretrained-model-name to Model Class
     name2class = None
     config_file = "config.json"
+    legacy_config_file = "config.json"
 
     @classmethod
     def _get_config_class_from_config(
@@ -89,9 +94,13 @@ class AutoConfig(PretrainedConfig):
         with io.open(config_file_path, encoding="utf-8") as f:
             config = json.load(f)
 
-        architectures = config.pop("architectures", None)
-        if architectures is None:
-            return cls
+        # add support for legacy config
+        if "init_class" in config:
+            architectures = [config.pop("init_class")]
+        else:
+            architectures = config.pop("architectures", None)
+            if architectures is None:
+                return cls
 
         model_name = architectures[0]
         model_class = import_module(f"paddlenlp.transformers.{model_name}")
@@ -172,7 +181,15 @@ class AutoConfig(PretrainedConfig):
         elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path, cls.config_file)
             if not os.path.exists(config_file):
-                raise ValueError(f"config file<{cls.config_file}> not found")
+                # try to load legacy config file
+                legacy_config_file = os.path.join(pretrained_model_name_or_path, cls.legacy_config_file)
+                if not os.path.exists(legacy_config_file):
+                    raise ValueError(
+                        f"config file<{cls.config_file}> or legacy config file<{cls.legacy_config_file}> not found"
+                    )
+
+                logger.warning(f"loading legacy config file<{cls.legacy_config_file}> ...")
+                config_file = legacy_config_file
 
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
@@ -194,25 +211,29 @@ class AutoConfig(PretrainedConfig):
 
         # Assuming from community-contributed pretrained models
         else:
+            # add support for legacy config file ...
             community_config_path = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file])
+            if not url_file_exists(community_config_path):
+                legacy_community_config_path = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_config_file]
+                )
+                if not url_file_exists(legacy_community_config_path):
+                    raise RuntimeError(
+                        f"Can't load Config for '{pretrained_model_name_or_path}'.\n"
+                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                        "- a correct model-identifier of built-in pretrained models,\n"
+                        "- or a correct model-identifier of community-contributed pretrained models,\n"
+                        "- or the correct path to a directory containing relevant config files.\n"
+                    )
+                logger.warning(f"loading legacy config file<{cls.legacy_config_file}> ...")
+                community_config_path = legacy_community_config_path
 
             default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            try:
-                resolved_config_file = get_path_from_url(community_config_path, default_root)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't load Config for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "- a correct model-identifier of built-in pretrained models,\n"
-                    "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant config files.\n"
-                )
+            resolved_config_file = get_path_from_url(community_config_path, default_root)
 
-            if os.path.exists(resolved_config_file):
-                config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, resolved_config_file)
-                logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
-                if config_class is cls:
-                    return cls.from_file(resolved_config_file, **kwargs)
+            config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, resolved_config_file)
+            logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
+            if config_class is cls:
+                return cls.from_file(resolved_config_file, **kwargs)
 
-                return config_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            return config_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
