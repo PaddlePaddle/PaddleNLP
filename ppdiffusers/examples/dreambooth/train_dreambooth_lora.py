@@ -20,15 +20,17 @@ import hashlib
 import math
 import os
 import sys
+import time
 import warnings
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from huggingface_hub import HfFolder, Repository, create_repo, whoami
+import requests
+from huggingface_hub import HfFolder, create_repo, upload_folder, whoami
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -52,6 +54,33 @@ from ppdiffusers.loaders import AttnProcsLayers
 from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
 from ppdiffusers.optimization import get_scheduler
+
+
+# Since HF sometimes timeout, we need to retry uploads
+# Credit: https://github.com/huggingface/datasets/blob/06ae3f678651bfbb3ca7dd3274ee2f38e0e0237e/src/datasets/utils/file_utils.py#L265
+def _retry(
+    func,
+    func_args: Optional[tuple] = None,
+    func_kwargs: Optional[dict] = None,
+    exceptions: Type[requests.exceptions.RequestException] = requests.exceptions.RequestException,
+    max_retries: int = 0,
+    base_wait_time: float = 0.5,
+    max_wait_time: float = 2,
+):
+    func_args = func_args or ()
+    func_kwargs = func_kwargs or {}
+    retry = 0
+    while True:
+        try:
+            return func(*func_args, **func_kwargs)
+        except exceptions as err:
+            if retry >= max_retries:
+                raise err
+            else:
+                sleep_time = min(max_wait_time, base_wait_time * 2**retry)  # Exponential backoff
+                logger.info(f"{func} timed out, retrying in {sleep_time}s... [{retry/max_retries}]")
+                time.sleep(sleep_time)
+                retry += 1
 
 
 def url_or_path_join(*path_list):
@@ -561,21 +590,7 @@ def main():
             gc.collect()
 
     if is_main_process:
-        if args.push_to_hub:
-            if args.hub_model_id is None:
-                repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
-            else:
-                repo_name = args.hub_model_id
-
-            create_repo(repo_name, exist_ok=True, token=args.hub_token)
-            repo = Repository(args.output_dir, clone_from=repo_name, token=args.hub_token)
-
-            with open(os.path.join(args.output_dir, ".gitignore"), "w+") as gitignore:
-                if "step_*" not in gitignore:
-                    gitignore.write("step_*\n")
-                if "epoch_*" not in gitignore:
-                    gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
+        if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer
@@ -877,15 +892,6 @@ def main():
         unet = unwrap_model(unet)
         unet.save_attn_procs(args.output_dir)
 
-        if args.push_to_hub:
-            save_model_card(
-                repo_name,
-                images=images,
-                base_model=args.pretrained_model_name_or_path,
-                prompt=args.instance_prompt,
-                repo_folder=args.output_dir,
-            )
-            repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
         # Final inference
         # Load previous pipeline
         pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, safety_checker=None)
@@ -908,6 +914,45 @@ def main():
                 writer.add_image("test", np_images, epoch, dataformats="NHWC")
 
         writer.close()
+
+        # logic to push to HF Hub
+        if args.push_to_hub:
+            if args.hub_model_id is None:
+                repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
+            else:
+                repo_name = args.hub_model_id
+
+            _retry(
+                create_repo,
+                func_kwargs={"repo_id": repo_name, "exist_ok": True, "token": args.hub_token},
+                base_wait_time=1.0,
+                max_retries=5,
+                max_wait_time=10.0,
+            )
+
+            save_model_card(
+                repo_name,
+                images=images,
+                base_model=args.pretrained_model_name_or_path,
+                prompt=args.instance_prompt,
+                repo_folder=args.output_dir,
+            )
+            # Upload model
+            logger.info(f"Pushing to {repo_name}")
+            _retry(
+                upload_folder,
+                func_kwargs={
+                    "repo_id": repo_name,
+                    "repo_type": "model",
+                    "folder_path": args.output_dir,
+                    "commit_message": "End of training",
+                    "token": args.hub_token,
+                    "ignore_patterns": ["checkpoint-*/*", "logs/*"],
+                },
+                base_wait_time=1.0,
+                max_retries=5,
+                max_wait_time=20.0,
+            )
 
 
 if __name__ == "__main__":
