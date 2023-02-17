@@ -215,7 +215,7 @@ class DataCollatorIntegrationTest(unittest.TestCase):
             # Expect error due to padding token missing
             data_collator(pad_features)
 
-        set_seed(42)  # For reproducibility
+        set_seed(3)  # For reproducibility
         tokenizer = BertTokenizer(self.vocab_file)
         data_collator = DataCollatorForLanguageModeling(tokenizer)
         batch = data_collator(no_pad_features)
