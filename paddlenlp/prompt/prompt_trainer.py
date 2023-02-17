@@ -144,7 +144,7 @@ class PromptTrainer(Trainer):
     def load_state_dict_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
         if resume_from_checkpoint is not None:
             self.template = AutoTemplate.load_from(
-                resume_from_checkpoint, self.tokenizer, self.args.max_seq_length, self._get_model()
+                resume_from_checkpoint, self.tokenizer, self.args.max_seq_length, self._get_model().plm
             )
         super(PromptTrainer, self).load_state_dict_from_checkpoint(resume_from_checkpoint)
 

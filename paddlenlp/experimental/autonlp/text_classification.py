@@ -289,6 +289,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
         id2label_path = os.path.join(self.output_dir, "id2label.json")
         with open(id2label_path, "w", encoding="utf-8") as f:
             json.dump(self.id2label, f, ensure_ascii=False)
