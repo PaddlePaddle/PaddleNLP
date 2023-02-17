@@ -364,6 +364,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
 
         eval_metrics = trainer.evaluate()
+        if os.path.exists(self.training_path):
+            logger.info(f"Removing {self.training_path} to conserve disk space")
+            shutil.rmtree(self.training_path)
         return eval_metrics
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
@@ -505,5 +508,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         # save id2label
         shutil.copyfile(os.path.join(self.output_dir, "id2label.json"), os.path.join(export_path, "id2label.json"))
+
+        if os.path.exists(self.training_path):
+            logger.info("Removing training checkpoints to conserve disk space")
+            shutil.rmtree(self.training_path)
 
         logger.info(f"Exported {trial_id} to {export_path}")
