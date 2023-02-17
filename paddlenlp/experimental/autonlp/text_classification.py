@@ -325,6 +325,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self) -> Callable:
         def trainable(config):
+            # import is required for proper pickling
+            from paddlenlp.utils.log import logger
 
             self.set_log_level()
             config = config["candidates"]
@@ -397,7 +399,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _preprocess_labels(self, example):
         if self.problem_type == "multi_class":
-            example["labels"] = self.label2id[example[self.label_column]]
+            example["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
         # multi_label
         else:
             labels = [1.0 if i in example[self.label_column] else 0.0 for i in self.label2id]
@@ -474,7 +476,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         # save static model
         if model_config["trainer_type"] == "PromptTrainer":
             trainer.export_model(export_path)
-            trainer.plm.save_pretrained(os.path.join(export_path, "plm"))
+            trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
             mode = "prompt"
         else:
             if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
