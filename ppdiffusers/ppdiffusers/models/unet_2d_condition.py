@@ -129,7 +129,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
-        resnet_pre_temb_non_linearity=False,
+        resnet_pre_temb_non_linearity=[False],
     ):
         super().__init__()
 
@@ -193,12 +193,12 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 cross_attention_dim=cross_attention_dim,
                 attn_num_head_channels=attention_head_dim[i],
                 downsample_padding=downsample_padding,
-                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
                 dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 only_cross_attention=only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
             self.down_blocks.append(down_block)
 
@@ -491,7 +491,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # 3. down
         down_block_res_samples = (sample,)
-        if self.resnet_pre_temb_non_linearity:
+        if self.resnet_pre_temb_non_linearity[0]:
             down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
         else:
             down_nonlinear_temb = emb
@@ -499,20 +499,20 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
         sample = self.mid_block(
             sample,
-            emb,
+            down_nonlinear_temb,
             encoder_hidden_states=encoder_hidden_states,
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
@@ -532,7 +532,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     res_hidden_states_tuple=res_samples,
                     encoder_hidden_states=encoder_hidden_states,
                     cross_attention_kwargs=cross_attention_kwargs,

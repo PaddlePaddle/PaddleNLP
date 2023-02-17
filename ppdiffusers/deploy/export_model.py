@@ -32,7 +32,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
 ):
     pipeline = StableDiffusionPipeline.from_pretrained(model_path, safety_checker=None, feature_extractor=None)
     # enable unet pre_temb_act opt
-    pipeline.unet.resnet_pre_temb_non_linearity = True
+    pipeline.unet.resnet_pre_temb_non_linearity[0] = True
     output_path = Path(output_path)
     # calculate latent's H and W
     latent_height = height // 8 if height is not None else None
