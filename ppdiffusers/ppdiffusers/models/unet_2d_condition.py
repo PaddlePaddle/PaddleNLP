@@ -229,10 +229,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 cross_attention_dim=cross_attention_dim,
                 attn_num_head_channels=attention_head_dim[-1],
                 resnet_groups=norm_num_groups,
-<<<<<<< HEAD
-=======
-                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
->>>>>>> ca1a55533... silu opt disable by default and enable on sd export
                 resnet_time_scale_shift=resnet_time_scale_shift,
                 resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
