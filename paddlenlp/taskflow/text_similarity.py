@@ -133,6 +133,26 @@ class TextSimilarityTask(Task):
                 "dcff14cd671e1064be2c5d63734098bb",
             ],
         },
+        "rocketqav2-en-marco-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqav2-en-marco-cross-encoder/model_state.pdparams",
+                "a5afc77b6a63fc32a1beca3010f40f32",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqav2-en-marco-cross-encoder/config.json",
+                "8f5d5c71c8a891b68d0402a13e38b6f9",
+            ],
+        },
+        "ernie-search-large-cross-encoder-marco-en": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/ernie-search-large-cross-encoder-marco-en/model_state.pdparams",
+                "fdf29f7de0f7fe570740d343c96165e5",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/ernie-search-large-cross-encoder-marco-en/config.json",
+                "28bad2c7b36fa148fa75a8dc5b690485",
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, max_seq_len=384, **kwargs):
@@ -163,8 +183,11 @@ class TextSimilarityTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if "rocketqa" in model:
-            self._model = ErnieCrossEncoder(model)
+
+        if "rocketqav2-en" in model or "ernie-search" in model:
+            self._model = ErnieCrossEncoder(model, num_classes=1, reinitialize=True)
+        elif "rocketqa" in model:
+            self._model = ErnieCrossEncoder(model, num_classes=2)
         else:
             self._model = BertModel.from_pretrained(self._task_path, pool_act="linear")
         self._model.eval()
@@ -173,7 +196,7 @@ class TextSimilarityTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        if "rocketqa" in model:
+        if "rocketqa" in model or "ernie-search" in model:
             self._tokenizer = ErnieTokenizer.from_pretrained(model)
         else:
             self._tokenizer = BertTokenizer.from_pretrained(model)
@@ -195,7 +218,7 @@ class TextSimilarityTask(Task):
         examples = []
         for data in inputs:
             text1, text2 = data[0], data[1]
-            if "rocketqa" in self.model_name:
+            if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
                 encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_seq_len=self._max_seq_len)
                 ids = encoded_inputs["input_ids"]
                 segment_ids = encoded_inputs["token_type_ids"]
@@ -212,7 +235,7 @@ class TextSimilarityTask(Task):
                 examples.append((text1_input_ids, text1_token_type_ids, text2_input_ids, text2_token_type_ids))
 
         batches = [examples[idx : idx + self._batch_size] for idx in range(0, len(examples), self._batch_size)]
-        if "rocketqa" in self.model_name:
+        if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input ids
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token type ids
@@ -236,7 +259,7 @@ class TextSimilarityTask(Task):
         Run the task model from the outputs of the `_tokenize` function.
         """
         results = []
-        if "rocketqa" in self.model_name:
+        if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
                     input_ids, segment_ids = self._batchify_fn(batch)
@@ -276,7 +299,10 @@ class TextSimilarityTask(Task):
             result["text1"] = text[0]
             result["text2"] = text[1]
             # The numpy.float32 can not be converted to the json format
-            result["similarity"] = float(similarity)
+            if isinstance(similarity, list):
+                result["similarity"] = float(similarity[0])
+            else:
+                result["similarity"] = float(similarity)
             final_results.append(result)
         return final_results
 

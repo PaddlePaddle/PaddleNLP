@@ -24,6 +24,24 @@ from ..utils.log import logger
 from .task import Task
 from .utils import static_mode_guard
 
+ENCODER_TYPE = {
+    "rocketqa-zh-dureader-query-encoder": "query",
+    "rocketqa-zh-dureader-para-encoder": "paragraph",
+    "rocketqa-zh-base-query-encoder": "query",
+    "rocketqa-zh-base-para-encoder": "paragraph",
+    "rocketqa-zh-medium-query-encoder": "query",
+    "rocketqa-zh-medium-para-encoder": "paragraph",
+    "rocketqa-zh-mini-query-encoder": "query",
+    "rocketqa-zh-mini-para-encoder": "paragraph",
+    "rocketqa-zh-micro-query-encoder": "query",
+    "rocketqa-zh-micro-para-encoder": "paragraph",
+    "rocketqa-zh-nano-query-encoder": "query",
+    "rocketqa-zh-nano-para-encoder": "paragraph",
+    "rocketqav2-en-marco-query-encoder": "query",
+    "rocketqav2-en-marco-para-encoder": "paragraph",
+    "ernie-search-base-dual-encoder-marco-en": "query_paragraph",
+}
+
 
 class TextFeatureExtractionTask(Task):
 
@@ -92,6 +110,7 @@ class TextFeatureExtractionTask(Task):
         return_tensors: bool = True,
         reinitialize: bool = False,
         share_parameters: bool = False,
+        is_paragraph: bool = False,
         output_emb_size: Optional[int] = None,
         **kwargs
     ):
@@ -108,7 +127,8 @@ class TextFeatureExtractionTask(Task):
         self.reinitialize = reinitialize
         self.share_parameters = share_parameters
         self.output_emb_size = output_emb_size
-
+        self.is_paragraph = is_paragraph
+        self._check_para_encoder()
         # self._check_task_files()
         self._check_predictor_type()
         self._construct_tokenizer()
@@ -117,6 +137,15 @@ class TextFeatureExtractionTask(Task):
             self._get_inference_model()
         else:
             self._construct_model(model)
+
+    def _check_para_encoder(self):
+        if self.model in ENCODER_TYPE:
+            if ENCODER_TYPE[self.model] == "paragraph":
+                self.is_paragraph = True
+            else:
+                self.is_paragraph = False
+        else:
+            self.is_paragraph = False
 
     def _construct_model(self, model):
         """
@@ -157,16 +186,19 @@ class TextFeatureExtractionTask(Task):
         """
 
         def _parse_batch(batch_examples):
-            if self._static_mode:
+            if self.is_paragraph:
+                # The input of the passage encoder is [CLS][SEP]...[SEP].
                 tokenized_inputs = self._tokenizer(
-                    text=batch_examples,
+                    text=[""] * len(batch_examples),
+                    text_pair=batch_examples,
                     padding="max_length",
                     truncation=True,
                     max_seq_len=self.max_seq_len,
                 )
             else:
                 tokenized_inputs = self._tokenizer(
-                    text=batch_examples,
+                    text=[""] * len(batch_examples),
+                    text_pair=batch_examples,
                     padding="max_length",
                     truncation=True,
                     max_seq_len=self.max_seq_len,
