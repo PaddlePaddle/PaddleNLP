@@ -134,6 +134,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         chinese_models = hp.choice(
             "models",
             [
+                "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
                 "ernie-3.0-tiny-base-v2-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
                 "ernie-3.0-tiny-medium-v2-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
@@ -153,6 +154,21 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "ernie-3.0-tiny-mini-v2-en",  # 6-layer, 384-hidden, 12-heads, 27M parameters
                 "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
                 "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
+            ],
+        )
+        english_prompt_models = hp.choice(
+            "models",
+            [
+                # add deberta-v3 when we have it
+                "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
+                "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
+            ],
+        )
+        chinese_prompt_models = hp.choice(
+            "models",
+            [
+                "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
+                "ernie-1.0-base-zh-cw"  # 12-layer, 768-hidden, 12-heads, 118M parameters.
             ],
         )
         return [
@@ -202,7 +218,33 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.model_name_or_path": english_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
-            # Note: prompt tuning candidates not included for now due to lack of inference capability
+            # prompt tuning candidates
+            {
+                "preset": "prompt",
+                "language": "Chinese",
+                "trainer_type": "PromptTrainer",
+                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
+                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "PromptTuningArguments.num_train_epochs": 100,
+                "PromptTuningArguments.model_name_or_path": chinese_prompt_models,
+                "PromptTuningArguments.learning_rate": 1e-5,
+                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+            },
+            {
+                "preset": "prompt",
+                "language": "English",
+                "trainer_type": "PromptTrainer",
+                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
+                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "PromptTuningArguments.num_train_epochs": 100,
+                "PromptTuningArguments.model_name_or_path": english_prompt_models,
+                "PromptTuningArguments.learning_rate": 1e-5,
+                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+            },
         ]
 
     def _data_checks_and_inference(self):
@@ -247,6 +289,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
         id2label_path = os.path.join(self.output_dir, "id2label.json")
         with open(id2label_path, "w", encoding="utf-8") as f:
             json.dump(self.id2label, f, ensure_ascii=False)
