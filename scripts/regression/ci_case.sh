@@ -708,7 +708,7 @@ python -m paddle.distributed.launch train.py --config ./config/transformer.yaml 
 print_info $? stacl_wk-1
 
 time (sed -i "s/batch_size: 500/batch_size: 100/g" config/transformer.yaml
-sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models_1/step_1/"#g' config/transformer.yaml
+sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models/step_1/"#g' config/transformer.yaml
 python predict.py --config ./config/transformer.yaml >${log_path}/stacl_predict) >>${log_path}/stacl_predict 2>&1
 print_info $? stacl_predict
 }
