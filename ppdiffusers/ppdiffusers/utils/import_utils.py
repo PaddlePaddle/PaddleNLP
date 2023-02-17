@@ -143,6 +143,13 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _k_diffusion_available = True
 
+_wandb_available = importlib.util.find_spec("wandb") is not None
+try:
+    _wandb_version = importlib_metadata.version("wandb")
+    logger.debug(f"Successfully imported wandb version {_wandb_version }")
+except importlib_metadata.PackageNotFoundError:
+    _wandb_available = False
+
 
 def is_paddle_available():
     return _paddle_available
@@ -182,6 +189,10 @@ def is_fastdeploy_available():
 
 def is_k_diffusion_available():
     return _k_diffusion_available
+
+
+def is_wandb_available():
+    return _wandb_available
 
 
 # docstyle-ignore
@@ -238,6 +249,12 @@ K_DIFFUSION_IMPORT_ERROR = """
 install k-diffusion`
 """
 
+# docstyle-ignore
+WANDB_IMPORT_ERROR = """
+{0} requires the wandb library but it was not found in your environment. You can install it with pip: `pip
+install wandb`
+"""
+
 BACKENDS_MAPPING = OrderedDict(
     [
         ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
@@ -249,6 +266,7 @@ BACKENDS_MAPPING = OrderedDict(
         ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
         ("librosa", (is_librosa_available, LIBROSA_IMPORT_ERROR)),
         ("k_diffusion", (is_k_diffusion_available, K_DIFFUSION_IMPORT_ERROR)),
+        ("wandb", (is_wandb_available, WANDB_IMPORT_ERROR)),
     ]
 )
 

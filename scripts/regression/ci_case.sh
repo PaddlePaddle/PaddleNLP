@@ -19,10 +19,10 @@ export cudaid1=$2
 export cudaid2=$3
 export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-if [ -f "model_logs/" ];then 
+if [ ! -f "model_logs/" ];then 
     mkdir model_logs
 fi
-if [ -f "unittest_logs/" ];then 
+if [ ! -f "unittest_logs/" ];then 
     mkdir unittest_logs
 fi
 print_info(){
@@ -707,21 +707,8 @@ sed -i "s/batch_size: 4096/batch_size: 500/g" config/transformer.yaml
 python -m paddle.distributed.launch train.py --config ./config/transformer.yaml  >${log_path}/stacl_wk-1) >>${log_path}/stacl_wk-1 2>&1
 print_info $? stacl_wk-1
 
-time (
-sed -i "s/waitk: -1/waitk: 3/g" config/transformer.yaml
-sed -i 's/save_model: "trained_models"/save_model: "trained_models_3"/g' config/transformer.yaml
-sed -i 's#init_from_checkpoint: ""#init_from_checkpoint: "./trained_models/step_1/"#g' config/transformer.yaml
-python -m paddle.distributed.launch  train.py --config ./config/transformer.yaml >${log_path}/stacl_wk3) >>${log_path}/stacl_wk3 2>&1
-print_info $? stacl_wk3
-
-time (sed -i "s/waitk: 3/waitk: 5/g" config/transformer.yaml
-sed -i 's/save_model: "trained_models_3"/save_model: "trained_models_5"/g' config/transformer.yaml
-sed -i 's#init_from_checkpoint: "./trained_models/step_1/"#init_from_checkpoint: "./trained_models_3/step_1/"#g' config/transformer.yaml
-python -m paddle.distributed.launch train.py --config ./config/transformer.yaml >${log_path}/stacl_wk5) >>${log_path}/stacl_wk5 2>&1
-print_info $? stacl_wk5
-
 time (sed -i "s/batch_size: 500/batch_size: 100/g" config/transformer.yaml
-sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models_5/step_1/"#g' config/transformer.yaml
+sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models/step_1/"#g' config/transformer.yaml
 python predict.py --config ./config/transformer.yaml >${log_path}/stacl_predict) >>${log_path}/stacl_predict 2>&1
 print_info $? stacl_predict
 }
@@ -1135,60 +1122,68 @@ fast_transformer
 }
 ernie-3.0(){
 cd ${nlp_dir}/model_zoo/ernie-3.0/
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-    unset http_proxy
-    unset https_proxy
-    #训练
-    python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_seq_cls >>${log_path}/ernie-3.0_train_seq_cls 2>&1
-    print_info $? ernie-3.0_train_seq_cls
-    python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_token_cls >>${log_path}/ernie-3.0_train_token_cls 2>&1
-    print_info $? ernie-3.0_train_token_cls
-    python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_qa >>${log_path}/ernie-3.0_train_qa 2>&1
-    print_info $? ernie-3.0_train_qa
-    # 预测
-    python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_seq_cls >>${log_path}/ernie-3.0_predict_seq_cls 2>&1
-    print_info $? ernie-3.0_predict_seq_cls
-    python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_token_cls >>${log_path}/ernie-3.0_predict_token_cls 2>&1
-    print_info $? ernie-3.0_predict_token_cls
-    python run_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_qa >>${log_path}/ernie-3.0_predict_qa 2>&1
-    print_info $? ernie-3.0_predict_qa
-    #压缩
-    python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5 --save_steps 5 --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_seq_cls >>${log_path}/ernie-3.0_compress_seq_cls 2>&1
-    print_info $? ernie-3.0_compress_seq_cls
-    python compress_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models/msra_ner --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_token_cls >>${log_path}/ernie-3.0_compress_token_cls 2>&1
-    print_info $? ernie-3.0_compress_token_cls
-    python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
-    print_info $? ernie-3.0_compress_qa
-else 
-    python -m pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
-    print_info $? ernie-3.0
-fi
+#训练
+python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_seq_cls >>${log_path}/ernie-3.0_train_seq_cls 2>&1
+print_info $? ernie-3.0_train_seq_cls
+python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_token_cls >>${log_path}/ernie-3.0_train_token_cls 2>&1
+print_info $? ernie-3.0_train_token_cls
+python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_qa >>${log_path}/ernie-3.0_train_qa 2>&1
+print_info $? ernie-3.0_train_qa
+# 预测
+python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_seq_cls >>${log_path}/ernie-3.0_predict_seq_cls 2>&1
+print_info $? ernie-3.0_predict_seq_cls
+python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_token_cls >>${log_path}/ernie-3.0_predict_token_cls 2>&1
+print_info $? ernie-3.0_predict_token_cls
+python run_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_qa >>${log_path}/ernie-3.0_predict_qa 2>&1
+print_info $? ernie-3.0_predict_qa
+#压缩
+python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5 --save_steps 5 --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_seq_cls >>${log_path}/ernie-3.0_compress_seq_cls 2>&1
+print_info $? ernie-3.0_compress_seq_cls
+python compress_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models/msra_ner --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_token_cls >>${log_path}/ernie-3.0_compress_token_cls 2>&1
+print_info $? ernie-3.0_compress_token_cls
+python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
+print_info $? ernie-3.0_compress_qa
 }
 ernie-health(){
-if [ ! -f 'test.py' ];then
+cd ${nlp_dir}/tests/model_zoo/
+if [ ! -f 'test_ernie-health.py' ];then
     echo '模型测试文件不存在！'
 else 
-    python -m pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
-    print_info $? ernie-health
+    python -m pytest tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health_unittest>>${log_path}/ernie-health_unittest 2>&1
+    print_info $? tests ernie-health_unittest
 fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-else 
-    python -m pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
-    print_info $? uie
-fi
+mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json
+python doccano.py --doccano_file ./data/doccano_ext.json --task_type ext --save_dir ./data --splits 0.8 0.2 0 --schema_lang ch >${log_path}/uie_doccano>>${log_path}/uie_doccano 2>&1
+print_info $? uie_doccano
+python -u -m paddle.distributed.launch finetune.py --device gpu --logging_steps 2 --save_steps 2 --eval_steps 2 --seed 42 \
+    --model_name_or_path uie-base --output_dir ./checkpoint/model_best --train_path data/train.txt --dev_path data/dev.txt \
+    --max_seq_length 512 --per_device_eval_batch_size 16 --per_device_train_batch_size 16 --num_train_epochs 100 --learning_rate 1e-5 \
+    --do_train --do_eval --do_export --export_model_dir ./checkpoint/model_best --label_names start_positions end_positions \
+    --overwrite_output_dir --disable_tqdm True --metric_for_best_model eval_f1 --load_best_model_at_end True \
+    --save_total_limit 1 --max_steps 2  >${log_path}/uie_train>>${log_path}/uie_train2>&1
+print_info $? uie_train
+python evaluate.py --model_path ./checkpoint/model_best --test_path ./data/dev.txt --batch_size 16 --max_seq_len 512 >${log_path}/uie_eval>>${log_path}/uie_eval 2>&1
+print_info $? uie_eval
 }
 ernie-layout(){
 cd ${nlp_dir}/model_zoo/ernie-layout/  
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-else 
-    python -m pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
-    print_info $? ernie-layout
-fi
+# train ner
+python -u run_ner.py --model_name_or_path ernie-layoutx-base-uncased --output_dir ./ernie-layoutx-base-uncased/models/funsd/ \
+    --dataset_name funsd --do_train --do_eval --max_steps 2 --eval_steps 2 --save_steps 2 --save_total_limit 1 --seed 1000 --overwrite_output_dir \
+    --load_best_model_at_end --pattern ner-bio --preprocessing_num_workers 4 --overwrite_cache false --doc_stride 128 --target_size 1000 \
+    --per_device_train_batch_size 4 --per_device_eval_batch_size 4 --learning_rate 2e-5 --lr_scheduler_type constant --gradient_accumulation_steps 1 \
+    --metric_for_best_model eval_f1 --greater_is_better true >${log_path}/ernie-layout_train>>${log_path}/ernie-layout_train 2>&1
+print_info $? ernie-layout_train
+# export ner
+python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export >${log_path}/ernie-layout_export>>${log_path}/ernie-layout_export2>&1
+print_info $? ernie-layout_export
+# deploy ner
+cd ${nlp_dir}/model_zoo/ernie-layout/deploy/python
+wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
+python infer.py --model_path_prefix ../../ner_export/inference --task_type ner --lang "en" --batch_size 8 >${log_path}/ernie-layout_deploy>>${log_path}/ernie-layout_deploy 2>&1
+print_info $? ernie-layout_deploy
 }
 $1

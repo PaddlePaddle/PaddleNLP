@@ -17,9 +17,7 @@ import os
 import unittest
 
 from paddlenlp.transformers.ernie_gram.tokenizer import ErnieGramTokenizer
-from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
-from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
