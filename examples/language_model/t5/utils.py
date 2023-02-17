@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sklearn
-from scipy.stats import pearsonr, spearmanr
 import collections
-import numpy as np
-from sklearn.metrics import matthews_corrcoef, accuracy_score, f1_score
-
 import json
 import pickle
 import random
 
+import numpy as np
 import paddle
+import sklearn
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
 
 from paddlenlp.transformers import (
     CosineDecayWithWarmup,
@@ -63,6 +62,19 @@ def pearson_corrcoef(targets, predictions):
 def spearman_corrcoef(targets, predictions):
     return {"spearman_corrcoef": 100 * spearmanr(targets, predictions)[0]}
 
+
+CLUE_METRICS = collections.OrderedDict(
+    [
+        ("afqmc", [accuracy]),
+        ("tnews", [accuracy]),
+        ("iflytek", [accuracy]),
+        ("cmnli", [accuracy]),
+        ("ocnli", [accuracy]),
+        ("cluewsc2020", [accuracy]),
+        ("csl", [accuracy]),
+        ("ax", []),  # Only test set available.
+    ]
+)
 
 GLUE_METRICS = collections.OrderedDict(
     [
@@ -121,10 +133,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,

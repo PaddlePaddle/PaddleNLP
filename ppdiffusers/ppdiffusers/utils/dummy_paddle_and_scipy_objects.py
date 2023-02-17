@@ -32,3 +32,18 @@ class LMSDiscreteScheduler(metaclass=DummyObject):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         requires_backends(cls, ["paddle", "scipy"])
+
+
+class PreconfigLMSDiscreteScheduler(metaclass=DummyObject):
+    _backends = ["paddle", "scipy"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "scipy"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "scipy"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "scipy"])

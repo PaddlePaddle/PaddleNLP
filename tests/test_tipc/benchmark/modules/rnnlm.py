@@ -1,12 +1,24 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import sys
 
 import paddle
-import paddle.nn as nn
 
-from paddlenlp.utils import profiler
-from paddlenlp.utils.log import logger
 from paddlenlp.metrics import Perplexity
+from paddlenlp.utils import profiler
 
 from .model_base import BenchmarkBase
 
@@ -17,8 +29,8 @@ sys.path.append(
         )
     )
 )
-from rnnlm.reader import create_data_loader
-from rnnlm.model import RnnLm, CrossEntropyLossForLm, UpdateModel
+from rnnlm.model import CrossEntropyLossForLm, RnnLm, UpdateModel  # noqa: E402
+from rnnlm.reader import create_data_loader  # noqa: E402
 
 
 class AddProfiler(paddle.callbacks.Callback):

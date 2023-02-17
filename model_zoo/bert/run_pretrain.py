@@ -13,31 +13,32 @@
 # limitations under the License.
 
 import argparse
-import collections
-import itertools
 import logging
 import os
 import random
 import time
-import h5py
-import yaml
-import distutils.util
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
+import h5py
 import numpy as np
-
 import paddle
-import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Stack
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    BertForPretraining,
+    BertModel,
+    BertPretrainingCriterion,
+    BertTokenizer,
+    ErnieForPretraining,
+    ErnieModel,
+    ErniePretrainingCriterion,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion, BertConfig
-from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
-from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -121,16 +122,12 @@ def parse_args():
         choices=["cpu", "gpu", "xpu", "npu"],
         help="Device for selecting for the training.",
     )
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument(
         "--amp_level", type=str, default="O2", choices=["O1", "O2"], help="select O1 or O2 of amp level."
     )
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--to_static", type=distutils.util.strtobool, default=False, help="Enable training under @to_static."
-    )
+    parser.add_argument("--to_static", type=strtobool, default=False, help="Enable training under @to_static.")
 
     # For benchmark.
     parser.add_argument(
@@ -141,7 +138,7 @@ def parse_args():
     )
     parser.add_argument(
         "--fuse_transformer",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=False,
         help="Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not.",
     )
@@ -179,8 +176,8 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args, w
         # masked_lm_labels, next_sentence_labels, mask_token_num
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        _, seq_length = out[0].shape
+        size = sum(len(x[3]) for x in data)
         # Padding for divisibility by 8 for fp16 or int8 usage
         if size % 8 != 0:
             size += 8 - (size % 8)
@@ -255,10 +252,8 @@ class PretrainingDataset(Dataset):
         padded_mask_indices = (masked_lm_positions == 0).nonzero()[0]
         if len(padded_mask_indices) != 0:
             index = padded_mask_indices[0].item()
-            mask_token_num = index
         else:
             index = self.max_pred_length
-            mask_token_num = self.max_pred_length
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]
@@ -299,7 +294,10 @@ def do_train(args):
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
+    # BUG: train_data_loader is undefined variable here hence the noqa: F821
+    num_training_steps = (
+        args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs  # noqa: F821
+    )
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
 
@@ -323,7 +321,6 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
-    tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f)
@@ -352,8 +349,6 @@ def do_train(args):
                 (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
             ]
 
-        previous_file = data_file
-
         train_data_loader, _ = create_pretraining_dataset(
             data_file, args.max_predictions_per_seq, shared_file_list, args, worker_init
         )
@@ -374,7 +369,6 @@ def do_train(args):
                     (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
                 ]
 
-            previous_file = data_file
             dataset_future = pool.submit(
                 create_pretraining_dataset,
                 data_file,
