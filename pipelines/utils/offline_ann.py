@@ -40,6 +40,7 @@ parser.add_argument("--params_path", default="checkpoints/model_40/model_state.p
 parser.add_argument("--delete_index", action="store_true", help="Whether to delete existing index while updating index")
 parser.add_argument("--share_parameters", action="store_true", help="Use to control the query and title models sharing the same parameters",)
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 args = parser.parse_args()
 # yapf: enable
 
@@ -87,7 +88,7 @@ def offline_ann(index_name, doc_dir):
         max_seq_len_passage=256,
         batch_size=16,
         use_gpu=True,
-        embed_title=False,
+        embed_title=args.embed_title,
     )
 
     # 建立索引库

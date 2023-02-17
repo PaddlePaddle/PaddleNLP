@@ -528,6 +528,41 @@ TASKS = {
                 "task_flag": "feature_extraction-rocketqa-zh-base-query-encoder",
                 "task_priority_path": "rocketqa-zh-base-query-encoder",
             },
+            "rocketqa-zh-base-para-encoderr": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-para-encoder",
+                "task_priority_path": "rocketqa-zh-base-para-encoder",
+            },
+            "rocketqa-zh-medium-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-query-encoder",
+                "task_priority_path": "rocketqa-zh-medium-query-encoder",
+            },
+            "rocketqa-zh-medium-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-para-encoder",
+                "task_priority_path": "rocketqa-zh-medium-para-encoder",
+            },
+            "rocketqa-zh-mini-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-mini-query-encoder",
+                "task_priority_path": "rocketqa-zh-mini-query-encoder",
+            },
+            "rocketqa-zh-mini-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-rocketqa-zh-mini-para-encoder",
+                "task_priority_path": "rocketqa-zh-mini-para-encoder",
+            },
+            "rocketqa-zh-micro-query-encoderr": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-query-encoder",
+                "task_priority_path": "rocketqa-zh-micro-query-encoder",
+            },
+            "rocketqa-zh-micro-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-para-encoder",
+                "task_priority_path": "rocketqa-zh-micro-para-encoder",
+            },
             "rocketqa-zh-nano-query-encoder": {
                 "task_class": TextFeatureExtractionTask,
                 "task_flag": "feature_extraction-rocketqa-zh-nano-query-encoder",
