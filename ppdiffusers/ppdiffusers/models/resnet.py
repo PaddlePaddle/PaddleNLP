@@ -395,7 +395,7 @@ class ResnetBlock2D(nn.Layer):
         use_in_shortcut=None,
         up=False,
         down=False,
-        pre_temb_non_linearity=[False],
+        pre_temb_non_linearity=False,
     ):
         super().__init__()
         self.pre_temb_non_linearity = pre_temb_non_linearity

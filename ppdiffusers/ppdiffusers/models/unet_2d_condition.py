@@ -129,7 +129,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
-        resnet_pre_temb_non_linearity=[False],
+        resnet_pre_temb_non_linearity=False,
     ):
         super().__init__()
 
