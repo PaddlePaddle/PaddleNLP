@@ -53,8 +53,9 @@ except Exception as e:
     raise e
 
 from . import core_tokenizers as C
-from . import decoders, models, normalizers, postprocessors, pretokenizers
 from .c_wrap import *
+
+from . import decoders, models, normalizers, postprocessors, pretokenizers
 from .tokenizers_impl import (
     ClipFastTokenizer,
     ErnieFastTokenizer,
