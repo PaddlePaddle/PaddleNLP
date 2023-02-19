@@ -43,7 +43,7 @@ usage = r"""
         from paddlenlp import Taskflow
         text_cls = Taskflow(
             "text_classification",
-            model="finetune",
+            mode="finetune",
             problem_type="multi_class",
             task_path=<local_saved_dynamic_model>,
             id2label={0: "negative", 1: "positive"}
@@ -62,7 +62,7 @@ usage = r"""
         '''
         text_cls = Taskflow(
             "text_classification",
-            model="prompt",
+            mode="prompt",
             problem_type="multi_label",
             is_static_model=True,
             task_path=<local_saved_static_model>,
@@ -114,15 +114,25 @@ class TextClassificationTask(Task):
 
     Args:
         task (string): The name of task.
-        task_path (string): The local file path to the model path or a pre-trained model.
+        model (string): Mode of the classification, Supports ["prompt", "finetune"].
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+            task_path (string): The local file path to the model path or a pre-trained model.
+            is_static_model (string): Whether the model in task path  is a static model.
+            problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem. Default to "multi_class".
+            multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5.
+            max_length (int): Maximum number of tokens for the model.
+            precision (int): Select among ["fp32", "fp16"]. Default to "fp32".
+            plm_model_name (str): Pretrained langugae model name for PromptModel.
+            input_spec [list]: Specify the tensor information for each input parameter of the forward function.
+            id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+            batch_size(int): The sample number of a mini-batch.
     """
 
     def __init__(self, task: str, model: str = "finetune", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self.problem_type = kwargs.get("problem_type", "multi_class")
-        self.multilabel_threshold = kwargs.get("multilabel_threshold", 0.5)
-        self._max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
+        self.problem_type = self.kwargs.get("problem_type", "multi_class")
+        self.multilabel_threshold = self.kwargs.get("multilabel_threshold", 0.5)
+        self._max_length = self.kwargs.get("max_length", 512)
 
         self._construct_tokenizer()
         if self.model == "prompt":
@@ -207,28 +217,36 @@ class TextClassificationTask(Task):
 
     def _construct_id2label(self):
         if "id2label" in self.kwargs:
-            self.id2label = self.kwargs["id2label"]
+            id2label = self.kwargs["id2label"]
         elif os.path.exists(os.path.join(self._task_path, "id2label.json")):
             id2label_path = os.path.join(self._task_path, "id2label.json")
             with open(id2label_path) as fb:
-                self.id2label = json.load(fb)
+                id2label = json.load(fb)
             logger.info(f"Load id2label from {id2label_path}.")
         elif self.model == "prompt" and os.path.exists(os.path.join(self._task_path, "verbalizer_config.json")):
             label_list = sorted(list(self._verbalizer.label_words.keys()))
-            self.id2label = {}
+            id2label = {}
             for i, l in enumerate(label_list):
-                self.id2label[i] = l
+                id2label[i] = l
             logger.info("Load id2label from verbalizer.")
         elif self.model == "finetune" and os.path.exists(os.path.join(self._task_path, CONFIG_NAME)):
             config_path = os.path.join(self._task_path, CONFIG_NAME)
             with open(config_path) as fb:
-                id2label = json.load(fb)["id2label"]
+                config = json.load(fb)
+                if "id2label" in config:
+                    id2label = config["id2label"]
+                    logger.info(f"Load id2label from {config_path}.")
+                else:
+                    id2label = None
+        else:
+            id2label = None
+
+        if id2label is None:
+            self.id2label = id2label
+        else:
             self.id2label = {}
             for i in id2label:
                 self.id2label[int(i)] = id2label[i]
-            logger.info(f"Load id2label from {config_path}.")
-        else:
-            self.id2label = None
 
     def _preprocess(self, inputs: Union[str, List[str]]) -> Dict[str, Any]:
         """
@@ -248,7 +266,11 @@ class TextClassificationTask(Task):
             collator = PromptDataCollatorWithPadding(
                 self._tokenizer, padding=True, return_tensors="np", return_attention_mask=True
             )
-            template_inputs = [self._template({"text_a": x}) for x in inputs]
+            part_text = "text"
+            for part in self._template.prompt:
+                if "text" in part:
+                    part_text = part["text"]
+            template_inputs = [self._template({part_text: x}) for x in inputs]
             batches = [template_inputs[idx : idx + batch_size] for idx in range(0, len(template_inputs), batch_size)]
         else:
             raise NotImplementedError(

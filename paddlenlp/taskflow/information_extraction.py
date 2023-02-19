@@ -653,16 +653,18 @@ class UIETask(Task):
                     q_sep_index = content_encoded_inputs["input_ids"].index(2, 1)
 
                     bias = 0
-                    for index in range(len(sub_offset_mapping)):
-                        if index == 0:
+                    for i in range(len(sub_offset_mapping)):
+                        if i == 0:
                             continue
-                        mapping = sub_offset_mapping[index]
+                        mapping = sub_offset_mapping[i]
                         if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-                            bias = sub_offset_mapping[index - 1][-1] + 1
+                            bias = sub_offset_mapping[i - 1][-1] + 1
                         if mapping[0] == 0 and mapping[1] == 0:
                             continue
-                        sub_offset_mapping[index][0] += bias
-                        sub_offset_mapping[index][1] += bias
+                        if mapping == sub_offset_mapping[i - 1]:
+                            continue
+                        sub_offset_mapping[i][0] += bias
+                        sub_offset_mapping[i][1] += bias
 
                     offset_mapping = sub_offset_mapping[:-1]
                     last_offset = offset_mapping[-1][-1]
@@ -672,12 +674,11 @@ class UIETask(Task):
                     )
                     inputs_ids += content_encoded_inputs["input_ids"][1:-1]
                     sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
-
                     for i, sub_list in enumerate(sub_offset_mapping[1:-1]):
                         if i == 0:
                             org_offset = sub_list[1]
                         else:
-                            if sub_list[0] != org_offset:
+                            if sub_list[0] != org_offset and sub_offset_mapping[1:-1][i - 1] != sub_list:
                                 last_offset += 1
                             org_offset = sub_list[1]
                         offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
@@ -879,7 +880,6 @@ class UIETask(Task):
 
             start_ids_list = get_bool_ids_greater_than(start_prob, limit=self._position_prob, return_prob=True)
             end_ids_list = get_bool_ids_greater_than(end_prob, limit=self._position_prob, return_prob=True)
-
             for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list, offset_maps.tolist()):
                 span_set = get_span(start_ids, end_ids, with_prob=True)
                 sentence_id, prob = get_id_and_prob(span_set, offset_map)
@@ -1090,7 +1090,7 @@ class UIETask(Task):
         def _add_bbox(result, char_boxes):
             for vs in result.values():
                 for v in vs:
-                    if "start" in v.keys():
+                    if "start" in v.keys() and "end" in v.keys():
                         boxes = []
                         for i in range(v["start"], v["end"]):
                             cur_box = char_boxes[i][1]

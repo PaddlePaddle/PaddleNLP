@@ -19,6 +19,7 @@ import paddle
 from PIL import Image
 
 from ..transformers import AutoModelForImageGeneration, AutoTokenizer
+from ..utils.log import logger
 from .task import Task
 
 usage = r"""
@@ -46,6 +47,10 @@ class TextToImageGenerationTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self._seed = None
         # we do not use batch
         self._batch_size = 1

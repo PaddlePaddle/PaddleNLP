@@ -169,7 +169,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.
     --epochs=10 \
     --batch_size=32 \
     --learning_rate=5e-5 \
-    --warmup_propotion=0.02 \
+    --warmup_proportion=0.02 \
     --weight_decay=0.01 \
     --max_seq_len=60 \
     --max_target_len=30 \

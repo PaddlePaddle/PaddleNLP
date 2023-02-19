@@ -597,9 +597,7 @@ class RobertaTokenizer:
             return RobertaBPETokenizer.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         else:
             # Assuming from community-contributed pretrained models
-            config_file = os.path.join(
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file
-            )
+            config_file = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file])
             default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
                 resolved_config_file = get_path_from_url(config_file, default_root)

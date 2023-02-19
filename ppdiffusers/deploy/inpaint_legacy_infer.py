@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 import time
 from io import BytesIO
@@ -24,6 +23,7 @@ import PIL
 import requests
 from fastdeploy import ModelFormat
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     EulerAncestralDiscreteScheduler,
@@ -75,7 +75,7 @@ def parse_arguments():
         help="The inference runtime device of models.",
     )
     parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
