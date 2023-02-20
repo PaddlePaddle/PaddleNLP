@@ -14,7 +14,7 @@
 
 import paddle
 
-from paddlenlp.transformers import BertModel, BertTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from ..data import Pad, Tuple
 from ..transformers import ErnieCrossEncoder, ErnieTokenizer
@@ -155,7 +155,7 @@ class TextSimilarityTask(Task):
         if "rocketqa" in model:
             self._model = ErnieCrossEncoder(model)
         else:
-            self._model = BertModel.from_pretrained(self._task_path, pool_act="linear")
+            self._model = AutoModel.from_pretrained(self._task_path, pool_act="linear")
         self._model.eval()
 
     def _construct_tokenizer(self, model):
@@ -165,7 +165,7 @@ class TextSimilarityTask(Task):
         if "rocketqa" in model:
             self._tokenizer = ErnieTokenizer.from_pretrained(model)
         else:
-            self._tokenizer = BertTokenizer.from_pretrained(model)
+            self._tokenizer = AutoTokenizer.from_pretrained(model)
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]
