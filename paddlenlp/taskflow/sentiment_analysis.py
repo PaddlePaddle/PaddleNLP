@@ -261,7 +261,7 @@ class SkepTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = SkepSequenceModel.from_pretrained(self._task_path, num_classes=len(self._label_map))
+        model_instance = SkepSequenceModel.from_pretrained(self._task_path, num_labels=len(self._label_map))
         self._model = model_instance
         self._model.eval()
 

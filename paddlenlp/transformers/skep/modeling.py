@@ -330,7 +330,7 @@ class SkepModel(SkepPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids.astype("int64") == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids.astype("int64") == self.config.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2],
             )
             if past_key_values is not None:

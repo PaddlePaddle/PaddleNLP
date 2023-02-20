@@ -97,7 +97,11 @@ train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
 我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
+python -m paddle.distributed.launch --gpus "6" train_sentence.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --device "gpu" \
+    --save_dir "./checkpoints"
+
 ```
 
 可支持配置的参数：
@@ -116,15 +120,6 @@ python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "s
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
 
-```python
-model = paddlenlp.transformers.SkepForSequenceClassification.from_pretrained(
-    "skep_ernie_1.0_large_ch")
-tokenizer = paddlenlp.transformers.SkepTokenizer.from_pretrained(
-    "skep_ernie_1.0_large_ch")
-```
-更多预训练模型，参考[transformers](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
-
-
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
 ```text
@@ -141,17 +136,23 @@ checkpoints/
 * 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
 * 如需使用ernie-tiny模型，则需要提前先安装sentencepiece依赖，如`pip install sentencepiece`
 * 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
-  运行方式：
+  运行方式如下：
 
 ```shell
-python export_model.py --model_name="skep_ernie_1.0_large_ch" --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
+python export_model.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --params_path="./checkpoint/model_900/model_state.pdparams" \
+    --output_path="./static_graph_params"
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
 
 ```shell
-python deploy/python/predict.py --model_name="skep_ernie_1.0_large_ch" --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
+python deploy/python/predict.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --model_file="static_graph_params.pdmodel" \
+    --params_file="static_graph_params.pdiparams"
 ```
 
 ### 模型预测
@@ -159,7 +160,10 @@ python deploy/python/predict.py --model_name="skep_ernie_1.0_large_ch" --model_f
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict_sentence.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
+python predict_sentence.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --params_path "checkpoints/model_900/model_state.pdparams" \
+    --device 'gpu'
 ```
 
 将待预测数据如以下示例：
