@@ -21,6 +21,7 @@ from typing import Optional, Tuple, Union
 import paddle
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
+from paddle.fluid.framework import in_dygraph_mode
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -46,8 +47,7 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 
 
 def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_split_chunks: bool = False):
-    """Split a tensor along its last dimension.
-
+    """Split a tensor along its last dimension -> query/key/value layer
     Args:
         tensor: ([`paddle.Tensor`], *required*):
             input tensor to split
@@ -56,26 +56,7 @@ def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_
         contiguous_split_chunks ([`bool`], *optional*, default=`False`)::
             If True, make each chunk contiguous in memory.
     """
-    # Get the size and dimension.
-    last_dim = tensor.dim() - 1
-    numerator, denominator = tensor.shape[last_dim], num_partitions
-    if not (numerator % denominator == 0):
-        raise ValueError(f"{numerator} is not divisible by {denominator}")
-    last_dim_size = numerator // denominator
-    print(last_dim_size)
-    # Split.
-
-    # tensor_list = paddle.split(tensor, last_dim_size, axis=last_dim)
-    # TODO(wj-Mcat): split into 3 tensor
-    tensor_list = paddle.split(tensor, 3, axis=last_dim)
-    # TODO(wj-Mcat): tensor list
-
-    return tensor_list
-    # # Note: paddle.split does not create contiguous tensors by default.
-    # if contiguous_split_chunks:
-    #     return tuple(chunk.contiguous() for chunk in tensor_list)
-
-    # return tensor_list
+    return paddle.split(tensor, 3, axis=-1)
 
 
 def masked_fill(x, mask, value):
@@ -95,6 +76,7 @@ def attention_mask_func(attention_scores: Tensor, attention_mask: Tensor, causal
     )
     padded_causal_mask = paddle.logical_or(padded_causal_mask, attention_mask_bool[:, None, None, :key_length])
     # Make use of floats
+    padded_causal_mask.stop_gradient = True
     attention_scores = masked_fill(attention_scores, padded_causal_mask.expand([-1, n_heads, -1, -1]), -10000.0)
     return (
         attention_scores,
@@ -272,7 +254,8 @@ class BloomGelu(nn.Layer):
         super().__init__()
 
     def forward(self, x):
-        if self.training:
+
+        if self.training and in_dygraph_mode():
             return GeLUFunction.apply(x)
         else:
             return bloom_gelu_forward(x)
@@ -379,7 +362,7 @@ class BloomAttention(nn.Layer):
     ):
         # hidden_states: [batch_size, seq_length, hidden_size]
         # repeat alibi tensor with the batch size
-        # TODO(wj-Mcat): repeat the same with bloom
+
         alibi = alibi.repeat_interleave(hidden_states.shape[0], axis=0)
         # alibi = alibi.repeat(hidden_states.shape[0], 1, 1).to(hidden_states.device)
 
@@ -675,22 +658,22 @@ class BloomPreTrainedModel(PretrainedModel):
         for i in range(config.n_layer):
             hard_mapping.extend(
                 [
-                    [f"h.{i}.input_layernorm.weight", "h.0.input_layernorm.weight"],
-                    [f"h.{i}.input_layernorm.bias", "h.0.input_layernorm.bias"],
+                    [f"h.{i}.input_layernorm.weight", f"h.{i}.input_layernorm.weight"],
+                    [f"h.{i}.input_layernorm.bias", f"h.{i}.input_layernorm.bias"],
                     [
                         f"h.{i}.self_attention.query_key_value.weight",
-                        "h.0.self_attention.query_key_value.weight",
+                        f"h.{i}.self_attention.query_key_value.weight",
                         "transpose",
                     ],
-                    [f"h.{i}.self_attention.query_key_value.bias", "h.0.self_attention.query_key_value.bias"],
-                    [f"h.{i}.self_attention.dense.weight", "h.0.self_attention.dense.weight", "transpose"],
-                    [f"h.{i}.self_attention.dense.bias", "h.0.self_attention.dense.bias"],
-                    [f"h.{i}.post_attention_layernorm.weight", "h.0.post_attention_layernorm.weight"],
-                    [f"h.{i}.post_attention_layernorm.bias", "h.0.post_attention_layernorm.bias"],
-                    [f"h.{i}.mlp.dense_h_to_4h.weight", "h.0.mlp.dense_h_to_4h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_h_to_4h.bias", "h.0.mlp.dense_h_to_4h.bias"],
-                    [f"h.{i}.mlp.dense_4h_to_h.weight", "h.0.mlp.dense_4h_to_h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_4h_to_h.bias", "h.0.mlp.dense_4h_to_h.bias"],
+                    [f"h.{i}.self_attention.query_key_value.bias", f"h.{i}.self_attention.query_key_value.bias"],
+                    [f"h.{i}.self_attention.dense.weight", f"h.{i}.self_attention.dense.weight", "transpose"],
+                    [f"h.{i}.self_attention.dense.bias", f"h.{i}.self_attention.dense.bias"],
+                    [f"h.{i}.post_attention_layernorm.weight", f"h.{i}.post_attention_layernorm.weight"],
+                    [f"h.{i}.post_attention_layernorm.bias", f"h.{i}.post_attention_layernorm.bias"],
+                    [f"h.{i}.mlp.dense_h_to_4h.weight", f"h.{i}.mlp.dense_h_to_4h.weight", "transpose"],
+                    [f"h.{i}.mlp.dense_h_to_4h.bias", f"h.{i}.mlp.dense_h_to_4h.bias"],
+                    [f"h.{i}.mlp.dense_4h_to_h.weight", f"h.{i}.mlp.dense_4h_to_h.weight", "transpose"],
+                    [f"h.{i}.mlp.dense_4h_to_h.bias", f"h.{i}.mlp.dense_4h_to_h.bias"],
                 ]
             )
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]

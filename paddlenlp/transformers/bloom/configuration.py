@@ -60,6 +60,12 @@ class BloomConfig(PretrainedConfig):
     ```"""
     model_type = "bloom"
     attribute_map: Dict[str, str] = {}  # noqa: F811
+    attribute_map = {
+        "num_hidden_layers": "n_layer",
+        "n_head": "num_attention_heads",
+        "hidden_size": "n_embed",
+    }
+
     pretrained_init_configuration = BLOOM_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

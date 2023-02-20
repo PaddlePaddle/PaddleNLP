@@ -14,24 +14,22 @@
 # limitations under the License.
 from __future__ import annotations
 
+import tempfile
 import unittest
 
+import numpy as np
 import paddle
 
 from paddlenlp.transformers import (
-    BloomForMaskedLM,
-    BloomForMultipleChoice,
-    BloomForPretraining,
-    BloomForQuestionAnswering,
+    BloomForCausalLM,
     BloomForSequenceClassification,
     BloomForTokenClassification,
     BloomModel,
 )
 from paddlenlp.transformers.bloom.configuration import BloomConfig
-
-from ...testing_utils import slow
-from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import (
+from tests.testing_utils import require_package, slow
+from tests.transformers.test_configuration_common import ConfigTester
+from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     ModelTesterPretrainedMixin,
     ids_tensor,
@@ -43,60 +41,63 @@ class BloomModelTester:
     def __init__(
         self,
         parent: BloomModelTest,
-        batch_size=13,
-        seq_length=7,
-        is_training=True,
-        use_input_mask=True,
-        use_token_type_ids=True,
-        use_labels=True,
-        vocab_size=99,
-        hidden_size=32,
-        num_hidden_layers=5,
-        num_attention_heads=4,
-        intermediate_size=37,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
+        vocab_size=250880,
+        hidden_size=64,
+        n_layer=2,
+        n_head=8,
+        masked_softmax_fusion=True,
+        layer_norm_epsilon=1e-5,
         initializer_range=0.02,
-        pad_token_id=0,
-        pool_act="tanh",
-        fuse=False,
+        use_cache=False,
+        bos_token_id=1,
+        eos_token_id=2,
+        apply_residual_connection_post_layernorm=False,
+        hidden_dropout=0.0,
+        attention_dropout=0.0,
+        attention_softmax_in_fp32=True,
+        pretraining_tp=1,  # TP rank used when training with megatron
+        dtype="bfloat16",
+        slow_but_exact=False,
+        batch_size: int = 2,
+        seq_length: int = 10,
         type_sequence_label_size=2,
         num_labels=3,
         num_choices=4,
         scope=None,
         dropout=0.56,
+        use_input_mask: bool = False,
+        use_labels: bool = False,
         return_dict=False,
     ):
-        # TODO(cookiecutter): change the params of here to fix for BloomModel
         self.parent: BloomModelTest = parent
-        self.batch_size = batch_size
-        self.seq_length = seq_length
-        self.is_training = is_training
-        self.use_input_mask = use_input_mask
-        self.use_token_type_ids = use_token_type_ids
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.num_attention_heads = num_attention_heads
-        self.intermediate_size = intermediate_size
-        self.hidden_act = hidden_act
-        self.hidden_dropout_prob = hidden_dropout_prob
-        self.attention_probs_dropout_prob = attention_probs_dropout_prob
-        self.max_position_embeddings = max_position_embeddings
-        self.type_vocab_size = type_vocab_size
+        self.n_layer = n_layer
+        self.n_head = n_head
+        self.masked_softmax_fusion = masked_softmax_fusion
+        self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
-        self.pad_token_id = pad_token_id
-        self.pool_act = pool_act
-        self.fuse = fuse
+        self.use_cache = use_cache
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
+        self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
+        self.hidden_dropout = hidden_dropout
+        self.attention_dropout = attention_dropout
+        self.attention_softmax_in_fp32 = attention_softmax_in_fp32
+        self.pretraining_tp = pretraining_tp
+        self.dtype = dtype
+        self.slow_but_exact = slow_but_exact
+
+        self.batch_size = batch_size
+        self.seq_length = seq_length
         self.type_sequence_label_size = type_sequence_label_size
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
         self.dropout = dropout
+
+        self.use_input_mask = use_input_mask
+        self.use_labels = use_labels
         self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
@@ -105,10 +106,6 @@ class BloomModelTester:
         input_mask = None
         if self.use_input_mask:
             input_mask = random_attention_mask([self.batch_size, self.seq_length])
-
-        token_type_ids = None
-        if self.use_token_type_ids:
-            token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
         sequence_labels = None
         token_labels = None
@@ -119,60 +116,45 @@ class BloomModelTester:
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        return config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self) -> BloomConfig:
-        # TODO(cookiecutter): change the params of here to fix for BloomModel
         return BloomConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
-            num_hidden_layers=self.num_hidden_layers,
-            num_attention_heads=self.num_attention_heads,
-            intermediate_size=self.intermediate_size,
-            hidden_act=self.hidden_act,
-            hidden_dropout_prob=self.hidden_dropout_prob,
-            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
-            max_position_embeddings=self.max_position_embeddings,
-            type_vocab_size=self.type_vocab_size,
+            n_layer=self.n_layer,
+            n_head=self.n_head,
+            masked_softmax_fusion=self.masked_softmax_fusion,
+            layer_norm_epsilon=self.layer_norm_epsilon,
             initializer_range=self.initializer_range,
-            pad_token_id=self.pad_token_id,
-            pool_act=self.pool_act,
-            fuse=self.fuse,
+            use_cache=self.use_cache,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            apply_residual_connection_post_layernorm=self.apply_residual_connection_post_layernorm,
+            hidden_dropout=self.hidden_dropout,
+            attention_dropout=self.attention_dropout,
+            attention_softmax_in_fp32=self.attention_softmax_in_fp32,
+            pretraining_tp=self.pretraining_tp,
+            dtype=self.dtype,
+            slow_but_exact=self.slow_but_exact,
             num_labels=self.num_labels,
             num_choices=self.num_choices,
         )
 
     def create_and_check_model(
-        self, config: BloomConfig, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        self, config: BloomConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
         model = BloomModel(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
+        result = model(input_ids, attention_mask=input_mask)
         result = model(input_ids)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
-
-    def create_and_check_for_masked_lm(
-        self,
-        config: BloomConfig,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
-        model = BloomForMaskedLM(config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_model_past_large_inputs(
         self,
         config: BloomConfig,
         input_ids,
-        token_type_ids,
         input_mask,
         sequence_labels,
         token_labels,
@@ -219,79 +201,10 @@ class BloomModelTester:
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_for_pretraining(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
-        model = BloomForPretraining(config)
-        model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-            labels=token_labels,
-            next_sentence_label=sequence_labels,
-        )
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
-        self.parent.assertEqual(result[2].shape, [self.batch_size, 2])
-
-    def create_and_check_for_multiple_choice(
-        self,
-        config: BloomConfig,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
-        model = BloomForMultipleChoice(config)
-        model.eval()
-        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_input_mask = input_mask.unsqueeze(1).expand([-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-            labels=choice_labels,
-        )
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.num_choices])
-
-    def create_and_check_for_question_answering(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
-        model = BloomForQuestionAnswering(config)
-
-        model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
-        )
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
-        self.parent.assertEqual(result[2].shape, [self.batch_size, self.seq_length])
-
     def create_and_check_for_sequence_classification(
         self,
         config: BloomConfig,
         input_ids,
-        token_type_ids,
         input_mask,
         sequence_labels,
         token_labels,
@@ -300,14 +213,13 @@ class BloomModelTester:
 
         model = BloomForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
+        result = model(input_ids, attention_mask=input_mask, labels=sequence_labels)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.num_labels])
 
     def create_and_check_for_token_classification(
         self,
         config,
         input_ids,
-        token_type_ids,
         input_mask,
         sequence_labels,
         token_labels,
@@ -316,7 +228,7 @@ class BloomModelTester:
         model = BloomForTokenClassification(config)
 
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
+        result = model(input_ids, attention_mask=input_mask, labels=token_labels)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def test_addition_params(self, config: BloomConfig, *args, **kwargs):
@@ -334,14 +246,29 @@ class BloomModelTester:
         (
             config,
             input_ids,
-            token_type_ids,
             input_mask,
             sequence_labels,
             token_labels,
             choice_labels,
         ) = config_and_inputs
-        inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
+        inputs_dict = {"input_ids": input_ids, "attention_mask": input_mask}
         return config, inputs_dict
+
+    def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
+        model = BloomForCausalLM(config)
+        model.eval()
+
+        result = model(
+            input_ids,
+            use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
 
 class BloomModelTest(ModelTesterMixin, unittest.TestCase):
@@ -349,16 +276,7 @@ class BloomModelTest(ModelTesterMixin, unittest.TestCase):
     return_dict = False
     use_labels = False
 
-    # TODO(cookiecutter): to make sure the following model classes are valid
-    all_model_classes = (
-        BloomModel,
-        BloomForMaskedLM,
-        BloomForMultipleChoice,
-        BloomForPretraining,
-        BloomForQuestionAnswering,
-        BloomForSequenceClassification,
-        BloomForTokenClassification,
-    )
+    all_model_classes = (BloomModel, BloomForSequenceClassification, BloomForTokenClassification, BloomForCausalLM)
 
     def setUp(self):
         super().setUp()
@@ -366,33 +284,13 @@ class BloomModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester = BloomModelTester(self)
         self.config_tester = ConfigTester(self, config_class=BloomConfig, vocab_size=256, hidden_size=24)
 
-    def test_config(self):
-        # self.config_tester.create_and_test_config_from_and_save_pretrained()
-        self.config_tester.run_common_tests()
-
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_for_masked_lm(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
-
     def test_decoder_model_past_with_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_past_large_inputs(*config_and_inputs)
-
-    def test_for_multiple_choice(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_multiple_choice(*config_and_inputs)
-
-    def test_for_pretraining(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_pretraining(*config_and_inputs)
-
-    def test_for_question_answering(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_question_answering(*config_and_inputs)
 
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -411,24 +309,59 @@ class BloomModelTest(ModelTesterMixin, unittest.TestCase):
         model = self.base_model_class(config)
         self.assertTrue(len(model.model_name_list) != 0)
 
+    def test_gpt_lm_head_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
+
+
+class BloomCompatibilityTest(unittest.TestCase):
+    @require_package("transformers", "torch")
+    def test_bloom_converter(self):
+        model_name = "hf-internal-testing/tiny-random-BloomModel"
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BloomModel
+
+            paddle_model = BloomModel.from_pretrained(model_name, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import BloomModel
+
+            torch_model = BloomModel.from_pretrained(model_name, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
+            )
+
 
 class BloomModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BloomModel
 
     @slow
     def test_inference_no_attention(self):
-        model = BloomModel.from_pretrained("bigscience/bloom-560m")
+        model = BloomModel.from_pretrained("bigscience/bloom-560m", from_hf_hub=True)
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
 
-        # TODO(cookiecutter): change the hidden_size according to the model-name
-        expected_shape = [1, 11, 768]
+        expected_shape = [1, 11, 1024]
         self.assertEqual(output.shape, expected_shape)
 
-        # TODO(cookiecutter): change the expected slice according to your model
         expected_slice = paddle.to_tensor(
             [[[0.4249, 0.1008, 0.7531], [0.3771, 0.1188, 0.7467], [0.4152, 0.1098, 0.7108]]]
         )
@@ -436,17 +369,16 @@ class BloomModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_with_attention(self):
-        model = BloomModel.from_pretrained("bert-base-uncased")
+        model = BloomModel.from_pretrained("bigscience/bloom-560m")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
-        # TODO(cookiecutter): change the hidden_size according to the model-name
-        expected_shape = [1, 11, 768]
+
+        expected_shape = [1, 11, 1024]
         self.assertEqual(output.shape, expected_shape)
 
-        # TODO(cookiecutter): change the expected slice according to your model
         expected_slice = paddle.to_tensor(
             [[[0.4249, 0.1008, 0.7531], [0.3771, 0.1188, 0.7467], [0.4152, 0.1098, 0.7108]]]
         )
