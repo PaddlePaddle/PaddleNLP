@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import unittest
 from tempfile import TemporaryDirectory
 
@@ -31,6 +32,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         cls.max_resolution = 40
         cls.min_resolution = 30
         cls.num_channels = 3
+        cls.model = "__internal_testing__/tiny-random-ernievil2"
 
     @classmethod
     def tearDownClass(cls):
@@ -84,6 +86,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         dygraph_taskflow = MultimodalFeatureExtractionTask(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
+            task_path=self.model,
             is_static_model=False,
             return_tensors=False,
         )
@@ -94,6 +97,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         static_taskflow = MultimodalFeatureExtractionTask(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
+            task_path=self.model,
             is_static_model=True,
             return_tensors=False,
             device_id=0,
@@ -120,9 +124,11 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
 
     def test_taskflow_task(self):
         input_text = ["这是一只猫", "这是一只狗"]
+
         # dygraph test
         dygraph_taskflow = Taskflow(
             task="feature_extraction",
+            task_path=self.model,
             is_static_model=False,
             return_tensors=False,
         )
@@ -133,6 +139,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         # static test
         static_taskflow = Taskflow(
             task="feature_extraction",
+            task_path=self.model,
             is_static_model=True,
             return_tensors=False,
         )
