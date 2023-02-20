@@ -127,7 +127,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(results_df[result_hp_key][0], hp_value)
 
             # test save
-            self.assertTrue(os.path.exists(os.path.join(auto_trainer.output_dir, "id2label.json")))
             save_path = os.path.join(auto_trainer._get_model_result().log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
             self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
@@ -139,7 +138,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "id2label.json")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
             if custom_model_candidate["trainer_type"] == "PromptTrainer":
@@ -218,7 +217,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(results_df[result_hp_key][0], hp_value)
 
             # test save
-            self.assertTrue(os.path.exists(os.path.join(auto_trainer.output_dir, "id2label.json")))
             save_path = os.path.join(auto_trainer._get_model_result().log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
             self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
@@ -230,7 +228,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "id2label.json")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
             if custom_model_candidate["trainer_type"] == "PromptTrainer":
@@ -320,32 +318,31 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             train_ds = copy.deepcopy(self.multi_class_train_ds)
             # multi class
             dev_ds = copy.deepcopy(self.multi_class_dev_ds)
-            auto_trainer = AutoTrainerForTextClassification(
-                train_dataset=train_ds,
-                eval_dataset=dev_ds,
-                label_column="label_desc",
-                text_column="sentence",
-                language="Chinese",
-                output_dir=temp_dir,
-                id2label={0: "negative", 1: "positive"},
-                problem_type="multi_class",
-            )
             with self.assertRaises(ValueError):
-                auto_trainer._data_checks_and_inference()
+                AutoTrainerForTextClassification(
+                    train_dataset=train_ds,
+                    eval_dataset=dev_ds,
+                    label_column="label_desc",
+                    text_column="sentence",
+                    language="Chinese",
+                    output_dir=temp_dir,
+                    id2label={0: "negative", 1: "positive"},
+                    problem_type="multi_class",
+                )
+
             # multi label
             dev_ds = copy.deepcopy(self.multi_label_dev_ds)
-            auto_trainer = AutoTrainerForTextClassification(
-                train_dataset=train_ds,
-                eval_dataset=dev_ds,
-                label_column="label_desc",
-                text_column="sentence",
-                language="Chinese",
-                output_dir=temp_dir,
-                id2label={0: "negative", 1: "positive"},
-                problem_type="multi_label",
-            )
             with self.assertRaises(ValueError):
-                auto_trainer._data_checks_and_inference()
+                AutoTrainerForTextClassification(
+                    train_dataset=train_ds,
+                    eval_dataset=dev_ds,
+                    label_column="label_desc",
+                    text_column="sentence",
+                    language="Chinese",
+                    output_dir=temp_dir,
+                    id2label={0: "negative", 1: "positive"},
+                    problem_type="multi_label",
+                )
 
 
 if __name__ == "__main__":

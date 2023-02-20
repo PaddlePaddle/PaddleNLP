@@ -97,6 +97,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
+        self._data_checks_and_inference()
 
     @property
     def supported_languages(self) -> List[str]:
@@ -132,7 +133,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _model_candidates(self) -> List[Dict[str, Any]]:
         train_batch_size = hp.choice("batch_size", [2, 4, 8, 16, 32])
         chinese_models = hp.choice(
-            "models",
+            "chinese_models",
             [
                 "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
@@ -145,7 +146,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         english_models = hp.choice(
-            "models",
+            "english_models",
             [
                 # add deberta-v3 when we have it
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
@@ -157,7 +158,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         english_prompt_models = hp.choice(
-            "models",
+            "english_prompt_models",
             [
                 # add deberta-v3 when we have it
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
@@ -165,10 +166,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         chinese_prompt_models = hp.choice(
-            "models",
+            "chinese_prompt_models",
             [
-                "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
-                "ernie-1.0-base-zh-cw"  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+                "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
+                "ernie-1.0-base-zh-cw",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
             ],
         )
         return [
@@ -289,12 +290,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-        id2label_path = os.path.join(self.output_dir, "id2label.json")
-        with open(id2label_path, "w", encoding="utf-8") as f:
-            json.dump(self.id2label, f, ensure_ascii=False)
-        logger.info(f"Exported id2label to {id2label_path}")
 
     def _construct_trainer(self, config, eval_dataset=None) -> Trainer:
         if "EarlyStoppingCallback.early_stopping_patience" in config:
@@ -306,7 +301,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if config["trainer_type"] == "Trainer":
             model_path = config["TrainingArguments.model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
-            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_path, num_labels=len(self.id2label), id2label=self.id2label, label2id=self.label2id
+            )
             trans_func = functools.partial(
                 self._preprocess_fn,
                 tokenizer=tokenizer,
@@ -411,6 +408,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if os.path.exists(self.training_path):
             logger.info(f"Removing {self.training_path} to conserve disk space")
             shutil.rmtree(self.training_path)
+        trainer.log_metrics("eval", eval_metrics)
         return eval_metrics
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
@@ -473,42 +471,27 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, max_length=512, precision="fp32"):
+    def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, precision="fp32"):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
             trial_id (int): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
-            export_path (str): the filepath to export to
-            max_length (int): Maximum number of tokens for the model. Defaults to 512.
+            export_path (str): the filepath to export to.
             batch_size(int): The sample number of a mini-batch. Defaults to 1.
             precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
         model_result = self._get_model_result(trial_id=trial_id)
-        model_config = model_result.metrics["config"]["candidates"]
         trial_id = model_result.metrics["trial_id"]
 
         if export_path is None:
             export_path = os.path.join(self.export_path, trial_id)
 
-        self.export(export_path=export_path, trial_id=trial_id)
-
-        if model_config["trainer_type"] == "PromptTrainer":
-            mode = "prompt"
-        else:
-            mode = "finetune"
-
-        return Taskflow(
-            "text_classification",
-            mode=mode,
-            is_static_model=True,
-            problem_type=self.problem_type,
-            task_path=export_path,
-            multilabel_threshold=self.multilabel_threshold,
-            batch_size=batch_size,
-            max_length=max_length,
-            precision=precision,
-        )
+        taskflow_config = self.export(export_path=export_path, trial_id=trial_id)
+        taskflow_config["task_path"] = export_path
+        taskflow_config["batch_size"] = batch_size
+        taskflow_config["precision"] = precision
+        return Taskflow(**taskflow_config)
 
     def export(self, export_path, trial_id=None):
         """
@@ -538,6 +521,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if model_config["trainer_type"] == "PromptTrainer":
             trainer.export_model(export_path)
             trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
+            mode = "prompt"
+            max_length = model_config.get("PreprocessArguments.max_length", 128)
         else:
             if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
                 input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
@@ -547,14 +532,29 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
                 ]
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
+            mode = "finetune"
+            max_length = trainer.model.config.max_position_embeddings
+
         # save tokenizer
         trainer.tokenizer.save_pretrained(export_path)
 
-        # save id2label
-        shutil.copyfile(os.path.join(self.output_dir, "id2label.json"), os.path.join(export_path, "id2label.json"))
+        # save taskflow config file
+        taskflow_config = {
+            "task": "text_classification",
+            "mode": mode,
+            "is_static_model": True,
+            "problem_type": self.problem_type,
+            "multilabel_threshold": self.multilabel_threshold,
+            "max_length": max_length,
+            "id2label": self.id2label,
+        }
+
+        with open(os.path.join(export_path, "taskflow_config.json"), "w", encoding="utf-8") as f:
+            json.dump(taskflow_config, f, ensure_ascii=False)
 
         if os.path.exists(self.training_path):
             logger.info("Removing training checkpoints to conserve disk space")
             shutil.rmtree(self.training_path)
 
         logger.info(f"Exported {trial_id} to {export_path}")
+        return taskflow_config
