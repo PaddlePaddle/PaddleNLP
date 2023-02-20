@@ -482,6 +482,7 @@ class RobertaModel(RobertaPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
 
@@ -616,6 +617,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
@@ -768,6 +770,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
@@ -887,6 +890,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
@@ -1046,6 +1050,7 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 # [2, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if input_ids is not None:
             num_choices = paddle.shape(input_ids)[1]
         elif inputs_embeds is not None:
@@ -1177,7 +1182,7 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 print(logits.shape)
                 # [1, 13, 30522]
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
@@ -1329,7 +1334,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 print(logits.shape)
                 # [1, 13, 30522]
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if labels is not None:
             use_cache = False
         outputs = self.roberta(

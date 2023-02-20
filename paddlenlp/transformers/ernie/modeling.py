@@ -314,6 +314,7 @@ class ErnieModel(ErniePretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
 
@@ -457,6 +458,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
@@ -573,7 +575,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
@@ -694,6 +696,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
@@ -889,6 +892,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.bert.ErnieForPreTrainingOutput`.
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         with paddle.static.amp.fp16_guard():
             outputs = self.ernie(
                 input_ids,
@@ -1067,7 +1071,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 # [1, 17, 18000]
 
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
@@ -1169,6 +1173,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # input_ids: [bs, num_choice, seq_l]
         if input_ids is not None:
             input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
@@ -1241,6 +1246,7 @@ class UIE(ErniePretrainedModel):
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         inputs_embeds: Optional[Tensor] = None,
+        return_dict: Optional[Tensor] = None,
     ):
         r"""
         Args:
@@ -1262,12 +1268,14 @@ class UIE(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 start_prob, end_prob = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         sequence_output, _ = self.ernie(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
+            return_dict=return_dict,
         )
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
@@ -1322,6 +1330,7 @@ class UTC(ErniePretrainedModel):
             labels (Tensor of shape `(num_labels_in_batch,)`, optional):
                 Labels for computing classification loss.
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
