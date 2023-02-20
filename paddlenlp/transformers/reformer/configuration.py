@@ -23,95 +23,96 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = ["REFORMER_PRETRAINED_INIT_CONFIGURATION", "ReformerConfig", "REFORMER_PRETRAINED_RESOURCE_FILES_MAP"]
 
 REFORMER_PRETRAINED_INIT_CONFIGURATION = {
-        "reformer-enwik8": {
-            "tie_word_embeddings": False,
-            "is_decoder": True,
-            "chunk_size_feed_forward": 0,
-            "pad_token_id": 0,
-            "hash_seed": None,
-            "vocab_size": 258,
-            "attention_head_size": 128,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hashes": 4,
-            "num_hidden_layers": 12,
-            "num_buckets": 512,
-            "lsh_attn_chunk_length": 256,
-            "local_attn_chunk_length": 128,
-            "lsh_num_chunks_after": 0,
-            "lsh_num_chunks_before": 1,
-            "local_num_chunks_after": 0,
-            "local_num_chunks_before": 1,
-            "hidden_act": "relu",
-            "feed_forward_size": 4096,
-            "hidden_dropout_prob": 0.2,
-            "lsh_attention_probs_dropout_prob": 0.1,
-            "local_attention_probs_dropout_prob": 0.2,
-            "max_position_embeddings": 65536,
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "axial_pos_embds": True,
-            "axial_pos_shape": [128, 512],
-            "axial_pos_embds_dim": [256, 768],
-            "axial_norm_std": 1.0,
-            "chunk_size_lm_head": 0,
-            "attn_layers": [
-                "local",
-                "local",
-                "lsh",
-                "local",
-                "local",
-                "local",
-                "lsh",
-                "local",
-                "local",
-                "local",
-                "lsh",
-                "local",
-            ],
-        },
-        "reformer-crime-and-punishment": {
-            "tie_word_embeddings": False,
-            "is_decoder": True,
-            "chunk_size_feed_forward": 0,
-            "pad_token_id": 0,
-            "num_hidden_layers": 6,
-            "hash_seed": None,
-            "vocab_size": 320,
-            "attention_head_size": 64,
-            "hidden_size": 256,
-            "num_attention_heads": 2,
-            "num_hashes": 1,
-            "num_buckets": [64, 128],
-            "lsh_attn_chunk_length": 64,
-            "local_attn_chunk_length": 64,
-            "lsh_num_chunks_after": 0,
-            "lsh_num_chunks_before": 1,
-            "local_num_chunks_after": 0,
-            "local_num_chunks_before": 1,
-            "hidden_act": "relu",
-            "feed_forward_size": 512,
-            "hidden_dropout_prob": 0.05,
-            "lsh_attention_probs_dropout_prob": 0.0,
-            "local_attention_probs_dropout_prob": 0.05,
-            "max_position_embeddings": 524288,
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "axial_pos_embds": True,
-            "axial_pos_shape": [512, 1024],
-            "axial_pos_embds_dim": [64, 192],
-            "axial_norm_std": 1.0,
-            "chunk_size_lm_head": 0,
-            "attn_layers": ["local", "lsh", "local", "lsh", "local", "lsh"],
-        },
-    }
+    "reformer-enwik8": {
+        "tie_word_embeddings": False,
+        "is_decoder": True,
+        "chunk_size_feed_forward": 0,
+        "pad_token_id": 0,
+        "hash_seed": None,
+        "vocab_size": 258,
+        "attention_head_size": 128,
+        "hidden_size": 1024,
+        "num_attention_heads": 8,
+        "num_hashes": 4,
+        "num_hidden_layers": 12,
+        "num_buckets": 512,
+        "lsh_attn_chunk_length": 256,
+        "local_attn_chunk_length": 128,
+        "lsh_num_chunks_after": 0,
+        "lsh_num_chunks_before": 1,
+        "local_num_chunks_after": 0,
+        "local_num_chunks_before": 1,
+        "hidden_act": "relu",
+        "feed_forward_size": 4096,
+        "hidden_dropout_prob": 0.2,
+        "lsh_attention_probs_dropout_prob": 0.1,
+        "local_attention_probs_dropout_prob": 0.2,
+        "max_position_embeddings": 65536,
+        "initializer_range": 0.02,
+        "layer_norm_eps": 1e-12,
+        "axial_pos_embds": True,
+        "axial_pos_shape": [128, 512],
+        "axial_pos_embds_dim": [256, 768],
+        "axial_norm_std": 1.0,
+        "chunk_size_lm_head": 0,
+        "attn_layers": [
+            "local",
+            "local",
+            "lsh",
+            "local",
+            "local",
+            "local",
+            "lsh",
+            "local",
+            "local",
+            "local",
+            "lsh",
+            "local",
+        ],
+    },
+    "reformer-crime-and-punishment": {
+        "tie_word_embeddings": False,
+        "is_decoder": True,
+        "chunk_size_feed_forward": 0,
+        "pad_token_id": 0,
+        "num_hidden_layers": 6,
+        "hash_seed": None,
+        "vocab_size": 320,
+        "attention_head_size": 64,
+        "hidden_size": 256,
+        "num_attention_heads": 2,
+        "num_hashes": 1,
+        "num_buckets": [64, 128],
+        "lsh_attn_chunk_length": 64,
+        "local_attn_chunk_length": 64,
+        "lsh_num_chunks_after": 0,
+        "lsh_num_chunks_before": 1,
+        "local_num_chunks_after": 0,
+        "local_num_chunks_before": 1,
+        "hidden_act": "relu",
+        "feed_forward_size": 512,
+        "hidden_dropout_prob": 0.05,
+        "lsh_attention_probs_dropout_prob": 0.0,
+        "local_attention_probs_dropout_prob": 0.05,
+        "max_position_embeddings": 524288,
+        "initializer_range": 0.02,
+        "layer_norm_eps": 1e-12,
+        "axial_pos_embds": True,
+        "axial_pos_shape": [512, 1024],
+        "axial_pos_embds_dim": [64, 192],
+        "axial_norm_std": 1.0,
+        "chunk_size_lm_head": 0,
+        "attn_layers": ["local", "lsh", "local", "lsh", "local", "lsh"],
+    },
+}
 
 REFORMER_PRETRAINED_RESOURCE_FILES_MAP = {
-        "model_state": {
-            "reformer-enwik8": "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-enwik8/model_state.pdparams",
-            "reformer-crime-and-punishment": "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-crime-and-punishment/model_state.pdparams",
-        }
+    "model_state": {
+        "reformer-enwik8": "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-enwik8/model_state.pdparams",
+        "reformer-crime-and-punishment": "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-crime-and-punishment/model_state.pdparams",
     }
+}
+
 
 class ReformerConfig(PretrainedConfig):
     r"""
@@ -204,7 +205,7 @@ class ReformerConfig(PretrainedConfig):
             sequence_length embeddings at a time. Defaults to `0`.
         attn_layers (List[str], optional):
             List of attention layer types in ascending order. It can be chosen between a LSHSelfAttention layer
-            (`"lsh"`) and a LocalSelfAttention layer (`"local"`). Defaults to `["local", "local", "lsh", "local", "local", "local", "lsh", "local", "local", "local", "lsh", "local"]`. 
+            (`"lsh"`) and a LocalSelfAttention layer (`"local"`). Defaults to `["local", "local", "lsh", "local", "local", "local", "lsh", "local", "local", "local", "lsh", "local"]`.
 
     """
     model_type = "reformer"
@@ -237,7 +238,7 @@ class ReformerConfig(PretrainedConfig):
         lsh_attn_chunk_length=256,
         local_attn_chunk_length=128,
         hidden_size=1024,
-        max_position_embeddings=65536, 
+        max_position_embeddings=65536,
         axial_pos_embds=True,
         vocab_size=258,
         num_hashes=4,
@@ -248,7 +249,7 @@ class ReformerConfig(PretrainedConfig):
         is_decoder=True,
         lsh_attention_probs_dropout_prob=0.1,
         num_attention_heads=8,
-        attention_head_size=128,   
+        attention_head_size=128,
         local_num_chunks_before=1,
         local_num_chunks_after=0,
         pad_token_id=0,
@@ -257,7 +258,7 @@ class ReformerConfig(PretrainedConfig):
         hidden_act="relu",
         feed_forward_size=4096,
         chunk_size_feed_forward=0,
-        chunk_size_lm_head=0, 
+        chunk_size_lm_head=0,
         tie_word_embeddings=False,
         initializer_range=0.02,
         axial_norm_std=1.0,
@@ -266,39 +267,38 @@ class ReformerConfig(PretrainedConfig):
         num_hidden_layers=12,
         **kwargs
     ):
-        
-        self.axial_pos_shape=tuple(axial_pos_shape)
-        self.axial_pos_embds_dim=tuple(axial_pos_embds_dim)
-        self.hidden_dropout_prob=hidden_dropout_prob
-        self.attn_layers=attn_layers
-        self.lsh_attn_chunk_length=lsh_attn_chunk_length
-        self.local_attn_chunk_length=local_attn_chunk_length
-        self.hidden_size=hidden_size
-        self.max_position_embeddings=max_position_embeddings
-        self.axial_pos_embds=axial_pos_embds
-        self.vocab_size=vocab_size
-        self.num_hashes=num_hashes
+
+        self.axial_pos_shape = tuple(axial_pos_shape)
+        self.axial_pos_embds_dim = tuple(axial_pos_embds_dim)
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attn_layers = attn_layers
+        self.lsh_attn_chunk_length = lsh_attn_chunk_length
+        self.local_attn_chunk_length = local_attn_chunk_length
+        self.hidden_size = hidden_size
+        self.max_position_embeddings = max_position_embeddings
+        self.axial_pos_embds = axial_pos_embds
+        self.vocab_size = vocab_size
+        self.num_hashes = num_hashes
         self.num_buckets = tuple(num_buckets) if isinstance(num_buckets, list) else num_buckets
-        self.lsh_num_chunks_before=lsh_num_chunks_before
-        self.lsh_num_chunks_after=lsh_num_chunks_after
-        self.hash_seed=hash_seed
-        self.is_decoder=is_decoder
-        self.lsh_attention_probs_dropout_prob=lsh_attention_probs_dropout_prob
-        self.num_attention_heads=num_attention_heads
-        self.attention_head_size=attention_head_size   
-        self.local_num_chunks_before=local_num_chunks_before
-        self.local_num_chunks_after=local_num_chunks_after
-        self.pad_token_id=pad_token_id
-        self.local_attention_probs_dropout_prob=local_attention_probs_dropout_prob
-        self.layer_norm_eps=layer_norm_eps
-        self.hidden_act=hidden_act
-        self.feed_forward_size=feed_forward_size
-        self.chunk_size_lm_head=chunk_size_lm_head
-        self.tie_word_embeddings=tie_word_embeddings
-        #self.num_hidden_layers=len(attn_layers)
-        self.num_hidden_layers=num_hidden_layers
-        self.initializer_range=initializer_range
-        self.axial_norm_std=axial_norm_std
+        self.lsh_num_chunks_before = lsh_num_chunks_before
+        self.lsh_num_chunks_after = lsh_num_chunks_after
+        self.hash_seed = hash_seed
+        self.is_decoder = is_decoder
+        self.lsh_attention_probs_dropout_prob = lsh_attention_probs_dropout_prob
+        self.num_attention_heads = num_attention_heads
+        self.attention_head_size = attention_head_size
+        self.local_num_chunks_before = local_num_chunks_before
+        self.local_num_chunks_after = local_num_chunks_after
+        self.pad_token_id = pad_token_id
+        self.local_attention_probs_dropout_prob = local_attention_probs_dropout_prob
+        self.layer_norm_eps = layer_norm_eps
+        self.hidden_act = hidden_act
+        self.feed_forward_size = feed_forward_size
+        self.chunk_size_lm_head = chunk_size_lm_head
+        self.tie_word_embeddings = tie_word_embeddings
+        self.num_hidden_layers = num_hidden_layers
+        self.initializer_range = initializer_range
+        self.axial_norm_std = axial_norm_std
         self.use_cache = use_cache
         self.classifier_dropout = classifier_dropout
         super().__init__(
@@ -307,7 +307,4 @@ class ReformerConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             chunk_size_feed_forward=chunk_size_feed_forward,
             **kwargs,
-            )
-            
-
-    
+        )

@@ -42,7 +42,7 @@ __all__ = [
     "ReformerForQuestionAnswering",
     "ReformerModelWithLMHead",
     "ReformerForMaskedLM",
-    "ReformerLayer"
+    "ReformerLayer",
 ]
 
 REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -336,8 +336,8 @@ class AxialPositionEmbeddings(nn.Layer):
         super().__init__()
         self.axial_pos_shape = config.axial_pos_shape
         self.axial_pos_embds_dim = config.axial_pos_embds_dim
-        #import pdb
-        #pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         self.dropout = config.hidden_dropout_prob
 
         self.least_common_mult_chunk_length = _get_least_common_mult_chunk_len(
@@ -346,14 +346,14 @@ class AxialPositionEmbeddings(nn.Layer):
             local_attn_chunk_length=config.local_attn_chunk_length,
         )
         self.weights = nn.ParameterList()
-        
+
         if sum(self.axial_pos_embds_dim) != config.hidden_size:
             raise ValueError(
                 f"Make sure that axial_pos_embds factors: {self.axial_pos_embds_dim} sum to "
                 f"hidden_size: {config.hidden_size}"
             )
-        #import pdb
-        #pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         # create weights
         for axis, axial_pos_embd_dim in enumerate(self.axial_pos_embds_dim):
             # create expanded shapes
@@ -374,7 +374,8 @@ class AxialPositionEmbeddings(nn.Layer):
         batch_size = position_ids.shape[0]
         sequence_length = position_ids.shape[1]
         broadcasted_weights = [
-            weight.expand(shape=[batch_size] + list(self.axial_pos_shape) + weight.shape[-1:]) for weight in self.weights
+            weight.expand(shape=[batch_size] + list(self.axial_pos_shape) + weight.shape[-1:])
+            for weight in self.weights
         ]
 
         if self.training is True:
@@ -456,14 +457,14 @@ class ReformerEmbeddings(nn.Layer):
 
     def __init__(self, config: ReformerConfig):
         super().__init__()
-        #import pdb
-        #pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         self.max_position_embeddings = config.max_position_embeddings
         self.dropout = config.hidden_dropout_prob
 
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
-        #import pdb
-        #pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         self.position_embeddings = (
             AxialPositionEmbeddings(config) if config.axial_pos_embds else PositionEmbeddings(config)
         )
@@ -1521,7 +1522,7 @@ class ReformerAttention(nn.Layer):
             self.self_attention = LSHSelfAttention(config)
         elif len(set(self.attn_layers)) == 1 and self.attn_layers[0] == "local":
             self.self_attention = LocalSelfAttention(config)
-                
+
         elif len(set(self.attn_layers)) == 2 and set(self.attn_layers) == set(["lsh", "local"]):
             # get correct attn layers
             if self.attn_layers[self.layer_id] == "lsh":
@@ -1666,6 +1667,7 @@ class ReformerLayer(nn.Layer):
         self.feed_forward_seed = None
 
         self.feed_forward = ChunkReformerFeedForward(config)
+
     def _init_attention_seed(self):
         """
         This function sets a new seed for the attention layer to make dropout
@@ -1821,7 +1823,7 @@ class ReformerLayer(nn.Layer):
 
 
 class ReformerEncoder(nn.Layer):
-    def __init__(self, config: ReformerConfig):   
+    def __init__(self, config: ReformerConfig):
         super().__init__()
         self.dropout = config.hidden_dropout_prob
 
@@ -1880,7 +1882,7 @@ class ReformerEncoder(nn.Layer):
 
 
 class ReformerOnlyLMHead(nn.Layer):
-    def __init__(self, config: ReformerConfig):  
+    def __init__(self, config: ReformerConfig):
         super().__init__()
         # Reformer is using Rev Nets, thus last layer outputs are concatenated and
         # Layer Norm is done over 2 * hidden_size
@@ -2122,7 +2124,7 @@ class ReformerModel(ReformerPretrainedModel):
 
     """
 
-    def __init__(self, config: ReformerConfig):  
+    def __init__(self, config: ReformerConfig):
         super().__init__(config)
         self.config = config
         assert (
@@ -2363,8 +2365,7 @@ class ReformerModel(ReformerPretrainedModel):
                 axis=-1,
             )
 
-        
-        input_ids = paddle.concat([paddle.cast(input_ids, dtype='int64'), padded_input_ids], axis=-1)
+        input_ids = paddle.concat([paddle.cast(input_ids, dtype="int64"), padded_input_ids], axis=-1)
         input_shape = input_ids.shape
 
         # Pad position ids if given
@@ -2401,11 +2402,11 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
             "lsh" not in self.reformer.config["attn_layers"] or lsh_num_chunks_after == 0
         ), f"If causal mask is enabled, make sure that `lsh_num_chunks_after` is set to 1 and not {lsh_num_chunks_after}."
 
-        '''self.lm_head = ReformerOnlyLMHead(
+        """self.lm_head = ReformerOnlyLMHead(
             chunk_size_lm_head=self.reformer.config["chunk_size_lm_head"],
             hidden_size=self.reformer.config["hidden_size"],
             vocab_size=self.reformer.config["vocab_size"],
-        )'''
+        )"""
         self.lm_head = ReformerOnlyLMHead(config)
 
         self.init_weights()
@@ -2663,8 +2664,8 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             )
 
         output = (logits,) + reformer_outputs[1:]
-        #import pdb
-        #pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
 
@@ -2814,7 +2815,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
 
     def __init__(self, config: ReformerConfig):
         super().__init__(config)
-        dropout=None,
+        dropout = (None,)
         self.reformer = ReformerModel(config)
         self.dropout = nn.Dropout(dropout if dropout is not None else self.reformer.config["hidden_dropout_prob"])
         # 2 * hidden_size because we use reversible residual layers
