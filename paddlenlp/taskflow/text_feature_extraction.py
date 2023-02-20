@@ -22,7 +22,7 @@ from paddlenlp.transformers import AutoTokenizer, ErnieDualEncoder
 
 from ..utils.log import logger
 from .task import Task
-from .utils import static_mode_guard
+from .utils import dygraph_mode_guard, static_mode_guard
 
 ENCODER_TYPE = {
     "rocketqa-zh-dureader-query-encoder": "query",
@@ -116,7 +116,6 @@ class TextFeatureExtractionTask(Task):
     ):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
-        # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
         self.max_seq_len = max_seq_len
@@ -132,7 +131,7 @@ class TextFeatureExtractionTask(Task):
         # self._check_task_files()
         self._check_predictor_type()
         self._construct_tokenizer()
-        self._get_inference_model()
+        # self._get_inference_model()
         if self._static_mode:
             self._get_inference_model()
         else:
@@ -252,12 +251,13 @@ class TextFeatureExtractionTask(Task):
                             all_feats.append(text_features)
 
         else:
-            for batch_inputs in inputs["batches"]:
-                batch_inputs = self._collator(batch_inputs)
-                text_features = self._model.get_pooled_embedding(
-                    input_ids=batch_inputs["input_ids"], token_type_ids=batch_inputs["token_type_ids"]
-                )
-                all_feats.append(text_features.numpy())
+            with dygraph_mode_guard():
+                for batch_inputs in inputs["batches"]:
+                    batch_inputs = self._collator(batch_inputs)
+                    text_features = self._model.get_pooled_embedding(
+                        input_ids=batch_inputs["input_ids"], token_type_ids=batch_inputs["token_type_ids"]
+                    )
+                    all_feats.append(text_features.numpy())
         inputs.update({"features": all_feats})
         return inputs
 

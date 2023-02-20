@@ -185,9 +185,9 @@ class TextSimilarityTask(Task):
         """
 
         if "rocketqav2-en" in model or "ernie-search" in model:
-            self._model = ErnieCrossEncoder(model, num_classes=1, reinitialize=True)
+            self._model = ErnieCrossEncoder(self._task_path, num_classes=1, reinitialize=True)
         elif "rocketqa" in model:
-            self._model = ErnieCrossEncoder(model, num_classes=2)
+            self._model = ErnieCrossEncoder(self._task_path, num_classes=2)
         else:
             self._model = AutoModel.from_pretrained(self._task_path, pool_act="linear")
         self._model.eval()

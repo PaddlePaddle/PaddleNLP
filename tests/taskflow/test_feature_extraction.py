@@ -39,12 +39,19 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         cls.temp_dir.cleanup()
 
     def test_small_model_pd(self):
-        feature_extractor = Taskflow(task="feature_extraction")
+        feature_extractor = Taskflow(
+            model="PaddlePaddle/ernie_vil-2.0-base-zh", task="feature_extraction", task_path=self.model
+        )
         outputs = feature_extractor("This is a test")
         self.assertEqual(outputs["features"].shape, [1, 768])
 
     def test_return_tensors_pd(self):
-        feature_extractor = Taskflow(task="feature_extraction", return_tensors=True)
+        feature_extractor = Taskflow(
+            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            task="feature_extraction",
+            task_path=self.model,
+            return_tensors=True,
+        )
         outputs = feature_extractor(
             "This is a test",
         )
