@@ -315,6 +315,7 @@ def do_train():
         paddlenlp.transformers.export_model(
             model=model_to_save, input_spec=input_spec, path=model_args.export_model_dir
         )
+        trainer.tokenizer.save_pretrained(model_args.export_model_dir)
 
 
 if __name__ == "__main__":
