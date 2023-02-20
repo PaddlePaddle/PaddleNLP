@@ -142,13 +142,21 @@ class GLMTokenizerMixin:
         inputs = self._collate(samples)
         return BatchEncoding(inputs)
 
-    def build_inputs_for_generation(self, model_input: BatchEncoding, max_gen_length=512, targets=None, padding=False):
+    def build_inputs_for_generation(
+        self,
+        model_input: BatchEncoding,
+        max_gen_length=512,
+        targets=None,
+        padding=False,
+        is_train=False,
+    ):
         mask_ids = self.mask_token_ids
         input_ids = model_input.input_ids
         batch_size, seq_length = input_ids.shape[:2]
         position_id, block_position_id = list(range(seq_length)), [0 for _ in range(seq_length)]
         position_ids, block_position_ids = [], []
         labels = None
+        loss_mask = None
         if targets is not None:
             is_batched = isinstance(targets, (list, tuple))
             targets = self(targets, add_special_tokens=False, padding=False).input_ids
@@ -163,6 +171,7 @@ class GLMTokenizerMixin:
             targets = [target + [self.pad_token_id] * (max_gen_length + 1 - len(target)) for target in targets]
             labels = [label + [-100] * (max_gen_length - len(label)) for label in labels]
             targets = paddle.to_tensor(targets, dtype=input_ids.dtype)
+            loss_mask = (targets != self.pad_token_id).astype("int64")
             labels = paddle.to_tensor(labels, dtype=input_ids.dtype)
             labels = paddle.concat([paddle.full([batch_size, seq_length], -100), labels], axis=1)
 
@@ -200,6 +209,7 @@ class GLMTokenizerMixin:
                 [input_ids, paddle.full([batch_size, 1], self.sop_token_id, dtype=input_ids.dtype)], axis=-1
             )
         else:
+            loss_mask = paddle.concat([paddle.zeros_like(input_ids), loss_mask], axis=1)
             input_ids = paddle.concat([input_ids, targets[:, :-1]], axis=1)
 
         batch = {"input_ids": input_ids, "position_ids": position_ids}
@@ -207,6 +217,7 @@ class GLMTokenizerMixin:
             batch["attention_mask"] = attention_mask
         else:
             batch["attention_mask"] = attention_mask
+            batch["loss_mask"] = loss_mask
             batch["labels"] = labels
         return BatchEncoding(batch)
 
