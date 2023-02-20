@@ -491,7 +491,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # 3. down
         down_block_res_samples = (sample,)
-        if self.resnet_pre_temb_non_linearity[0]:
+        if self.resnet_pre_temb_non_linearity:
             down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
         else:
             down_nonlinear_temb = emb
