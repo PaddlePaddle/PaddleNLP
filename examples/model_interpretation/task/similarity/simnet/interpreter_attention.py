@@ -53,7 +53,7 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
         results(obj:`dict`): All the predictions labels.
     """
 
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batches = [data[idx : idx + batch_size] for idx in range(0, len(data), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
