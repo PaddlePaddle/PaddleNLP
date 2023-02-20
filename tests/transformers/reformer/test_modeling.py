@@ -13,31 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pdb
-import random
-import tempfile
 import unittest
 
-import numpy as np
 import paddle
 import paddle.nn as nn
-from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    ReformerModel,
-    ReformerTokenizer,
     ReformerForMaskedLM,
     ReformerForQuestionAnswering,
     ReformerForSequenceClassification,
+    ReformerModel,
     ReformerModelWithLMHead,
 )
 from paddlenlp.transformers.reformer.configuration import ReformerConfig
-from paddlenlp.transformers.reformer.modeling import REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST,  ReformerLayer
-from tests.testing_utils import require_package, slow
+from paddlenlp.transformers.reformer.modeling import (
+    REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST,
+    ReformerLayer,
+)
+from tests.testing_utils import slow
 
-from ..test_generation_utils import GenerationTesterMixin
+# from ..test_generation_utils import GenerationTesterMixin
 from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask, floats_tensor
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
+
 
 class ReformerModelTester:
     def __init__(
@@ -199,11 +202,11 @@ class ReformerModelTester:
         result = model(input_ids)
 
         # 2 * hidden_size because we use reversible resnet layers
-        self.parent.assertEqual(
-            result[0].shape, [self.batch_size, self.seq_length, 2 * self.hidden_size]
-        )
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, 2 * self.hidden_size])
 
-    def create_and_check_reformer_model_with_lm_backward(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
+    def create_and_check_reformer_model_with_lm_backward(
+        self, config: ReformerConfig, input_ids, input_mask, choice_labels
+    ):
         if not self.is_training:
             return
 
@@ -245,7 +248,9 @@ class ReformerModelTester:
         # set all position encodings to zero so that postions don't matter
         with paddle.no_grad():
             embedding = model.embeddings.position_embeddings.embedding
-            embedding.weight = paddle.create_parameter(embedding.weight.shape, dtype='float32', default_initializer=nn.initializer.Constant(value=0))
+            embedding.weight = paddle.create_parameter(
+                embedding.weight.shape, dtype="float32", default_initializer=nn.initializer.Constant(value=0)
+            )
             embedding.weight.requires_grad = False
 
         half_seq_len = self.seq_length // 2
@@ -319,7 +324,9 @@ class ReformerModelTester:
             )
         )
 
-    def create_and_check_reformer_feed_backward_chunking(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
+    def create_and_check_reformer_feed_backward_chunking(
+        self, config: ReformerConfig, input_ids, input_mask, choice_labels
+    ):
         if not self.is_training:
             return
 
@@ -333,7 +340,7 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        #model.zero_grad()
+        # model.zero_grad()
         loss_no_chunk, output_no_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
         loss_no_chunk.backward()
         grad_slice_word_no_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
@@ -346,7 +353,7 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        #model.zero_grad()
+        # model.zero_grad()
         loss_chunk, output_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
         loss_chunk.backward()
         grad_slice_word_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
@@ -381,10 +388,12 @@ class ReformerModelTester:
         config.is_decoder = False
         model = ReformerForMaskedLM(config=config)
         model.eval()
-        output_logits = model(input_ids, attention_mask=input_mask) # (loss, logits, hidden_states, attentions)
+        output_logits = model(input_ids, attention_mask=input_mask)  # (loss, logits, hidden_states, attentions)
         self.parent.assertTrue(output_logits[0].shape[1] == input_ids.shape[-1])
 
-    def create_and_check_reformer_for_question_answering(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
+    def create_and_check_reformer_for_question_answering(
+        self, config: ReformerConfig, input_ids, input_mask, choice_labels
+    ):
         model = ReformerForQuestionAnswering(config=config)
         model.eval()
         result = model(
@@ -485,9 +494,9 @@ class ReformerTesterMixin:
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_reformer_for_question_answering(*config_and_inputs)
 
-    '''def test_reformer_cached_inference(self):
+    """def test_reformer_cached_inference(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_cache(*config_and_inputs)'''
+        self.model_tester.create_and_check_cache(*config_and_inputs)"""
 
     def test_reformer_cached_generate(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -499,17 +508,21 @@ class ReformerTesterMixin:
 
 
 class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.TestCase):
-#class ReformerLocalAttnModelTest(ReformerTesterMixin, GenerationTesterMixin, ModelTesterMixin, unittest.TestCase):
+    # class ReformerLocalAttnModelTest(ReformerTesterMixin, GenerationTesterMixin, ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
-        (ReformerModel, ReformerModelWithLMHead, ReformerForSequenceClassification, ReformerForQuestionAnswering)
+        ReformerModel,
+        ReformerModelWithLMHead,
+        ReformerForSequenceClassification,
+        ReformerForQuestionAnswering,
     )
-    #all_generative_model_classes = (ReformerModelWithLMHead,)
+    # all_generative_model_classes = (ReformerModelWithLMHead,)
     all_generative_model_classes = {ReformerModelWithLMHead: (ReformerModel, "Reformer")}
     test_pruning = False
     test_headmasking = False
     test_torchscript = False
     test_sequence_classification_problem_types = True
     base_model_class = ReformerModel
+
     def setUp(self):
         self.model_tester = ReformerModelTester(self)
         self.config_tester = ConfigTester(self, config_class=ReformerConfig, hidden_size=37)
@@ -584,18 +597,21 @@ class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest
             )
 
 
-
 class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.TestCase):
-# class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+    # class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     all_model_classes = (
-        (ReformerModel, ReformerModelWithLMHead, ReformerForSequenceClassification, ReformerForQuestionAnswering)
+        ReformerModel,
+        ReformerModelWithLMHead,
+        ReformerForSequenceClassification,
+        ReformerForQuestionAnswering,
     )
-    #all_generative_model_classes = (ReformerModelWithLMHead,)
+    # all_generative_model_classes = (ReformerModelWithLMHead,)
     all_generative_model_classes = {ReformerModelWithLMHead: (ReformerModel, "Reformer")}
     test_pruning = False
     test_headmasking = False
     test_torchscript = False
     base_model_class = ReformerModel
+
     def setUp(self):
         self.model_tester = ReformerModelTester(
             self,
@@ -706,7 +722,6 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     def test_problem_types(self):
         # Fails because the sequence length is not a multiple of 4
         pass
-
 
 
 '''class ReformerIntegrationTests(unittest.TestCase):

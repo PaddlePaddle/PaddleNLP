@@ -17,14 +17,15 @@ import os
 import tempfile
 import unittest
 
-from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, ReformerTokenizer, ReformerTokenizer
+from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, ReformerTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import BatchEncoding
-from tests.testing_utils import get_tests_dir, slow
+from tests.testing_utils import get_tests_dir
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")
 FRAMEWORK = "pd"
+
 
 class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
@@ -145,7 +146,29 @@ class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def test_prepare_batch(self):
         tokenizer = self.reformer_base_tokenizer()
         src_text = ["A long paragraph for summarization.", "Another paragraph for summarization."]
-        expected_src_tokens = [99, 35, 28, 275, 40, 52, 261, 275, 209, 279, 265, 88, 117, 271, 271, 52, 264, 299, 248, 278, 2]
+        expected_src_tokens = [
+            99,
+            35,
+            28,
+            275,
+            40,
+            52,
+            261,
+            275,
+            209,
+            279,
+            265,
+            88,
+            117,
+            271,
+            271,
+            52,
+            264,
+            299,
+            248,
+            278,
+            2,
+        ]
         batch = tokenizer(src_text, padding=True, return_tensors=FRAMEWORK)
         self.assertIsInstance(batch, BatchEncoding)
 
@@ -193,7 +216,29 @@ class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tokenizer = self.reformer_base_tokenizer()
         src_text = ["A long paragraph for summarization. </s>"]
         tgt_text = ["Summary of the text. </s>"]
-        expected_src_tokens = [99, 35, 28, 275, 40, 52, 261, 275, 209, 279, 265, 88, 117, 271, 271, 52, 264, 299, 248, 278, 2]
+        expected_src_tokens = [
+            99,
+            35,
+            28,
+            275,
+            40,
+            52,
+            261,
+            275,
+            209,
+            279,
+            265,
+            88,
+            117,
+            271,
+            271,
+            52,
+            264,
+            299,
+            248,
+            278,
+            2,
+        ]
 
         # TODO(wj-Mcat): to enable `expected_tgt_tokens`
         # expected_tgt_tokens = [20698, 13, 8, 1499, 5, 1]
@@ -297,4 +342,3 @@ class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             )
             self.assertEqual(len(encoding["input_ids"]), 3)
             self.assertEqual(len(encoding["offset_mapping"]), 3)
-
