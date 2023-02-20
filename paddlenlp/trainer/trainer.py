@@ -133,6 +133,30 @@ def paddlenlp_load(path, return_numpy=False):
         return paddle.load(path, return_numpy=return_numpy)
 
 
+def extract_prefix_parameter_name(name):
+    """
+    Extract name for moment or beta
+
+        create_parameter_0.w_0_moment1_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_1.w_0_moment1_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_0.w_0_moment2_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_1.w_0_moment2_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_0.w_0_beta1_pow_acc_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_1.w_0_beta1_pow_acc_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_0.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32)
+        create_parameter_1.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32）
+        create_parameter_1.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32）
+
+        custom_keys_moment1_0 Tensor(shape=[1], dtype=float32)
+    """
+    origin_name = name
+    suffix = ["_moment1_0", "_moment2_0", "_beta1_pow_acc_0", "_beta2_pow_acc_0"]
+    for x in suffix:
+        name = name.replace(x, "")
+    assert origin_name.startswith(name), f"Extract prefix faild, origin: {origin_name}, extracted: {name}"
+    return name
+
+
 __all__ = ["Trainer"]
 
 
@@ -1353,7 +1377,27 @@ class Trainer:
                 # alias for opitimizer state, should be merge on different shard!
                 paddle.save({}, os.path.join(output_dir, OPTIMIZER_NAME))
             else:
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                if self.args.keep_optimizer_state_static_keys:
+                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                else:
+                    # trans the static keys to dygraph keys.
+                    static_dygraph_name_mapping = {}
+                    for k, v in self.model.state_dict().items():
+                        if isinstance(v, paddle.Tensor):
+                            static_dygraph_name_mapping[v.name] = k
+
+                    dygraph_keys_state_dict = {}
+                    for k, v in self.optimizer.state_dict().items():
+                        if isinstance(v, paddle.Tensor):
+                            k_pure = extract_prefix_parameter_name(k)
+                            if k_pure in static_dygraph_name_mapping:
+                                k = k.replace(k_pure, static_dygraph_name_mapping[k_pure], 1)
+                            dygraph_keys_state_dict[k] = v.cpu()
+                        else:
+                            dygraph_keys_state_dict[k] = v
+
+                    paddle.save(dygraph_keys_state_dict, os.path.join(output_dir, OPTIMIZER_NAME))
+                    del dygraph_keys_state_dict
 
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
@@ -1500,9 +1544,27 @@ class Trainer:
                 empty_dict = paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME), return_numpy=True)
                 assert len(empty_dict) == 0, "Optimizer file of sharding, should be empty!"
             else:
-                self.optimizer.set_state_dict(
-                    paddlenlp_load(os.path.join(checkpoint, OPTIMIZER_NAME), return_numpy=True)
-                )
+                # fix for amp master weight, can't load with numpy must be tensor !
+                opt_state_dict = paddlenlp_load(os.path.join(checkpoint, OPTIMIZER_NAME), return_numpy=True)
+
+                if self.args.keep_optimizer_state_static_keys:
+                    self.optimizer.set_state_dict(opt_state_dict)
+                else:
+                    # trans the dygraph keys to satic keys.
+                    dygraph_static_name_mapping = {}
+                    for k, v in self.model.state_dict().items():
+                        if isinstance(v, paddle.Tensor):
+                            dygraph_static_name_mapping[k] = v.name
+                    keys = list(opt_state_dict.keys())
+                    for k in keys:
+                        if isinstance(opt_state_dict[k], paddle.Tensor):
+                            k_pure = extract_prefix_parameter_name(k)
+                            if k_pure in dygraph_static_name_mapping:
+                                k_new = k.replace(k_pure, dygraph_static_name_mapping[k_pure], 1)
+                            opt_state_dict[k_new] = opt_state_dict.pop(k)
+
+                    self.optimizer.set_state_dict(opt_state_dict)
+                    del opt_state_dict
 
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):

@@ -240,6 +240,7 @@ class GPTConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "gpt"
+    keys_to_ignore_at_inference = ["past_key_values"]
     attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
 

@@ -496,6 +496,9 @@ class TrainingArguments:
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
     )
+    keep_optimizer_state_static_keys: bool = field(
+        default=True, metadata={"help": "Whether or not to save the optimizer state as paddle statice keys."}
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
