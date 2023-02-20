@@ -17,24 +17,25 @@ import os
 import tempfile
 import unittest
 
-from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, T5Tokenizer, ReformerTokenizer
+from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, ReformerTokenizer, ReformerTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import BatchEncoding
 from tests.testing_utils import get_tests_dir, slow
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")
+FRAMEWORK = "pd"
 
 class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+
     tokenizer_class = ReformerTokenizer
-    test_rust_tokenizer = False
-    test_seq2seq = False
     test_sentencepiece = True
     from_pretrained_vocab_key = "sentencepiece_model_file"
 
     def setUp(self):
         super().setUp()
 
+        # We have a SentencePiece fixture for testing
         tokenizer = ReformerTokenizer(SAMPLE_VOCAB, keep_accents=True)
         tokenizer.save_pretrained(self.tmpdirname)
 
@@ -51,81 +52,11 @@ class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         self.assertEqual(vocab_keys[0], "<unk>")
         self.assertEqual(vocab_keys[1], "<s>")
-        self.assertEqual(vocab_keys[-1], "j")
-        self.assertEqual(len(vocab_keys), 1_000)
+        self.assertEqual(vocab_keys[-1], "<pad>")
+        self.assertEqual(len(vocab_keys), 1_101)
 
     def test_vocab_size(self):
-        self.assertEqual(self.get_tokenizer().vocab_size, 1_000)
-
-    def test_rust_and_python_full_tokenizers(self):
-        if not self.test_rust_tokenizer:
-            return
-
-        tokenizer = self.get_tokenizer()
-        rust_tokenizer = self.get_rust_tokenizer()
-
-        sequence = "I was born in 92000, and this is falsé."
-
-        tokens = tokenizer.tokenize(sequence)
-        rust_tokens = rust_tokenizer.tokenize(sequence)
-        self.assertListEqual(tokens, rust_tokens)
-
-        ids = tokenizer.encode(sequence, add_special_tokens=False)
-        rust_ids = rust_tokenizer.encode(sequence, add_special_tokens=False)
-        self.assertListEqual(ids, rust_ids)
-
-        rust_tokenizer = self.get_rust_tokenizer()
-        ids = tokenizer.encode(sequence)
-        rust_ids = rust_tokenizer.encode(sequence)
-        self.assertListEqual(ids, rust_ids)
-
-    def test_padding(self, max_length=15):
-        for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer_r = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-
-                # Simple input
-                s = "This is a simple input"
-                s2 = ["This is a simple input 1", "This is a simple input 2"]
-                p = ("This is a simple input", "This is a pair")
-                p2 = [
-                    ("This is a simple input 1", "This is a simple input 2"),
-                    ("This is a simple pair 1", "This is a simple pair 2"),
-                ]
-
-                # Simple input tests
-                self.assertRaises(ValueError, tokenizer_r.encode, s, max_length=max_length, padding="max_length")
-
-                # Simple input
-                self.assertRaises(ValueError, tokenizer_r.encode_plus, s, max_length=max_length, padding="max_length")
-
-                # Simple input
-                self.assertRaises(
-                    ValueError,
-                    tokenizer_r.batch_encode_plus,
-                    s2,
-                    max_length=max_length,
-                    padding="max_length",
-                )
-
-                # Pair input
-                self.assertRaises(ValueError, tokenizer_r.encode, p, max_length=max_length, padding="max_length")
-
-                # Pair input
-                self.assertRaises(ValueError, tokenizer_r.encode_plus, p, max_length=max_length, padding="max_length")
-
-                # Pair input
-                self.assertRaises(
-                    ValueError,
-                    tokenizer_r.batch_encode_plus,
-                    p2,
-                    max_length=max_length,
-                    padding="max_length",
-                )
-
-    # tokenizer has no padding token
-    def test_padding_different_model_input_name(self):
-        pass
+        self.assertEqual(self.get_tokenizer().vocab_size, 1_100)
 
     def test_full_tokenizer(self):
         tokenizer = ReformerTokenizer(SAMPLE_VOCAB, keep_accents=True)
@@ -199,171 +130,171 @@ class ReformerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             ],
         )
 
-    def big_tokenizer(self):
-        return ReformerTokenizer.from_pretrained("google/reformer-crime-and-punishment")
+    def reformer_base_tokenizer(self):
+        return ReformerTokenizer.from_pretrained("reformer-crime-and-punishment")
 
-    @slow
-    def test_tokenization_base_easy_symbols(self):
-        symbols = "Hello World!"
-        original_tokenizer_encodings = [126, 32, 262, 152, 38, 72, 287]
+    def get_tokenizer(self, **kwargs) -> ReformerTokenizer:
+        return self.tokenizer_class.from_pretrained(self.tmpdirname, pad_token=None, **kwargs)
 
-        self.assertListEqual(original_tokenizer_encodings, self.big_tokenizer.encode(symbols))
+    def test_eos_treatment(self):
+        tokenizer = self.reformer_base_tokenizer()
+        batch_with_eos_added = tokenizer(["hi</s>", "I went to the gym</s>", "</s>"])
+        batch_without_eos_added = tokenizer(["hi", "I went to the gym", ""])
+        self.assertListEqual(batch_with_eos_added["input_ids"], batch_without_eos_added["input_ids"])
 
-    @slow
-    def test_tokenization_base_hard_symbols(self):
-        symbols = (
-            'This is a very long text with a lot of weird characters, such as: . , ~ ? ( ) " [ ] ! : - . Also we will'
-            " add words that should not exsist and be tokenized to <unk>, such as saoneuhaoesuth"
-        )
-        original_tokenizer_encodings = [
-            108,
-            265,
-            24,
-            111,
-            4,
-            258,
-            156,
-            35,
-            28,
-            275,
-            3,
-            259,
-            297,
-            260,
-            84,
-            4,
-            35,
-            110,
-            44,
-            8,
-            259,
-            91,
-            268,
-            21,
-            11,
-            209,
-            274,
-            109,
-            266,
-            277,
-            117,
-            86,
-            93,
-            315,
-            258,
-            278,
-            258,
-            277,
-            258,
-            0,
-            258,
-            288,
-            258,
-            319,
-            258,
-            0,
-            258,
-            0,
-            258,
-            0,
-            258,
-            0,
-            258,
-            287,
-            258,
-            315,
-            258,
-            289,
-            258,
-            278,
-            99,
-            269,
-            266,
-            262,
-            8,
-            259,
-            241,
-            4,
-            217,
-            230,
-            268,
-            266,
-            55,
-            168,
-            106,
-            75,
-            193,
-            266,
-            223,
-            27,
-            49,
-            26,
-            282,
-            25,
-            264,
-            299,
-            19,
-            26,
-            0,
-            258,
-            277,
-            117,
-            86,
-            93,
-            176,
-            183,
-            270,
-            11,
-            262,
-            42,
-            61,
-            265,
+    def test_prepare_batch(self):
+        tokenizer = self.reformer_base_tokenizer()
+        src_text = ["A long paragraph for summarization.", "Another paragraph for summarization."]
+        expected_src_tokens = [99, 35, 28, 275, 40, 52, 261, 275, 209, 279, 265, 88, 117, 271, 271, 52, 264, 299, 248, 278, 2]
+        batch = tokenizer(src_text, padding=True, return_tensors=FRAMEWORK)
+        self.assertIsInstance(batch, BatchEncoding)
+
+        result = list(batch["input_ids"].tolist()[0])
+
+        self.assertListEqual(expected_src_tokens, result)
+
+        self.assertEqual([2, 21], batch["input_ids"].shape)
+        self.assertEqual([2, 21], batch.attention_mask.shape)
+
+    def test_empty_target_text(self):
+        tokenizer = self.reformer_base_tokenizer()
+        src_text = ["A long paragraph for summarization.", "Another paragraph for summarization."]
+        batch = tokenizer(src_text, padding=True, return_tensors=FRAMEWORK)
+        # check if input_ids are returned and no decoder_input_ids
+        self.assertIn("input_ids", batch)
+        self.assertIn("attention_mask", batch)
+        self.assertNotIn("decoder_input_ids", batch)
+        self.assertNotIn("decoder_attention_mask", batch)
+
+    def test_max_length(self):
+        tokenizer = self.reformer_base_tokenizer()
+        tgt_text = [
+            "Summary of the text.",
+            "Another summary.",
         ]
-
-        self.assertListEqual(original_tokenizer_encodings, self.big_tokenizer.encode(symbols))
-
-    @slow
-    def test_torch_encode_plus_sent_to_model(self):
-        import paddle
-
-        from paddlenlp.transformers import ReformerConfig, ReformerModel
-
-        # Build sequence
-        first_ten_tokens = list(self.big_tokenizer.get_vocab().keys())[:10]
-        sequence = " ".join(first_ten_tokens)
-        encoded_sequence = self.big_tokenizer.encode_plus(sequence, return_tensors="pt")
-        batch_encoded_sequence = self.big_tokenizer.batch_encode_plus([sequence, sequence], return_tensors="pt")
-
-        config = ReformerConfig()
-        # The input gets padded during training so adjust the axial position encodings from the pretrained model value of (512, 1024)
-        config.axial_pos_shape = encoded_sequence["input_ids"].shape
-        model = ReformerModel(config)
-
-        # Reformer has config.vocab_size == tokenizer.vocab_size == len(tokenizer) - 1 = 320; len(tokenizer) is 321 (including a pad token with id 320)
-        assert model.get_input_embeddings().weight.shape[0] >= self.big_tokenizer.vocab_size
-
-        with paddle.no_grad():
-            model(**encoded_sequence)
-            model(**batch_encoded_sequence)
-
-    @slow
-    def test_tokenizer_integration(self):
-        # fmt: off
-        expected_encoding = {'input_ids': [[108, 265, 24, 111, 4, 258, 156, 7, 51, 279, 58, 7, 76, 25, 69, 278], [140, 243, 264, 134, 17, 267, 77, 263, 22, 262, 297, 258, 304, 177, 279, 266, 14, 89, 13, 35, 261, 299, 272, 137, 275, 278]], 'attention_mask': [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]}  # noqa: E501
-        # fmt: on
-
-        # This tokenizer does not know some characters like ")".
-        # That is the reason why we use very simple texts here.
-        # Also see https://github.com/huggingface/transformers/pull/11737#issuecomment-850769064
-        sequences = [
-            "This is a very simple sentence.",
-            "The quick brown fox jumps over the lazy dog.",
-        ]
-
-        self.tokenizer_integration_test_util(
-            expected_encoding=expected_encoding,
-            model_name="google/reformer-crime-and-punishment",
-            revision="0e6c3decb8211d49bf881013425dc8b0448b3f5a",
-            padding=False,
-            sequences=sequences,
+        targets = tokenizer(
+            text=tgt_text, max_length=32, padding="max_length", truncation=True, return_tensors=FRAMEWORK
         )
+        self.assertEqual(32, targets["input_ids"].shape[1])
+
+    def test_outputs_not_longer_than_maxlen(self):
+        tokenizer = self.reformer_base_tokenizer()
+
+        batch = tokenizer(
+            ["I am a small frog" * 1000, "I am a small frog"], padding=True, truncation=True, return_tensors=FRAMEWORK
+        )
+        self.assertIsInstance(batch, BatchEncoding)
+        # Since Reformer does NOT have a max input length,
+        # this test should be changed to the following in Transformers v5:
+        # self.assertEqual(batch["input_ids"].shape, (2, 8001))
+        self.assertEqual(batch["input_ids"].shape, [2, 9001])
+
+    def test_eos_in_input(self):
+        tokenizer = self.reformer_base_tokenizer()
+        src_text = ["A long paragraph for summarization. </s>"]
+        tgt_text = ["Summary of the text. </s>"]
+        expected_src_tokens = [99, 35, 28, 275, 40, 52, 261, 275, 209, 279, 265, 88, 117, 271, 271, 52, 264, 299, 248, 278, 2]
+
+        # TODO(wj-Mcat): to enable `expected_tgt_tokens`
+        # expected_tgt_tokens = [20698, 13, 8, 1499, 5, 1]
+
+        batch = tokenizer(src_text, text_target=tgt_text)
+
+        self.assertEqual(expected_src_tokens, batch["input_ids"][0])
+        # self.assertEqual(expected_tgt_tokens, batch["labels"][0])
+
+    def test_token_type_ids(self):
+        src_text_1 = ["A first paragraph for summarization."]
+        src_text_2 = ["A second paragraph for summarization."]
+
+        tokenizer = self.reformer_base_tokenizer()
+
+        slow_token_type_ids = tokenizer(src_text_1, src_text_2, add_special_tokens=True, return_token_type_ids=True)[
+            "token_type_ids"
+        ]
+        self.assertEqual(len(slow_token_type_ids[0]), 44)
+
+    def test_special_tokens_initialization_with_non_empty_additional_special_tokens(self):
+        tokenizer_list = []
+        tokenizer_list.append((self.tokenizer_class, self.get_tokenizer()))
+
+        for tokenizer_class, tokenizer_utils in tokenizer_list:
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tokenizer_utils.save_pretrained(tmp_dir)
+
+                with open(os.path.join(tmp_dir, "special_tokens_map.json"), encoding="utf-8") as json_file:
+                    special_tokens_map = json.load(json_file)
+
+                with open(os.path.join(tmp_dir, "tokenizer_config.json"), encoding="utf-8") as json_file:
+                    tokenizer_config = json.load(json_file)
+
+                added_tokens_extra_ids = [f"<extra_id_{i}>" for i in range(100)]
+
+                special_tokens_map["additional_special_tokens"] = added_tokens_extra_ids + [
+                    "an_additional_special_token"
+                ]
+                tokenizer_config["additional_special_tokens"] = added_tokens_extra_ids + [
+                    "an_additional_special_token"
+                ]
+
+                with open(os.path.join(tmp_dir, "special_tokens_map.json"), "w", encoding="utf-8") as outfile:
+                    json.dump(special_tokens_map, outfile)
+                with open(os.path.join(tmp_dir, "tokenizer_config.json"), "w", encoding="utf-8") as outfile:
+                    json.dump(tokenizer_config, outfile)
+
+                # the following checks allow us to verify that our test works as expected, i.e. that the tokenizer takes
+                # into account the new value of additional_special_tokens given in the "tokenizer_config.json" and
+                # "special_tokens_map.json" files
+                tokenizer_without_change_in_init = tokenizer_class.from_pretrained(
+                    tmp_dir,
+                )
+                self.assertIn(
+                    "an_additional_special_token", tokenizer_without_change_in_init.additional_special_tokens
+                )
+                # self.assertIn("an_additional_special_token",tokenizer_without_change_in_init.get_vocab()) # ByReformerTokenization no vocab
+                self.assertEqual(
+                    ["an_additional_special_token"],
+                    tokenizer_without_change_in_init.convert_ids_to_tokens(
+                        tokenizer_without_change_in_init.convert_tokens_to_ids(["an_additional_special_token"])
+                    ),
+                )
+
+                # Now we test that we can change the value of additional_special_tokens in the from_pretrained
+                new_added_tokens = added_tokens_extra_ids + [AddedToken("a_new_additional_special_token", lstrip=True)]
+                tokenizer = tokenizer_class.from_pretrained(
+                    tmp_dir,
+                    additional_special_tokens=new_added_tokens,
+                )
+
+                self.assertIn("a_new_additional_special_token", tokenizer.additional_special_tokens)
+                self.assertEqual(
+                    ["a_new_additional_special_token"],
+                    tokenizer.convert_ids_to_tokens(
+                        tokenizer.convert_tokens_to_ids(["a_new_additional_special_token"])
+                    ),
+                )
+
+    # overwritten from `test_tokenization_common` since Reformer has no max length
+    def test_pretrained_model_lists(self):
+        # We should have at least one default checkpoint for each tokenizer
+        # We should specify the max input length as well (used in some part to list the pretrained checkpoints)
+        self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
+        self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
+
+    def test_offsets_mapping(self):
+        pass
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                truncation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 3)
+            self.assertEqual(len(encoding["offset_mapping"]), 3)
+

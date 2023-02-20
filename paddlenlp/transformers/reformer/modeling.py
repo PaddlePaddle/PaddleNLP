@@ -37,7 +37,6 @@ from .configuration import (
 
 __all__ = [
     "ReformerModel",
-    "ReformerEncoder",
     "ReformerPretrainedModel",
     "ReformerForSequenceClassification",
     "ReformerForQuestionAnswering",
@@ -47,9 +46,8 @@ __all__ = [
 ]
 
 REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "google/reformer-crime-and-punishment",
-    "google/reformer-enwik8",
-    # See all Reformer models at https://huggingface.co/models?filter=reformer
+    "reformer-crime-and-punishment",
+    "reformer-enwik8",
 ]
 
 # Define named tuples for nn.Layers here
