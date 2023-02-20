@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import paddle
 import paddle.nn as nn
@@ -244,7 +244,7 @@ class GLMStack(nn.Layer):
         hidden_states: Tensor,
         position_ids: Tensor,
         attention_mask: Tensor,
-        memory_states: (Tensor, Optional) = None,
+        memory_states: Tuple[Tensor, Optional] = None,
     ):
         batch_size, query_length = hidden_states.shape[:2]
         memory_length = memory_states[0].shape[1] if memory_states is not None else 0
@@ -252,7 +252,7 @@ class GLMStack(nn.Layer):
         is_scalar = (paddle.numel(attention_mask) == 1)[0]
         is_sep = is_scalar or paddle.numel(attention_mask) == batch_size
         if is_sep:
-            scalar_sep = attention_mask.tolist()[0] if is_scalar else attention_mask
+            scalar_sep = attention_mask[0] if is_scalar else attention_mask
 
             # attention mask is the beginning postion of B region in [0, query_len)
             def build_mask_matrix(seq_length, sep, memory_length=0):
@@ -263,8 +263,8 @@ class GLMStack(nn.Layer):
                 else:
                     mask = mask.expand([batch_size, -1, -1])
                     ids = paddle.arange(seq_length, dtype=sep.dtype).unsqueeze(0)
-                    m = ids < sep.reshape([-1, 1])
-                    m = m.unsqueeze(1).expand_as(mask)
+                    m = (ids < sep.reshape([-1, 1])).astype("float32")
+                    m = m.unsqueeze(1).expand_as(mask).astype("bool")
                     y = paddle.full(mask.shape, 1, mask.dtype)
                     mask = paddle.where(m, y, mask)
                 if memory_length > 0:
@@ -307,12 +307,11 @@ class GLMStack(nn.Layer):
     def update_memories(self, hiddens, cache):
         memory_length = cache[0].shape[1] if cache else 0
         query_length = hiddens[0].shape[1]
-
         new_memory_length = memory_length + query_length
 
         new_memories = []
         for i in range(len(hiddens)):
-            if new_memory_length <= query_length:
+            if new_memory_length <= query_length or cache is None:
                 new_memories.append(hiddens[i][-new_memory_length:])
             else:
                 new_memories.append(paddle.concat([cache[i][:, -memory_length:], hiddens[i]], axis=1))
