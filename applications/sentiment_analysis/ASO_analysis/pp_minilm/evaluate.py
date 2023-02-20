@@ -76,4 +76,4 @@ if __name__ == "__main__":
 
     # evaluate on dev data
     accuracy, precision, recall, f1 = evaluate(model, test_loader, metric)
-    print(f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
+    print(f'evaluation result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
