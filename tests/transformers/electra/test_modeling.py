@@ -29,8 +29,9 @@ from paddlenlp.transformers import (
     ElectraModel,
     ElectraPretrainedModel,
 )
-from tests.testing_utils import slow
-from tests.transformers.test_modeling_common import (
+
+from ...testing_utils import slow
+from ..test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,

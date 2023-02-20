@@ -25,18 +25,18 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.transformers import MT5_PRETRAINED_INIT_CONFIGURATION, MT5Config
-from paddlenlp.transformers.activations import ACT2FN
-from paddlenlp.transformers.model_outputs import (
+from ...utils.converter import StateDictNameMapping
+from ...utils.log import logger
+from ..activations import ACT2FN
+from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
     convert_encoder_output,
 )
-from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
-from paddlenlp.utils.converter import StateDictNameMapping
-from paddlenlp.utils.log import logger
+from ..model_utils import PretrainedModel, register_base_model
+from .configuration import MT5_PRETRAINED_INIT_CONFIGURATION, MT5Config
 
 __all__ = [
     "MT5Model",
