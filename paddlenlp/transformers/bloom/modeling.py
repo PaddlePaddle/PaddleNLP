@@ -362,9 +362,7 @@ class BloomAttention(nn.Layer):
     ):
         # hidden_states: [batch_size, seq_length, hidden_size]
         # repeat alibi tensor with the batch size
-
-        alibi = alibi.repeat_interleave(hidden_states.shape[0], axis=0)
-        # alibi = alibi.repeat(hidden_states.shape[0], 1, 1).to(hidden_states.device)
+        alibi = alibi.repeat_interleave(hidden_states.shape[0], axis=1)
 
         # apply preprocessing if the input is padded
         if attention_mask is not None and 0 in attention_mask:
