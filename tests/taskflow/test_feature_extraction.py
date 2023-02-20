@@ -39,12 +39,22 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         cls.temp_dir.cleanup()
 
     def test_small_model_pd(self):
-        feature_extractor = Taskflow(task="feature_extraction")
+        feature_extractor = Taskflow(
+            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            task="feature_extraction",
+            task_path=self.model,
+            return_tensors="np",
+        )
         outputs = feature_extractor("This is a test")
-        self.assertEqual(outputs["features"].shape, [1, 768])
+        self.assertEqual(outputs["features"].shape, (1, 768))
 
     def test_return_tensors_pd(self):
-        feature_extractor = Taskflow(task="feature_extraction", return_tensors=True)
+        feature_extractor = Taskflow(
+            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            task="feature_extraction",
+            task_path=self.model,
+            return_tensors="pd",
+        )
         outputs = feature_extractor(
             "This is a test",
         )
@@ -88,7 +98,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             is_static_model=False,
-            return_tensors=False,
+            return_tensors="np",
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
@@ -99,7 +109,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             is_static_model=True,
-            return_tensors=False,
+            return_tensors="np",
             device_id=0,
         )
         static_results = static_taskflow(input_text)
@@ -130,7 +140,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             is_static_model=False,
-            return_tensors=False,
+            return_tensors="np",
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
@@ -141,7 +151,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             is_static_model=True,
-            return_tensors=False,
+            return_tensors="np",
         )
         static_results = static_taskflow(input_text)
         self.assertEqual(static_results["features"].shape[0], 2)
