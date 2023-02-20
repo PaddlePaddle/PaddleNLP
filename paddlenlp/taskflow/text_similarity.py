@@ -219,6 +219,7 @@ class TextSimilarityTask(Task):
         for data in inputs:
             text1, text2 = data[0], data[1]
             if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
+                # Todo: wugaosheng, Add erine-search encoding support
                 encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_seq_len=self._max_seq_len)
                 ids = encoded_inputs["input_ids"]
                 segment_ids = encoded_inputs["token_type_ids"]
