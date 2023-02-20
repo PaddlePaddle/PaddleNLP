@@ -19,12 +19,17 @@ export cudaid1=$2
 export cudaid2=$3
 export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-if [ ! -f "model_logs/" ];then 
+if [ ! -d "model_logs" ];then 
     mkdir model_logs
+else 
+    echo 'model_logs/ exists'
 fi
-if [ ! -f "unittest_logs/" ];then 
-    mkdir unittest_logs
+if [ ! -d "unittest_logs" ];then 
+    mkdir model_logs
+else 
+    echo 'unittest_logs/ exists'
 fi
+
 print_info(){
 if [ $1 -ne 0 ];then
     if [[ $2 =~ 'tests' ]];then
@@ -349,7 +354,7 @@ if [ ! -f 'test.py' ];then
         --log_dir "./log" \
         run_pretrain_static.py \
         --model_type "ernie" \
-        --model_name_or_path "ernie-1.0" \
+        --model_name_or_path "ernie-1.0-base-zh " \
         --input_dir "./data/" \
         --output_dir "./output/" \
         --max_seq_len 512 \
@@ -920,7 +925,7 @@ python download.py --data_dir ./extra_train_ds/ --url https://github.com/wdimmy/
 #trans xml txt
 python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/train.txt
 #2卡训练
-python -m paddle.distributed.launch  train.py --batch_size 32 --logging_steps 100 --epochs 1 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/  >${log_path}/ernie-csc_train >>${log_path}/ernie-csc_train 2>&1
+python -m paddle.distributed.launch  train.py --batch_size 32 --logging_steps 100 --epochs 1 --learning_rate 5e-5 --model_name_or_path ernie-1.0-base-zh --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/  >${log_path}/ernie-csc_train >>${log_path}/ernie-csc_train 2>&1
 print_info $? ernie-csc_train
 #predict
 sh run_sighan_predict.sh >${log_path}/ernie-csc_predict >>${log_path}/ernie-csc_predict 2>&1
