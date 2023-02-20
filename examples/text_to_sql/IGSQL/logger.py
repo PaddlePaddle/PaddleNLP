@@ -47,7 +47,7 @@ class Logger:
         return default
 
     def contains(self, string):
-        """Dtermines whether the string is present in the log."""
+        """Determines whether the string is present in the log."""
         for line in self.lines[::-1]:
             if string.lower() in line.lower():
                 return True

@@ -151,7 +151,7 @@ def gen_text_file(similar_text_pair_file):
 
 
 def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
-    """Word Reptition strategy."""
+    """Word Repetition strategy."""
     input_ids = input_ids.numpy().tolist()
     token_type_ids = token_type_ids.numpy().tolist()
 

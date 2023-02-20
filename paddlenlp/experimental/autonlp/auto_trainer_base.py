@@ -14,7 +14,6 @@
 import copy
 import datetime
 import os
-import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -49,8 +48,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 use verbosity > 0 to set stop the workers from logging to the driver.
     """
 
-    training_path = "training"
-    export_path = "exported_model"
+    training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
+    save_path = "trained_model"  # filepath for the trained dygraph model
+    export_path = "exported_model"  # filepath for the exported static model
     results_filename = "experiment_results.csv"
 
     def __init__(
@@ -143,10 +143,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             export_path (str, required): the filepath to export to
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
-        model_result = self._get_model_result(trial_id=trial_id)
-        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-        shutil.copytree(exported_model_path, export_path)
-        logger.info(f"Exported to {export_path}")
+
+        raise NotImplementedError
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):

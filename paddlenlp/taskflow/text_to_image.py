@@ -90,7 +90,7 @@ class TextToImageGenerationTask(Task):
                 tokenizerd_inputs["condition_scale"] = self._condition_scale
             return tokenizerd_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in data:
             one_batch.append(example)
@@ -227,7 +227,7 @@ class TextToImageDiscoDiffusionTask(Task):
             )
             return tokenizerd_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in data:
             one_batch.append(example)
@@ -360,7 +360,7 @@ class TextToImageStableDiffusionTask(Task):
 
             return tokenizerd_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in data:
             one_batch.append(example)
