@@ -705,6 +705,7 @@ class MT5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 
 class MT5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -736,6 +737,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter_from_local_dir_with_enable_torch(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -756,6 +758,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             model_utils.ENABLE_TORCH_CHECKPOINT = True
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -791,6 +794,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_for_conditional_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
