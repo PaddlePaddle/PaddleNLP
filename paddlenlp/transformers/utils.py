@@ -221,7 +221,11 @@ def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cac
             return HF_CACHE_HOME
     else:
         if cache_dir is not None:
-            return os.path.join(cache_dir, pretrained_model_name_or_path)
+            # since model_clas.from_pretrained calls config_clas.from_pretrained, the model_name may get appended twice
+            if cache_dir.endswith(pretrained_model_name_or_path):
+                return cache_dir
+            else:
+                return os.path.join(cache_dir, pretrained_model_name_or_path)
         return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 
 
