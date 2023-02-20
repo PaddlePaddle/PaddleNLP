@@ -14,7 +14,7 @@
 
 import os
 import json
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCR, __version__ as paddleocr_version
 import numpy as np
 import re
 import time
@@ -60,7 +60,6 @@ def merge_bbox(tok_bboxes):
 
 
 def xlm_parse(ocr_res, tokenizer):
-
     doc_tokens, doc_bboxes = [], []
     all_chr = get_all_chars(tokenizer)
 
@@ -263,6 +262,8 @@ def ocr_preprocess(img_dir):
         parsing_res = ocr.ocr(img_path, cls=True)
         ocr_res = []
         for para in parsing_res:
+            if paddleocr_version > "2.6.0.1":
+                para = para[0]
             ocr_res.append({"text": para[1][0], "bbox": para[0]})
         ocr_reses.append((img_name, ocr_res))
 
