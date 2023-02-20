@@ -179,6 +179,9 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .nystromformer.configuration import *
+from .nystromformer.modeling import *
+from .nystromformer.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
