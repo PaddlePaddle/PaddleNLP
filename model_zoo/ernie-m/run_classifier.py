@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,134 +12,81 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
+import json
 import os
 import random
-import time
+from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 import numpy as np
 import paddle
-import paddle.nn as nn
 from datasets import load_dataset
-from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
+from paddle.io import Dataset
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
 
+import paddlenlp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.ops.optimizer import layerwise_lr_decay
-from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+)
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    ErnieMForSequenceClassification,
     LinearDecayWithWarmup,
 )
+from paddlenlp.utils.log import logger
 
 all_languages = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
+task_type_list = ["cross-lingual-transfer", "translate-train-all"]
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-
-    # Required parameters
-    parser.add_argument(
-        "--task_type",
+@dataclass
+class ModelArguments:
+    task_type: str = field(
         default=None,
-        type=str,
-        required=True,
-        help="The type of the task to finetune.",
-        choices=["cross-lingual-transfer", "translate-train-all"],
+        metadata={"help": "The type of the task to finetune selected in the list: " + ", ".join(task_type_list)},
     )
-    parser.add_argument(
-        "--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model."
-    )
-    parser.add_argument(
-        "--output_dir",
+    model_name_or_path: str = field(
         default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        metadata={
+            "help": "Path to pre-trained model or shortcut name selected in the list: "
+            + ", ".join(list(ErnieMForSequenceClassification.pretrained_init_configuration.keys()))
+        },
     )
-    parser.add_argument(
-        "--max_seq_length",
+    max_seq_length: Optional[int] = field(
         default=256,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.",
+        metadata={
+            "help": "The maximum total input sequence length after tokenization. Sequences longer "
+            "than this will be truncated, sequences shorter will be padded."
+        },
     )
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--dropout", default=0.1, type=float, help="Dropout rate.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=5,
-        type=int,
-        help="Total number of training epochs to perform.",
+    classifier_dropout: Optional[float] = field(default=0.1, metadata={"help": "Dropout rate."})
+    layerwise_decay: Optional[float] = field(default=0.8, metadata={"help": "Layerwise decay ratio."})
+    export_model_dir: Optional[str] = field(
+        default="./best_models",
+        metadata={"help": "Path to directory to store the exported inference model."},
     )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=10000, help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--batch_size",
-        default=16,
-        type=int,
-        help="Batch size per GPU/CPU/XPU for training.",
+    use_test_data: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use a tiny dataset for CI test."}
     )
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--layerwise_decay", default=0.8, type=float, help="Layerwise decay ratio.")
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion",
-    )
-    parser.add_argument(
-        "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps."
-    )
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
-    )
-    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
-    )
-    parser.add_argument("--overwrite_cache", action="store_true", help="Whether to overwrite cache for dataset.")
-    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
-    parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
-    args = parser.parse_args()
-    return args
+    test_data_path: Optional[str] = field(default=None, metadata={"help": "Path to tiny dataset."})
 
 
-def set_seed(args):
+def set_seed(seed):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
     # consistency after sharding.
-    random.seed(args.seed)
-    np.random.seed(args.seed)
+    random.seed(seed)
+    np.random.seed(seed)
     # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(args.seed)
-
-
-@paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader, language):
-    model.eval()
-    metric.reset()
-    for batch in data_loader:
-        labels = batch.pop("labels")
-        logits = model(**batch)
-        loss = loss_fct(logits, labels)
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-    res = metric.accumulate()
-    print("[%s] eval loss: %f, acc: %s, " % (language.upper(), loss.numpy(), res), end="")
-    model.train()
+    # `paddle.seed(seed + paddle.distributed.get_rank())`
+    paddle.seed(seed)
 
 
 def convert_example(example, tokenizer, max_seq_length=256):
@@ -158,16 +105,19 @@ def convert_example(example, tokenizer, max_seq_length=256):
     return tokenized_example
 
 
-def get_test_dataloader(args, language, batchify_fn, trans_func, remove_columns):
-    test_ds = load_dataset("xnli", language, split="test")
-    test_ds = test_ds.map(
-        trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=not args.overwrite_cache
-    )
-    test_batch_sampler = BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_data_loader = DataLoader(
-        dataset=test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
-    )
-    return test_data_loader
+def load_xnli_dataset(args, path, lang, split=None):
+    """load dataset for specificed language"""
+    if args.use_test_data:
+        if args.test_data_path is None:
+            raise ValueError("Should specified `test_data_path` for test datasets when `use_test_data` is True.")
+        data_files = {
+            "train": args.test_data_path,
+            "validation": args.test_data_path,
+            "test": args.test_data_path,
+        }
+        return load_dataset("json", data_files=data_files, split=split)
+    else:
+        return load_dataset(path, lang, split=split)
 
 
 class XnliDataset(Dataset):
@@ -191,58 +141,97 @@ class XnliDataset(Dataset):
         return self.cumsum_len[-1]
 
 
-def do_train(args):
-    paddle.set_device(args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+def do_train():
+    training_args, model_args = PdArgumentParser([TrainingArguments, ModelArguments]).parse_args_into_dataclasses()
+    training_args: TrainingArguments = training_args
+    model_args: ModelArguments = model_args
 
-    set_seed(args)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
-    remove_columns = ["premise", "hypothesis"]
-    if args.task_type == "cross-lingual-transfer":
-        train_ds = load_dataset("xnli", "en", split="train")
-        train_ds = train_ds.map(
-            trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=not args.overwrite_cache
-        )
-    elif args.task_type == "translate-train-all":
-        all_train_ds = []
-        for language in all_languages:
-            train_ds = load_dataset("xnli", language, split="train")
-            all_train_ds.append(
-                train_ds.map(
-                    trans_func,
-                    batched=True,
-                    remove_columns=remove_columns,
-                    load_from_cache_file=not args.overwrite_cache,
-                )
+    training_args.print_config(model_args, "Model")
+
+    paddle.set_device(training_args.device)
+
+    set_seed(training_args.seed)
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
             )
-        train_ds = XnliDataset(all_train_ds)
-    train_batch_sampler = DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-    batchify_fn = DataCollatorWithPadding(tokenizer)
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
 
-    train_data_loader = DataLoader(
-        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
-    )
+    # Dataset pre-process
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=model_args.max_seq_length)
+    remove_columns = ["premise", "hypothesis"]
 
-    num_classes = 3
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes, dropout=args.dropout
-    )
-    n_layers = model.ernie_m.config["num_hidden_layers"]
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+    def collect_all_languages_dataset(split):
+        all_ds = []
+        for language in all_languages:
+            ds = load_xnli_dataset(model_args, "xnli", language, split=split)
+            all_ds.append(ds.map(trans_func, batched=True, remove_columns=remove_columns))
+        return XnliDataset(all_ds)
 
-    if args.max_steps > 0:
-        num_training_steps = args.max_steps
-        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
+    if model_args.task_type == "cross-lingual-transfer":
+        raw_datasets = load_xnli_dataset(model_args, "xnli", "en")
+        if training_args.do_train:
+            train_ds = raw_datasets["train"].map(trans_func, batched=True, remove_columns=remove_columns)
+        if training_args.do_eval:
+            eval_ds = raw_datasets["validation"].map(trans_func, batched=True, remove_columns=remove_columns)
+        if training_args.do_predict:
+            test_ds = raw_datasets["test"].map(trans_func, batched=True, remove_columns=remove_columns)
+    elif model_args.task_type == "translate-train-all":
+        if training_args.do_train:
+            train_ds = collect_all_languages_dataset("train")
+        if training_args.do_eval:
+            eval_ds = collect_all_languages_dataset("validation")
+        if training_args.do_predict:
+            test_ds = collect_all_languages_dataset("test")
     else:
-        num_training_steps = len(train_data_loader) * args.num_train_epochs
-        num_train_epochs = args.num_train_epochs
+        raise ValueError(
+            f"task_type should be 'cross-lingual-transfer' or 'translate-train-all' but '{model_args.task_type}' is specificed."
+        )
 
-    warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
+    data_collator = DataCollatorWithPadding(tokenizer)
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
+    num_labels = 3
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_args.model_name_or_path, num_labels=num_labels, classifier_dropout=model_args.classifier_dropout
+    )
+
+    # Define the metrics of tasks.
+    def compute_metrics(p):
+        # Define the metrics of tasks.
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+
+        preds = paddle.to_tensor(preds)
+        label = paddle.to_tensor(p.label_ids)
+
+        metric = Accuracy()
+        result = metric.compute(preds, label)
+        metric.update(result)
+        accu = metric.accumulate()
+        return {"accuracy": accu}
+
+    n_layers = model.ernie_m.config["num_hidden_layers"]
+    warmup = training_args.warmup_steps if training_args.warmup_steps > 0 else training_args.warmup_ratio
+    if training_args.do_train:
+        num_training_steps = (
+            training_args.max_steps
+            if training_args.max_steps > 0
+            else len(train_ds) // training_args.train_batch_size * training_args.num_train_epochs
+        )
+    else:
+        num_training_steps = 10
+
+    lr_scheduler = LinearDecayWithWarmup(training_args.learning_rate, num_training_steps, warmup)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -252,94 +241,86 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay, name_dict, n_layers)
+    simple_lr_setting = partial(layerwise_lr_decay, model_args.layerwise_decay, name_dict, n_layers)
 
     optimizer = AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
         beta2=0.999,
-        epsilon=args.adam_epsilon,
+        epsilon=training_args.adam_epsilon,
         parameters=model.parameters(),
-        weight_decay=args.weight_decay,
+        weight_decay=training_args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
         lr_ratio=simple_lr_setting,
     )
 
-    loss_fct = nn.CrossEntropyLoss()
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-    metric = Accuracy()
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_ds if training_args.do_train else None,
+        eval_dataset=eval_ds if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+        optimizers=[optimizer, lr_scheduler],
+    )
 
-    global_step = 0
-    tic_train = time.time()
-    for epoch in range(num_train_epochs):
-        for step, batch in enumerate(train_data_loader):
-            global_step += 1
-            labels = batch.pop("labels")
-            with paddle.amp.auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits = model(**batch)
-                loss = loss_fct(logits, labels)
-            if args.use_amp:
-                scaled_loss = scaler.scale(loss)
-                scaled_loss.backward()
-                scaler.minimize(optimizer, scaled_loss)
-            else:
-                loss.backward()
-                optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (
-                        global_step,
-                        num_training_steps,
-                        epoch,
-                        step,
-                        paddle.distributed.get_rank(),
-                        loss,
-                        optimizer.get_lr(),
-                        args.logging_steps / (time.time() - tic_train),
-                    )
-                )
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                for language in all_languages:
-                    tic_eval = time.time()
-                    test_data_loader = get_test_dataloader(args, language, batchify_fn, trans_func, remove_columns)
-                    evaluate(model, loss_fct, metric, test_data_loader, language)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
-                if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir, "ernie_m_ft_model_%d.pdparams" % (global_step))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-            if global_step >= num_training_steps:
-                break
-        if global_step >= num_training_steps:
-            break
-    if paddle.distributed.get_rank() == 0:
-        output_dir = os.path.join(args.output_dir, "ernie_m_final_model_%d.pdparams" % global_step)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        # Need better way to get inner model of DataParallel
-        model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
 
+    # training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
-def print_arguments(args):
-    """print arguments"""
-    print("-----------  Configuration Arguments -----------")
-    for arg, value in sorted(vars(args).items()):
-        print("%s: %s" % (arg, value))
-    print("------------------------------------------------")
+    # Evaluating
+    if training_args.do_eval:
+        combined = {}
+        for language in all_languages:
+            eval_ds = load_xnli_dataset(model_args, "xnli", language, split="validation")
+            eval_ds = eval_ds.map(trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=True)
+            metrics = trainer.evaluate(eval_dataset=eval_ds)
+            metrics = {k + f"_{language}": v for k, v in metrics.items()}
+            combined.update({f"eval_accuracy_{language}": metrics.get(f"eval_accuracy_{language}", 0.0)})
+            trainer.log_metrics("eval", metrics)
+
+        combined.update({"eval_accuracy_average": np.mean(list(combined.values()))})
+        trainer.log_metrics("eval", combined)
+        trainer.save_metrics("eval", combined)
+
+    # Predicting
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_ds)
+        trainer.log_metrics("test", test_ret.metrics)
+        logits = test_ret.predictions
+        max_value = np.max(logits, axis=1, keepdims=True)
+        exp_data = np.exp(logits - max_value)
+        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+        out_dict = {"label": probs.argmax(axis=-1).tolist(), "confidence": probs.max(axis=-1).tolist()}
+        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
+        json.dump(out_dict, out_file)
+
+    # Export inference model
+    if training_args.do_export and paddle.distributed.get_rank() == 0:
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        model_to_save = trainer.model
+        model_to_save = model_to_save._layers if isinstance(model_to_save, paddle.DataParallel) else model_to_save
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        ]
+        model_args.export_model_dir = os.path.join(model_args.export_model_dir, "export")
+        paddlenlp.transformers.export_model(
+            model=model_to_save, input_spec=input_spec, path=model_args.export_model_dir
+        )
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    print_arguments(args)
-    do_train(args)
+    do_train()
