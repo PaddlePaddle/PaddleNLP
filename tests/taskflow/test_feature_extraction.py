@@ -38,7 +38,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
 
-    def test_small_model_pd(self):
+    def test_model_np(self):
         feature_extractor = Taskflow(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
@@ -48,7 +48,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         outputs = feature_extractor("This is a test")
         self.assertEqual(outputs["features"].shape, (1, 768))
 
-    def test_return_tensors_pd(self):
+    def test_return_tensors(self):
         feature_extractor = Taskflow(
             model="PaddlePaddle/ernie_vil-2.0-base-zh",
             task="feature_extraction",
