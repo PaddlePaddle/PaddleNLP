@@ -27,35 +27,12 @@ __all__ = [
 ]
 
 NYSTROMFORMER_PRETRAINED_INIT_CONFIGURATION = {
-    "nystromformer-512": {
+    "nystromformer-base-zh": {
         "model_type": "nystromformer",
         "attention_probs_dropout_prob": 0.1,
-        "bos_token_id": 0,
+        "bos_token_id": 1,
         "conv_kernel_size": 65,
         "eos_token_id": 2,
-        "hidden_act": "gelu_new",
-        "hidden_dropout_prob": 0.1,
-        "hidden_size": 768,
-        "initializer_range": 0.02,
-        "intermediate_size": 3072,
-        "inv_coeff_init_option": False,
-        "layer_norm_eps": 1e-05,
-        "max_position_embeddings": 510,
-        "num_attention_heads": 12,
-        "num_hidden_layers": 12,
-        "num_landmarks": 64,
-        "pad_token_id": 1,
-        "segment_means_seq_len": 64,
-        "type_vocab_size": 2,
-        "use_cache": True,
-        "vocab_size": 30000,
-    },
-    "nystromformer-64-ch": {
-        "model_type": "nystromformer",
-        "attention_probs_dropout_prob": 0.1,
-        "bos_token_id": 101,
-        "conv_kernel_size": 65,
-        "eos_token_id": 102,
         "hidden_act": "gelu_new",
         "hidden_dropout_prob": 0.1,
         "hidden_size": 768,
@@ -69,8 +46,6 @@ NYSTROMFORMER_PRETRAINED_INIT_CONFIGURATION = {
         "num_landmarks": 64,
         "pad_token_id": 0,
         "segment_means_seq_len": 64,
-        "torch_dtype": "float32",
-        "transformers_version": "4.22.0",
         "type_vocab_size": 2,
         "vocab_size": 40000,
     },
@@ -78,8 +53,7 @@ NYSTROMFORMER_PRETRAINED_INIT_CONFIGURATION = {
 
 NYSTROMFORMER_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        # TODO: upload parameter file and get the link here.
-        "nystromformer-512": "https://to-be-uploaded"
+        "nystromformer-base-zh": "https://paddlenlp.bj.bcebos.com/models/transformers/nystromformer/nystromformer_base_zh/model_state.pdparams"
     }
 }
 
@@ -93,7 +67,7 @@ class NystromformerConfig(PretrainedConfig):
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
     Args:
-        vocab_size (`int`, *optional*, defaults to 30000):
+        vocab_size (`int`, *optional*, defaults to 40000):
             Vocabulary size of the Nystromformer model. Defines the number of different tokens that can be represented
             by the `inputs_ids` passed when calling [`NystromformerModel`].
         hidden_size (`int`, *optional*, defaults to 768):
@@ -111,7 +85,7 @@ class NystromformerConfig(PretrainedConfig):
             The dropout probabilitiy for all fully connected layers in the embeddings, encoder, and pooler.
         attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
             The dropout ratio for the attention probabilities.
-        max_position_embeddings (`int`, *optional*, defaults to 512):
+        max_position_embeddings (`int`, *optional*, defaults to 4096):
             The maximum sequence length that this model might ever be used with. Typically set this to something large
             just in case (e.g., 512 or 1024 or 2048).
         type_vocab_size (`int`, *optional*, defaults to 2):
@@ -147,7 +121,7 @@ class NystromformerConfig(PretrainedConfig):
 
     def __init__(
         self,
-        vocab_size=30000,
+        vocab_size=40000,
         hidden_size=768,
         num_hidden_layers=12,
         num_attention_heads=12,
@@ -155,7 +129,7 @@ class NystromformerConfig(PretrainedConfig):
         hidden_act="gelu_new",
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
-        max_position_embeddings=510,
+        max_position_embeddings=4096,
         type_vocab_size=2,
         segment_means_seq_len=64,
         num_landmarks=64,
@@ -163,33 +137,11 @@ class NystromformerConfig(PretrainedConfig):
         inv_coeff_init_option=False,
         initializer_range=0.02,
         layer_norm_eps=1e-5,
-        pad_token_id=1,
-        bos_token_id=0,
+        pad_token_id=0,
+        bos_token_id=1,
         eos_token_id=2,
         **kwargs,
     ):
-        attention_probs_dropout_prob = 0.1
-        bos_token_id = 101
-        conv_kernel_size = 65
-        eos_token_id = 102
-        hidden_act = "gelu_new"
-        hidden_dropout_prob = 0.1
-        hidden_size = 768
-        initializer_range = 0.02
-        intermediate_size = 3072
-        inv_coeff_init_option = False
-        layer_norm_eps = 1e-05
-        max_position_embeddings = 4096
-        num_attention_heads = 12
-        num_hidden_layers = 12
-        num_landmarks = 64
-        pad_token_id = 0
-        segment_means_seq_len = 64
-        torch_dtype = "float32"
-        transformers_version = "4.22.0"
-        type_vocab_size = 2
-        vocab_size = 40000
-
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings

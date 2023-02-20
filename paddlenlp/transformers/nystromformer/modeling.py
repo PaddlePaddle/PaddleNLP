@@ -1007,24 +1007,24 @@ class NystromformerForMultipleChoice(NystromformerPretrainedModel):
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Its data type should be `int64` and it has a shape of [batch_size, num_choice, sequence_length].
             attention_mask (Tensor, optional):
                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type should be int. The `masked` tokens have `0` values and the others have `1` values.
-                It is a tensor with shape `[batch_size, sequence_length]`.
+                It is a tensor with shape `[batch_size, num_choice, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             token_type_ids (Tensor, optional):
                 Segment token indices to indicate different portions of the inputs.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Its data type should be `int64` and it has a shape of [batch_size, num_choice, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range
                 ``[0, max_position_embeddings - 1]``.
-                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+                Shape as `(batch_size, num_choice, sequence_length)` and dtype as int64. Defaults to `None`.
             inputs_embeds (Tensor, optional):
                 Indices of embedded input sequence. They are representations of tokens that build the input sequence.
-                Its data type should be `float32` and it has a shape of [batch_size, sequence_length, hidden_size].
+                Its data type should be `float32` and it has a shape of [batch_size, num_choice, sequence_length, hidden_size].
                 Defaults to 'None', which means the input_ids represents the sequence.
             labels (Tensor of shape `(batch_size, )`, optional):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
@@ -1220,10 +1220,8 @@ class NystromformerForQuestionAnswering(NystromformerPretrainedModel):
         super(NystromformerForQuestionAnswering, self).__init__(config)
 
         config.num_labels = 2
-        self.num_labels = config.num_labels
-
         self.nystromformer = NystromformerModel(config)
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
         self.apply(self.init_weights)
 
@@ -1306,22 +1304,21 @@ class NystromformerForQuestionAnswering(NystromformerPretrainedModel):
 
         sequence_output = outputs[0]
 
-        logits = self.qa_outputs(sequence_output)
-        start_logits, end_logits = logits.split(1, axis=-1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
         total_loss = None
         if start_positions is not None and end_positions is not None:
             # If we are on multi-GPU, split add a dimension
-            if len(start_positions.shape) > 1:
+            if start_positions.ndim > 1:
                 start_positions = start_positions.squeeze(-1)
-            if len(end_positions.shape) > 1:
+            if end_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
             ignored_index = start_logits.shape[1]
-            start_positions = start_positions.clamp(0, ignored_index)
-            end_positions = end_positions.clamp(0, ignored_index)
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
 
             loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
             start_loss = loss_fct(start_logits, start_positions)

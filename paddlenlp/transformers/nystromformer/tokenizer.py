@@ -14,276 +14,17 @@
 # limitations under the License.
 
 import os
-import unicodedata
 
-from ..tokenizer_utils import (
-    PretrainedTokenizer,
-    _is_control,
-    _is_punctuation,
-    _is_symbol,
-    _is_whitespace,
-    convert_to_unicode,
-    whitespace_tokenize,
-)
+from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = [
-    "BasicTokenizer",
-    "BertTokenizer",
-    "WordpieceTokenizer",
+    "NystromformerTokenizer",
 ]
 
 
-class BasicTokenizer(object):
+class NystromformerTokenizer(PretrainedTokenizer):
     """
-    Runs basic tokenization (punctuation splitting, lower casing, etc.).
-
-    Args:
-        do_lower_case (bool):
-            Whether to lowercase the input when tokenizing.
-            Defaults to `True`.
-        never_split (Iterable):
-            Collection of tokens which will never be split during tokenization. Only has an effect when
-            `do_basic_tokenize=True`
-        tokenize_chinese_chars (bool):
-            Whether to tokenize Chinese characters.
-        strip_accents: (bool):
-            Whether to strip all accents. If this option is not specified, then it will be determined by the
-            value for `lowercase` (as in the original BERT).
-    """
-
-    def __init__(self, do_lower_case=True, never_split=None, tokenize_chinese_chars=True, strip_accents=None):
-        """Constructs a BasicTokenizer."""
-        if never_split is None:
-            never_split = []
-        self.do_lower_case = do_lower_case
-        self.never_split = set(never_split)
-        self.tokenize_chinese_chars = tokenize_chinese_chars
-        self.strip_accents = strip_accents
-
-    def tokenize(self, text, never_split=None):
-        """
-        Tokenizes a piece of text using basic tokenizer.
-
-        Args:
-            text (str): A piece of text.
-            never_split (List[str]): List of token not to split.
-
-        Returns:
-            list(str): A list of tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import BasicTokenizer
-                basictokenizer = BasicTokenizer()
-                tokens = basictokenizer.tokenize('He was a puppeteer')
-                '''
-                ['he', 'was', 'a', 'puppeteer']
-                '''
-        """
-        text = convert_to_unicode(text)
-        never_split = self.never_split.union(set(never_split)) if never_split else self.never_split
-        text = self._clean_text(text)
-
-        if self.tokenize_chinese_chars:
-            text = self._tokenize_chinese_chars(text)
-        orig_tokens = whitespace_tokenize(text)
-        split_tokens = []
-        for token in orig_tokens:
-            if token not in never_split:
-                if self.do_lower_case:
-                    token = token.lower()
-                    if self.strip_accents is not False:
-                        token = self._run_strip_accents(token)
-                elif self.strip_accents:
-                    token = self._run_strip_accents(token)
-            split_tokens.extend(self._run_split_on_punc(token, never_split))
-
-        output_tokens = whitespace_tokenize(" ".join(split_tokens))
-        return output_tokens
-
-    def _run_strip_accents(self, text):
-        """
-        Strips accents from a piece of text.
-        """
-        text = unicodedata.normalize("NFD", text)
-        output = []
-        for char in text:
-            cat = unicodedata.category(char)
-            if cat == "Mn":
-                continue
-            output.append(char)
-        return "".join(output)
-
-    def _run_split_on_punc(self, text, never_split=None):
-        """
-        Splits punctuation on a piece of text.
-        """
-        if never_split is not None and text in never_split:
-            return [text]
-        chars = list(text)
-        i = 0
-        start_new_word = True
-        output = []
-        while i < len(chars):
-            char = chars[i]
-            # punctuation and symbol should be treat as single char.
-            if _is_punctuation(char) or _is_symbol(char):
-                output.append([char])
-                start_new_word = True
-            else:
-                if start_new_word:
-                    output.append([])
-                start_new_word = False
-                output[-1].append(char)
-            i += 1
-
-        return ["".join(x) for x in output]
-
-    def _tokenize_chinese_chars(self, text):
-        """
-        Adds whitespace around any CJK character.
-        """
-        output = []
-        for char in text:
-            cp = ord(char)
-            if self._is_chinese_char(cp):
-                output.append(" ")
-                output.append(char)
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
-
-    def _is_chinese_char(self, cp):
-        """
-        Checks whether CP is the codepoint of a CJK character.
-        """
-        # This defines a "chinese character" as anything in the CJK Unicode block:
-        #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-        #
-        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-        # despite its name. The modern Korean Hangul alphabet is a different block,
-        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-        # space-separated words, so they are not treated specially and handled
-        # like the all the other languages.
-        if (
-            (cp >= 0x4E00 and cp <= 0x9FFF)
-            or (cp >= 0x3400 and cp <= 0x4DBF)  #
-            or (cp >= 0x20000 and cp <= 0x2A6DF)  #
-            or (cp >= 0x2A700 and cp <= 0x2B73F)  #
-            or (cp >= 0x2B740 and cp <= 0x2B81F)  #
-            or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
-            or (cp >= 0xF900 and cp <= 0xFAFF)
-            or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
-        ):  #
-            return True
-
-        return False
-
-    def _clean_text(self, text):
-        """
-        Performs invalid character removal and whitespace cleanup on text.
-        """
-        output = []
-        for char in text:
-            cp = ord(char)
-            if cp == 0 or cp == 0xFFFD or _is_control(char):
-                continue
-            if _is_whitespace(char):
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
-
-
-class WordpieceTokenizer(object):
-    """
-    Runs WordPiece tokenization.
-
-    Args:
-        vocab (Vocab|dict):
-            Vocab of the word piece tokenizer.
-        unk_token (str):
-            A specific token to replace all unknown tokens.
-        max_input_chars_per_word (int):
-            If a word's length is more than
-            max_input_chars_per_word, it will be dealt as unknown word.
-            Defaults to 100.
-    """
-
-    def __init__(self, vocab, unk_token, max_input_chars_per_word=100):
-        self.vocab = vocab
-        self.unk_token = unk_token
-        self.max_input_chars_per_word = max_input_chars_per_word
-
-    def tokenize(self, text):
-        """
-        Tokenizes a piece of text into its word pieces.
-        This uses a greedy longest-match-first algorithm to perform tokenization
-        using the given vocabulary.
-
-        Args:
-            text: A single token or whitespace separated tokens. This should have
-                already been passed through `BasicTokenizer`.
-
-        Returns:
-            list (str): A list of wordpiece tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import BertTokenizer, WordpieceTokenizer
-
-                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                vocab  = berttokenizer.vocab
-                unk_token = berttokenizer.unk_token
-
-                wordpiecetokenizer = WordpieceTokenizer(vocab,unk_token)
-                inputs = wordpiecetokenizer.tokenize("unaffable")
-                print(inputs)
-                '''
-                ["un", "##aff", "##able"]
-                '''
-        """
-
-        output_tokens = []
-        for token in whitespace_tokenize(text):
-            chars = list(token)
-            if len(chars) > self.max_input_chars_per_word:
-                output_tokens.append(self.unk_token)
-                continue
-
-            is_bad = False
-            start = 0
-            sub_tokens = []
-            while start < len(chars):
-                end = len(chars)
-                cur_substr = None
-                while start < end:
-                    substr = "".join(chars[start:end])
-                    if start > 0:
-                        substr = "##" + substr
-                    if substr in self.vocab:
-                        cur_substr = substr
-                        break
-                    end -= 1
-                if cur_substr is None:
-                    is_bad = True
-                    break
-                sub_tokens.append(cur_substr)
-                start = end
-
-            if is_bad:
-                output_tokens.append(self.unk_token)
-            else:
-                output_tokens.extend(sub_tokens)
-        return output_tokens
-
-
-class BertTokenizer(PretrainedTokenizer):
-    """
-    Constructs a BERT tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs a Nystromformer tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
@@ -322,14 +63,14 @@ class BertTokenizer(PretrainedTokenizer):
             Defaults to `True`.
         strip_accents: (bool, optional):
             Whether to strip all accents. If this option is not specified, then it will be determined by the
-            value for `lowercase` (as in the original BERT).
+            value for `lowercase`.
             Defaults to `None`.
 
     Examples:
         .. code-block::
 
-            from paddlenlp.transformers import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            from paddlenlp.transformers import NystromformerTokenizer
+            tokenizer = NystromformerTokenizer.from_pretrained('model_weight_name')
 
             inputs = tokenizer('He was a puppeteer')
             print(inputs)
@@ -342,65 +83,14 @@ class BertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "bert-base-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
-            "bert-large-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-uncased-vocab.txt",
-            "bert-base-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
-            "bert-large-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-cased-vocab.txt",
-            "bert-base-multilingual-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-uncased-vocab.txt",
-            "bert-base-multilingual-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-cased-vocab.txt",
-            "bert-base-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "bert-wwm-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese-vocab.txt",
-            "bert-wwm-ext-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
-            "macbert-large-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "macbert-base-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "simbert-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
-            "uer/chinese-roberta-base": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-small": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "nystromformer-base-zh": "https://paddlenlp.bj.bcebos.com/models/transformers/nystromformer/nystromformer_base_zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "bert-base-uncased": {"do_lower_case": True},
-        "bert-large-uncased": {"do_lower_case": True},
-        "bert-base-cased": {"do_lower_case": False},
-        "bert-large-cased": {"do_lower_case": False},
-        "bert-base-multilingual-uncased": {"do_lower_case": True},
-        "bert-base-multilingual-cased": {"do_lower_case": False},
-        "bert-base-chinese": {"do_lower_case": False},
-        "bert-wwm-chinese": {"do_lower_case": False},
-        "bert-wwm-ext-chinese": {"do_lower_case": False},
-        "macbert-large-chinese": {"do_lower_case": False},
-        "macbert-base-chinese": {"do_lower_case": False},
-        "simbert-base-chinese": {"do_lower_case": True},
-        "uer/chinese-roberta-base": {"do_lower_case": True},
-        "uer/chinese-roberta-medium": {"do_lower_case": True},
-        "uer/chinese-roberta-6l-768h": {"do_lower_case": True},
-        "uer/chinese-roberta-small": {"do_lower_case": True},
-        "uer/chinese-roberta-mini": {"do_lower_case": True},
-        "uer/chinese-roberta-tiny": {"do_lower_case": True},
+        "nystromformer-base-zh": {"do_lower_case": True},
     }
     max_model_input_sizes = {
-        "bert-base-uncased": 512,
-        "bert-large-uncased": 512,
-        "bert-base-cased": 512,
-        "bert-large-cased": 512,
-        "bert-base-multilingual-uncased": 512,
-        "bert-base-multilingual-cased": 512,
-        "bert-base-chinese": 512,
-        "bert-wwm-chinese": 512,
-        "bert-wwm-ext-chinese": 512,
-        "macbert-large-chinese": 512,
-        "macbert-base-chinese": 512,
-        "simbert-base-chinese": 512,
-        "uer/chinese-roberta-base": 512,
-        "uer/chinese-roberta-medium": 512,
-        "uer/chinese-roberta-6l-768h": 512,
-        "uer/chinese-roberta-small": 512,
-        "uer/chinese-roberta-mini": 512,
-        "uer/chinese-roberta-tiny": 512,
+        "nystromformer-base-zh": 4096,
     }
     padding_side = "right"
 
@@ -424,7 +114,7 @@ class BertTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+                "`tokenizer = NystromformerTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
             )
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
@@ -454,7 +144,7 @@ class BertTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for Nystromformer models.
 
         Args:
             text (str): The text to be tokenized.
@@ -489,10 +179,10 @@ class BertTokenizer(PretrainedTokenizer):
         Examples:
             .. code-block::
 
-                from paddlenlp.transformers import BertTokenizer
+                from paddlenlp.transformers import NystromformerTokenizer
 
-                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                tokens = berttokenizer.tokenize('He was a puppeteer')
+                tokenizer = NystromformerTokenizer.from_pretrained('model_weight_name')
+                tokens = tokenizer.tokenize('He was a puppeteer')
                 '''
                 ['he', 'was', 'a', 'puppet', '##eer']
                 '''
@@ -526,7 +216,7 @@ class BertTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens.
 
-        A BERT sequence has the following format:
+        A Nystromformer sequence has the following format:
 
         - single sequence:      ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
@@ -550,7 +240,7 @@ class BertTokenizer(PretrainedTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
-        A BERT offset_mapping has the following format:
+        A Nystromformer offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
@@ -573,7 +263,7 @@ class BertTokenizer(PretrainedTokenizer):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
-        A BERT sequence pair mask has the following format:
+        A Nystromformer sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
