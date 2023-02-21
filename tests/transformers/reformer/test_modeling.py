@@ -32,7 +32,6 @@ from paddlenlp.transformers.reformer.modeling import (
 )
 from tests.testing_utils import slow
 
-# from ..test_generation_utils import GenerationTesterMixin
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
@@ -340,7 +339,6 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        # model.zero_grad()
         loss_no_chunk, output_no_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
         loss_no_chunk.backward()
         grad_slice_word_no_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
@@ -353,7 +351,6 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        # model.zero_grad()
         loss_chunk, output_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
         loss_chunk.backward()
         grad_slice_word_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
@@ -494,7 +491,8 @@ class ReformerTesterMixin:
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_reformer_for_question_answering(*config_and_inputs)
 
-    """def test_reformer_cached_inference(self):
+    """todo:
+        def test_reformer_cached_inference(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_cache(*config_and_inputs)"""
 
@@ -508,14 +506,12 @@ class ReformerTesterMixin:
 
 
 class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.TestCase):
-    # class ReformerLocalAttnModelTest(ReformerTesterMixin, GenerationTesterMixin, ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
         ReformerModel,
         ReformerModelWithLMHead,
         ReformerForSequenceClassification,
         ReformerForQuestionAnswering,
     )
-    # all_generative_model_classes = (ReformerModelWithLMHead,)
     all_generative_model_classes = {ReformerModelWithLMHead: (ReformerModel, "Reformer")}
     test_pruning = False
     test_headmasking = False
@@ -598,14 +594,12 @@ class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest
 
 
 class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.TestCase):
-    # class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     all_model_classes = (
         ReformerModel,
         ReformerModelWithLMHead,
         ReformerForSequenceClassification,
         ReformerForQuestionAnswering,
     )
-    # all_generative_model_classes = (ReformerModelWithLMHead,)
     all_generative_model_classes = {ReformerModelWithLMHead: (ReformerModel, "Reformer")}
     test_pruning = False
     test_headmasking = False
@@ -722,451 +716,3 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     def test_problem_types(self):
         # Fails because the sequence length is not a multiple of 4
         pass
-
-
-'''class ReformerIntegrationTests(unittest.TestCase):
-    """
-    These integration tests test the current layer activations and gradients againts the output of the Hugging Face Reformer model at time of integration: 29/06/2020. During integration, the model was tested against the output of the official Trax ReformerLM model for various cases ("lsh" only, "lsh" only, masked / non-masked, different chunk length, ....). In order to recover the original trax integration tests, one should use patrickvonplaten's fork of trax and the code that lives on the branch `reformer_trax_tests`.
-    """
-
-    def _get_basic_config_and_input(self):
-        config = {
-            "vocab_size": 320,
-            "attention_head_size": 8,
-            "hidden_size": 16,
-            "num_attention_heads": 2,
-            "num_buckets": 2,
-            "num_hashes": 4,
-            "lsh_attn_chunk_length": 4,
-            "local_attn_chunk_length": 4,
-            "lsh_num_chunks_before": 1,
-            "lsh_num_chunks_after": 0,
-            "local_num_chunks_before": 1,
-            "local_num_chunks_after": 0,
-            "chunk_size_lm_head": 0,
-            "chunk_size_feed_forward": 0,
-            "feed_forward_size": 32,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "lsh_attention_probs_dropout_prob": 0.0,
-            "local_attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 32,
-            "initializer_range": 0.02,
-            "axial_norm_std": 1.0,
-            "layer_norm_eps": 1e-12,
-            "sinusoidal_pos_embds": False,
-            "axial_pos_embds": True,
-            "axial_pos_shape": [4, 8],
-            "axial_pos_embds_dim": [8, 8],
-            "hash_seed": 0,
-            "is_decoder": True,
-        }
-        return config
-
-    def _get_hidden_states(self):
-        return paddle.to_tensor(
-            [
-                [
-                    [
-                        1.90826353e00,
-                        -1.45999730e00,
-                        -6.20405462e-01,
-                        1.52503433e00,
-                        -3.64464232e-01,
-                        -8.27359235e-01,
-                        8.39670803e-01,
-                        2.44492178e-01,
-                        4.98332758e-01,
-                        2.69175139e00,
-                        -7.08081422e-03,
-                        1.04915401e00,
-                        -1.83476661e00,
-                        7.67220476e-01,
-                        2.98580543e-01,
-                        2.84803992e-02,
-                    ],
-                    [
-                        -2.66374286e-02,
-                        4.33497576e-01,
-                        3.10386309e-01,
-                        5.46039944e-01,
-                        -2.47292666e-04,
-                        -7.52305019e-01,
-                        2.39162103e-01,
-                        7.25216186e-01,
-                        -7.58357372e-01,
-                        4.20635998e-01,
-                        -4.04739919e-02,
-                        1.59924145e-01,
-                        2.05135748e00,
-                        -1.15997978e00,
-                        5.37166397e-01,
-                        2.62873606e-01,
-                    ],
-                    [
-                        1.85247482e-01,
-                        7.07046037e-01,
-                        -6.77089715e-01,
-                        -2.24209655e00,
-                        -3.75307980e-02,
-                        -8.59380874e-01,
-                        -2.81027884e00,
-                        1.01276376e00,
-                        -1.69438001e00,
-                        4.17574660e-01,
-                        -1.49196962e00,
-                        -1.76483717e00,
-                        -1.94566312e-01,
-                        -1.71183858e00,
-                        7.72903565e-01,
-                        -1.11557056e00,
-                    ],
-                    [
-                        9.46069193e-01,
-                        1.53417623e-01,
-                        -9.58686996e-01,
-                        1.18126669e-01,
-                        1.75967724e00,
-                        1.62194590e00,
-                        -5.74108159e-01,
-                        6.79920443e-01,
-                        5.44028163e-01,
-                        2.05466114e-01,
-                        -3.63045868e-01,
-                        2.41865062e-01,
-                        3.20348382e-01,
-                        -9.05611176e-01,
-                        -1.92690727e-01,
-                        -1.19917547e00,
-                    ],
-                ]
-            ],
-            dtype='float32',
-        )
-
-    def _get_attn_mask(self):
-        return paddle.to_tensor([[0, 1, 0, 0]], dtype='int64')
-
-    def _get_input_ids_and_mask(self):
-        mask = paddle.to_tensor(
-            [
-                [1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1],
-                [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0],
-            ],
-            dtype='int64',
-        )
-
-        input_ids = paddle.to_tensor(
-            [
-                [
-                    89,
-                    279,
-                    286,
-                    84,
-                    194,
-                    316,
-                    182,
-                    28,
-                    283,
-                    37,
-                    169,
-                    7,
-                    253,
-                    267,
-                    107,
-                    250,
-                    44,
-                    7,
-                    102,
-                    62,
-                    3,
-                    243,
-                    171,
-                    265,
-                    302,
-                    48,
-                    164,
-                    264,
-                    148,
-                    229,
-                    280,
-                    150,
-                ],
-                [
-                    9,
-                    192,
-                    66,
-                    112,
-                    163,
-                    83,
-                    135,
-                    70,
-                    224,
-                    96,
-                    31,
-                    80,
-                    196,
-                    80,
-                    63,
-                    22,
-                    85,
-                    100,
-                    47,
-                    283,
-                    0,
-                    163,
-                    126,
-                    143,
-                    195,
-                    82,
-                    53,
-                    82,
-                    18,
-                    27,
-                    182,
-                    52,
-                ],
-            ],
-            dtype='int64',
-        )
-
-        return input_ids, mask
-
-    def test_lsh_layer_forward(self):
-        config = self._get_basic_config_and_input()
-        config["lsh_num_chunks_before"] = 0
-        config["attn_layers"] = ["lsh"]
-        config["num_hidden_layers"] = 1
-        config["is_decoder"] = False
-        hidden_states = self._get_hidden_states()
-        paddle.seed(0)
-        layer = ReformerLayer(ReformerConfig(**config))
-        layer.eval()
-        reformer_output = layer(prev_attn_output=hidden_states.clone(), hidden_states=hidden_states)
-        output_slice = reformer_output.hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [1.6879, -1.3083, -0.4708, 1.3555, -0.6292],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_lsh_layer_forward_complex(self):
-        config = self._get_basic_config_and_input()
-        config["lsh_num_chunks_before"] = 0
-        config["attn_layers"] = ["lsh"]
-        config["num_hidden_layers"] = 1
-        config["num_buckets"] = [2, 4]
-        attn_mask = self._get_attn_mask()
-        hidden_states = self._get_hidden_states()
-        paddle.seed(0)
-        layer = ReformerLayer(ReformerConfig(**config))
-        layer.eval()
-        reformer_output = layer(
-            prev_attn_output=hidden_states.clone(),
-            hidden_states=hidden_states,
-            attention_mask=attn_mask,
-        )
-        output_slice = reformer_output.hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [1.6439, -1.2306, -0.5108, 1.3006, -0.6537],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_local_layer_forward(self):
-        config = self._get_basic_config_and_input()
-        config["local_num_chunks_before"] = 0
-        config["attn_layers"] = ["local"]
-        config["num_hidden_layers"] = 1
-        config["is_decoder"] = False
-        hidden_states = self._get_hidden_states()
-        paddle.seed(0)
-        layer = ReformerLayer(ReformerConfig(**config))
-        layer.eval()
-        reformer_output = layer(prev_attn_output=hidden_states, hidden_states=hidden_states)
-        output_slice = reformer_output.hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [1.4212, -2.0576, -0.9688, 1.4599, -0.1344],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_local_layer_forward_complex(self):
-        config = self._get_basic_config_and_input()
-        config["local_num_chunks_before"] = 0
-        config["attn_layers"] = ["local"]
-        config["num_hidden_layers"] = 1
-        attn_mask = self._get_attn_mask()
-        hidden_states = self._get_hidden_states()
-        paddle.seed(0)
-        layer = ReformerLayer(ReformerConfig(**config))
-        layer.eval()
-        reformer_output = layer(
-            prev_attn_output=hidden_states,
-            hidden_states=hidden_states,
-            attention_mask=attn_mask,
-        )
-        output_slice = reformer_output.hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [1.4750, -2.0235, -0.9743, 1.4463, -0.1269],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_lsh_model_forward(self):
-        config = self._get_basic_config_and_input()
-        config["attn_layers"] = ["lsh", "lsh", "lsh", "lsh"]
-        config["num_hidden_layers"] = 4
-        config["num_buckets"] = [2, 4]
-        paddle.seed(0)
-        model = ReformerModel(ReformerConfig(**config))
-        model.eval()
-        input_ids, attn_mask = self._get_input_ids_and_mask()
-        hidden_states = model(input_ids=input_ids, attention_mask=attn_mask)[0]
-        output_slice = hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [-0.9896, -0.9396, -1.0831, -0.0597, 0.2456],
-            dtype='float32',
-        )
-        import numpy as np
-        np.testing.assert_allclose(output_slice, expected_output_slice, atol=1e-3)
-        # self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_local_model_forward(self):
-        config = self._get_basic_config_and_input()
-        config["attn_layers"] = ["local", "local", "local", "local"]
-        config["num_hidden_layers"] = 4
-        paddle.seed(0)
-        model = ReformerModel(ReformerConfig(**config))
-        model.eval()
-        input_ids, attn_mask = self._get_input_ids_and_mask()
-        hidden_states = model(input_ids=input_ids, attention_mask=attn_mask)[0]
-        output_slice = hidden_states[0, 0, :5]
-        expected_output_slice = paddle.to_tensor(
-            [-1.6791, 0.7171, 0.1594, 0.4063, 1.2584],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_lm_model_forward(self):
-        config = self._get_basic_config_and_input()
-        config["attn_layers"] = ["local", "lsh", "local", "lsh", "local", "lsh"]
-        config["num_hidden_layers"] = 6
-        config["num_buckets"] = [2, 4]
-        config["is_decoder"] = False
-        paddle.seed(0)
-        model = ReformerForMaskedLM(ReformerConfig(**config))
-        model.eval()
-        input_ids, attn_mask = self._get_input_ids_and_mask()
-        hidden_states = model(input_ids=input_ids, attention_mask=attn_mask)[0]
-        output_slice = hidden_states[1, -1, :5]
-        expected_output_slice = paddle.to_tensor(
-            [0.1018, -0.2026, 0.2116, 0.0270, -0.1233],
-            dtype='float32',
-        )
-
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
-
-    def test_local_lm_model_grad(self):
-        config = self._get_basic_config_and_input()
-        config["attn_layers"] = ["local", "local", "local", "local"]
-        config["num_hidden_layers"] = 4
-        config["hidden_dropout_prob"] = 0.0
-        config["local_attention_probs_dropout_prob"] = 0.0
-        paddle.seed(0)
-        model = ReformerModelWithLMHead(ReformerConfig(**config))
-        model.train()
-        #model.zero_grad()
-        input_ids, _ = self._get_input_ids_and_mask()
-        loss = model(input_ids=input_ids, labels=input_ids)[0]
-
-        self.assertTrue(paddle.allclose(loss, paddle.to_tensor(5.8019, dtype='float32'), atol=1e-3))
-        loss.backward()
-
-        # check last grads to cover all proable errors
-        grad_slice_word = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
-        expected_grad_slice_word = paddle.to_tensor(
-            [-0.0005, -0.0001, -0.0002, -0.0006, -0.0006],
-            dtype='float32',
-        )
-        grad_slice_position_factor_1 = model.reformer.embeddings.position_embeddings.weights[0][1, 0, -5:]
-        expected_grad_slice_pos_fac_1 = paddle.to_tensor(
-            [-0.5235, 0.5704, 0.0922, -0.3140, 0.9928],
-            dtype='float32',
-        )
-        grad_slice_position_factor_2 = model.reformer.embeddings.position_embeddings.weights[1][0, 1, :5]
-        expected_grad_slice_pos_fac_2 = paddle.to_tensor(
-            [1.7960, 1.7668, 0.5593, 0.0907, 1.8342],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(grad_slice_word, expected_grad_slice_word, atol=1e-3))
-        self.assertTrue(paddle.allclose(grad_slice_position_factor_1, expected_grad_slice_pos_fac_1, atol=1e-3))
-        self.assertTrue(paddle.allclose(grad_slice_position_factor_2, expected_grad_slice_pos_fac_2, atol=1e-3))
-
-    def test_lsh_lm_model_grad(self):
-        config = self._get_basic_config_and_input()
-        config["attn_layers"] = ["lsh", "lsh", "lsh", "lsh"]
-        config["num_hidden_layers"] = 4
-        config["hidden_dropout_prob"] = 0.0
-        config["lsh_attention_probs_dropout_prob"] = 0.0
-        config["num_buckets"] = [2, 4]
-        config["num_hashes"] = 6
-        paddle.seed(0)
-        model = ReformerModelWithLMHead(ReformerConfig(**config))
-        model.train()
-        #model.zero_grad()
-        input_ids, _ = self._get_input_ids_and_mask()
-        loss = model(input_ids=input_ids, labels=input_ids)[0]
-
-        self.assertTrue(paddle.allclose(loss, paddle.to_tensor(5.7854, dtype='float32'), atol=1e-3))
-        loss.backward()
-        # check last grads to cover all proable errors
-        grad_slice_word = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
-        expected_grad_slice_word = paddle.to_tensor(
-            [0.0004, 0.0003, 0.0006, -0.0004, 0.0002],
-            dtype='float32',
-        )
-        grad_slice_position_factor_1 = model.reformer.embeddings.position_embeddings.weights[0][1, 0, -5:]
-        expected_grad_slice_pos_fac_1 = paddle.to_tensor(
-            [-0.3792, 0.5593, -1.6993, 0.2033, 0.4131],
-            dtype='float32',
-        )
-        grad_slice_position_factor_2 = model.reformer.embeddings.position_embeddings.weights[1][0, 1, :5]
-        expected_grad_slice_pos_fac_2 = paddle.to_tensor(
-            [-1.4212, -0.3201, -1.1944, 0.1258, 0.2856],
-            dtype='float32',
-        )
-        self.assertTrue(paddle.allclose(grad_slice_word, expected_grad_slice_word, atol=1e-3))
-        self.assertTrue(paddle.allclose(grad_slice_position_factor_1, expected_grad_slice_pos_fac_1, atol=1e-3))
-        self.assertTrue(paddle.allclose(grad_slice_position_factor_2, expected_grad_slice_pos_fac_2, atol=1e-3))
-
-    @slow
-    def test_pretrained_generate_crime_and_punish(self):
-        model = ReformerModelWithLMHead.from_pretrained("google/reformer-crime-and-punishment")
-        tokenizer = ReformerTokenizer.from_pretrained("google/reformer-crime-and-punishment")
-        model.eval()
-
-        input_ids = tokenizer.encode("A few months later", return_tensors="pt")
-        output_ids = model.generate(
-            input_ids, max_length=50, num_beams=4, early_stopping=True, do_sample=False, num_hashes=8
-        )
-        output = tokenizer.decode(output_ids[0])
-
-        self.assertEqual(
-            output,
-            "A few months later state expression in his ideas, at the first entrance. He was positively for an inst",
-        )
-
-    @slow
-    def test_pretrained_generate_use_cache_equality(self):
-        model = ReformerModelWithLMHead.from_pretrained("google/reformer-crime-and-punishment")
-        tokenizer = ReformerTokenizer.from_pretrained("google/reformer-crime-and-punishment")
-        model.eval()
-        input_ids = tokenizer.encode("A few months later", return_tensors="pt")
-        output_ids_with_cache = model.generate(input_ids, max_length=130, num_hashes=8, use_cache=False)
-        output_ids_without_cache = model.generate(input_ids, max_length=130, num_hashes=8, use_cache=True)
-
-        output_with_cache = tokenizer.decode(output_ids_with_cache[0])
-        output_without_cache = tokenizer.decode(output_ids_without_cache[0])
-
-        self.assertEqual(output_with_cache, output_without_cache)'''

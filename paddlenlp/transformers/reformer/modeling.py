@@ -336,8 +336,6 @@ class AxialPositionEmbeddings(nn.Layer):
         super().__init__()
         self.axial_pos_shape = config.axial_pos_shape
         self.axial_pos_embds_dim = config.axial_pos_embds_dim
-        # import pdb
-        # pdb.set_trace()
         self.dropout = config.hidden_dropout_prob
 
         self.least_common_mult_chunk_length = _get_least_common_mult_chunk_len(
@@ -352,8 +350,7 @@ class AxialPositionEmbeddings(nn.Layer):
                 f"Make sure that axial_pos_embds factors: {self.axial_pos_embds_dim} sum to "
                 f"hidden_size: {config.hidden_size}"
             )
-        # import pdb
-        # pdb.set_trace()
+
         # create weights
         for axis, axial_pos_embd_dim in enumerate(self.axial_pos_embds_dim):
             # create expanded shapes
@@ -457,14 +454,9 @@ class ReformerEmbeddings(nn.Layer):
 
     def __init__(self, config: ReformerConfig):
         super().__init__()
-        # import pdb
-        # pdb.set_trace()
         self.max_position_embeddings = config.max_position_embeddings
         self.dropout = config.hidden_dropout_prob
-
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
-        # import pdb
-        # pdb.set_trace()
         self.position_embeddings = (
             AxialPositionEmbeddings(config) if config.axial_pos_embds else PositionEmbeddings(config)
         )
@@ -2664,8 +2656,6 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             )
 
         output = (logits,) + reformer_outputs[1:]
-        # import pdb
-        # pdb.set_trace()
         return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
 
