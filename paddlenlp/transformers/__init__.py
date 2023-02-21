@@ -125,6 +125,7 @@ from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
+from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
@@ -189,6 +190,7 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .auto.configuration import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

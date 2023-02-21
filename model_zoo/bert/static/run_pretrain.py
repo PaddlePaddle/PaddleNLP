@@ -223,7 +223,7 @@ class WorkerInitObj(object):
 
 
 def do_train(args):
-    # Initialize the paddle and paddle fleet execute enviroment
+    # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
     place = paddle.set_device(args.device)
     fleet.init(is_collective=True)

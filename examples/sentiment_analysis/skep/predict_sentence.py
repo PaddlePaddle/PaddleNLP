@@ -97,7 +97,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         )
         examples.append((input_ids, token_type_ids))
 
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids

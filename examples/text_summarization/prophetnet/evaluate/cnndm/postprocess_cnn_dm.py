@@ -14,7 +14,7 @@ parser.add_argument(
     "--duplicate_rate",
     type=float,
     default=0.7,
-    help="If the duplicat rate (compared with history) is large, we can discard the current sentence.",
+    help="If the duplicate rate (compared with history) is large, we can discard the current sentence.",
 )
 parser.add_argument("--trunc_len", type=int, default=0, help="Truncate line by the maximum length.")
 args = parser.parse_args()
