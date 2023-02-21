@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
+from paddlenlp.trainer.argparser import strtobool
 import os
 from dataclasses import dataclass, field
 
@@ -60,12 +60,12 @@ class ModelArguments:
         default=80, metadata={"help": "The maximum total of masked tokens in input sequence"}
     )
 
-    to_static: distutils.util.strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
+    to_static: strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
     profiler_options: str = field(
         default=None,
         metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
     )
-    fuse_transformer: distutils.util.strtobool = field(
+    fuse_transformer: strtobool = field(
         default=False,
         metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
     )
