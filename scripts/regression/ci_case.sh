@@ -141,19 +141,20 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --use_amp False >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
 time (python -m paddle.distributed.launch run_glue.py \
-    --model_type bert \
     --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
     --learning_rate 2e-5 \
-    --num_train_epochs 3 \
+    --num_train_epochs 1 \
     --logging_steps 1 \
     --save_steps 1 \
-    --max_steps 1 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
+    --fp16 False \
+    --do_train \
+    --do_eval >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
 print_info $? bert_fintune
 time (python -u ./export_model.py \
     --model_type bert \
