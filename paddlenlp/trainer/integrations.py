@@ -18,7 +18,6 @@
 
 import importlib
 import json
-from importlib import import_module
 
 from ..transformers import PretrainedModel
 from ..utils.log import logger
@@ -149,7 +148,7 @@ class AutoNLPCallback(TrainerCallback):
             raise RuntimeError(
                 "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
             )
-        self.session = import_module("ray.air.session")
+        self.session = importlib.import_module("ray.air.session")
 
     # report session metrics to Ray to track trial progress
     def on_evaluate(self, args, state, control, **kwargs):
