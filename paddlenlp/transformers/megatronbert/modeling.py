@@ -63,7 +63,7 @@ class MegatronBertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = MEGATRONBERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = MEGATRONBERT_PRETRAINED_RESOURCE_FILES_MAP
 
-     @classmethod
+    @classmethod
     def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
