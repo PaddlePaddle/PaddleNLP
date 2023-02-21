@@ -237,7 +237,7 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
 - `train_batch_size` 表示训练时**每张卡**上的样本数目。
 - `eval_batch_size` 表示测试时**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
-- `warmup_propotion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `warmup_proportion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
 可通过`bash run_clm.sh`启动训练，更多参数详情和参数的默认值请参考`run_clm.py`。
