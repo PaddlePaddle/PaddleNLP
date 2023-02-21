@@ -125,6 +125,7 @@ from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
+from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
