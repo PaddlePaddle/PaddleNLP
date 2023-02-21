@@ -19,7 +19,7 @@ import numpy as np
 import paddle
 from paddle import inference
 
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Stack, Tuple, Pad, DataCollatorWithPadding
 from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
@@ -40,9 +40,9 @@ args = parser.parse_args()
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
     text = example
     encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
-    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
-    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
-    return input_ids, token_type_ids
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
+    return {"input_ids": input_ids, "token_type_ids":token_type_ids}
 
 
 class Predictor(object):
@@ -85,24 +85,21 @@ class Predictor(object):
         """
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example(
+            encoded_inputs = convert_example(
                 text, tokenizer, label_list=label_map.values(), max_seq_length=self.max_seq_length, is_test=True
             )
-            examples.append((input_ids, segment_ids))
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-        ): fn(samples)
+            examples.append(encoded_inputs)
 
         # Seperates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
+        data_collator = DataCollatorWithPadding(tokenizer, padding=True, return_tensors="np")
 
         results = []
-        for batch in batches:
-            input_ids, segment_ids = batchify_fn(batch)
+        for raw_batch in batches:
+            batch = data_collator(raw_batch)
+            input_ids, token_type_ids = batch["input_ids"], batch["token_type_ids"]
             self.input_handles[0].copy_from_cpu(input_ids)
-            self.input_handles[1].copy_from_cpu(segment_ids)
+            self.input_handles[1].copy_from_cpu(token_type_ids)
             self.predictor.run()
             logits = self.output_handle.copy_to_cpu()
             probs = softmax(logits, axis=1)

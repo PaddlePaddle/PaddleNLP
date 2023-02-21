@@ -84,17 +84,20 @@ skep/
 
 ### 数据下载
 
-句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
+句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
 通过以下方式即可实现加载。
 
 ```python
+from paddlenlp.datasets import load_dataset
+
 train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
 ```
 
 ### 模型训练
 
-我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
+我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证。如果想要训练中文情感分析模型，请指定model_name为：`skep_ernie_1.0_large_ch`； 训练英文情感分析模型请指定model_name为：`skep_ernie_2.0_large_en`。
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "6" train_sentence.py \
@@ -119,6 +122,7 @@ python -m paddle.distributed.launch --gpus "6" train_sentence.py \
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
+**NOTE:** 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
@@ -132,29 +136,6 @@ checkpoints/
 └── ...
 ```
 
-**NOTE:**
-* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
-* 如需使用ernie-tiny模型，则需要提前先安装sentencepiece依赖，如`pip install sentencepiece`
-* 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
-  运行方式如下：
-
-```shell
-python export_model.py \
-    --model_name="skep_ernie_1.0_large_ch" \
-    --params_path="./checkpoint/model_900/model_state.pdparams" \
-    --output_path="./static_graph_params"
-```
-其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
-
-导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
-
-```shell
-python deploy/python/predict.py \
-    --model_name="skep_ernie_1.0_large_ch" \
-    --model_file="static_graph_params.pdmodel" \
-    --params_file="static_graph_params.pdiparams"
-```
-
 ### 模型预测
 
 启动预测：
@@ -162,21 +143,11 @@ python deploy/python/predict.py \
 export CUDA_VISIBLE_DEVICES=0
 python predict_sentence.py \
     --model_name "skep_ernie_1.0_large_ch" \
-    --params_path "checkpoints/model_900/model_state.pdparams" \
+    --ckpt_dir "checkpoints/model_100" \
     --device 'gpu'
 ```
 
-将待预测数据如以下示例：
-
-```text
-这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般
-怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片
-作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。
-```
-
-可以直接调用`predict`函数即可输出预测结果。
-
-如
+下面展示了一些模型预测结果：
 
 ```text
 Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般      Label: negative
@@ -188,26 +159,38 @@ Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场�
 可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键情感分析，具体使用方法如下:
 
 ```python
-
 from paddlenlp import Taskflow
 
-senta = Taskflow("sentiment_analysis")
+senta = Taskflow("sentiment_analysis", , model="skep_ernie_1.0_large_ch")
 senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
 '''
-[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
+[{'text': '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般', 'label': 'negative', 'score': 0.9894790053367615}]
 '''
 senta(["怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
        "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
 '''
-[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'},
- {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive'}
-]
+[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.9684522151947021},
+{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive', 'score': 0.9843207597732544}]
 '''
+```
 
-# 使用skep_ernie_1.0_large_ch模型进行情感分析
-senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
-senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
-'''
-[{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
-'''
+### 模型部署
+
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。运行方式如下：
+
+```shell
+python export_model.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --ckpt_dir="./checkpoints/model_100" \
+    --output_path="./static/static_graph_params"
+```
+其中`ckpt_dir`是指动态图训练保存的目录，`output_path`是指静态图参数导出路径。
+
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式如下：
+
+```shell
+python deploy/python/predict.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --model_file="static_graph_params.pdmodel" \
+    --params_file="static_graph_params.pdiparams"
 ```
