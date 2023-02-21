@@ -17,8 +17,17 @@ import math
 import paddle
 from paddle import einsum, nn
 
+from ...utils.converter import StateDictNameMapping
+from ...utils.env import CONFIG_NAME
+
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
+
+from .configuration import (
+    MEGATRONBERT_PRETRAINED_INIT_CONFIGURATION,
+    MEGATRONBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    MegatronBertConfig,
+)
 
 __all__ = [
     "MegatronBertModel",
@@ -46,45 +55,13 @@ class MegatronBertPretrainedModel(PretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "megatronbert-cased": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 2,
-            "vocab_size": 29056,
-            "pad_token_id": 0,
-        },
-        "megatronbert-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 2,
-            "vocab_size": 30592,
-            "pad_token_id": 0,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "megatronbert-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/"
-            "megatron-bert/megatronbert-cased/model_state.pdparams",
-            "megatronbert-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/"
-            "megatron-bert/megatronbert-cased/model_state.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = MegatronBertConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "megatronbert"
+
+    pretrained_init_configuration = MEGATRONBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = MEGATRONBERT_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
