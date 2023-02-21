@@ -11,13 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..initializer import normal_, zeros_
+
+
+def is_cutlass_fused_multi_head_attention_available():
+
+    try:
+        from paddle.incubate.nn.functional import cutlass_fused_multi_head_attention
+
+        cutlass_fused_multi_head_attention
+
+        return True
+    except ImportError:
+        return False
+
+
+if is_cutlass_fused_multi_head_attention_available():
+    from paddle.incubate.nn.functional import cutlass_fused_multi_head_attention
+else:
+    cutlass_fused_multi_head_attention = None
 
 
 class CrossAttention(nn.Layer):
@@ -153,6 +171,42 @@ class CrossAttention(nn.Layer):
             attention_mask = F.pad(attention_mask, (0, target_length), value=0.0, data_format="NCL")
             attention_mask = attention_mask.repeat_interleave(self.num_heads, axis=0)
         return attention_mask
+
+    def set_use_memory_efficient_attention_xformers(
+        self, use_memory_efficient_attention_xformers: bool, attention_op: Optional[Callable] = None
+    ):
+        if use_memory_efficient_attention_xformers:
+            if self.added_kv_proj_dim is not None:
+                # TODO(Anton, Patrick, Suraj, William) - currently xformers doesn't work for UnCLIP
+                # which uses this type of cross attention ONLY because the attention mask of format
+                # [0, ..., -10.000, ..., 0, ...,] is not supported
+                raise NotImplementedError(
+                    "Memory efficient attention with `xformers` is currently not supported when"
+                    " `self.added_kv_proj_dim` is defined."
+                )
+            elif not is_cutlass_fused_multi_head_attention_available():
+                raise ModuleNotFoundError(
+                    (
+                        "Refer to https://github.com/facebookresearch/xformers for more information on how to install"
+                        " xformers"
+                    ),
+                    name="xformers",
+                )
+            else:
+                try:
+                    _ = cutlass_fused_multi_head_attention(
+                        paddle.randn((1, 1, 2, 40)),
+                        paddle.randn((1, 1, 2, 40)),
+                        paddle.randn((1, 1, 2, 40)),
+                    )
+                except Exception as e:
+                    raise e
+
+            processor = XFormersCrossAttnProcessor(attention_op=attention_op)
+        else:
+            processor = CrossAttnProcessor()
+
+        self.set_processor(processor)
 
 
 class CrossAttnProcessor:
@@ -354,6 +408,42 @@ class SlicedAttnProcessor:
         return hidden_states
 
 
+class XFormersCrossAttnProcessor:
+    def __init__(self, attention_op=None):
+        self.attention_op = attention_op
+
+    def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
+        batch_size, sequence_length, _ = hidden_states.shape
+
+        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+        attention_mask = (
+            attention_mask.reshape([batch_size, attn.num_heads, -1, attention_mask.shape[-1]])
+            if attention_mask is not None
+            else None
+        )
+
+        query = attn.to_q(hidden_states)
+
+        if encoder_hidden_states is None:
+            encoder_hidden_states = hidden_states
+
+        key = attn.to_k(encoder_hidden_states)
+        value = attn.to_v(encoder_hidden_states)
+
+        query = query.reshape([0, 0, attn.num_heads, attn.head_dim])
+        key = key.reshape([0, 0, attn.num_heads, attn.head_dim])
+        value = value.reshape([0, 0, attn.num_heads, attn.head_dim])
+        with paddle.amp.auto_cast(False):
+            hidden_states = cutlass_fused_multi_head_attention(query, key, value, attention_mask, attn.scale)
+        hidden_states = hidden_states.reshape([0, 0, hidden_states.shape[2] * hidden_states.shape[3]])
+
+        # linear proj
+        hidden_states = attn.to_out[0](hidden_states)
+        # dropout
+        hidden_states = attn.to_out[1](hidden_states)
+        return hidden_states
+
+
 class SlicedAttnAddedKVProcessor:
     def __init__(self, slice_size):
         self.slice_size = slice_size
@@ -426,6 +516,7 @@ class SlicedAttnAddedKVProcessor:
 AttnProcessor = Union[
     CrossAttnProcessor,
     SlicedAttnProcessor,
+    XFormersCrossAttnProcessor,
     CrossAttnAddedKVProcessor,
     SlicedAttnAddedKVProcessor,
 ]

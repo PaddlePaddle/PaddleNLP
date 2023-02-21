@@ -14,7 +14,7 @@
 # limitations under the License.
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import paddle
 import paddle.nn.functional as F
@@ -25,6 +25,23 @@ from ..modeling_utils import ModelMixin
 from ..models.embeddings import ImagePositionalEmbeddings
 from ..utils import BaseOutput
 from .cross_attention import CrossAttention
+
+
+def is_cutlass_fused_multi_head_attention_available():
+
+    try:
+        from paddle.incubate.nn.functional import cutlass_fused_multi_head_attention
+
+        cutlass_fused_multi_head_attention
+        return True
+    except ImportError:
+        return False
+
+
+if is_cutlass_fused_multi_head_attention_available():
+    from paddle.incubate.nn.functional import cutlass_fused_multi_head_attention
+else:
+    cutlass_fused_multi_head_attention = None
 
 
 @dataclass
@@ -279,6 +296,8 @@ class AttentionBlock(nn.Layer):
 
         self.rescale_output_factor = rescale_output_factor
         self.proj_attn = nn.Linear(channels, channels)
+        self._use_memory_efficient_attention_xformers = False
+        self._attention_op = None
 
     def reshape_heads_to_batch_dim(self, tensor):
         tensor = tensor.reshape([0, 0, self.num_heads, self.head_dim])
@@ -308,12 +327,21 @@ class AttentionBlock(nn.Layer):
         key_proj = self.reshape_heads_to_batch_dim(key_proj)
         value_proj = self.reshape_heads_to_batch_dim(value_proj)
 
-        # get scores
-        attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
-        attention_probs = F.softmax(attention_scores.cast("float32"), axis=-1).cast(attention_scores.dtype)
+        if self._use_memory_efficient_attention_xformers:
+            # Memory efficient attention
+            with paddle.amp.auto_cast(False):
+                hidden_states = cutlass_fused_multi_head_attention(
+                    query_proj,
+                    key_proj,
+                    value_proj,
+                )
+        else:
+            # get scores
+            attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
+            attention_probs = F.softmax(attention_scores.cast("float32"), axis=-1).cast(attention_scores.dtype)
 
-        # compute attention output
-        hidden_states = paddle.matmul(attention_probs, value_proj)
+            # compute attention output
+            hidden_states = paddle.matmul(attention_probs, value_proj)
 
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
 
@@ -324,6 +352,30 @@ class AttentionBlock(nn.Layer):
         # res connect and rescale
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
         return hidden_states
+
+    def set_use_memory_efficient_attention_xformers(
+        self, use_memory_efficient_attention_xformers: bool, attention_op: Optional[Callable] = None
+    ):
+        if use_memory_efficient_attention_xformers:
+            if not is_cutlass_fused_multi_head_attention_available():
+                raise ModuleNotFoundError(
+                    (
+                        "Refer to https://github.com/facebookresearch/xformers for more information on how to install"
+                        " xformers"
+                    ),
+                    name="xformers",
+                )
+            else:
+                try:
+                    _ = cutlass_fused_multi_head_attention(
+                        paddle.randn((1, 1, 2, 40)),
+                        paddle.randn((1, 1, 2, 40)),
+                        paddle.randn((1, 1, 2, 40)),
+                    )
+                except Exception as e:
+                    raise e
+        self._use_memory_efficient_attention_xformers = use_memory_efficient_attention_xformers
+        self._attention_op = attention_op
 
 
 class BasicTransformerBlock(nn.Layer):
