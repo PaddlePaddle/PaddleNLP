@@ -298,7 +298,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ]
         else:
             callbacks = None
-        max_length = config.get("PreprocessArguments.max_length", 128)
         if config["trainer_type"] == "Trainer":
             model_path = config["TrainingArguments.model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
