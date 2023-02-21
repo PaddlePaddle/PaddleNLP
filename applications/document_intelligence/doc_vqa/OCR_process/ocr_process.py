@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import json
-from paddleocr import PaddleOCR, __version__ as paddleocr_version
-import numpy as np
+import os
 import re
-import time
-import sys
-from multiprocessing import Process, Queue
+
+from paddleocr import PaddleOCR
+from paddleocr import __version__ as paddleocr_version
 
 from paddlenlp.transformers import LayoutXLMTokenizer
 
@@ -60,7 +58,7 @@ def merge_bbox(tok_bboxes):
 
 
 def xlm_parse(ocr_res, tokenizer):
-    doc_tokens, doc_bboxes = [], []
+    doc_bboxes = []
     all_chr = get_all_chars(tokenizer)
 
     try:
@@ -170,7 +168,7 @@ def xlm_parse(ocr_res, tokenizer):
 
             doc_bboxes.append(merged_bbox)
             i = i + tok_len
-    except:
+    except Exception:
         print("Error")
         span_tokens = ["▁"] * 512
         doc_bboxes = [[0, 0, 0, 0]] * 512
