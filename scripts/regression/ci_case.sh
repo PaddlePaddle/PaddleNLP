@@ -119,9 +119,12 @@ print_info $? glue_${TASK_NAME}_train
 # 4 bert
 bert() {
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-cd ${nlp_dir}/model_zoo/bert/
-wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
-tar -xzvf bert.tar.gz
+# cd ${nlp_dir}/model_zoo/bert/
+# wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
+# tar -xzvf bert.tar.gz
+cd ${nlp_dir}/model_zoo/bert/data
+wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
+cd ../
 # pretrain
 time (python -m paddle.distributed.launch run_pretrain.py \
     --model_type bert \
@@ -141,29 +144,25 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --use_amp False >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
 
-# cd ${nlp_dir}/model_zoo/bert/data
-# wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
-# cd ../
-
 # pretrain （Trainer）
-# time (python -m paddle.distributed.launch run_pretrain_trainer.py \
-#     --model_type bert \
-#     --model_name_or_path "bert" \
-#     --max_predictions_per_seq 20 \
-#     --per_device_train_batch_size 32  \
-#     --learning_rate 1e-4 \
-#     --weight_decay 1e-2 \
-#     --adam_epsilon 1e-6 \
-#     --warmup_steps 10000 \
-#     --input_dir data/ \
-#     --output_dir pretrained_models/ \
-#     --logging_steps 1 \
-#     --save_steps 1 \
-#     --max_steps 1 \
-#     --device gpu \
-#     --fp16 False \
-#     --do_train >${log_path}/bert_pretrain_trainer) >>${log_path}/bert_pretrain_trainer 2>&1
-# print_info $? bert_pretrain_trainer
+time (python -m paddle.distributed.launch run_pretrain_trainer.py \
+    --model_type bert \
+    --model_name_or_path "bert" \
+    --max_predictions_per_seq 20 \
+    --per_device_train_batch_size 32  \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --input_dir data/ \
+    --output_dir pretrained_models/ \
+    --logging_steps 1 \
+    --save_steps 1 \
+    --max_steps 1 \
+    --device gpu \
+    --fp16 False \
+    --do_train >${log_path}/bert_pretrain_trainer) >>${log_path}/bert_pretrain_trainer 2>&1
+print_info $? bert_pretrain_trainer
 
 time (python -m paddle.distributed.launch run_glue.py \
     --model_name_or_path bert-base-uncased \
@@ -1218,14 +1217,6 @@ else
     python -m pytest tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health_unittest>>${log_path}/ernie-health_unittest 2>&1
     print_info $? tests ernie-health_unittest
 fi
-# cd ${nlp_dir}/tests/model_zoo/
-# if [ ! -f 'test_ernie-health.py' ];then
-#     echo '模型测试文件不存在！'
-# else
-#     cd ${nlp_dir}
-#     python -m pytest -v tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
-#     print_info $? ernie-health
-# fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
