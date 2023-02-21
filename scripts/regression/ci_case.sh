@@ -132,7 +132,7 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --input_dir bert/ \
+    --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
     --save_steps 1 \

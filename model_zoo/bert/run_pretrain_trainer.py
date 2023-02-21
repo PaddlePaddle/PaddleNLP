@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.trainer.argparser import strtobool
 import os
 from dataclasses import dataclass, field
 
@@ -23,6 +22,7 @@ from paddle.io import Dataset
 
 from paddlenlp.data import Stack
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     BertForPretraining,
     BertTokenizer,
