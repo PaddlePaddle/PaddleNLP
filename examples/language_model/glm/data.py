@@ -59,7 +59,6 @@ def cnnmail_reader(data_file):
     for idx, (source_text, target_text) in enumerate(zip(source_texts, target_texts)):
         if (idx + 1) % 20000 == 0:
             print(f"Processed {idx + 1} examples")
-        source_text = "[sMASK] Content:" + source_text
         example = {"text_a": source_text, "text_b": target_text}
         example_list.append(example)
     return example_list
@@ -71,3 +70,50 @@ def load_local_dataset(data_path, splits):
         data_file = os.path.join(data_path, split)
         dataset.append(load_dataset(cnnmail_reader, data_file=data_file, lazy=False))
     return dataset
+
+
+def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
+    prompt = tokenizer.encode("[sMASK] Content:")["input_ids"][:-1]
+    source_tokens = tokenizer.encode(" " + example["text_a"], add_special_tokens=False)["input_ids"]
+    if len(source_tokens) > data_args.src_length - len(prompt):
+        source_tokens = source_tokens[: data_args.src_length - len(prompt)]
+    source_tokens = prompt + source_tokens
+    if len(source_tokens) < data_args.src_length:
+        source_tokens = source_tokens + [tokenizer.pad_token_id] * (data_args.src_length - len(source_tokens))
+    sep = len(source_tokens)
+    position_ids = list(range(len(source_tokens)))
+    block_position_ids = [0] * len(source_tokens)
+    mask_position = source_tokens.index(tokenizer.smask_token_id)
+    if not is_test:
+        target_tokens = tokenizer.encode(" " + example["text_b"], add_special_tokens=False)["input_ids"]
+        target_tokens = target_tokens + [tokenizer.eos_token_id]
+        if len(target_tokens) > data_args.tgt_length:
+            target_tokens = target_tokens[: data_args.tgt_length]
+        loss_mask = [1] * len(target_tokens)
+        if len(target_tokens) < data_args.tgt_length:
+            loss_mask = loss_mask + [0] * (data_args.tgt_length - len(target_tokens))
+            target_tokens = target_tokens + [tokenizer.pad_token_id] * (data_args.tgt_length - len(target_tokens))
+        tokens = source_tokens + [tokenizer.bos_token_id] + target_tokens[:-1]
+        loss_mask = [0] * len(source_tokens) + loss_mask
+        target_ids = [0] * len(source_tokens) + target_tokens
+        position_ids = position_ids + [mask_position] * len(target_tokens)
+        block_position_ids = block_position_ids + list(range(1, len(target_tokens) + 1))
+        position_ids = [position_ids, block_position_ids]
+        example = {
+            "input_ids": tokens,
+            "labels": target_ids,
+            "attention_mask": sep,
+            "loss_mask": loss_mask,
+            "position_ids": position_ids,
+        }
+    else:
+        tokens = source_tokens + [tokenizer.bos_token_id]
+        position_ids = position_ids + [mask_position]
+        block_position_ids = block_position_ids + [1]
+        position_ids = [position_ids, block_position_ids]
+        example = {
+            "input_ids": tokens,
+            "attention_mask": sep,
+            "position_ids": position_ids,
+        }
+    return example

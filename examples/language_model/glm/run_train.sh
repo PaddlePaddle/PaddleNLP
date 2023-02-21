@@ -13,20 +13,21 @@
 # limitations under the License.
 
 device=$1
+model=515m
 
 CUDA_VISIBLE_DEVICES=$device python run_train.py \
---model_name_or_path glm-2b \
+--model_name_or_path glm-$model \
 --task_name cnn_dm \
---data_path ./data/cnn_dm \
+--data_path ./cnn_dm \
 --num_train_epochs 15 \
 --learning_rate 1e-5 \
 --warmup_ratio 0.06 \
 --weight_decay 0.1 \
 --label_smoothing 0.1 \
 --save_steps 10000 \
---logging_steps 50 \
---eval_steps 1000 \
---output_dir ./checkpoints/glm-2b-cnn_dm \
+--logging_steps 1 \
+--eval_steps 1 \
+--output_dir ./checkpoints/glm-$model-cnn_dm \
 --src_length 608 \
 --tgt_length 160 \
 --min_tgt_length 55 \
@@ -34,9 +35,16 @@ CUDA_VISIBLE_DEVICES=$device python run_train.py \
 --no_repeat_ngram_size 3 \
 --num_beams 5 \
 --select_topk True \
---per_device_eval_batch_size 4 \
---recompute \
---fp16 \
+--per_device_eval_batch_size 1 \
+--per_device_train_batch_size 1 \
 --max_grad_norm 1.0 \
 --lr_scheduler_type linear \
---resume_from_checkpoint ../../../paddlenlp/transformers/glm/paddle/glm-2b/ 
+--do_train \
+--do_eval 
+
+#--resume_from_checkpoint ../../../paddlenlp/transformers/glm/paddle/glm-515m/ 
+#--per_device_eval_batch_size 4 \
+#--logging_steps 50 \
+#--eval_steps 1000 \
+--fp16 \
+--recompute \

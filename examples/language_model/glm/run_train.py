@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+from functools import partial
 
 import paddle
 import paddle.nn as nn
-from data import load_local_dataset
+from data import cnn_dm_convert_example, load_local_dataset
 from utils import CacheCallback, GLMTrainer
 
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
@@ -55,6 +56,8 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    for field_item in fields(model_args):
+        setattr(training_args, field_item.name, getattr(model_args, field_item.name))
 
     paddle.set_device(training_args.device)
 
@@ -68,6 +71,10 @@ def main():
 
     # Load the dataset.
     train_ds, dev_ds, test_ds = load_local_dataset(data_path=data_args.data_path, splits=["train", "dev", "test"])
+    trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = train_ds.map(partial(trans_func, is_test=False))
+    dev_ds = dev_ds.map(trans_func)
+    test_ds = test_ds.map(trans_func)
 
     # TODO: Set seed for sampler based on specific epoch and seed.
     criterion = nn.loss.CrossEntropyLoss(reduction="none")

@@ -22,6 +22,10 @@ from paddlenlp.trainer.trainer_callback import TrainerCallback
 
 
 class GLMTrainer(Trainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.caches = None
+
     def compute_loss(
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], return_outputs: bool = False
     ):
@@ -37,17 +41,20 @@ class GLMTrainer(Trainer):
                 labels = inputs["generator_labels"]
         else:
             labels = None
+        if "loss_mask" in inputs and inputs["loss_mask"] is not None:
+            loss_mask = inputs.pop("loss_mask").reshape([-1])
+        else:
+            loss_mask = None
 
-        caches = [] if self.caches is None else self.caches
-        logits, caches = model(**inputs, caches=caches)
+        # caches = [] if self.caches is None else self.caches
+        logits, caches = model(**inputs)  # , cache=self.caches)
 
         if self.criterion is not None:
             loss = self.criterion(logits, labels)
             if self.args.label_smoothing > 0:
-                smooth_loss = -nn.functional.log_softmax(logits, axis=-1).mean(axis=-1)
+                smooth_loss = (-nn.functional.log_softmax(logits, axis=-1) / logits.shape[2]).sum(axis=-1)
                 loss = (1 - self.args.label_smoothing) * loss + self.args.label_smoothing * smooth_loss
-            if "loss_mask" in inputs and inputs["loss_mask"] is not None:
-                loss_mask = inputs["loss_mask"].reshape([-1])
+            if loss_mask is not None:
                 loss = paddle.sum(loss.reshape([-1]) * loss_mask) / paddle.sum(loss_mask)
             outputs = (loss, logits)
         self.caches = caches
@@ -60,7 +67,7 @@ class GLMTrainer(Trainer):
 
 class CacheCallback(TrainerCallback):
     def on_train_begin(self, args, state, control, **kwargs):
-        state.caches = None
+        self.caches = None
 
     def on_step_end(self, args, state, control, **kwargs):
-        state.caches = None
+        self.caches = None
