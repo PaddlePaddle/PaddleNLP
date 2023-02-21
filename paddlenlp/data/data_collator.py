@@ -204,6 +204,10 @@ class DataCollatorWithPadding:
         if "label_ids" in batch:
             batch["labels"] = batch["label_ids"]
             del batch["label_ids"]
+        # To fix windows bug for paddle inference dtype error
+        # InvalidArgumentError: The type of data we are trying to retrieve does not match the type of data currently contained in the container
+        if self.return_tensors == "np":
+            batch = {k: np.array(v, dtype=np.int64) for k, v in batch.items()}
         return batch
 
 
