@@ -46,7 +46,7 @@ schema = ['Billing Date', 'Name', 'Taxpayer Identification Number', 'Account Ban
 #### Set model path
 ```
 # Default task_path
-uie = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema)
+uie = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema)
 ```
 
 #### Doka Service Prediction
