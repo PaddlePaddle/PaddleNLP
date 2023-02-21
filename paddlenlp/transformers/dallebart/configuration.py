@@ -115,7 +115,7 @@ DALLEBART_PRETRAINED_INIT_CONFIGURATION = {
         },
     }
 
-BERT_PRETRAINED_RESOURCE_FILES_MAP = {
+DALLEBART_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
          "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
@@ -124,7 +124,7 @@ BERT_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class BertConfig(PretrainedConfig):
+class DalleBartConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`BertModel`] or a [`TFBertModel`]. It is used to
     instantiate a BERT model according to the specified arguments, defining the model architecture. Instantiating a
@@ -191,7 +191,7 @@ class BertConfig(PretrainedConfig):
     ```"""
     model_type = "dallebart"
     attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
-    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = DALLEBART_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
