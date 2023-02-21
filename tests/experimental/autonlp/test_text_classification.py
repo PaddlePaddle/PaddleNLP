@@ -263,11 +263,18 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test training_path
             self.assertFalse(os.path.exists(os.path.join(auto_trainer.training_path)))
 
-    @slow
     @parameterized.expand(
         [
             (
-                None,
+                "Chinese",
+                {
+                    "TrainingArguments.max_steps": 2,
+                    "TrainingArguments.per_device_train_batch_size": 1,
+                    "TrainingArguments.per_device_eval_batch_size": 1,
+                },
+            ),
+            (
+                "English",
                 {
                     "TrainingArguments.max_steps": 2,
                     "TrainingArguments.per_device_train_batch_size": 1,
@@ -276,7 +283,8 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             ),
         ]
     )
-    def test_default_model_candidate(self, custom_model_candidate, hp_overrides):
+    @slow
+    def test_default_model_candidate(self, language, hp_overrides):
         with TemporaryDirectory() as temp_dir_path:
             train_ds = copy.deepcopy(self.multi_class_train_ds)
             dev_ds = copy.deepcopy(self.multi_class_dev_ds)
@@ -287,7 +295,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 eval_dataset=dev_ds,
                 label_column="label_desc",
                 text_column="sentence",
-                language="Chinese",
+                language=language,
                 output_dir=temp_dir_path,
                 problem_type="multi_class",
             )
@@ -296,7 +304,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 num_gpus=1,
                 max_concurrent_trials=1,
                 num_models=num_models,
-                custom_model_candidates=custom_model_candidate,
                 hp_overrides=hp_overrides,
             )
 

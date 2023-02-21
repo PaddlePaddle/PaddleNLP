@@ -135,7 +135,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         chinese_finetune_models = hp.choice(
             "finetune_models",
             [
-                "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
+                "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
                 "ernie-3.0-tiny-base-v2-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
                 "ernie-3.0-tiny-medium-v2-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
@@ -152,7 +152,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
                 "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
                 "distilroberta-base",  # 6-layer, 768-hidden, 12-heads, 66M parameters. Case-sensitive
-                "ernie-3.0-tiny-mini-v2-en",  # 6-layer, 384-hidden, 12-heads, 27M parameters
                 "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
                 "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
             ],
@@ -523,7 +522,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trainer.export_model(export_path)
             trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
             mode = "prompt"
-            max_length = model_config.get("PreprocessArguments.max_length", 128)
+            max_length = model_config.get(
+                "PreprocessArguments.max_length", trainer.model.plm.config.max_position_embeddings
+            )
         else:
             if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
                 input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
@@ -534,7 +535,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 ]
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
             mode = "finetune"
-            max_length = trainer.model.config.max_position_embeddings
+            max_length = model_config.get(
+                "PreprocessArguments.max_length", trainer.model.config.max_position_embeddings
+            )
 
         # save tokenizer
         trainer.tokenizer.save_pretrained(export_path)
@@ -553,7 +556,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         with open(os.path.join(export_path, "taskflow_config.json"), "w", encoding="utf-8") as f:
             json.dump(taskflow_config, f, ensure_ascii=False)
         logger.info(
-            f"taskflow config saved to {export_path}. You can use the taskflow config to create a Taskflow instance for inference"
+            f"Taskflow config saved to {export_path}. You can use the Taskflow config to create a Taskflow instance for inference"
         )
 
         if os.path.exists(self.training_path):
