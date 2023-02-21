@@ -12,18 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad, DataCollatorForTokenClassification
+
+from paddlenlp.data import DataCollatorForTokenClassification, Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
+from paddlenlp.transformers import (
+    SkepCrfForTokenClassification,
+    SkepModel,
+    SkepTokenizer,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -166,7 +171,12 @@ if __name__ == "__main__":
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             # print(batch)
-            input_ids, token_type_ids, seq_lens, labels = batch["input_ids"], batch["token_type_ids"], batch["seq_lens"], batch["labels"]
+            input_ids, token_type_ids, seq_lens, labels = (
+                batch["input_ids"],
+                batch["token_type_ids"],
+                batch["seq_lens"],
+                batch["labels"],
+            )
             loss = model(input_ids, token_type_ids, seq_lens=seq_lens, labels=labels)
             avg_loss = paddle.mean(loss)
             global_step += 1

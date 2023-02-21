@@ -19,7 +19,8 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad, DataCollatorWithPadding
+
+from paddlenlp.data import DataCollatorWithPadding, Pad, Stack, Tuple
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 # yapf: disable
@@ -55,7 +56,7 @@ def convert_example_to_feature(example, tokenizer, max_seq_len=512):
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
-    return {"input_ids": input_ids, "token_type_ids":token_type_ids}
+    return {"input_ids": input_ids, "token_type_ids": token_type_ids}
 
 
 @paddle.no_grad()
@@ -77,7 +78,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     examples = []
     for text in data:
-        encoded_inputs = convert_example_to_feature(text, tokenizer,  max_seq_len=args.max_seq_len)
+        encoded_inputs = convert_example_to_feature(text, tokenizer, max_seq_len=args.max_seq_len)
         examples.append(encoded_inputs)
 
     # Seperates data into some batches.

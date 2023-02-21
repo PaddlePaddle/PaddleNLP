@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import argparse
-from scipy.special import softmax
-import numpy as np
 
+import numpy as np
 import paddle
 from paddle import inference
+from scipy.special import softmax
 
-from paddlenlp.data import Stack, Tuple, Pad, DataCollatorWithPadding
+from paddlenlp.data import DataCollatorWithPadding, Pad, Stack, Tuple
 from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
@@ -42,7 +42,7 @@ def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=
     encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
-    return {"input_ids": input_ids, "token_type_ids":token_type_ids}
+    return {"input_ids": input_ids, "token_type_ids": token_type_ids}
 
 
 class Predictor(object):

@@ -15,14 +15,19 @@
 import argparse
 import os
 from functools import partial
-from tqdm import tqdm
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad, DataCollatorForTokenClassification
+from tqdm import tqdm
+
+from paddlenlp.data import DataCollatorForTokenClassification, Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
+from paddlenlp.transformers import (
+    SkepCrfForTokenClassification,
+    SkepModel,
+    SkepTokenizer,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -39,7 +44,7 @@ args = parser.parse_args()
 def predict(model, data_loader, label_map):
     """
     Given a prediction dataset, it gives the prediction results.
-    
+
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
@@ -54,7 +59,7 @@ def predict(model, data_loader, label_map):
         results.extend(tags)
     return results
 
-    
+
 def convert_example_to_feature(example, tokenizer, max_seq_len=512):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
@@ -136,7 +141,7 @@ if __name__ == "__main__":
     test_data_loader = create_dataloader(
         test_ds, mode="test", batch_size=args.batch_size, batchify_fn=data_collator, trans_fn=trans_func
     )
-    
+
     results = predict(model, test_data_loader, label_map)
     for idx, example in enumerate(test_ds.data):
         print(len(example["tokens"]), len(results[idx]))

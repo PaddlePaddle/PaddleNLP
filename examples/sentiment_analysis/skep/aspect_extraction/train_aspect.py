@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad, DataCollatorWithPadding
+
+from paddlenlp.data import DataCollatorWithPadding, Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
@@ -66,10 +67,10 @@ def convert_example(example, tokenizer, max_seq_len=512, is_test=False):
         token_type_ids(obj: `list[int]`): The list of token_type_ids.
         label(obj:`int`, optional): The input label if not is_test.
     """
-    
+
     encoded_inputs = tokenizer(text=example["text"], text_pair=example["text_pair"], max_seq_len=max_seq_len)
 
-    input_ids =encoded_inputs["input_ids"]
+    input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
     if is_test:
@@ -77,7 +78,7 @@ def convert_example(example, tokenizer, max_seq_len=512, is_test=False):
     else:
         label = example["label"]
         return {"input_ids": input_ids, "token_type_ids": token_type_ids, "labels": label}
-        
+
 
 def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
