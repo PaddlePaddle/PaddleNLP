@@ -70,10 +70,10 @@ class MegatronBertPretrainedModel(PretrainedModel):
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
             ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
-            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
-            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
             ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
             ["pooler.dense.bias", "pooler.dense.bias"],
+            ["encoder.ln.weight", "encoder.norm.weight"],
+            ["encoder.ln.bias", "encoder.norm.bias"],
             # for TokenClassification
         ]
         for layer_index in range(config.num_hidden_layers):
@@ -121,11 +121,11 @@ class MegatronBertPretrainedModel(PretrainedModel):
                 ],
                 [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
                 [
-                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layer.{layer_index}.attention.output.ln.weight",
                     f"encoder.layers.{layer_index}.norm1.weight",
                 ],
                 [
-                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layer.{layer_index}.attention.output.ln.bias",
                     f"encoder.layers.{layer_index}.norm1.bias",
                 ],
                 [
@@ -134,8 +134,14 @@ class MegatronBertPretrainedModel(PretrainedModel):
                     "transpose",
                 ],
                 [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+                [
+                    f"encoder.layer.{layer_index}.ln.weight",
+                    f"encoder.layers.{layer_index}.norm2.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.ln.bias",
+                    f"encoder.layers.{layer_index}.norm2.bias",
+                ],
             ]
             model_mappings.extend(layer_mappings)
 
@@ -155,7 +161,7 @@ class MegatronBertPretrainedModel(PretrainedModel):
             or "MegatronBertForSequenceClassification" in config.architectures
             or "MegatronBertForTokenClassification" in config.architectures
         ):
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias", "classifier.bias"]])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
