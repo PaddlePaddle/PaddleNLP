@@ -18,6 +18,7 @@
 
 import importlib
 import json
+from importlib import import_module
 
 from ..transformers import PretrainedModel
 from ..utils.log import logger
@@ -26,6 +27,10 @@ from .trainer_callback import TrainerCallback
 
 def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
+
+
+def is_ray_available():
+    return importlib.util.find_spec("ray.air") is not None
 
 
 def get_available_reporting_integrations():
@@ -130,8 +135,54 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer = None
 
 
+class AutoNLPCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that sends the logs to [Ray Tune]().
+    Args:
+        vdl_writer (`LogWriter`, *optional*):
+            The writer to use. Will instantiate one if not set.
+    """
+
+    def __init__(self):
+        has_ray = is_ray_available()
+        if not has_ray:
+            raise RuntimeError(
+                "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
+            )
+        self.session = import_module("ray.air.session")
+
+    # report session metrics to Ray to track trial progress
+    def on_evaluate(self, args, state, control, **kwargs):
+        if not state.is_world_process_zero:
+            return
+
+        metrics = kwargs.get("metrics", None)
+        if metrics is not None and isinstance(metrics, dict):
+            self.session.report(metrics)
+
+    # report session metrics to Ray to track trial progress
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if not state.is_world_process_zero:
+            return
+
+        metrics = kwargs.get("metrics", None)
+        if metrics is not None and isinstance(metrics, dict):
+            self.session.report(metrics)
+
+    # forward trainer logs
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not state.is_world_process_zero:
+            return
+
+        if logs is not None:
+            # In AutoNLP's Ray setup, we pipe stdout to a stdout file for logging purposes
+            # TODO: find a better way for this
+            print(logs)
+
+
 INTEGRATION_TO_CALLBACK = {
     "visualdl": VisualDLCallback,
+    "autonlp": AutoNLPCallback,
 }
 
 
