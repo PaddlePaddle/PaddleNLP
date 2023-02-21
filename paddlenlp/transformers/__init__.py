@@ -108,6 +108,7 @@ from .luke.tokenizer import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .mbart.configuration import *
+from .megatronbert.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .prophetnet.modeling import *
@@ -169,8 +170,10 @@ from .auto.processing import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
+from .artist.configuration import *
 from .artist.modeling import *
 from .artist.tokenizer import *
+from .dallebart.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 from .clip.modeling import *
