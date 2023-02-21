@@ -25,12 +25,12 @@ from paddlenlp.transformers import (
     XLNetForSequenceClassification,
     XLNetForTokenClassification,
     XLNetLMHeadModel,
-    XLNetPretrainedModel,
     XLNetModel,
+    XLNetPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
-from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class XLNetModelTester:
@@ -155,7 +155,7 @@ class XLNetModelTester:
         config["mem_len"] = 0
         model = XLNetModel(**config)
         model.eval()
-        base_model_output = model(input_ids_1, return_dict=self.parent.return_dict)
+        model(input_ids_1, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
 
@@ -233,8 +233,6 @@ class XLNetModelTester:
     ):
         model = XLNetLMHeadModel(XLNetModel(**config))
         model.eval()
-
-        results = []
 
         result = model(
             input_ids_1, token_type_ids=token_type_ids, labels=token_labels, return_dict=self.parent.return_dict

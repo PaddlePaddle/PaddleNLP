@@ -37,7 +37,7 @@ parser.add_argument("--params_path", type=str, required=True, help="The path to 
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
+parser.add_argument("--margin", default=0.0, type=float, help="Margin between pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
 parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embedding_size, 0 means use hidden_size as output embedding size.")
 parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
@@ -53,7 +53,7 @@ def predict(model, data_loader):
 
     Args:
         model (obj:`SimCSE`): A model to extract text embedding or calculate similarity of text pair.
-        data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
+        data_loader (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
     ): [data for data in fn(samples)]
 
     valid_ds = load_dataset(read_text_pair, data_path=args.text_pair_file, lazy=False, is_test=True)

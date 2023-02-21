@@ -61,6 +61,8 @@ class Task(metaclass=abc.ABCMeta):
         self._home_path = self.kwargs["home_path"] if "home_path" in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs["task_flag"] if "task_flag" in self.kwargs else self.model
         self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+        # Add mode flag for onnx output path redirection
+        self.export_type = None
 
         if "task_path" in self.kwargs:
             self._task_path = self.kwargs["task_path"]
@@ -69,6 +71,8 @@ class Task(metaclass=abc.ABCMeta):
             self._task_path = os.path.join(self._home_path, "taskflow", self._priority_path)
         else:
             self._task_path = os.path.join(self._home_path, "taskflow", self.task, self.model)
+        if self.is_static_model:
+            self._static_model_name = self._get_static_model_name()
 
         if not self.from_hf_hub:
             download_check(self._task_flag)
@@ -110,6 +114,17 @@ class Task(metaclass=abc.ABCMeta):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
+
+    def _get_static_model_name(self):
+        names = []
+        for file_name in os.listdir(self._task_path):
+            if ".pdmodel" in file_name:
+                names.append(file_name[:-8])
+        if len(names) == 0:
+            raise IOError(f"{self._task_path} should include '.pdmodel' file.")
+        if len(names) > 1:
+            logger.warning(f"{self._task_path} includes more than one '.pdmodel' file.")
+        return names[0]
 
     def _check_task_files(self):
         """
@@ -186,7 +201,9 @@ class Task(metaclass=abc.ABCMeta):
 
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]:
+        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"] or (
+            self.task == "text_classification" and self.model == "prompt"
+        ):
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)
@@ -206,8 +223,12 @@ class Task(metaclass=abc.ABCMeta):
             logger.warning(
                 "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
             )
+        if self.export_type is None:
+            onnx_dir = os.path.join(self._task_path, "onnx")
+        else:
+            # Compatible multimodal model for saving image and text path
+            onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
-        onnx_dir = os.path.join(self._task_path, "onnx")
         if not os.path.exists(onnx_dir):
             os.mkdir(onnx_dir)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
@@ -236,6 +257,7 @@ class Task(metaclass=abc.ABCMeta):
             "Please run the following commands to reinstall: \n "
             "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
         )
+        self.input_handler = [i.name for i in self.predictor.get_inputs()]
 
     def _get_inference_model(self):
         """
@@ -279,7 +301,13 @@ class Task(metaclass=abc.ABCMeta):
 
         # When the user-provided model path is already a static model, skip to_static conversion
         if self.is_static_model:
-            self.inference_model_path = self._task_path
+            self.inference_model_path = os.path.join(self._task_path, self._static_model_name)
+            if not os.path.exists(self.inference_model_path + ".pdmodel") or not os.path.exists(
+                self.inference_model_path + ".pdiparams"
+            ):
+                raise IOError(
+                    f"{self._task_path} should include {self._static_model_name + '.pdmodel'} and {self._static_model_name + '.pdiparams'} while is_static_model is True"
+                )
         else:
             # Since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way
             _base_path = (
@@ -288,11 +316,11 @@ class Task(metaclass=abc.ABCMeta):
                 else os.path.join(self._home_path, "taskflow", self.task, self.model)
             )
             self.inference_model_path = os.path.join(_base_path, "static", "inference")
-        if not os.path.exists(self.inference_model_path + ".pdiparams") or self._param_updated:
-            with dygraph_mode_guard():
-                self._construct_model(self.model)
-                self._construct_input_spec()
-                self._convert_dygraph_to_static()
+            if not os.path.exists(self.inference_model_path + ".pdiparams") or self._param_updated:
+                with dygraph_mode_guard():
+                    self._construct_model(self.model)
+                    self._construct_input_spec()
+                    self._convert_dygraph_to_static()
 
         self._static_model_file = self.inference_model_path + ".pdmodel"
         self._static_params_file = self.inference_model_path + ".pdiparams"

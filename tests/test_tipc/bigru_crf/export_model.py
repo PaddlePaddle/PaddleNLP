@@ -17,21 +17,21 @@ import argparse
 import os
 
 import paddle
-from paddle.static import InputSpec
-from paddlenlp.data import Vocab
-
 from data import load_vocab
 from model import BiGruCrf
+from paddle.static import InputSpec
 
-# yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
-parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
-parser.add_argument("--output_path", type=str, default='./infer_model', help="The path of model parameter in static graph to be saved.")
+parser.add_argument(
+    "--params_path", type=str, default="./checkpoints/final.pdparams", help="The path of model parameter to be loaded."
+)
+parser.add_argument(
+    "--output_path", type=str, default="./infer_model", help="The path of model parameter in static graph to be saved."
+)
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 args = parser.parse_args()
-# yapf: enable
 
 
 def main():

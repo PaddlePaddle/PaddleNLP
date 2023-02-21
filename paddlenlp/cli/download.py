@@ -15,12 +15,10 @@
 import json
 import os
 from typing import List, Tuple
-from dataclasses import dataclass
 
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.transformers.utils import find_transformer_model_type, find_transformer_model_class_by_name
+from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 COMMUNITY_MODEL_CONFIG_FILE_NAME = "community_models.json"
 
@@ -36,7 +34,7 @@ def load_community_models() -> List[Tuple[str, str]]:
 
     if not os.path.exists(local_community_model_config_path):
         logger.info("download community model configuration from server ...")
-        remote_community_model_path = os.path.join(COMMUNITY_MODEL_PREFIX, COMMUNITY_MODEL_CONFIG_FILE_NAME)
+        remote_community_model_path = "/".join([COMMUNITY_MODEL_PREFIX, COMMUNITY_MODEL_CONFIG_FILE_NAME])
         cache_dir = os.path.join(MODEL_HOME)
         local_community_model_config_path = get_path_from_url(remote_community_model_path, root_dir=cache_dir)
 

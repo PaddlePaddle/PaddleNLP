@@ -53,6 +53,7 @@ Args:
 - greater_is_better (bool, optional): 更好的模型是否应该有更大的指标。与`metric_for_best_model`结合使用
 - problem_type (str, optional): 根据问题的性质在 [`multi_class`, `multi_label`] 中选择
 - output_dir (str, optional): 输出目录，默认为`autpnlp_results`
+- verbosity: (int, optional): 控制日志的详细程度。默认为“1”，可在driver中看见worker的日志。如果需要减少日志量，请使用 `verbosity > 0` 。
 
 ### 训练
 
@@ -76,7 +77,6 @@ Args:
 - max_concurrent_trials (int, optional): 同时运行的最大试验数。必须是非负数。如果为 None 或 0，则不应用任何限制。默认为None。
 - time_budget_s: (int|float|datetime.timedelta, optional) 以秒为单位的全局时间预算，超过时间后停止所有模型试验。
 - experiment_name: (str, optional): 实验的名称。实验日志将存储在"<output_dir>/<experiment_name>"下。默认为 UNIX 时间戳。
-- verbosity: (int, optional): 控制日志的详细程度。默认为“0”，将日志级别设置为 INFO。如果需要减少日志量，请使用 `verbosity > 0` 将日志级别设置为 WARNINGS
 - hp_overrides: (dict[str, Any], optional): （仅限高级用户）。覆盖每个候选模型的超参数。例如，`{"TrainingArguments.max_steps"：5}`。
 - custom_model_candiates: (dict[str, Any], optional): （仅限高级用户）。运行用户提供的候选模型而不 PaddleNLP 的默认候选模型。可以参考 `._model_candidates` 属性
 
