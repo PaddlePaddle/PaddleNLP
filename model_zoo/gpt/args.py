@@ -11,22 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
 
 import argparse
 
 import paddle
 
-from paddlenlp.utils.log import logger  # noqa: E402
-
-
-def str2bool(v):
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Unsupported value encountered.")
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.utils.log import logger
 
 
 def parse_args(MODEL_CLASSES):
@@ -119,7 +110,7 @@ def parse_args(MODEL_CLASSES):
 
     # Config for 4D Parallelism
     parser.add_argument(
-        "--use_sharding", type=str2bool, nargs="?", const=False, help="Use sharding Parallelism to training."
+        "--use_sharding", type=strtobool, nargs="?", const=False, help="Use sharding Parallelism to training."
     )
     parser.add_argument(
         "--sharding_degree", type=int, default=1, help="Sharding degree. Share the parameters to many cards."
@@ -135,17 +126,17 @@ def parse_args(MODEL_CLASSES):
         help="Pipeline Parallelism degree.  Spliting the the model layers to different parts.",
     )
     parser.add_argument(
-        "--use_recompute", type=str2bool, nargs="?", const=False, help="Using the recompute to save the memory."
+        "--use_recompute", type=strtobool, nargs="?", const=False, help="Using the recompute to save the memory."
     )
 
     # AMP config
-    parser.add_argument("--use_amp", type=str2bool, nargs="?", const=False, help="Enable mixed precision training.")
+    parser.add_argument("--use_amp", type=strtobool, nargs="?", const=False, help="Enable mixed precision training.")
     parser.add_argument(
         "--amp_level", type=str, default="O1", choices=["O1", "O2"], help="select O1 or O2 of amp level."
     )
     parser.add_argument(
         "--enable_addto",
-        type=str2bool,
+        type=strtobool,
         nargs="?",
         const=True,
         help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.",
@@ -164,10 +155,13 @@ def parse_args(MODEL_CLASSES):
     # Other config
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization")
     parser.add_argument(
-        "--check_accuracy", type=str2bool, nargs="?", const=False, help="Check accuracy for training process."
+        "--check_accuracy", type=strtobool, nargs="?", const=False, help="Check accuracy for training process."
     )
     parser.add_argument(
         "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="select cpu, gpu, xpu devices."
+    )
+    parser.add_argument(
+        "--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style."
     )
     parser.add_argument(
         "-p",

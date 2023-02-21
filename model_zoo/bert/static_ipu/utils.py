@@ -14,10 +14,11 @@
 
 import argparse
 import os
-from distutils.util import strtobool
 
 import tqdm
 from paddle.utils.cpp_extension import load
+
+from paddlenlp.trainer.argparser import strtobool
 
 
 def load_custom_ops():

@@ -54,7 +54,7 @@ parser.add_argument("--learning_rate", default=1.5e-5, type=float, help="The ini
 parser.add_argument("--weight_decay", default=0.0001, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=5, type=int, help="Total number of training epochs to perform.")
 parser.add_argument(
-    "--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process."
+    "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over the training process."
 )
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=2333, help="random seed for initialization")

@@ -138,33 +138,6 @@ class Predictor(object):
         return output
 
 
-def seq_cls_print_ret(infer_result, input_data):
-    label_list = [
-        "news_story",
-        "news_culture",
-        "news_entertainment",
-        "news_sports",
-        "news_finance",
-        "news_house",
-        "news_car",
-        "news_edu",
-        "news_tech",
-        "news_military",
-        "news_travel",
-        "news_world",
-        "news_stock",
-        "news_agriculture",
-        "news_game",
-    ]
-    label = infer_result["label"].tolist()
-    confidence = infer_result["confidence"].tolist()
-    for i, ret in enumerate(label):
-        print("input data:", input_data[i])
-        print("seq cls result:")
-        print("label:", label_list[label[i]], "  confidence:", confidence[i])
-        print("-----------------------------")
-
-
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)

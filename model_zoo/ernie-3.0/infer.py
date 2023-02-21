@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import distutils.util
 import time
 from functools import partial
 from multiprocessing import cpu_count
@@ -29,6 +28,7 @@ from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithP
 from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer
 
 METRIC_CLASSES = {
@@ -102,9 +102,7 @@ def parse_args():
         action="store_true",
         help="Whether to use the bfloat16 datatype",
     )
-    parser.add_argument(
-        "--use_onnxruntime", type=distutils.util.strtobool, default=False, help="Use onnxruntime to infer or not."
-    )
+    parser.add_argument("--use_onnxruntime", type=strtobool, default=False, help="Use onnxruntime to infer or not.")
     parser.add_argument(
         "--debug", action="store_true", help="With debug it will save graph and model after each pass."
     )
@@ -481,13 +479,7 @@ def main():
 
         column_names = dev_ds.column_names
         dev_ds = dev_ds.map(trans_fn, remove_columns=column_names)
-        if args.device == "npu":
-            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
-            batchify_fn = DataCollatorForTokenClassification(
-                tokenizer, padding="max_length", max_length=args.max_seq_length
-            )
-        else:
-            batchify_fn = DataCollatorForTokenClassification(tokenizer)
+        batchify_fn = DataCollatorForTokenClassification(tokenizer)
         predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     elif args.task_name == "cmrc2018":
         dev_example = load_dataset("cmrc2018", split="validation")
@@ -503,11 +495,7 @@ def main():
             desc="Running tokenizer on validation dataset",
         )
 
-        if args.device == "npu":
-            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
-            batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
-        else:
-            batchify_fn = DataCollatorWithPadding(tokenizer)
+        batchify_fn = DataCollatorWithPadding(tokenizer)
         predictor.predict(dev_ds, tokenizer, batchify_fn, args, dev_example)
     else:
         dev_ds = ppnlp_load_dataset("clue", args.task_name, splits="dev")
