@@ -27,11 +27,16 @@ __all__ = [
     "ArtistForConditionalGeneration",
 ]
 
+from .configuration import (
+    ARTIST_PRETRAINED_INIT_CONFIGURATION,
+    ARTIST_PRETRAINED_RESOURCE_FILES_MAP,
+    ArtistConfig,
+)
 
 
 class ArtistModel(GPTModel):
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
 
 class ArtistForConditionalGeneration(GPTLMHeadModel):
@@ -44,8 +49,8 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     """
 
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
     def __init__(self, gpt):
         super().__init__(gpt)
@@ -69,8 +74,8 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             The vocabulary size of image.
             Defaults to `16384`.
     """
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
     def __init__(self, gpt, image_vocab_size=16384):
         super().__init__(gpt)
