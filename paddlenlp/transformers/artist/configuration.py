@@ -20,7 +20,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["ARTIST_PRETRAINED_INIT_CONFIGURATION", "ArtistConfig", "ARTIST_PRETRAINED_RESOURCE_FILES_MAP"]
 
-BERT_PRETRAINED_INIT_CONFIGURATION = {
+ARTIST_PRETRAINED_INIT_CONFIGURATION = {
     "pai-painter-base-zh": {
         "vocab_size": 37512,
         "hidden_size": 768,
@@ -184,9 +184,9 @@ class ArtistConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "bert"
+    model_type = "artist"
     attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
-    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
