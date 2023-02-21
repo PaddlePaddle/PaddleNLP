@@ -182,7 +182,7 @@ class MultimodalFeatureExtractionTask(Task):
         },
     }
 
-    def __init__(self, task, model, batch_size=1, is_static_model=True, return_tensors=True, **kwargs):
+    def __init__(self, task, model, batch_size=1, is_static_model=True, return_tensors="pd", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
@@ -229,10 +229,12 @@ class MultimodalFeatureExtractionTask(Task):
                 batch_texts = None
                 batch_images = batch_examples
             if self.is_static_model:
+                # The input of static model is numpy array
                 tokenized_inputs = self._processor(
                     text=batch_texts, images=batch_images, return_tensors="np", padding="max_length", truncation=True
                 )
             else:
+                # The input of dygraph model is padddle.Tensor
                 tokenized_inputs = self._processor(
                     text=batch_texts, images=batch_images, return_tensors="pd", padding="max_length", truncation=True
                 )
@@ -326,7 +328,7 @@ class MultimodalFeatureExtractionTask(Task):
 
     def _postprocess(self, inputs):
         inputs["features"] = np.concatenate(inputs["features"], axis=0)
-        if self.return_tensors:
+        if self.return_tensors == "pd":
             inputs["features"] = paddle.to_tensor(inputs["features"])
         return inputs
 
