@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import paddle
 import paddle.nn as nn
@@ -76,9 +76,6 @@ class GLMAttention(nn.Layer):
         return outputs
 
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
-        """
-        TODO: (1) mem to cache
-        """
         query_length = hidden_states.shape[1]
         if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
@@ -232,7 +229,7 @@ class GLMStack(nn.Layer):
     def recompute_training(self, layer_module: nn.Layer, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor):
         def create_custom_forward(module):
             def custom_forward(*inputs):
-                return tuple(module(*inputs))
+                return module(*inputs)
 
             return custom_forward
 
@@ -244,7 +241,7 @@ class GLMStack(nn.Layer):
         hidden_states: Tensor,
         position_ids: Tensor,
         attention_mask: Tensor,
-        memory_states: Tuple[Tensor, Optional] = None,
+        memory_states: Optional[Tensor] = None,
     ):
         batch_size, query_length = hidden_states.shape[:2]
         memory_length = memory_states[0].shape[1] if memory_states is not None else 0

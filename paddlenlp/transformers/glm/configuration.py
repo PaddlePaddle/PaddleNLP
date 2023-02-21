@@ -161,6 +161,7 @@ class GLMConfig(PretrainedConfig):
         attention_scale=1.0,
         initializer_range=0.02,
         pool_token="cls",
+        layernorm_epsilon=1e-5,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -183,3 +184,4 @@ class GLMConfig(PretrainedConfig):
         self.attention_scale = attention_scale
         self.initializer_range = initializer_range
         self.pool_token = pool_token
+        self.layernorm_epsilon = layernorm_epsilon

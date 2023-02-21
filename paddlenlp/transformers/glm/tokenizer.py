@@ -34,24 +34,24 @@ from ..tokenizer_utils_base import BatchEncoding
 
 class GLMTokenizerMixin:
     """
-    SOP and EOP tokens are used for autoregressive blank filling.
+    BOS and EOS tokens are used for autoregressive blank filling.
     """
 
     @property
-    def sop_token(self) -> Optional[str]:
+    def bos_token(self) -> Optional[str]:
         return "<|startofpiece|>"
 
     @property
-    def sop_token_id(self) -> Optional[int]:
-        return self.convert_tokens_to_ids(self.sop_token)
+    def bos_token_id(self) -> Optional[int]:
+        return self.convert_tokens_to_ids(self.bos_token)
 
     @property
-    def eop_token(self) -> Optional[str]:
+    def eos_token(self) -> Optional[str]:
         return "<|endofpiece|>"
 
     @property
-    def eop_token_id(self) -> Optional[int]:
-        return self.convert_tokens_to_ids(self.eop_token)
+    def eos_token_id(self) -> Optional[int]:
+        return self.convert_tokens_to_ids(self.eos_token)
 
     @property
     def gmask_token_id(self) -> int:
@@ -89,7 +89,7 @@ class GLMTokenizerMixin:
             choice_indices.append(paddle.arange(len(token), len(token) + len(choice), dtype="int64"))
             attention_mask.append(paddle.tril(paddle.ones([len(choice), len(choice)], dtype="int64")))
 
-            token = paddle.concat([token, paddle.to_tensor([self.sop_token_id], dtype="int64"), choice[:-1]])
+            token = paddle.concat([token, paddle.to_tensor([self.bos_token_id], dtype="int64"), choice[:-1]])
             position_id = paddle.concat([position_id, paddle.to_tensor([mask_position] * len(choice), dtype="int64")])
             block_position_id = paddle.concat([block_position_id, paddle.arange(1, len(choice) + 1, dtype="int64")])
 
@@ -163,10 +163,10 @@ class GLMTokenizerMixin:
             if not is_batched:
                 targets = [targets]
             assert len(targets) == len(input_ids)
-            targets = [(target + [self.eop_token_id])[:max_gen_length] for target in targets]
+            targets = [(target + [self.eos_token_id])[:max_gen_length] for target in targets]
             if not padding:
                 max_gen_length = max(map(len, targets))
-            targets = [[self.sop_token_id] + target for target in targets]
+            targets = [[self.bos_token_id] + target for target in targets]
             labels = [target[1:] for target in targets]
             targets = [target + [self.pad_token_id] * (max_gen_length + 1 - len(target)) for target in targets]
             labels = [label + [-100] * (max_gen_length - len(label)) for label in labels]
@@ -206,7 +206,7 @@ class GLMTokenizerMixin:
 
         if targets is None:
             input_ids = paddle.concat(
-                [input_ids, paddle.full([batch_size, 1], self.sop_token_id, dtype=input_ids.dtype)], axis=-1
+                [input_ids, paddle.full([batch_size, 1], self.bos_token_id, dtype=input_ids.dtype)], axis=-1
             )
         else:
             loss_mask = paddle.concat([paddle.zeros_like(input_ids), loss_mask], axis=1)
