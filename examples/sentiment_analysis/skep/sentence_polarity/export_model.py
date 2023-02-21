@@ -13,14 +13,9 @@
 # limitations under the License.
 
 import argparse
-import os
-from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
 
-from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import SkepForSequenceClassification
 
 # yapf: disable
@@ -49,3 +44,4 @@ if __name__ == "__main__":
     )
     # Save in static graph model.
     paddle.jit.save(model, args.output_path)
+    print("Static Model has been saved to: {}".format(args.output_path))

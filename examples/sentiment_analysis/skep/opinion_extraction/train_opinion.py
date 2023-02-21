@@ -20,15 +20,10 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 
-from paddlenlp.data import DataCollatorForTokenClassification, Pad, Stack, Tuple
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import (
-    SkepCrfForTokenClassification,
-    SkepModel,
-    SkepTokenizer,
-)
+from paddlenlp.transformers import SkepCrfForTokenClassification, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()

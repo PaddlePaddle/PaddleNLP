@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.data import DataCollatorWithPadding, Pad, Stack, Tuple
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 

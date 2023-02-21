@@ -16,38 +16,34 @@ import argparse
 
 import numpy as np
 import paddle
-from paddle import inference
 from scipy.special import softmax
 
-from paddlenlp.data import DataCollatorWithPadding, Pad, Stack, Tuple
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
 parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
-
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'],
-    default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
+parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'], default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
+def convert_example(example, tokenizer, label_list, max_seq_len=512, is_test=False):
     text = example
-    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_len)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
     return {"input_ids": input_ids, "token_type_ids": token_type_ids}
 
 
 class Predictor(object):
-    def __init__(self, model_file, params_file, device, max_seq_length):
-        self.max_seq_length = max_seq_length
+    def __init__(self, model_file, params_file, device, max_seq_len):
+        self.max_seq_len = max_seq_len
 
         config = paddle.inference.Config(model_file, params_file)
         if device == "gpu":
@@ -86,7 +82,7 @@ class Predictor(object):
         examples = []
         for text in data:
             encoded_inputs = convert_example(
-                text, tokenizer, label_list=label_map.values(), max_seq_length=self.max_seq_length, is_test=True
+                text, tokenizer, label_list=label_map.values(), max_seq_len=self.max_seq_len, is_test=True
             )
             examples.append(encoded_inputs)
 
@@ -112,7 +108,7 @@ class Predictor(object):
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_file, args.params_file, args.device, args.max_seq_length)
+    predictor = Predictor(args.model_file, args.params_file, args.device, args.max_seq_len)
 
     tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
