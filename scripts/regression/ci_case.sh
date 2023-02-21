@@ -166,7 +166,7 @@ print_info $? bert_pretrain
 # print_info $? bert_pretrain_trainer
 
 time (python -m paddle.distributed.launch run_glue.py \
-    --model_name_or_path __internal_testing__/bert \
+    --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
     --per_device_train_batch_size 32 \
