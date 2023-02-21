@@ -19,11 +19,11 @@
 #   https://github.com/google-research/albert/blob/master/create_pretraining_data.py
 # with some modifications.
 
+import collections
 import math
 import os
 import re
 import time
-import collections
 
 import numpy as np
 import paddle
@@ -96,10 +96,12 @@ class BlendableDataset(paddle.io.Dataset):
                 try:
                     from tool_helpers import helpers
                 except Exception as ine:
+                    print(ine)
                     print_rank_0(" > missing tool_helpers, pip install tool_helpers please, try to compile locally.")
                     import data_tools.helpers as helpers
                 break
             except Exception as e:
+                print(e)
                 if local_rank == 0:
                     compile_helper()
                 print_rank_0("> wait for hepers to be compiled!")
@@ -191,7 +193,8 @@ class MMapIndexedDataset(paddle.io.Dataset):
                 raise ValueError("Slices into indexed_dataset must be contiguous")
             ptr = self._pointers[start]
             sizes = self._sizes[idx]
-            offsets = list(accumulate(sizes))
+            # offsets = list(accumulate(sizes))
+            offsets = []
             total_size = sum(sizes)
             np_array = self._token_ids[ptr : ptr + total_size]
             sents = np.split(np_array, offsets[:-1])
@@ -209,7 +212,7 @@ class MMapIndexedDataset(paddle.io.Dataset):
         if length is None:
             length = size - offset
         ptr += offset
-        np_array = self._token_ids[ptr : prt + length]
+        np_array = self._token_ids[ptr : ptr + length]
         return np_array
 
     @property
@@ -713,6 +716,7 @@ def _build_train_valid_test_datasets(
         # from megatron.data.bert_dataset import BertDataset
         # from megatron.data.t5_dataset import T5Dataset
         from .ernie_dataset import ErnieDataset
+        from .t5_dataset import T5Dataset
 
         dataset = None
         if splits[index + 1] > splits[index]:
@@ -744,15 +748,15 @@ def _build_train_valid_test_datasets(
                     short_seq_prob=short_seq_prob,
                     **kwargs,
                 )
-            elif dataset_type == DSET_TYPE_BERT:
-                dataset = BertDataset(
-                    indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,
-                    masked_lm_prob=masked_lm_prob,
-                    short_seq_prob=short_seq_prob,
-                    binary_head=binary_head,
-                    **kwargs,
-                )
+            # elif dataset_type == DSET_TYPE_BERT:
+            #     dataset = BertDataset(
+            #         indexed_dataset=indexed_dataset,
+            #         tokenizer=tokenizer,
+            #         masked_lm_prob=masked_lm_prob,
+            #         short_seq_prob=short_seq_prob,
+            #         binary_head=binary_head,
+            #         **kwargs,
+            #     )
             elif dataset_type == DSET_TYPE_ERNIE:
                 dataset = ErnieDataset(
                     indexed_dataset=indexed_dataset,
@@ -912,6 +916,7 @@ def get_samples_mapping(
                     np.load(indexmap_filename, allow_pickle=True, mmap_mode="r")
                     break
                 except Exception as e:
+                    print(e)
                     print("%s file is still writing or damaged, please wait a moment." % indexmap_filename)
                     time.sleep(3)
 
