@@ -132,8 +132,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
         train_batch_size = hp.choice("batch_size", [2, 4, 8, 16, 32])
-        chinese_models = hp.choice(
-            "chinese_models",
+        chinese_finetune_models = hp.choice(
+            "finetune_models",
             [
                 "ernie-1.0-large-zh-cw"  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
@@ -145,8 +145,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "ernie-3.0-tiny-pico-v2-zh",  # 3-layer, 128-hidden, 2-heads, 5.9M parameters.
             ],
         )
-        english_models = hp.choice(
-            "english_models",
+        english_finetune_models = hp.choice(
+            "finetune_models",
             [
                 # add deberta-v3 when we have it
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
@@ -158,7 +158,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         english_prompt_models = hp.choice(
-            "english_prompt_models",
+            "prompt_models",
             [
                 # add deberta-v3 when we have it
                 "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
@@ -166,7 +166,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         chinese_prompt_models = hp.choice(
-            "chinese_prompt_models",
+            "prompt_models",
             [
                 "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-1.0-base-zh-cw",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
@@ -182,7 +182,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.model_name_or_path": chinese_finetune_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             {
@@ -193,7 +193,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": english_models,
+                "TrainingArguments.model_name_or_path": english_finetune_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             # slow learning: small LR, large early stop patience
@@ -205,7 +205,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.model_name_or_path": chinese_finetune_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
             {
@@ -216,7 +216,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": english_models,
+                "TrainingArguments.model_name_or_path": english_finetune_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
             # prompt tuning candidates
@@ -298,16 +298,18 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ]
         else:
             callbacks = None
+        max_length = config.get("PreprocessArguments.max_length", 128)
         if config["trainer_type"] == "Trainer":
             model_path = config["TrainingArguments.model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_path, num_labels=len(self.id2label), id2label=self.id2label, label2id=self.label2id
             )
+            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
             trans_func = functools.partial(
                 self._preprocess_fn,
                 tokenizer=tokenizer,
-                max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
+                max_length=max_length,  # truncate to the max length allowed by the model
             )
             processed_train_dataset = copy.deepcopy(self.train_dataset).map(trans_func, lazy=False)
             if eval_dataset is None:
@@ -327,7 +329,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
         elif config["trainer_type"] == "PromptTrainer":
             model_path = config["PromptTuningArguments.model_name_or_path"]
-            max_length = config.get("PreprocessArguments.max_length", 128)
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             processed_train_dataset = copy.deepcopy(self.train_dataset).map(self._preprocess_labels, lazy=False)
             if eval_dataset is None:
@@ -336,6 +337,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 processed_eval_dataset = copy.deepcopy(eval_dataset).map(self._preprocess_labels, lazy=False)
 
             model = AutoModelForMaskedLM.from_pretrained(model_path)
+            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
             template = AutoTemplate.create_from(
                 prompt=config["template.prompt"],
                 tokenizer=tokenizer,
@@ -551,6 +553,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         with open(os.path.join(export_path, "taskflow_config.json"), "w", encoding="utf-8") as f:
             json.dump(taskflow_config, f, ensure_ascii=False)
+        logger.info(
+            f"taskflow config saved to {export_path}. You can use the taskflow config to create a Taskflow instance for inference"
+        )
 
         if os.path.exists(self.training_path):
             logger.info("Removing training checkpoints to conserve disk space")
