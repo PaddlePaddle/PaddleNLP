@@ -1221,6 +1221,7 @@ class GPTask(Task):
         self._batch_size = kwargs.get("batch_size", 64)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
+        self._split_sentence = kwargs.get("split_sentence", False)
 
     def _load_config(self):
         model_config_file = os.path.join(self._task_path, self.resource_files_names["model_config"])
@@ -1243,7 +1244,7 @@ class GPTask(Task):
         """
         self._input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="att_mask"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
         ]
 
     def _construct_model(self, model):
@@ -1290,7 +1291,11 @@ class GPTask(Task):
                 tokenized_inputs["text"] = x
                 yield tokenized_inputs
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
+        short_input_texts, self.input_mapping = self._auto_splitter(
+            inputs, self._max_seq_len, split_sentence=self._split_sentence
+        )
+
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=self._lazy_load)
 
         data_collator = DataCollatorGP(self._tokenizer, label_maps=self._label_maps, task_type=self._task_type)
 
@@ -1305,11 +1310,11 @@ class GPTask(Task):
         )
         outputs = {}
         outputs["data_loader"] = infer_data_loader
-        outputs["input_texts"] = inputs
+        outputs["input_texts"] = short_input_texts
         return outputs
 
     def _run_model(self, inputs):
-        all_preds = ([], []) if self._task_type in ["opinion_extraction", "relation_extraction"] else []
+        all_preds = ([], [])
         for batch in inputs["data_loader"]:
             input_ids, attention_masks, offset_mappings, texts = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
@@ -1317,11 +1322,8 @@ class GPTask(Task):
             self.predictor.run()
             logits = [paddle.to_tensor(self.output_handle[i].copy_to_cpu()) for i in range(len(self.output_handle))]
             batch_outputs = gp_decode(logits, offset_mappings, texts, self._label_maps, self._task_type)
-            if isinstance(batch_outputs, tuple):
-                all_preds[0].extend(batch_outputs[0])  # Entity output
-                all_preds[1].extend(batch_outputs[1])  # Relation output
-            else:
-                all_preds.extend(batch_outputs)
+            all_preds[0].extend(batch_outputs[0])  # Entity output
+            all_preds[1].extend(batch_outputs[1])  # Relation output
         inputs["result"] = all_preds
         return inputs
 
@@ -1350,22 +1352,45 @@ class GPTask(Task):
                 raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
         return schema_tree
 
+    def _auto_joiner(self, short_results, short_inputs, input_mapping):
+        def _update_offset(result, offset):
+            for vs in result.values():
+                for v in vs:
+                    if v.get("relations"):
+                        _update_offset(v["relations"], offset)
+                    v["start"] += offset
+                    v["end"] += offset
+
+        concat_results = []
+        for vs in input_mapping.values():
+            result = short_results[vs[0]]
+            offset = len(short_inputs[vs[0]])
+            for v in vs[1:]:
+                _update_offset(short_results[v], offset)
+                for k1, v1 in short_results[v].items():
+                    if k1 not in result.keys():
+                        result[k1] = v1
+                    else:
+                        result[k1].extend(v1)
+                offset += len(short_inputs[v])
+            concat_results.append(result)
+        return concat_results
+
     def _postprocess(self, inputs):
-        if self._task_type == "entity_extraction":
-            results = self._postprocess_entity_extraction(inputs)
-        elif self._task_type == "opinion_extraction":
+        if self._task_type == "opinion_extraction":
             results = self._postprocess_opinion_extraction(inputs)
         else:
-            results = self._postprocess_relation_extraction(inputs)
+            results = self._postprocess_extraction(inputs)
+        results = self._auto_joiner(results, inputs["input_texts"], self.input_mapping)
         return results
 
     def _postprocess_opinion_extraction(self, inputs):
         all_ent_preds, all_rel_preds = inputs["result"]
         results = []
-        for i in range(len(inputs["input_texts"])):
+        for input_text_idx in range(len(inputs["input_texts"])):
             result = {}
             aspect_maps = {}
-            for ent in all_ent_preds[i]:
+            for ent in all_ent_preds[input_text_idx]:
                 ent_res = {
                     "text": ent["text"],
                     "start": ent["start_index"],
@@ -1379,9 +1404,8 @@ class GPTask(Task):
                             aspect_maps[(ent["text"], ent["start_index"])] = r
                             break
 
-            for rel in all_rel_preds[i]:
+            for rel in all_rel_preds[input_text_idx]:
                 r = aspect_maps[(rel["aspect"], rel["aspect_start_index"])]
-                r["relations"] = {}
                 sentiment = {"probability": rel["probability"], "text": rel["sentiment"]}
                 opinion = {
                     "text": rel["opinion"],
@@ -1389,12 +1413,15 @@ class GPTask(Task):
                     "end": rel["opinion_start_index"] + len(rel["opinion"]),
                     "probability": rel["probability"],
                 }
-                r["relations"].setdefault("情感倾向[正向，负向]", []).append(sentiment)
-                r["relations"].setdefault("观点词", []).append(opinion)
+                if "relations" not in r.keys():
+                    r["relations"] = {"情感倾向[正向，负向]": [sentiment], "观点词": [opinion]}
+                else:
+                    r["relations"].setdefault("情感倾向[正向，负向]", []).append(sentiment)
+                    r["relations"].setdefault("观点词", []).append(opinion)
             results.append(result)
         return results
 
-    def _postprocess_relation_extraction(self, inputs):
+    def _postprocess_extraction(self, inputs):
         all_ent_preds, all_rel_preds = inputs["result"]
         results = []
         for input_text_idx in range(len(inputs["input_texts"])):
@@ -1403,7 +1430,6 @@ class GPTask(Task):
             while len(schema_list) > 0:
                 node = schema_list.pop(0)
                 if node.parent_relations is None:
-                    prefix = []
                     relations = [[]]
                     cnt = -1
                     for ent in all_ent_preds[input_text_idx]:
@@ -1416,7 +1442,6 @@ class GPTask(Task):
                             }
                             result.setdefault(node.name, []).append(ent_res)
                             cnt += 1
-                            result[node.name][cnt]["relations"] = {}
                             relations[0].append(result[node.name][cnt])
                 else:
                     relations = [[] for _ in range(len(node.parent_relations))]
@@ -1435,33 +1460,14 @@ class GPTask(Task):
                                         "end": rel["object_start_index"] + len(rel["object"]),
                                         "probability": rel["probability"],
                                     }
-                                    r["relations"].setdefault(node.name, []).append(rel_res)
+                                    if "relations" not in r.keys():
+                                        r["relations"] = {node.name: [rel_res]}
+                                    else:
+                                        r["relations"].setdefault(node.name, []).append(rel_res)
                                     cnt += 1
-                                    r["relations"][node.name][cnt]["relations"] = {}
                                     relations[i].append(r["relations"][node.name][cnt])
                 for child in node.children:
-                    child.prefix = prefix
                     child.parent_relations = relations
                     schema_list.append(child)
-            results.append(result)
-        return results
-
-    def _postprocess_entity_extraction(self, inputs):
-        all_preds = inputs["result"]
-        results = []
-        for input_text_idx in range(len(inputs["input_texts"])):
-            result = {}
-            schema_list = self._schema_tree.children[:]
-            while len(schema_list) > 0:
-                node = schema_list.pop(0)
-                for ent in all_preds[input_text_idx]:
-                    if node.name == ent["type"]:
-                        ent_res = {
-                            "text": ent["text"],
-                            "start": ent["start_index"],
-                            "end": ent["start_index"] + len(ent["text"]),
-                            "probability": ent["probability"],
-                        }
-                        result.setdefault(node.name, []).append(ent_res)
             results.append(result)
         return results

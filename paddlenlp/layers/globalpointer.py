@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-import numpy as np
 import paddle
 import paddle.nn as nn
 
@@ -66,7 +64,7 @@ class GlobalPointer(nn.Layer):
         attn_mask = 1 - attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
         logits = logits - attn_mask * 1e12
 
-        # # 排除下三角
+        # 排除下三角
         if self.tril_mask:
             mask = paddle.tril(paddle.ones_like(logits), diagonal=-1)
 
@@ -122,26 +120,31 @@ class GPLinkerForRelationExtraction(nn.Layer):
         return spo_output
 
 
-class GPLinkerForEventExtraction(nn.Layer):
+class GPLinkerForDocExtraction(nn.Layer):
     def __init__(self, encoder, label_maps, head_size=64):
         super().__init__()
         self.encoder = encoder
         hidden_size = encoder.config["hidden_size"]
-        num_labels = len(label_maps["label2id"])
+        num_ents = len(label_maps["entity2id"])
         gpcls = GlobalPointer
+        self.entity_output = gpcls(hidden_size, num_ents, head_size=head_size)
+        self.with_rel = False
+        if label_maps["relation2id"]:
+            num_rels = len(label_maps["relation2id"])
+            self.with_rel = True
+            self.head_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
+            self.tail_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
 
-        self.argu_output = gpcls(hidden_size, num_labels, head_size=head_size)
-        self.head_output = gpcls(hidden_size, 1, head_size=head_size, RoPE=False)
-        self.tail_output = gpcls(hidden_size, 1, head_size=head_size, RoPE=False)
-
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, bbox, image):
         # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
-        context_outputs = self.encoder(input_ids, attention_mask=attention_mask)
-        # last_hidden_state: (batch_size, seq_len, hidden_size)
-        last_hidden_state = context_outputs[0]
+        sequence_output, _ = self.encoder(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
+        seq_length = paddle.shape(input_ids)[1]
+        sequence_output = sequence_output[:, :seq_length]
 
-        argu_output = self.argu_output(last_hidden_state, attention_mask)
-        head_output = self.head_output(last_hidden_state, attention_mask)
-        tail_output = self.tail_output(last_hidden_state, attention_mask)
-        aht_output = (argu_output, head_output, tail_output)
-        return aht_output
+        entity_output = self.entity_output(sequence_output, attention_mask)
+        if not self.with_rel:
+            return [entity_output]
+        else:
+            head_output = self.head_output(sequence_output, attention_mask)
+            tail_output = self.tail_output(sequence_output, attention_mask)
+            return [entity_output, head_output, tail_output]

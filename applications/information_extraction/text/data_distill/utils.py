@@ -467,6 +467,26 @@ def doccano2distill(json_lines, task_type, label_maps=None):
 
 def synthetic2distill(texts, infer_results, task_type, label_maps=None):
     """Convert synthetic data to distill format"""
+
+    def _update_pred(entity_list, spo_list, pred):
+        for k in pred["relations"].keys():
+            for o in pred["relations"][k]:
+                if "start" in o.keys():
+                    rel = {
+                        "subject": pred["text"],
+                        "predicate": k,
+                        "object": pred["text"],
+                        "subject_start_index": pred["start"],
+                        "object_start_index": o["start"],
+                    }
+                    spo_list.append(rel)
+
+                    ent_type = "object" if "relations" not in o.keys() else k
+                    ent = {"text": o["text"], "type": ent_type, "start_index": o["start"]}
+                    entity_list.append(ent)
+
+                    _update_pred(entity_list, spo_list, o)
+
     if task_type == "opinion_extraction":
         outputs = []
         for i, line in enumerate(infer_results):
@@ -508,46 +528,12 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
 
             entity_list = []
             spo_list = []
-            for key1 in pred.keys():
-                for s in pred[key1]:
-                    ent = {"text": s["text"], "type": key1, "start_index": s["start"]}
+            for key in pred.keys():
+                for s in pred[key]:
+                    ent = {"text": s["text"], "type": key, "start_index": s["start"]}
                     entity_list.append(ent)
                     if "relations" in s.keys():
-                        for key2 in s["relations"].keys():
-                            for o1 in s["relations"][key2]:
-                                if "start" in o1.keys():
-                                    rel = {
-                                        "subject": s["text"],
-                                        "predicate": key2,
-                                        "object": o1["text"],
-                                        "subject_start_index": s["start"],
-                                        "object_start_index": o1["start"],
-                                    }
-                                    spo_list.append(rel)
-
-                                    if "relations" not in o1.keys():
-                                        ent = {"text": o1["text"], "type": "object", "start_index": o1["start"]}
-                                        entity_list.append(ent)
-                                    else:
-                                        ent = {"text": o1["text"], "type": key2, "start_index": o1["start"]}
-                                        entity_list.append(ent)
-                                        for key3 in o1["relations"].keys():
-                                            for o2 in o1["relations"][key3]:
-                                                ent = {
-                                                    "text": o2["text"],
-                                                    "type": "object",
-                                                    "start_index": o2["start"],
-                                                }
-                                                entity_list.append(ent)
-
-                                                rel = {
-                                                    "subject": o1["text"],
-                                                    "predicate": key3,
-                                                    "object": o2["text"],
-                                                    "subject_start_index": o1["start"],
-                                                    "object_start_index": o2["start"],
-                                                }
-                                                spo_list.append(rel)
+                        _update_pred(entity_list, spo_list, s)
             output["entity_list"] = entity_list
             output["spo_list"] = spo_list
             outputs.append(output)

@@ -1338,7 +1338,8 @@ def gp_decode(batch_outputs, offset_mappings, texts, label_maps, task_type="rela
                 }
                 ent_list.append(ent)
             batch_ent_results.append(ent_list)
-        return batch_ent_results
+        batch_rel_results = [[] for _ in range(len(batch_ent_results))]
+        return batch_ent_results, batch_rel_results
     else:
         batch_ent_results = []
         batch_rel_results = []
