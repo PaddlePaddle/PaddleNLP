@@ -36,6 +36,11 @@ __all__ = [
     "VQGanDetokenizer",
 ]
 
+from .configuration import (
+    DALLEBART_PRETRAINED_INIT_CONFIGURATION,
+    DALLEBART_PRETRAINED_RESOURCE_FILES_MAP,
+    DalleBartConfig,
+)
 
 def shift_tokens_right(input_ids, decoder_start_token_id):
     """
@@ -86,109 +91,209 @@ class DalleBartPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "dalle-mini": {
-            "text_vocab_size": 50264,
-            "image_vocab_size": 16384,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 2730,
-            "decoder_ffn_dim": 2730,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega-v16": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega-v26": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
-            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
-            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
-            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = DALLEBART_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = DALLEBART_RESOURCE_FILES_MAP
     base_model_prefix = "dallebart"
+    @classmethod
+    def _get_name_mappings(cls, config: DalleBartConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["shared.weight", "shared.weight"],
+            ["encoder.embed_tokens.weight", "encoder.token_embeddings.weight"],
+            ["encoder.embed_position.weight", "encoder.position_embeddings.weight"],
+            ["encoder.layernorm_embedding.weight", "encoder.embeddings_layer_norm.weight"],
+            ["encoder.layernorm_embedding.bias", "encoder.embedding_layer_norm.bias"],
+            ["decoder.embed_tokens.weight", "decoder.token_embeddings.weight"],
+            ["decoder.embed_position.weight", "decoder.position_embeddings.weight"],
+            ["decoder.layernorm_embedding.weight", "decoder.embeddings_layer_norm.weight"],
+            ["decoder.layernorm_embedding.bias", "decoder.embedding_layer_norm.bias"],
+            # for TokenClassification
+        ]
+        for layer_index in range(config.num_encoder_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self.attn.out_proj.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn_out_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.fc1.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layers.{layer_index}.fc1.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layers.{layer_index}.self_attn_layer_norm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn_layer_norm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.fc2.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layers.{layer_index}.fc2.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.final_layer_norm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.final_layer_norm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+        
+        for layer_index in range(config.num_decoder_layers):
+            layer_mappings = [
+                [
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self.attn.out_proj.weight",
+                    f"decoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn_out_proj.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                 [
+                    f"decoder.layers.{layer_index}.self_attn_layer_norm.weight",
+                    f"decoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attn_layer_norm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                 [
+                    f"decoder.layers.{layer_index}.encoder_attn.q_proj.weight",
+                    f"decoder.layers.{layer_index}.encoder_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn.q_proj.bias",
+                    f"encoder.layers.{layer_index}.encoder_attn.q_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn.k_proj.weight",
+                    f"decoder.layers.{layer_index}.encoder_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn.k_proj.bias",
+                    f"decoder.layers.{layer_index}.encoder_attn.k_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn.v_proj.weight",
+                    f"decoder.layers.{layer_index}.encoder_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn.v_proj.bias",
+                    f"decoder.layers.{layer_index}.encoder_attn.v_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder.attn.out_proj.weight",
+                    f"decoder.layers.{layer_index}.encoder_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.encoder_attn_out_proj.bias",
+                    f"encoder.layers.{layer_index}.encoder_attn.out_proj.bias",
+                ],
+                 [
+                    f"decoder.layers.{layer_index}.encoder_attn_layer_norm.weight",
+                    f"decoder.layers.{layer_index}.norm2.weight",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.encoder_attn_layer_norm.bias",
+                    f"encoder.layers.{layer_index}.norm2.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.fc1.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layers.{layer_index}.fc1.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+               
+                [
+                    f"encoder.layers.{layer_index}.fc2.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layers.{layer_index}.fc2.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layers.{layer_index}.final_layer_norm.weight", f"encoder.layers.{layer_index}.norm3.weight"],
+                [f"encoder.layers.{layer_index}.final_layer_norm.bias", f"encoder.layers.{layer_index}.norm3.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+        
+        # base-model prefix "BertModel"
+        if "DalleBartModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "dallebart." + mapping[1]
+
+        # downstream mappings
+        if "DalleBartForConditionalGeneration" in config.architectures:
+            model_mappings.extend(
+                [["lm_head.weight", "lm_head.weight", "transpose"]]
+            )
+       
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
