@@ -145,24 +145,24 @@ time (python -m paddle.distributed.launch run_pretrain.py \
 print_info $? bert_pretrain
 
 # pretrain （Trainer）
-time (python -m paddle.distributed.launch run_pretrain_trainer.py \
-    --model_type bert \
-    --model_name_or_path "bert" \
-    --max_predictions_per_seq 20 \
-    --per_device_train_batch_size 32  \
-    --learning_rate 1e-4 \
-    --weight_decay 1e-2 \
-    --adam_epsilon 1e-6 \
-    --warmup_steps 10000 \
-    --input_dir data/ \
-    --output_dir pretrained_models/ \
-    --logging_steps 1 \
-    --save_steps 1 \
-    --max_steps 1 \
-    --device gpu \
-    --fp16 False \
-    --do_train >${log_path}/bert_pretrain_trainer) >>${log_path}/bert_pretrain_trainer 2>&1
-print_info $? bert_pretrain_trainer
+# time (python -m paddle.distributed.launch run_pretrain_trainer.py \
+#     --model_type bert \
+#     --model_name_or_path "bert" \
+#     --max_predictions_per_seq 20 \
+#     --per_device_train_batch_size 32  \
+#     --learning_rate 1e-4 \
+#     --weight_decay 1e-2 \
+#     --adam_epsilon 1e-6 \
+#     --warmup_steps 10000 \
+#     --input_dir data/ \
+#     --output_dir pretrained_models/ \
+#     --logging_steps 1 \
+#     --save_steps 1 \
+#     --max_steps 1 \
+#     --device gpu \
+#     --fp16 False \
+#     --do_train >${log_path}/bert_pretrain_trainer) >>${log_path}/bert_pretrain_trainer 2>&1
+# print_info $? bert_pretrain_trainer
 
 time (python -m paddle.distributed.launch run_glue.py \
     --model_name_or_path bert-base-uncased \
