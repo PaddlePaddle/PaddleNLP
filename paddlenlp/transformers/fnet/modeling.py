@@ -358,7 +358,7 @@ class FNetPretrainedModel(PretrainedModel):
               ["cls.predictions.transform.LayerNorm.bias", "classifier.predictions.transform.norm.bias"],
               ["cls.predictions.decoder.LayerNorm.weight", "classifier.predictions.decoder.norm.weight"],
               ["cls.predictions.decoder.LayerNorm.bias", "classifier.predictions.decoder.norm.bias"]
-                
+             ]      
             )
         if "FNetForNextSentencePrediction" in config.architectures:
               model_mappings.extend([["cls.seq_relationship.weight", "classifier.weight", "transpose"], ["cls.seq_relationship.bias", "classifier.bias"]])
