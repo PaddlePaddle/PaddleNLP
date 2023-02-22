@@ -34,7 +34,7 @@ __all__ = [
 from .configuration import (
     FNET_PRETRAINED_INIT_CONFIGURATION,
     FNET_PRETRAINED_RESOURCE_FILES_MAP,
-    FnetConfig,
+    FNetConfig,
 )
 
 
