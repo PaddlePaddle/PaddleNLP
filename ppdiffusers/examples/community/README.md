@@ -4,7 +4,8 @@
 
 |Example|Description|Code Example|Author|
 |-|-|-|-|
-|CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#CLIP%20Guided%20Stable%20Diffusion)||
+|CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#clip-guided-stable-diffusion)||
+|Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
 
 ## Example usages
 
@@ -70,3 +71,47 @@ for i, img in enumerate(images):
 [clip_guided_sd_1]: https://user-images.githubusercontent.com/40912707/220514703-1eaf444e-1506-4c44-b686-5950fd79a3da.png
 [clip_guided_sd_2]: https://user-images.githubusercontent.com/40912707/220514765-89e48c13-156f-4e61-b433-06f1283d2265.png
 [clip_guided_sd_3]: https://user-images.githubusercontent.com/40912707/220514751-82d63fd4-e35e-482b-a8e1-c5c956119b2e.png
+
+
+### Stable Diffusion Interpolation
+
+以下代码运行需要10GB的显存。
+
+```python
+from interpolate_stable_diffusion import StableDiffusionWalkPipeline
+import paddle
+
+pipe = StableDiffusionWalkPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+    revision='fp16',
+    paddle_dtype=paddle.float16,
+    safety_checker=None,  # Very important for videos...lots of false positives while interpolating
+)
+pipe.enable_attention_slicing()
+
+prompts = [
+    'a photo of a landscape in summer',
+    'a photo of a landscape in autumn',
+]
+seeds = [0] * len(prompts)
+
+with paddle.amp.auto_cast(True, level="O2"):
+    frame_filepaths = pipe.walk(
+        prompts=prompts,
+        seeds=seeds,
+        num_interpolation_steps=16,
+        output_dir='./dreams',
+        batch_size=4,
+        height=512,
+        width=512,
+        guidance_scale=8.5,
+        num_inference_steps=50,
+    )
+```
+
+`walk(...)`方法将生成一系列图片，保存在`output_dir`指定的目录下，并返回这些图片的路径。你可以使用这些图片来制造stable diffusion视频。上述代码生成的效果如下：
+
+![dreams](https://user-images.githubusercontent.com/40912707/220613501-df579ae1-c3a3-4f22-8865-d899c4732fe7.gif)
+
+
+> 关于如何使用 stable diffusion 制作视频详细介绍以及更多完整的功能，请参考 [https://github.com/nateraw/stable-diffusion-videos](https://github.com/nateraw/stable-diffusion-videos)。
