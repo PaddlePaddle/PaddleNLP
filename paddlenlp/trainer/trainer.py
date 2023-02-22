@@ -672,13 +672,15 @@ class Trainer:
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
-
-                    # Maunally collect gradients
+                    # Maunally collect gradients when group_sharded_parallel can't accepts_dp_group
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
                     # local_rank != -1 don't means dp in networks.
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.dp_degree > 1:
+                        accepts_dp_group = "dp_group" in set(
+                            inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys()
+                        )
+                        if self.args.dp_degree > 1 and not accepts_dp_group:
                             fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
