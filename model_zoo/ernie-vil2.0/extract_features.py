@@ -16,7 +16,7 @@ import argparse
 import json
 
 import paddle
-from data import get_eval_img_dataset, get_eval_txt_dataset
+from data_util import get_eval_img_dataset, get_eval_txt_dataset
 from paddle.io import DataLoader
 from tqdm import tqdm
 

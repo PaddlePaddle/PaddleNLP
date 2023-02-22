@@ -27,10 +27,7 @@ class ErnieViLTrainer(Trainer):
         images, texts = inputs["pixel_values"], inputs["input_ids"]
         ret = model(input_ids=texts, pixel_values=images, return_loss=True)
         loss = ret.loss
-        # loss = clip_loss(ret.logits_per_text)
         outputs = (loss, ret.logits_per_text)
-        # print(inputs.keys())
-        # print(inputs["text_ids"].shape)
         if self.criterion is not None:
             loss = self.criterion(outputs, ret.logits_per_text)
             outputs = (loss, outputs)

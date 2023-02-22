@@ -40,7 +40,7 @@ def _convert_to_rgb(image):
 
 
 def _preprocess_text(text):
-    # adapt the text to Chinese BERT vocab
+    # Adapt the text to Chinese BERT vocab
     text = text.lower().replace("“", '"').replace("”", '"')
     return text
 
@@ -49,7 +49,7 @@ class LMDBDataset(Dataset):
     def __init__(self, lmdb_path, split="val", max_txt_length=64, use_augment=False, resolution=224, tokenizer=None):
         self.lmdb_path = lmdb_path
 
-        # assert LMDB directories exist
+        # Assert LMDB directories exist
         assert os.path.isdir(lmdb_path), "The LMDB directory {} of {} split does not exist!".format(lmdb_path, split)
         lmdb_pairs = os.path.join(lmdb_path, "pairs")
         assert os.path.isdir(lmdb_pairs), "The LMDB directory {} of {} image-text pairs does not exist!".format(
@@ -60,13 +60,13 @@ class LMDBDataset(Dataset):
             lmdb_imgs, split
         )
 
-        # open LMDB files
+        # Open LMDB files
         self.env_pairs = lmdb.open(lmdb_pairs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
         self.txn_pairs = self.env_pairs.begin(buffers=True)
         self.env_imgs = lmdb.open(lmdb_imgs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
         self.txn_imgs = self.env_imgs.begin(buffers=True)
 
-        # fetch number of pairs and images
+        # Fetch number of pairs and images
         self.number_samples = int(self.txn_pairs.get(key=b"num_samples").tobytes().decode("utf-8"))
         self.number_images = int(self.txn_imgs.get(key=b"num_images").tobytes().decode("utf-8"))
         logging.info(
@@ -75,9 +75,9 @@ class LMDBDataset(Dataset):
 
         super(LMDBDataset, self).__init__()
 
-        # the self.dataset_len will be edited to a larger value by calling pad_dataset()
+        # The self.dataset_len will be edited to a larger value by calling pad_dataset()
         self.dataset_len = self.number_samples
-        self.global_batch_size = 1  # will be modified to the exact global_batch_size after calling pad_dataset()
+        self.global_batch_size = 1  # Will be modified to the exact global_batch_size after calling pad_dataset()
 
         self.split = split
         self.max_txt_length = max_txt_length
@@ -136,7 +136,7 @@ class LMDBDataset(Dataset):
 
 
 def pad_dataset(dataset, global_batch_size):
-    # edit dataset.__len__() of the dataset
+    # Edit dataset.__len__() of the dataset
     dataset.dataset_len = ceil(dataset.dataset_len / global_batch_size) * global_batch_size
     dataset.global_batch_size = global_batch_size
 
@@ -211,7 +211,6 @@ class EvalTxtDataset(Dataset):
     def __getitem__(self, idx):
         text_id, text = self.texts[idx]
         texts = self.tokenizer([_preprocess_text(str(text))], max_len=self.max_txt_length, padding="max_length")
-        # print(text['input_ids'][0])
         text = texts["input_ids"][0]
         return {"text_id": text_id, "input_ids": text}
 

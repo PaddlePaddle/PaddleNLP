@@ -12,31 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import os
 
 import paddle
 import paddle.nn.functional as F
 from PIL import Image
 
 from paddlenlp.transformers import ErnieViLModel, ErnieViLProcessor, ErnieViLTokenizer
-from paddlenlp.utils.downloader import get_path_from_url
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--resume", default=None, type=str, help="path to latest checkpoint (default: none)",)
+parser.add_argument("--image_path", default="000000039769.jpg", type=str, help="image_path used for prediction",)
 args = parser.parse_args()
 # yapf: enable
-
-
-def get_test_image_path():
-    image_path = "000000039769.jpg"
-    if os.path.exists(image_path):
-        return image_path
-    else:
-        # Download image first
-        url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-        get_path_from_url(url, root_dir=".")
-        return "000000039769.jpg"
 
 
 def main():
@@ -51,8 +39,7 @@ def main():
         model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
 
     model.eval()
-    image_path = get_test_image_path()
-    image = Image.open(image_path)
+    image = Image.open(args.image_path)
     images = processor(images=image, return_tensors="pd")
     source_text = ["猫的照片", "狗的照片"]
     texts = tokenizer(source_text, padding=True, return_tensors="pd")
@@ -63,12 +50,10 @@ def main():
         print(image_features)
         print("Text features")
         print(text_features)
-        # 对特征进行归一化，请使用归一化后的图文特征用于下游任务
+        # Normalize image and text features to have 0 mean and unit variance.
         image_features /= image_features.norm(axis=-1, keepdim=True)
         text_features /= text_features.norm(axis=-1, keepdim=True)
-        # breakpoint()
         ret = model(pixel_values=images["pixel_values"], input_ids=texts["input_ids"])
-        # logits_per_text = ret.logits_per_text
         logits_per_image = (ret.logits_per_image,)
         probs = F.softmax(logits_per_image, axis=-1)
 

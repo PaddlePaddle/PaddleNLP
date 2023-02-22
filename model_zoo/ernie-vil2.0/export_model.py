@@ -17,23 +17,11 @@ import os
 
 import paddle
 
-from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
-
-MODEL_CLASSES = {
-    "ernie_vil-2.0-base-zh": (ErnieViLModel, ErnieViLTokenizer),
-}
+from paddlenlp.transformers import ErnieViLModel
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # Required parameters
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
-    )
     parser.add_argument(
         "--model_path",
         default=None,
@@ -54,10 +42,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    model = model_class.from_pretrained(args.model_path)
+    model = ErnieViLModel.from_pretrained(args.model_path)
     # Switch to eval model
     model.eval()
     # Save text encoder model

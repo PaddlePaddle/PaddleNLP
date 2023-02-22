@@ -60,7 +60,6 @@ def do_train():
     if paddle.distributed.is_initialized() and paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    # tokenizer = ChineseCLIPTokenizer.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16")
     tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
     train_dataset, eval_dataset = get_train_eval_dataset(data_args, tokenizer=tokenizer)
 
@@ -71,7 +70,6 @@ def do_train():
     my_collate = DataCollatorWithPadding(tokenizer)
     model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
 
-    # model = ChineseCLIPModel.from_pretrained("OFA-Sys/chinese-clip-vit-base-patch16")
     # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -80,11 +78,9 @@ def do_train():
         label = paddle.to_tensor(p.label_ids)
 
         metric = Accuracy()
-        metric.reset()
         result = metric.compute(preds, label)
         metric.update(result)
         accu = metric.accumulate()
-        metric.reset()
         return {"accuracy": accu}
 
     trainer = ErnieViLTrainer(

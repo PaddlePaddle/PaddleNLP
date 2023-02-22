@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# export NCCL_IB_DISABLE=0
 DATAPATH=./data
 
 # data options
@@ -22,7 +21,7 @@ val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
 # 启动方式
 # --test_only \
 log_dir=train_log
-python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+python -u -m paddle.distributed.launch --gpus "0,1" \
                 --log_dir ${log_dir}  \
                 run_finetune.py --output_dir output_pd \
                 --do_train \

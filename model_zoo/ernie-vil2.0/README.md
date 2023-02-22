@@ -53,8 +53,13 @@ logits_per_image = outputs[0]
 probs = F.softmax(logits_per_image, axis=1)
 print(probs)
 
-
 ```
+结果输出为：
+```
+Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[0.99166542, 0.00833452]])
+```
+这是关于猫的照片，可以看到最终输出的猫的概率最高。
 
 <a name="模型效果"></a>
 
@@ -86,48 +91,17 @@ print(probs)
 以下是本项目代码结构
 
 ```text
-├── data
-│   └── datasets
-│       └── Flickr30k-CN
-│           ├── lmdb # 文本图像数据
-│           │   ├── test
-│           │   │   ├── imgs
-│           │   │   │   ├── data.mdb
-│           │   │   │   └── lock.mdb
-│           │   │   └── pairs
-│           │   │       ├── data.mdb
-│           │   │       └── lock.mdb
-│           │   ├── train
-│           │   │   ├── imgs
-│           │   │   │   ├── data.mdb
-│           │   │   │   └── lock.mdb
-│           │   │   └── pairs
-│           │   │       ├── data.mdb
-│           │   │       └── lock.mdb
-│           │   └── valid
-│           │       ├── imgs
-│           │       │   ├── data.mdb
-│           │       │   └── lock.mdb
-│           │       └── pairs
-│           │           ├── data.mdb
-│           │           └── lock.mdb
-│           ├── test_imgs.tsv # 图像测试集， 图片id & 图片内容
-│           ├── test_texts.jsonl # 文本测试数据，文本id & 文本内容，连同匹配的图片id列表
-│           ├── train_imgs.tsv # 图像训练集
-│           ├── train_texts.jsonl # 文本训练集
-│           ├── valid_imgs.tsv # 图像验证集
-│           ├── valid_texts.jsonl # 文本验证集，文到图
-│           └── valid_texts.tr.jsonl # 文本验证集，图到文
 ├── data_util.py  # 训练的预处理操作
 ├── extract_features.py # 提取图片和文本特征
-├── extract_features.sh # 提取特征的bash脚本
 ├── README.md # README文档
-├── recall_image_to_text.sh # 以图搜文的bash脚本
-├── recall_text_to_image.sh # 以文搜图的bash脚本
-├── run_train.sh # 微调的bash脚本
-├── test_example.py # 预测的示例
+├── predict.py # 预测的示例
 ├── run_finetune.py # trainer实现微调
 ├── trainer_util.py # 微调的工具代码
+├── scripts
+│   ├── extract_features.sh # 提取特征的bash脚本
+│   ├── recall_image_to_text.sh # 以图搜文的bash脚本
+│   ├── recall_text_to_image.sh # 以文搜图的bash脚本
+│   └── run_train.sh # 微调的bash脚本
 └── utils
     ├── evaluation.py # 评估以文搜图的召回脚本
     ├── evaluation_tr.py # 评估以图搜文的召回脚本
@@ -150,7 +124,7 @@ print(probs)
 ### 环境要求
 - python >= 3.7
 - paddlepaddle >= 2.4.1
-- paddlenlp >= 2.5
+- paddlenlp >= 2.5.1
 - lmdb==1.3.0
 
 ### 数据准备
@@ -221,9 +195,8 @@ train_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/train
 val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
 
 # 启动方式
-# --test_only \
 log_dir=train_log
-python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+python -u -m paddle.distributed.launch --gpus "0,1" \
                 --log_dir ${log_dir}  \
                 run_finetune.py --output_dir output_pd \
                 --train_data=${train_data} \
@@ -244,6 +217,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --lr_scheduler_type cosine \
                 --recompute
 ```
+**注意**：如果使用单卡训练，则默认不会开启Cross-batch Negatives策略，如果是多卡训练，则会默认开启Cross-batch Negatives策略，数据量比较大，一般建议多卡进行训练。
 
 可配置参数说明：
 * `do_train` 是否进行微调训练，设置该参数表示进行微调训练。
@@ -269,6 +243,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
 ## 模型评估
 
 ### 提取特征
+
+模型训练完以后，需要对训练集的文本和图像抽取特征，方便向量近似检索，下面是抽取特征向量的脚本：
 
 ```
 DATAPATH=./data
@@ -296,6 +272,7 @@ python -u extract_features.py \
 
 ### 以文搜图评估
 
+下面进行以文搜图的评估，即输入文本来搜索图像的内容：
 
 ```shell
 DATAPATH=./data
@@ -323,6 +300,8 @@ cat output.json
 ```
 
 ### 以图搜文评估
+
+下面进行图像搜文本的评估，即输入图像来检索文本的内容：
 
 ```
 DATAPATH=./data
@@ -353,7 +332,6 @@ cat output.json
 ```
 
 
-
 <a name="模型预测"></a>
 
 ## 模型预测
@@ -371,7 +349,7 @@ cat output.json
 运行如下的命令，计算图像和文本的相似度：
 
 ```
-python test_example.py --resume output_pd/checkpoint-600/
+python predict.py --resume output_pd/checkpoint-600/
 ```
 运行结束以后会有如下的输出：
 
@@ -400,8 +378,7 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradie
 上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。
 
 ```"shell
-python export_model.py --model_type=ernie_vil-2.0-base-zh \
-    --model_path=output_pd/checkpoint-600/ \
+python export_model.py --model_path=output_pd/checkpoint-600/ \
     --output_path=./infer_model/
 ```
 用户在`infer_model`中可以看到导出的文件。
