@@ -299,7 +299,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             tune_config=tune_config,
             run_config=RunConfig(
                 name=experiment_name,
-                log_to_file=True,  # TODO: log_to_file doesn't stream logger output to file for some reason
+                log_to_file=True,
                 local_dir=self.output_dir if self.output_dir else None,
                 callbacks=[tune.logger.CSVLoggerCallback()],
             ),
