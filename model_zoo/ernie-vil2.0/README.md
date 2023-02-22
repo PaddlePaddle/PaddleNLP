@@ -97,6 +97,9 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 ├── predict.py # 预测的示例
 ├── run_finetune.py # trainer实现微调
 ├── trainer_util.py # 微调的工具代码
+├── deploy
+│   └── python
+│       └── infer.py # FastDeploy预测脚本
 ├── scripts
 │   ├── extract_features.sh # 提取特征的bash脚本
 │   ├── recall_image_to_text.sh # 以图搜文的bash脚本
@@ -349,25 +352,25 @@ cat output.json
 运行如下的命令，计算图像和文本的相似度：
 
 ```
-python predict.py --resume output_pd/checkpoint-600/
+python predict.py --resume output_pd/checkpoint-600/ --image_path examples/212855663-c0a54707-e14c-4450-b45d-0162ae76aeb8.jpeg
 ```
 运行结束以后会有如下的输出：
 
 ```
 ......
-         -0.16923490,  0.51063180,  0.50393420, -0.67453980,  0.26532388,
-         -0.09257773, -1.26810551, -0.09288968,  2.01344800, -0.94694304,
-          0.47568727, -0.59764022, -0.54964906,  0.25573757,  0.74198186,
-         -0.50854760, -1.16371655,  0.86338192, -0.25785092, -0.20684876,
-         -0.37839428,  0.04234251,  0.63441759]])
+         -0.15448952,  0.72006893,  0.36882138, -0.84108782,  0.37967119,
+          0.12349987, -1.02212155, -0.58292383,  1.48998547, -0.46960664,
+          0.30193087, -0.56355256, -0.30767381, -0.34489608,  0.59651250,
+         -0.49545336, -0.95961350,  0.68815416,  0.47264558, -0.25057256,
+         -0.61301452,  0.09002528, -0.03568697]])
 Text features
-Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
-       [[ 0.06673798, -0.40317190,  0.28922316, ...,  0.26859814,
-          0.32744539,  0.19407970],
-        [ 0.11071929, -0.38126343,  0.17159876, ...,  0.21692061,
-          0.33863425,  0.32423186]])
-Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
-       [[0.99927372, 0.00072624]])
+Tensor(shape=[2, 768], dtype=float32, place=Place(cpu), stop_gradient=True,
+       [[ 0.04250492, -0.41429815,  0.26164034, ...,  0.26221907,
+          0.34387457,  0.18779679],
+        [ 0.06672275, -0.41456315,  0.13787840, ...,  0.21791621,
+          0.36693257,  0.34208682]])
+Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(cpu), stop_gradient=True,
+       [[0.99110782, 0.00889216]])
 ```
 可以看到`猫的照片`的相似度更高，结果符合预期。
 
@@ -375,7 +378,12 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradie
 
 ## 模型导出预测
 
-上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。
+上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。首先安装[FastDeploy](https://github.com/PaddlePaddle/FastDeploy):
+
+```
+pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
+```
+然后运行下面的命令：
 
 ```"shell
 python export_model.py --model_path=output_pd/checkpoint-600/ \
@@ -385,9 +393,17 @@ python export_model.py --model_path=output_pd/checkpoint-600/ \
 
 对于导出的模型，我们提供了Python的infer脚本，调用预测库对简单的例子进行预测。
 ```shell
-python deploy/python/inference.py --model_type ernie_vil-2.0-base-zh \
-    --model_path ./infer_model/
+python deploy/python/infer.py --model_dir ./infer_model/
 ```
+可以得到如下输出：
+```
+......
+  -5.63553333e-01 -3.07674855e-01 -3.44897419e-01  5.96513569e-01
+  -4.95454431e-01 -9.59614694e-01  6.88151956e-01  4.72645760e-01
+  -2.50571519e-01 -6.13013864e-01  9.00242254e-02 -3.56860608e-02]]
+[[0.99110764 0.00889209]]
+```
+可以看到输出的概率值跟前面的预测结果几乎是一致的
 
 <a name="参考文献"></a>
 

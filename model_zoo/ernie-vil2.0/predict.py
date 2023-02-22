@@ -43,6 +43,7 @@ def main():
     images = processor(images=image, return_tensors="pd")
     source_text = ["猫的照片", "狗的照片"]
     texts = tokenizer(source_text, padding=True, return_tensors="pd")
+
     with paddle.no_grad():
         image_features = model.get_image_features(**images)
         text_features = model.get_text_features(**texts)
@@ -50,6 +51,8 @@ def main():
         print(image_features)
         print("Text features")
         print(text_features)
+        print("model temperature")
+        print(model.temperature)
         # Normalize image and text features to have 0 mean and unit variance.
         image_features /= image_features.norm(axis=-1, keepdim=True)
         text_features /= text_features.norm(axis=-1, keepdim=True)

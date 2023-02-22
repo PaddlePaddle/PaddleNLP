@@ -48,6 +48,9 @@ class DataArguments:
 class ModelArguments:
     checkpoint_path: str = field(default="", metadata={"help": "checkpoint path"})
     model_type: str = field(default="ernie_vil-2.0-base-zh", metadata={"help": "the type of model"})
+    model_name_or_path: str = field(
+        default="PaddlePaddle/ernie_vil-2.0-base-zh", metadata={"help": "model name or path for initialization"}
+    )
 
 
 def do_train():
@@ -60,7 +63,7 @@ def do_train():
     if paddle.distributed.is_initialized() and paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+    tokenizer = ErnieViLTokenizer.from_pretrained(model_args.model_name_or_path)
     train_dataset, eval_dataset = get_train_eval_dataset(data_args, tokenizer=tokenizer)
 
     checkpoint = None
@@ -68,7 +71,7 @@ def do_train():
         checkpoint = training_args.resume_from_checkpoint
 
     my_collate = DataCollatorWithPadding(tokenizer)
-    model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+    model = ErnieViLModel.from_pretrained(model_args.model_name_or_path)
 
     # Define the metrics of tasks.
     def compute_metrics(p):

@@ -17,6 +17,7 @@ from __future__ import annotations
 import sys
 from unittest import TestCase
 
+from paddlenlp.utils import install_package
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
@@ -30,7 +31,7 @@ class ErnieViLTest(TestCase):
         sys.path.remove(self.path)
 
     def test_finetune(self):
-
+        install_package("lmdb", "1.3.0")
         # 1. run finetune
         finetune_config = load_test_config(self.config_path, "finetune")
         with argv_context_guard(finetune_config):
@@ -40,7 +41,6 @@ class ErnieViLTest(TestCase):
 
         # 2. export model
         export_config = {
-            "model_type": finetune_config["model_type"],
             "model_path": finetune_config["output_dir"],
             "output_path": finetune_config["output_dir"],
         }
@@ -49,13 +49,13 @@ class ErnieViLTest(TestCase):
 
             main()
 
-        # # 3. infer model
+        # 3. infer model
         infer_config = {
-            "model_type": export_config["model_type"],
+            "image_path": "./tests/fixtures/tests_samples/COCO/000000039769.png",
             "model_path": export_config["output_path"],
             "select_device": finetune_config["device"],
         }
         with argv_context_guard(infer_config):
-            from deploy.python.inference import main
+            from deploy.python.infer import main
 
             main()
