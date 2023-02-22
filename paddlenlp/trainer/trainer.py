@@ -41,7 +41,6 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.fluid.dygraph.parallel import sync_params_buffers
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
@@ -1201,6 +1200,12 @@ class Trainer:
             else:
                 # sync params (broadcast) buffers in dp group
                 if self.args.dp_degree > 1:
+                    try:
+                        from paddle.fluid.dygraph.parallel import sync_params_buffers
+                    except ImportError:
+                        # fix for new api in paddlepaddle v2.5
+                        from paddle.distributed.parallel import sync_params_buffers
+
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()
                     sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
