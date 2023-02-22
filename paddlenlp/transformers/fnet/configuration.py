@@ -20,7 +20,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["FNET_PRETRAINED_INIT_CONFIGURATION", "FnetConfig", "FNET_PRETRAINED_RESOURCE_FILES_MAP"]
 
-BERT_PRETRAINED_INIT_CONFIGURATION = {
+FNET_PRETRAINED_INIT_CONFIGURATION = {
         "fnet-base": {
             "vocab_size": 32000,
             "hidden_size": 768,
@@ -53,7 +53,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         },
     }
 
-BERT_PRETRAINED_RESOURCE_FILES_MAP = {
+FNET_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
             "fnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-base/model_state.pdparams",
             "fnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-large/model_state.pdparams",
