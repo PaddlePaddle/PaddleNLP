@@ -120,7 +120,7 @@ class FnetConfig(PretrainedConfig):
     ```"""
     model_type = "bert"
     attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
-    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = FNET_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
