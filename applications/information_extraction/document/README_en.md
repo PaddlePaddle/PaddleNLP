@@ -16,7 +16,7 @@
 
 This Information Extraction (IE) guide introduces our open-source industry-grade solution that covers the most widely-used application scenarios of Information Extraction. It features **multi-domain, multi-task, and cross-modal capabilities** and goes through the full lifecycle of **data labeling, model training and model deployment**. We hope this guide can help you apply Information Extraction techniques in your own products or models.
 
-Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction](https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapated models specialized for different industry sectors.
+Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction](https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapted models specialized for different industry sectors.
 
 **Highlights:**
 
@@ -259,7 +259,7 @@ from paddlenlp import Taskflow
 from paddlenlp.utils.doc_parser import DocParser
 
 schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
-my_ie = Taskflow("information_extraction", model="uie-x-base", schema=schema, task_path='./checkpoint/model_best', precison='fp16')
+my_ie = Taskflow("information_extraction", model="uie-x-base", schema=schema, task_path='./checkpoint/model_best', precision='fp16')
 ```
 
 We specify the extraction targets by setting `schema` and visualize the information of the specified `doc_path` document:
