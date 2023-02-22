@@ -23,12 +23,12 @@ from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
+parser.add_argument("--model_name", choices=["skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"], default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
 parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
 parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'], default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
+parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
