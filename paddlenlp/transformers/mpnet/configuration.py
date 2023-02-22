@@ -18,31 +18,31 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["MPNET_PRETRAINED_INIT_CONFIGURATION", "MPNetConfig", "BERT_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["MPNET_PRETRAINED_INIT_CONFIGURATION", "MPNetConfig", "MPNET_PRETRAINED_RESOURCE_FILES_MAP"]
 
 MPNET_PRETRAINED_INIT_CONFIGURATION = {
-        "mpnet-base": {
-            "vocab_size": 30527,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 514,
-            "relative_attention_num_buckets": 32,
-            "layer_norm_eps": 1e-05,
-            "initializer_range": 0.02,
-            "pad_token_id": 1,
-        }
+    "mpnet-base": {
+        "vocab_size": 30527,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 514,
+        "relative_attention_num_buckets": 32,
+        "layer_norm_eps": 1e-05,
+        "initializer_range": 0.02,
+        "pad_token_id": 1,
     }
+}
 
 MPNET_PRETRAINED_RESOURCE_FILES_MAP = {
-        "model_state": {
-            "mpnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/model_state.pdparams",
-        }
+    "model_state": {
+        "mpnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/model_state.pdparams",
     }
+}
 
 
 class MPNetConfig(PretrainedConfig):
@@ -102,9 +102,9 @@ class MPNetConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "bert"
+    model_type = "mpnet"
     attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
-    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = MPNET_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
