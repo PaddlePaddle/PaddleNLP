@@ -259,8 +259,6 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
             prompt_embeds = self.text_encoder(input_ids=text_input_ids.astype(np.int64))
             prompt_embeds = paddle.to_tensor(prompt_embeds[0])
 
-        prompt_embeds = prompt_embeds.cast(self.text_encoder.dtype)
-
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt, 1])
@@ -304,7 +302,6 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
-            negative_prompt_embeds = negative_prompt_embeds.cast(self.text_encoder.dtype)
             negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
             negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
