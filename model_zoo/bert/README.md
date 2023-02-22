@@ -156,7 +156,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain_trainer.py \
 - `output_dir` 表示模型的保存目录。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
-- `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
+- `max_steps` 表示最大训练步数，达到`max_steps`后就提前结束。注意，我们必须设置 `max_steps`。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。（非Trainer版本）
 - `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)（Trainer版本）
