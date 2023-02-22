@@ -16,13 +16,10 @@
 """Modeling classes for FNet model."""
 
 
-
-
 import paddle
 import paddle.nn as nn
 from paddle.nn import Layer
 
-from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 
@@ -37,12 +34,15 @@ __all__ = [
     "FNetForTokenClassification",
     "FNetForQuestionAnswering",
 ]
-from .configuration import (FNET_PRETRAINED_INIT_CONFIGURATION,
-                            FNET_PRETRAINED_RESOURCE_FILES_MAP, FNetConfig)
+from .configuration import (
+    FNET_PRETRAINED_INIT_CONFIGURATION,
+    FNET_PRETRAINED_RESOURCE_FILES_MAP,
+    FNetConfig,
+)
 
 
 class FNetBasicOutput(Layer):
-    def __init__(self, config:FNetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
@@ -99,12 +99,7 @@ class FNetLayer(Layer):
 class FNetEncoder(Layer):
     def __init__(self, config: FNetConfig):
         super().__init__()
-        self.layers = nn.LayerList(
-            [
-                FNetLayer(config)
-                for _ in range(config.num_hidden_layers)
-            ]
-        )
+        self.layers = nn.LayerList([FNetLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, output_hidden_states=False, return_dict=True):
@@ -245,7 +240,7 @@ class FNetLMPredictionHead(Layer):
 
 
 class FNetOnlyMLMHead(Layer):
-    def __init__(self,config:FNetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.predictions = FNetLMPredictionHead(config)
 
@@ -288,7 +283,6 @@ class FNetPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = FNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "fnet"
     config_class = FNetConfig
-    
 
     def init_weights(self):
         # Initialize weights
@@ -374,7 +368,9 @@ class FNetModel(FNetPretrainedModel):
     """
 
     def __init__(
-        self,config: FNetConfig, add_pooling_layer=True,
+        self,
+        config: FNetConfig,
+        add_pooling_layer=True,
     ):
         super(FNetModel, self).__init__()
         self.initializer_range = config.initializer_range
@@ -987,7 +983,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
         self,
         input_ids=None,
         token_type_ids=None,
-        position_ids=None,         
+        position_ids=None,
         inputs_embeds=None,
         start_positions=None,
         end_positions=None,
