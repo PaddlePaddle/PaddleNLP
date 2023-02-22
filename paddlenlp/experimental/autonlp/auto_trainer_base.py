@@ -271,7 +271,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting the existing Tuner and any previous training results")
 
-        self._data_checks_and_inference()
         trainable = self._construct_trainable()
         model_candidates = self._filter_model_candidates(
             language=self.language, preset=preset, custom_model_candidates=custom_model_candidates

@@ -39,7 +39,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
 parser.add_argument("--save_steps", default=100, type=int, help="The interval steps to save checkppoints.")
 parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")

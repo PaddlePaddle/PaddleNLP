@@ -106,7 +106,7 @@ class Predictor(object):
             Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)), Stack()  # input_id  # seq_len
         ): fn(samples)
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         results = []
