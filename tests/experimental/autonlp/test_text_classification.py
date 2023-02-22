@@ -79,6 +79,10 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
         )
         ray.init(local_mode=True)
 
+    @classmethod
+    def tearDownClass(cls):
+        ray.shutdown()
+
     @parameterized.expand(
         [
             ([finetune_model_candidate], {"TrainingArguments.max_steps": 2}),
