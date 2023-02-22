@@ -390,6 +390,7 @@ class NystromformerEncoder(nn.Layer):
         super(NystromformerEncoder, self).__init__()
         self.config = config
         self.layer = nn.LayerList([NystromformerLayer(config) for _ in range(config.num_hidden_layers)])
+        # The parameter output_attentions in forward shoule set to be False when self.use_recompute = True.
         self.use_recompute = False
 
     def forward(
@@ -793,7 +794,7 @@ class NystromformerForMaskedLM(NystromformerPretrainedModel):
         masked_lm_loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_scores.reshpae([-1, self.config.vocab_size]), labels.reshpae([-1]))
+            masked_lm_loss = loss_fct(prediction_scores.reshape([-1, self.config.vocab_size]), labels.reshape([-1]))
 
         if not return_dict:
             output = (prediction_scores,) + outputs[1:]
