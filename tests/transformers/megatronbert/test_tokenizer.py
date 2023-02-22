@@ -177,16 +177,3 @@ class MegatronBertTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
                 self.assertListEqual(tokens_without_spe_char_fast, list_of_commun_chinese_char)
-
-                # not yet supported in bert tokenizer
-                """
-                kwargs["tokenize_chinese_chars"] = False
-                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                ids_without_spe_char_p = tokenizer.encode(text_with_chinese_char, return_token_type_ids=None,add_special_tokens=False)["input_ids"]
-                tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
-                # it is expected that only the first Chinese character is not preceded by "##".
-                expected_tokens = [
-                    f"##{token}" if idx != 0 else token for idx, token in enumerate(list_of_commun_chinese_char)
-                ]
-                self.assertListEqual(tokens_without_spe_char_p, expected_tokens)
-                """
