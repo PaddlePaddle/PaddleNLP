@@ -209,6 +209,13 @@ if __name__ == "__main__":
             "opt_shape": [2, 4, 64, 64],
         }
     }
+    vae_encoder_dynamic_shape = {
+        "sample": {
+            "min_shape": [1, 3, 512, 512],
+            "max_shape": [2, 3, 512, 512],
+            "opt_shape": [2, 3, 512, 512],
+        }
+    }
     text_encoder_shape = {
         "input_ids": {
             "min_shape": [1, 77],
@@ -219,8 +226,8 @@ if __name__ == "__main__":
     unet_dynamic_shape = {
         "sample": {
             "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "max_shape": [4, 4, 64, 64],
+            "opt_shape": [4, 4, 64, 64],
         },
         "timestep": {
             "min_shape": [1],
@@ -229,8 +236,8 @@ if __name__ == "__main__":
         },
         "encoder_hidden_states": {
             "min_shape": [1, 77, 768],
-            "max_shape": [2, 77, 768],
-            "opt_shape": [2, 77, 768],
+            "max_shape": [4, 77, 768],
+            "opt_shape": [4, 77, 768],
         },
     }
     # 4. Init runtime
@@ -240,6 +247,9 @@ if __name__ == "__main__":
         )
         vae_decoder_runtime = create_ort_runtime(
             args.model_dir, args.vae_decoder_model_prefix, args.model_format, device_id=device_id
+        )
+        vae_encoder_runtime = create_ort_runtime(
+            args.model_dir, args.vae_encoder_model_prefix, args.model_format, device_id=device_id
         )
         start = time.time()
         unet_runtime = create_ort_runtime(
@@ -268,6 +278,15 @@ if __name__ == "__main__":
             device_id=device_id,
             paddle_stream=paddle_stream,
         )
+        vae_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            use_trt,
+            vae_encoder_dynamic_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+            paddle_stream=paddle_stream,
+        )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -289,6 +308,14 @@ if __name__ == "__main__":
             dynamic_shape=vae_decoder_dynamic_shape,
             device_id=device_id,
         )
+        vae_encoder_runtime = create_trt_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            args.model_format,
+            workspace=(1 << 30),
+            dynamic_shape=vae_encoder_dynamic_shape,
+            device_id=device_id,
+        )
         start = time.time()
         unet_runtime = create_trt_runtime(
             args.model_dir,
@@ -305,6 +332,9 @@ if __name__ == "__main__":
         vae_decoder_runtime = create_paddle_lite_runtime(
             args.model_dir, args.vae_decoder_model_prefix, device=args.device, device_id=device_id
         )
+        vae_encoder_runtime = create_paddle_lite_runtime(
+            args.model_dir, args.vae_encoder_model_prefix, device=args.device, device_id=device_id
+        )
         start = time.time()
         unet_runtime = create_paddle_lite_runtime(
             args.model_dir, args.unet_model_prefix, device=args.device, device_id=device_id
@@ -312,7 +342,7 @@ if __name__ == "__main__":
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
     pipe = FastDeployCycleDiffusionPipeline(
-        vae_encoder=None,
+        vae_encoder=FastDeployRuntimeModel(model=vae_encoder_runtime),
         vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
         tokenizer=tokenizer,

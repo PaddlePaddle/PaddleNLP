@@ -422,14 +422,10 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                 f" size of {batch_size}. Make sure the batch size matches the length of the generators."
             )
 
-        if isinstance(generator, list):
-            init_latents = [
-                self.vae.encode(image[i : i + 1]).latent_dist.sample(generator[i]) for i in range(batch_size)
-            ]
-            init_latents = paddle.concat(init_latents, axis=0)
-        else:
-            init_latents = self.vae.encode(image).latent_dist.sample(generator)
+        image = image.astype(dtype)
+        init_latents = self.vae_encoder(sample=image)[0]
         init_latents = 0.18215 * init_latents
+        init_latents = paddle.to_tensor(init_latents)
 
         if batch_size > init_latents.shape[0] and batch_size % init_latents.shape[0] == 0:
             # expand init_latents for batch_size
