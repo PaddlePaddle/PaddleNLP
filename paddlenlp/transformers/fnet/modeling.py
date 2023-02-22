@@ -62,7 +62,7 @@ class FNetOutput(Layer):
 
 
 class FNetIntermediate(Layer):
-    def __init__(self, config: FNetConifg):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         if isinstance(config.hidden_act, str):
@@ -98,7 +98,7 @@ class FNetEncoder(Layer):
         self.layers = nn.LayerList(
             [
                 FNetLayer(config)
-                for _ in range(num_hidden_layers)
+                for _ in range(config.num_hidden_layers)
             ]
         )
         self.gradient_checkpointing = False
@@ -212,7 +212,7 @@ class FNetPredictionHeadTransform(Layer):
             self.transform_act_fn = ACT2FN[config.hidden_act]
         else:
             self.transform_act_fn = config.hidden_act
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=config.layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
