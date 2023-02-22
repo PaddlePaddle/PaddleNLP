@@ -152,7 +152,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
 可配置参数说明：
-* `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
+* `device`: 训练设备，可选择 'cpu'、'gpu'、'npu' 其中的一种；默认为 GPU 训练。
 * `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认10。
 * `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
 * `eval_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
@@ -162,8 +162,8 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
 * `train_path`：训练集路径；默认为 `None` 。
 * `dev_path`：开发集路径；默认为 `None` 。
 * `max_seq_len`：文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-* `per_device_train_batch_size`:用于训练的每个 GPU 核心/CPU 的batch大小，默认为8。
-* `per_device_eval_batch_size`:用于评估的每个 GPU 核心/CPU 的batch大小，默认为8。
+* `per_device_train_batch_size`:用于训练的每个 GPU 核心/NPU 核心/CPU 的batch大小，默认为8。
+* `per_device_eval_batch_size`:用于评估的每个 GPU 核心/NPU 核心/CPU 的batch大小，默认为8。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择 100；默认为10。
 * `learning_rate`：训练最大学习率，UIE-X 推荐设置为 1e-5；默认值为3e-5。
 * `label_names`：训练数据标签label的名称，UIE-X 设置为'start_positions' 'end_positions'；默认值为None。
@@ -238,13 +238,13 @@ python evaluate.py \
 ```
 
 可配置参数：
-* `device`: 评估设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 评估。
+* `device`: 评估设备，可选择 'cpu'、'gpu'、'npu' 其中的一种；默认为 GPU 评估。
 * `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 * `test_path`: 进行评估的测试集文件。
 * `label_names`：训练数据标签label的名称，UIE-X 设置为'start_positions' 'end_positions'；默认值为None。
 * `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 * `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-* `per_device_eval_batch_size`:用于评估的每个 GPU 核心/CPU 的batch大小，默认为8。
+* `per_device_eval_batch_size`:用于评估的每个 GPU 核心/NPU 核心/CPU 的batch大小，默认为8。
 * `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
 * `schema_lang`: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 

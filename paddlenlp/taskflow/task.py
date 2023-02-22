@@ -341,6 +341,9 @@ class Task(metaclass=abc.ABCMeta):
                     os.path.join(self._static_fp16_params_file),
                     backend=paddle.inference.PlaceType.CUSTOM,
                     mixed_precision=paddle.inference.PrecisionType.Half,
+                    # Here, npu sigmoid will lead to OOM and cpu sigmoid don't support fp16.
+                    # So, we add sigmoid to black list temporarily.
+                    black_list={"sigmoid"},
                 )
                 logger.info(
                     "The inference model in fp16 precison save in the path:{}".format(self._static_fp16_model_file)
