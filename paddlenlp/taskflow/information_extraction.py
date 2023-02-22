@@ -478,17 +478,17 @@ class UIETask(Task):
             input_spec_dtype = "int64"
         if self._init_class in ["UIEX"]:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
-                paddle.static.InputSpec(shape=[None, None, 4], dtype=input_spec_dtype, name="bbox"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None, 4], dtype="int64", name="bbox"),
                 paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="image"),
             ]
         elif self._init_class in ["UIEM"]:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
             ]
         else:
             self._input_spec = [
