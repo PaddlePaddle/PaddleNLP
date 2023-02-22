@@ -16,7 +16,6 @@
 import paddle
 import paddle.nn as nn
 from paddle.nn import Layer
-from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 
@@ -39,9 +38,9 @@ from .configuration import (
 
 
 class FNetBasicOutput(Layer):
-    def __init__(self, hidden_size, layer_norm_eps):
+    def __init__(self, config:FNetConfig):
         super().__init__()
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.layer_norm(input_tensor + hidden_states)
@@ -49,11 +48,11 @@ class FNetBasicOutput(Layer):
 
 
 class FNetOutput(Layer):
-    def __init__(self, hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.dense = nn.Linear(intermediate_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -63,13 +62,13 @@ class FNetOutput(Layer):
 
 
 class FNetIntermediate(Layer):
-    def __init__(self, hidden_size, intermediate_size, hidden_act):
+    def __init__(self, config: FNetConifg):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, intermediate_size)
-        if isinstance(hidden_act, str):
-            self.intermediate_act_fn = ACT2FN[hidden_act]
+        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+        if isinstance(config.hidden_act, str):
+            self.intermediate_act_fn = ACT2FN[config.hidden_act]
         else:
-            self.intermediate_act_fn = hidden_act
+            self.intermediate_act_fn = config.hidden_act
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -78,11 +77,11 @@ class FNetIntermediate(Layer):
 
 
 class FNetLayer(Layer):
-    def __init__(self, hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob, hidden_act):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.fourier = FNetFourierTransform(hidden_size, layer_norm_eps)
-        self.intermediate = FNetIntermediate(hidden_size, intermediate_size, hidden_act)
-        self.output = FNetOutput(hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob)
+        self.fourier = FNetFourierTransform(config)
+        self.intermediate = FNetIntermediate(config)
+        self.output = FNetOutput(config)
 
     def forward(self, hidden_states):
         self_fourier_outputs = self.fourier(hidden_states)
@@ -94,13 +93,11 @@ class FNetLayer(Layer):
 
 
 class FNetEncoder(Layer):
-    def __init__(
-        self, hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob, hidden_act, num_hidden_layers
-    ):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.layers = nn.LayerList(
             [
-                FNetLayer(hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob, hidden_act)
+                FNetLayer(config)
                 for _ in range(num_hidden_layers)
             ]
         )
@@ -121,9 +118,9 @@ class FNetEncoder(Layer):
 
 
 class FNetPooler(Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -138,28 +135,19 @@ class FNetPooler(Layer):
 class FNetEmbeddings(Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size,
-        hidden_dropout_prob,
-        max_position_embeddings,
-        type_vocab_size,
-        layer_norm_eps,
-        pad_token_id,
-    ):
+    def __init__(self, config: FNetConfig):
         super(FNetEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         # NOTE: This is the project layer and will be needed. The original code allows for different embedding and different model dimensions.
-        self.projection = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.projection = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(
         self,
@@ -217,14 +205,14 @@ class FNetFourierTransform(Layer):
 
 
 class FNetPredictionHeadTransform(Layer):
-    def __init__(self, hidden_size, layer_norm_eps, hidden_act):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        if isinstance(hidden_act, str):
-            self.transform_act_fn = ACT2FN[hidden_act]
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        if isinstance(config.hidden_act, str):
+            self.transform_act_fn = ACT2FN[config.hidden_act]
         else:
-            self.transform_act_fn = hidden_act
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+            self.transform_act_fn = config.hidden_act
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=config.layer_norm_eps)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -234,15 +222,15 @@ class FNetPredictionHeadTransform(Layer):
 
 
 class FNetLMPredictionHead(Layer):
-    def __init__(self, hidden_size, vocab_size, layer_norm_eps, hidden_act):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.transform = FNetPredictionHeadTransform(hidden_size, layer_norm_eps, hidden_act)
+        self.transform = FNetPredictionHeadTransform(config)
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.decoder = nn.Linear(hidden_size, vocab_size)
+        self.decoder = nn.Linear(config.hidden_size, config.vocab_size)
 
         self.bias = self.create_parameter(
-            [vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
+            [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.decoder.bias = self.bias
 
@@ -253,9 +241,9 @@ class FNetLMPredictionHead(Layer):
 
 
 class FNetOnlyMLMHead(Layer):
-    def __init__(self, hidden_size, vocab_size, layer_norm_eps, hidden_act):
+    def __init__(self,config:FNetConfig):
         super().__init__()
-        self.predictions = FNetLMPredictionHead(hidden_size, vocab_size, layer_norm_eps, hidden_act)
+        self.predictions = FNetLMPredictionHead(config)
 
     def forward(self, sequence_output):
         prediction_scores = self.predictions(sequence_output)
@@ -263,9 +251,9 @@ class FNetOnlyMLMHead(Layer):
 
 
 class FNetOnlyNSPHead(Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, pooled_output):
         seq_relationship_score = self.seq_relationship(pooled_output)
@@ -273,10 +261,10 @@ class FNetOnlyNSPHead(Layer):
 
 
 class FNetPreTrainingHeads(Layer):
-    def __init__(self, hidden_size, vocab_size, layer_norm_eps, hidden_act):
+    def __init__(self, config: FNetConfig):
         super().__init__()
-        self.predictions = FNetLMPredictionHead(hidden_size, vocab_size, layer_norm_eps, hidden_act)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = FNetLMPredictionHead(config)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.predictions(sequence_output)
@@ -295,7 +283,7 @@ class FNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = FNET_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = FNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "fnet"
-    
+    config_class = FNetConfig
     
 
     def init_weights(self):
@@ -382,38 +370,14 @@ class FNetModel(FNetPretrainedModel):
     """
 
     def __init__(
-        self,
-        vocab_size=32000,
-        hidden_size=768,
-        num_hidden_layers=12,
-        intermediate_size=3072,
-        hidden_act="gelu_new",
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=4,
-        initializer_range=0.02,
-        layer_norm_eps=1e-12,
-        pad_token_id=3,
-        bos_token_id=1,
-        eos_token_id=2,
-        add_pooling_layer=True,
+        self,config: FNetConfig, add_pooling_layer=True,
     ):
         super(FNetModel, self).__init__()
-        self.initializer_range = initializer_range
-        self.num_hidden_layers = num_hidden_layers
-        self.embeddings = FNetEmbeddings(
-            vocab_size,
-            hidden_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
-            layer_norm_eps,
-            pad_token_id,
-        )
-        self.encoder = FNetEncoder(
-            hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob, hidden_act, num_hidden_layers
-        )
-        self.pooler = FNetPooler(hidden_size) if add_pooling_layer else None
+        self.initializer_range = config.initializer_range
+        self.num_hidden_layers = config.num_hidden_layers
+        self.embeddings = FNetEmbeddings(config)
+        self.encoder = FNetEncoder(config)
+        self.pooler = FNetPooler(config) if add_pooling_layer else None
         self.init_weights()
 
     def get_input_embeddings(self):
