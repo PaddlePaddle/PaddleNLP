@@ -93,6 +93,7 @@ from .ernie_layout.configuration import *
 from .ernie_m.configuration import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
+from .fnet.configuration import *
 from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
