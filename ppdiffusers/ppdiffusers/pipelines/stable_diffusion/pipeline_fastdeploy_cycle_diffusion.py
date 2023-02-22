@@ -388,11 +388,22 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
         latents = 1 / 0.18215 * latents
-        image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
-        return image
+        latents_shape = latents.shape
+        vae_output_shape = [latents_shape[0], 3, latents_shape[2] * 8, latents_shape[3] * 8]
+        images_vae = paddle.zeros(vae_output_shape, dtype="float32")
+
+        vae_input_name = self.vae_decoder.model.get_input_info(0).name
+        vae_output_name = self.vae_decoder.model.get_output_info(0).name
+
+        self.vae_decoder.zero_copy_infer(
+            prebinded_inputs={vae_input_name: latents},
+            prebinded_outputs={vae_output_name: images_vae},
+            share_with_raw_ptr=True,
+        )
+
+        images_vae = paddle.clip(images_vae / 2 + 0.5, 0, 1)
+        images = images_vae.transpose([0, 2, 3, 1])
+        return images.numpy()
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.StableDiffusionImg2ImgPipeline.get_timesteps
     def get_timesteps(self, num_inference_steps, strength):
