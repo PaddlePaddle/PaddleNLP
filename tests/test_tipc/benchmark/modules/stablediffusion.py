@@ -54,7 +54,9 @@ class StableDiffusion(nn.Layer):
         self.unet = UNet2DConditionModel.from_pretrained(url_or_path_join(args.model_name_or_path, "unet"))
         self.vae = AutoencoderKL.from_pretrained(url_or_path_join(args.model_name_or_path, "vae"))
         self.text_encoder = CLIPTextModel.from_pretrained(url_or_path_join(args.model_name_or_path, "text_encoder"))
+        # we only use self.noise_scheduler.alphas_cumprod
         self.noise_scheduler = DDPMScheduler.from_pretrained(url_or_path_join(args.model_name_or_path, "scheduler"))
+        self.register_buffer("alphas_cumprod", self.noise_scheduler.alphas_cumprod)
         freeze_params(self.vae.parameters())
         freeze_params(self.text_encoder.parameters())
         self.unet.train()
@@ -64,13 +66,32 @@ class StableDiffusion(nn.Layer):
             self.vae.to(dtype=paddle.float16)
             self.text_encoder.to(dtype=paddle.float16)
 
+    def add_noise(
+        self,
+        original_samples: paddle.Tensor,
+        noise: paddle.Tensor,
+        timesteps: paddle.Tensor,
+    ) -> paddle.Tensor:
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+        while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+
+        noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
+        return noisy_samples
+
     def forward(self, input_ids=None, pixel_values=None):
         with paddle.no_grad():
             latents = self.vae.encode(pixel_values).latent_dist.sample()
             latents = latents * 0.18215
             noise = paddle.randn(latents.shape)
             timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],))
-            noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
+            noisy_latents = self.add_noise(latents, noise, timesteps)
 
         encoder_hidden_states = self.text_encoder(input_ids)[0]
         model_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
@@ -129,10 +150,7 @@ class StableDiffusionBenchmark(BenchmarkBase):
 
     def create_input_specs(self):
         input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, self.model_max_length], dtype="int64")
-        if self.args.use_amp and self.args.amp_level == "O2":
-            dtype = "float16"
-        else:
-            dtype = "float32"
+        dtype = "float16" if self.args.use_amp and self.args.amp_level == "O2" else "float32"
         pixel_values = paddle.static.InputSpec(
             name="pixel_values", shape=[-1, 3, self.args.resolution, self.args.resolution], dtype=dtype
         )
