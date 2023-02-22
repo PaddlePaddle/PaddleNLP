@@ -38,14 +38,14 @@ schema = {"武器名称": ["产国", "类型", "研发单位"]}
 #### 设置模型路径
 ```
 # Default task_path
-uie = Taskflow('information_extration', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema)
+uie = Taskflow('information_extraction', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema)
 ```
 
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码
 ```
-uie1 = Taskflow('information_extration', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
-uie2 = Taskflow('information_extration', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
+uie1 = Taskflow('information_extraction', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
+uie2 = Taskflow('information_extraction', model='uie-data-distill-gp', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
 service.register_taskflow('uie', [uie1, uie2])
 ```
 
