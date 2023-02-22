@@ -93,8 +93,10 @@ from .ernie_layout.configuration import *
 from .ernie_m.configuration import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
+from .fnet.configuration import *
 from .fnet.modeling import *
 from .fnet.tokenizer import *
+from .funnel.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .layoutlm.modeling import *
@@ -114,6 +116,7 @@ from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
+from .mpnet.configuration import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
