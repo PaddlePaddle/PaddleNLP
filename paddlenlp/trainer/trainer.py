@@ -1215,8 +1215,26 @@ class Trainer:
 
                 from paddle.distributed.sharding import group_sharded_parallel
 
+                # add dp_group and exclude_layer params
+                # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
+                accepts_dp_group = "dp_group" in set(inspect.signature(group_sharded_parallel).parameters.keys())
+                accepts_exclude_layer = "exclude_layer" in set(
+                    inspect.signature(group_sharded_parallel).parameters.keys()
+                )
+                extra_kwargs = {}
+                if accepts_dp_group:
+                    extra_kwargs["dp_group"] = self.dp_group
+                if accepts_exclude_layer:
+                    extra_kwargs["exclude_layer"] = ["GroupNorm"]
+
                 model, optimizer, _ = group_sharded_parallel(
-                    model, self.optimizer, level=level, scaler=None, group=self.sharding_group, offload=cpu_offload
+                    model,
+                    self.optimizer,
+                    level=level,
+                    scaler=None,
+                    group=self.sharding_group,
+                    offload=cpu_offload,
+                    **extra_kwargs,
                 )
                 self.optimizer = optimizer
 
