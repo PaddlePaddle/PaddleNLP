@@ -145,6 +145,7 @@ class AutoNLPCallback(TrainerCallback):
                 "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
             )
         self.session = importlib.import_module("ray.air.session")
+        self.tune = importlib.import_module("ray.tune")
 
     # report session metrics to Ray to track trial progress
     def on_evaluate(self, args, state, control, **kwargs):
@@ -152,7 +153,7 @@ class AutoNLPCallback(TrainerCallback):
             return
 
         metrics = kwargs.get("metrics", None)
-        if metrics is not None and isinstance(metrics, dict):
+        if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
             self.session.report(metrics)
 
     # report session metrics to Ray to track trial progress
@@ -161,7 +162,7 @@ class AutoNLPCallback(TrainerCallback):
             return
 
         metrics = kwargs.get("metrics", None)
-        if metrics is not None and isinstance(metrics, dict):
+        if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
             self.session.report(metrics)
 
     # forward trainer logs
