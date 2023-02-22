@@ -219,7 +219,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         clip_prompt: Optional[Union[str, List[str]]] = None,
         num_cutouts: Optional[int] = 4,
         use_cutouts: Optional[bool] = True,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -342,9 +342,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         # However this currently doesn't work in `mps`.
         latents_shape = [batch_size * num_images_per_prompt, self.unet.in_channels, height // 8, width // 8]
         if latents is None:
-            if seed is not None:
-                paddle.seed(seed)
-            latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
+            latents = paddle.randn(latents_shape, generator=generator, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
                 raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
@@ -367,6 +365,11 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        if accepts_generator:
+            extra_step_kwargs["generator"] = generator
 
         for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the latents if we are doing classifier free guidance

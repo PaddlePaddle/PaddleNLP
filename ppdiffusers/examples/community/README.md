@@ -37,7 +37,7 @@ guided_pipeline.enable_attention_slicing()
 
 prompt = "fantasy book cover, full moon, fantasy forest landscape, golden vector elements, fantasy magic, dark light night, intricate, elegant, sharp focus, illustration, highly detailed, digital painting, concept art, matte, art by WLOP and Artgerm and Albert Bierstadt, masterpiece"
 
-generator = paddle.Generator().manual_seed(0)
+generator = paddle.Generator().manual_seed(2022)
 with paddle.amp.auto_cast(True, level="O2"):
     images = []
     for i in range(4):
@@ -48,7 +48,6 @@ with paddle.amp.auto_cast(True, level="O2"):
             clip_guidance_scale=100,
             num_cutouts=4,
             use_cutouts=False,
-            seed=i + 42,
             generator=generator,
             unfreeze_unet=False,
             unfreeze_vae=False,
@@ -67,7 +66,7 @@ for i, img in enumerate(images):
 |:-------------------:|:-------------------:|:-------------------:|:-------------------:|
 |![][clip_guided_sd_0]|![][clip_guided_sd_1]|![][clip_guided_sd_2]|![][clip_guided_sd_3]|
 
-[clip_guided_sd_0]: https://user-images.githubusercontent.com/40912707/220341377-50afcc02-9912-4350-b45d-34949ea5cd4b.png
-[clip_guided_sd_1]: https://user-images.githubusercontent.com/40912707/220341411-ead43237-7f78-48f9-b86e-bdc03dc7360c.png
-[clip_guided_sd_2]: https://user-images.githubusercontent.com/40912707/220341438-f5bcd21b-01d3-48d6-a7cd-14238deae628.png
-[clip_guided_sd_3]: https://user-images.githubusercontent.com/40912707/220341454-96a0108d-f14d-493e-8fc3-5e966a5904c2.png
+[clip_guided_sd_0]: https://user-images.githubusercontent.com/40912707/220514674-e5cb29a3-b07e-4e8f-a4c8-323b35637294.png
+[clip_guided_sd_1]: https://user-images.githubusercontent.com/40912707/220514703-1eaf444e-1506-4c44-b686-5950fd79a3da.png
+[clip_guided_sd_2]: https://user-images.githubusercontent.com/40912707/220514765-89e48c13-156f-4e61-b433-06f1283d2265.png
+[clip_guided_sd_3]: https://user-images.githubusercontent.com/40912707/220514751-82d63fd4-e35e-482b-a8e1-c5c956119b2e.png
