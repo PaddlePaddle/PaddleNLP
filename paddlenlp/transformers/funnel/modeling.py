@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import json
+
 import logging
-import os
 from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
@@ -26,16 +24,15 @@ import paddle
 from paddle import nn
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
 
+from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel as PreTrainedModel
 from .. import register_base_model
 from ..activations import ACT2FN
-
 from .configuration import (
     FUNNEL_PRETRAINED_INIT_CONFIGURATION,
     FUNNEL_PRETRAINED_RESOURCE_FILES_MAP,
     FunnelConfig,
 )
-
 
 FUNNEL_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "funnel-transformer/small",  # B4-4-4H768
@@ -799,12 +796,13 @@ class FunnelPreTrainedModel(PreTrainedModel):
 
     pretrained_init_configuration = FUNNEL_PRETRAINED_INIT_CONFIGURATION
     resource_files_names = {"model_state": "model_state.pdparams", "model_config": "model_config.json"}
-    pretrained_resource_files_map = FUNNEL_PRETRAINED_RESOURCES_FILES_MAP
+    pretrained_resource_files_map = FUNNEL_PRETRAINED_RESOURCE_FILES_MAP
 
     config_class = FunnelConfig
     base_model_prefix = "funnel"
-     @classmethod
-    def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
+
+    @classmethod
+    def _get_name_mappings(cls, config: FunnelConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
@@ -816,97 +814,99 @@ class FunnelPreTrainedModel(PreTrainedModel):
         ]
         for block_index in range(len(config.block_sizes)):
             for block_no in range(config.block_sizes[block_index]):
-                 block_mappings = [[
-                    f"encoder.blocks.{block_index}.{block_no}.attention.r_w_bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.r_w_bias",
-                ],
-                [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.r_r_bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.r_r_bias",
-                ],
-                [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.r_s_bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.r_s_bias",
-                ],
-                [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.seg_embed",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.segment_emdeddings",
-                ],
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.r_kernel",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.r_kernel",
-                    "transpose",
-                ],
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.q_head.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.q_head.weight",
-                    "transpose",
-                ], 
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.k_head.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.k_head.weight",
-                    "transpose",
-                ], 
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.v_head.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.v_head.weight",
-                    "transpose",
-                ], 
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.post_proj.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.post_proj.weight",
-                    "transpose",
-                ], 
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.ffn.linear_1.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear1.weight",
-                    "transpose",
-                ], 
-                  [
-                     f"encoder.blocks.{block_index}.{block_no}.ffn.linear_2.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear2.weight",
-                    "transpose",
-                ], 
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.k_head.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.k_head.bias",
-                ],
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.v_head.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.v_head.bias",
-                ],
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.post_proj.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.post_proj.bias",
-                ],
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear_1.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear1.bias",
-                ],
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear_2.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.linear2.bias",
-                ],
-                [
-                     f"encoder.blocks.{block_index}.{block_no}.attention.layer_norm.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.layer_norm.weight",
-                ], 
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.attention.layer_norm.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.attn.layer_norm.bias",
-                ],
-                     [
-                     f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.weight",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.weight",
-                ], 
-              [
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.bias",
-                    f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.bias",
-                ],
-            ]
+                block_mappings = [
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.r_w_bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.r_w_bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.r_r_bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.r_r_bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.r_s_bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.r_s_bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.seg_embed",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.segment_emdeddings",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.r_kernel",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.r_kernel",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.q_head.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.q_head.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.k_head.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.k_head.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.v_head.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.v_head.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.post_proj.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.post_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear_1.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear1.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear_2.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear2.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.k_head.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.k_head.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.v_head.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.v_head.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.post_proj.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.post_proj.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear_1.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear1.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear_2.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.linear2.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.layer_norm.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.layer_norm.weight",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.attention.layer_norm.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.attn.layer_norm.bias",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.weight",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.weight",
+                    ],
+                    [
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.bias",
+                        f"encoder.blocks.{block_index}.{block_no}.ffn.layer_norm.bias",
+                    ],
+                ]
             model_mappings.extend(block_mappings)
         for layer_index in range(config.num_decoder_layers):
-                 layer_mappings = [[
+            layer_mappings = [
+                [
                     f"decoder.layers.{layer_index}.attention.r_w_bias",
                     f"decoder.layers.{layer_index}.attn.r_w_bias",
                 ],
@@ -923,73 +923,73 @@ class FunnelPreTrainedModel(PreTrainedModel):
                     f"decoder.layers.{layer_index}.attn.segment_emdeddings",
                 ],
                 [
-                     f"decoder.layers.{layer_index}.attention.r_kernel",
+                    f"decoder.layers.{layer_index}.attention.r_kernel",
                     f"decoder.layers.{layer_index}.attn.r_kernel",
                     "transpose",
                 ],
                 [
-                     f"decoder.layers.{layer_index}.attention.q_head.weight",
+                    f"decoder.layers.{layer_index}.attention.q_head.weight",
                     f"decoder.layers.{layer_index}.attn.q_head.weight",
                     "transpose",
-                ], 
+                ],
                 [
-                     f"decoder.layers.{layer_index}.attention.k_head.weight",
+                    f"decoder.layers.{layer_index}.attention.k_head.weight",
                     f"decoder.layers.{layer_index}.attn.k_head.weight",
                     "transpose",
-                ], 
+                ],
                 [
-                     f"decoder.layers.{layer_index}.attention.v_head.weight",
+                    f"decoder.layers.{layer_index}.attention.v_head.weight",
                     f"decoder.layers.{layer_index}.attn.v_head.weight",
                     "transpose",
-                ], 
+                ],
                 [
-                     f"decoder.layers.{layer_index}.attention.post_proj.weight",
+                    f"decoder.layers.{layer_index}.attention.post_proj.weight",
                     f"decoder.layers.{layer_index}.attn.post_proj.weight",
                     "transpose",
-                ], 
+                ],
                 [
-                     f"decoder.layers.{layer_index}.ffn.linear_1.weight",
+                    f"decoder.layers.{layer_index}.ffn.linear_1.weight",
                     f"decoder.layers.{layer_index}.ffn.linear1.weight",
                     "transpose",
-                ], 
-                  [
-                     f"decoder.layers.{layer_index}.ffn.linear_2.weight",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.ffn.linear_2.weight",
                     f"decoder.layers.{layer_index}.ffn.linear2.weight",
                     "transpose",
-                ], 
-              [
+                ],
+                [
                     f"decoder.layers.{layer_index}.attention.k_head.bias",
                     f"decoder.layers.{layer_index}.attn.k_head.bias",
                 ],
-              [
+                [
                     f"decoder.layers.{layer_index}.attention.v_head.bias",
                     f"decoder.layers.{layer_index}.attn.v_head.bias",
                 ],
-              [
+                [
                     f"decoder.layers.{layer_index}.attention.post_proj.bias",
                     f"decoder.layers.{layer_index}.attn.post_proj.bias",
                 ],
-              [
+                [
                     f"decoder.layers.{layer_index}.ffn.linear_1.bias",
                     f"decoder.layers.{layer_index}.ffn.linear1.bias",
                 ],
-              [
+                [
                     f"decoder.layers.{layer_index}.ffn.linear_2.bias",
                     f"decoder.layers.{layer_index}.ffn.linear2.bias",
                 ],
                 [
-                     f"decoder.layers.{layer_index}.attention.layer_norm.weight",
+                    f"decoder.layers.{layer_index}.attention.layer_norm.weight",
                     f"decoder.layers.{layer_index}.attn.layer_norm.weight",
-                ], 
-              [
+                ],
+                [
                     f"decoder.layers.{layer_index}.attention.layer_norm.bias",
                     f"edecoder.layers.{layer_index}.attention.layer_norm.bias",
                 ],
-                     [
-                     f"decoder.layers.{layer_index}.ffn.layer_norm.weight",
+                [
                     f"decoder.layers.{layer_index}.ffn.layer_norm.weight",
-                ], 
-              [
+                    f"decoder.layers.{layer_index}.ffn.layer_norm.weight",
+                ],
+                [
                     f"decoder.layers.{layer_index}.ffn.layer_norm.bias",
                     f"decoder.layers.{layer_index}.ffn.layer_norm.bias",
                 ],
@@ -1007,13 +1007,22 @@ class FunnelPreTrainedModel(PreTrainedModel):
                 [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
             )
         if "FunnelForTokenClassification" in config.architectures:
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias","classifier.bias"]])
+            model_mappings.extend(
+                [["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias", "classifier.bias"]]
+            )
         if "FunnelForSequenceClassification" in config.architectures:
-            model_mappings.extend([["classifier.linear_hidden.weight", "classifier.linear1.weight", "transpose"], ["classifier.linear_hidden.bias","classifier.linear1.bias"],
-                                  ["classifier.linear_out.weight", "classifier.linear2.weight", "transpose"], ["classifier.linear_out.bias","classifier.linear2.bias"]])
+            model_mappings.extend(
+                [
+                    ["classifier.linear_hidden.weight", "classifier.linear1.weight", "transpose"],
+                    ["classifier.linear_hidden.bias", "classifier.linear1.bias"],
+                    ["classifier.linear_out.weight", "classifier.linear2.weight", "transpose"],
+                    ["classifier.linear_out.bias", "classifier.linear2.bias"],
+                ]
+            )
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
+
     def _init_weights(self, module):
         classname = module.__class__.__name__
         if classname.find("Linear") != -1:
@@ -1034,7 +1043,7 @@ class FunnelPreTrainedModel(PreTrainedModel):
             uniform_(module.seg_embed, b=self.config2.initializer_range)
         elif classname == "FunnelEmbeddings":
             std = 1.0 if self.config2.initializer_std is None else self.config2.initializer_std
-            normal_(module.word_embedd ings.weight, std=std)
+            normal_(module.word_embeddings.weight, std=std)
             if module.word_embeddings._padding_idx is not None:
                 module.word_embeddings.weight.data[module._padding_idx].zero_()
 
