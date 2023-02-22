@@ -136,15 +136,11 @@ class VisualDLCallback(TrainerCallback):
 
 class AutoNLPCallback(TrainerCallback):
     """
-    A [`TrainerCallback`] that sends the logs to [Ray Tune]().
-    Args:
-        vdl_writer (`LogWriter`, *optional*):
-            The writer to use. Will instantiate one if not set.
+    A [`TrainerCallback`] that sends the logs to [`Ray Tune`] for [`AutoNLP`]
     """
 
     def __init__(self):
-        has_ray = is_ray_available()
-        if not has_ray:
+        if not is_ray_available():
             raise RuntimeError(
                 "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
             )
