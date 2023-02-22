@@ -271,7 +271,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting the existing Tuner and any previous training results")
 
-        self._data_checks_and_inference()
         trainable = self._construct_trainable()
         model_candidates = self._filter_model_candidates(
             language=self.language, preset=preset, custom_model_candidates=custom_model_candidates
@@ -300,7 +299,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             tune_config=tune_config,
             run_config=RunConfig(
                 name=experiment_name,
-                log_to_file=True,  # TODO: log_to_file doesn't stream logger output to file for some reason
+                log_to_file=True,
                 local_dir=self.output_dir if self.output_dir else None,
                 callbacks=[tune.logger.CSVLoggerCallback()],
             ),

@@ -21,13 +21,9 @@ export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
 if [ ! -d "model_logs" ];then 
     mkdir model_logs
-else 
-    echo 'model_logs/ exists'
 fi
 if [ ! -d "unittest_logs" ];then 
     mkdir model_logs
-else 
-    echo 'unittest_logs/ exists'
 fi
 
 print_info(){
