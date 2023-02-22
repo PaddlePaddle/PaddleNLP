@@ -16,7 +16,7 @@
 import paddle
 import paddle.nn as nn
 from paddle.nn import Layer
-
+from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 
@@ -297,7 +297,7 @@ class FNetPretrainedModel(PretrainedModel):
     base_model_prefix = "fnet"
     
     @classmethod
-    def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: FNetConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
