@@ -305,7 +305,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 name=experiment_name,
                 log_to_file=True,
                 local_dir=self.output_dir if self.output_dir else None,
-                callbacks=[tune.logger.CSVLoggerCallback()],
+                callbacks=[tune.logger.CSVLoggerCallback(), tune.logger.JsonLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
