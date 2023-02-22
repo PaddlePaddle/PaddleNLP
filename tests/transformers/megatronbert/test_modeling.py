@@ -61,6 +61,7 @@ class MegatronBertModelTester:
         num_choices=4,
         num_classes=3,
         scope=None,
+        return_dict=False,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -86,6 +87,7 @@ class MegatronBertModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -167,6 +169,7 @@ class MegatronBertModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             token_type_ids=multiple_choice_token_type_ids,
+            labels=choice_labels,
         )
         if paddle.is_tensor(result):
             result = [result]
@@ -189,6 +192,9 @@ class MegatronBertModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.return_dict,
         )
         start_logits, end_logits = result[0], result[1]
 
@@ -207,11 +213,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForSequenceClassification(config)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
         if paddle.is_tensor(result):
             result = [result]
 
@@ -229,11 +231,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForNextSentencePrediction(config)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
         if paddle.is_tensor(result):
             result = [result]
         self.parent.assertEqual(result[0].shape, [self.batch_size, 2])
@@ -250,11 +248,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForTokenClassification(config)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
         if paddle.is_tensor(result):
             result = [result]
 
