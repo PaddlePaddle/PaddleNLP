@@ -65,7 +65,7 @@ class Example(object):
             # Store a version of the enc_input where in-article OOVs are represented by their temporary OOV id; also store the in-article OOVs words themselves
             self.enc_input_extend_vocab, self.article_oovs = data.article2ids(article_words, vocab)
 
-            # Get a verison of the reference summary where in-article OOVs are represented by their temporary article OOV id
+            # Get a version of the reference summary where in-article OOVs are represented by their temporary article OOV id
             abs_ids_extend_vocab = data.abstract2ids(abstract_words, vocab, self.article_oovs)
 
             # Overwrite decoder target sequence so it uses the temp article OOV ids
@@ -165,7 +165,7 @@ class Batch(object):
     def store_orig_strings(self, example_list):
         self.original_articles = [ex.original_article for ex in example_list]  # list of lists
         self.original_abstracts = [ex.original_abstract for ex in example_list]  # list of lists
-        self.original_abstracts_sents = [ex.original_abstract_sents for ex in example_list]  # list of list of lists
+        self.original_abstracts_sents = [ex.original_abstract_sents for ex in example_list]  # list of lists
 
 
 class Batcher(object):

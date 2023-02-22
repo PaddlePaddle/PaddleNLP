@@ -14,17 +14,16 @@
 # limitations under the License.
 
 import os
-import collections
 import unicodedata
 
-from ..tokenizer_utils import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import (
-    convert_to_unicode,
-    whitespace_tokenize,
-    _is_whitespace,
+    PretrainedTokenizer,
     _is_control,
     _is_punctuation,
     _is_symbol,
+    _is_whitespace,
+    convert_to_unicode,
+    whitespace_tokenize,
 )
 
 __all__ = [
@@ -605,7 +604,7 @@ class BertTokenizer(PretrainedTokenizer):
         Args:
             token_ids_0 (List[int]):
                 A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optinal):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs. Defaults to None.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
@@ -620,8 +619,12 @@ class BertTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
+            return list(map(lambda x: 1 if x in self.all_special_ids else 0, token_ids_0))
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def _convert_id_to_token(self, index):
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.vocab._idx_to_token.get(index, self.unk_token)

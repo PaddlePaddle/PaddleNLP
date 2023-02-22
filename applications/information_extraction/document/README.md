@@ -260,7 +260,7 @@ from paddlenlp import Taskflow
 from paddlenlp.utils.doc_parser import DocParser
 
 schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
-my_ie = Taskflow("information_extraction", model="uie-x-base", schema=schema, task_path='./checkpoint/model_best', precison='fp16')
+my_ie = Taskflow("information_extraction", model="uie-x-base", schema=schema, task_path='./checkpoint/model_best', precision='fp16')
 ```
 
 我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取并进行可视化：
