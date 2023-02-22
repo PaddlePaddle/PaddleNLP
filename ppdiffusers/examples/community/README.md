@@ -22,9 +22,10 @@ from clip_guided_stable_diffusion import CLIPGuidedStableDiffusion
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPModel
 
-feature_extractor = CLIPFeatureExtractor.from_pretrained("laion/CLIP-ViT-B-32-laion2B-s34B-b79K")
-clip_model = CLIPModel.from_pretrained("laion/CLIP-ViT-B-32-laion2B-s34B-b79K", dtype=paddle.float32)
-
+feature_extractor = CLIPFeatureExtractor.from_pretrained(
+    "laion/CLIP-ViT-B-32-laion2B-s34B-b79K")
+clip_model = CLIPModel.from_pretrained("laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+                                       dtype=paddle.float32)
 
 guided_pipeline = CLIPGuidedStableDiffusion.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
@@ -33,11 +34,10 @@ guided_pipeline = CLIPGuidedStableDiffusion.from_pretrained(
     paddle_dtype=paddle.float16,
 )
 guided_pipeline.enable_attention_slicing()
-guided_pipeline = guided_pipeline.to("gpu")
 
 prompt = "fantasy book cover, full moon, fantasy forest landscape, golden vector elements, fantasy magic, dark light night, intricate, elegant, sharp focus, illustration, highly detailed, digital painting, concept art, matte, art by WLOP and Artgerm and Albert Bierstadt, masterpiece"
 
-generator = paddle.Generator(device="gpu").manual_seed(0)
+generator = paddle.Generator().manual_seed(0)
 with paddle.amp.auto_cast(True, level="O2"):
     images = []
     for i in range(4):
