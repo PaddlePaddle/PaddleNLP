@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,13 +70,13 @@ class NystromformerTokenizer(PretrainedTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import NystromformerTokenizer
-            tokenizer = NystromformerTokenizer.from_pretrained('model_weight_name')
+            tokenizer = NystromformerTokenizer.from_pretrained("model_name")
 
-            inputs = tokenizer('He was a puppeteer')
+            inputs = tokenizer("He was a puppeteer")
             print(inputs)
 
             '''
-            {'input_ids': [101, 2002, 2001, 1037, 13997, 11510, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0]}
+            {"input_ids": [101, 2002, 2001, 1037, 13997, 11510, 102], "token_type_ids": [0, 0, 0, 0, 0, 0, 0]}
             '''
     """
 
@@ -181,10 +181,10 @@ class NystromformerTokenizer(PretrainedTokenizer):
 
                 from paddlenlp.transformers import NystromformerTokenizer
 
-                tokenizer = NystromformerTokenizer.from_pretrained('model_weight_name')
-                tokens = tokenizer.tokenize('He was a puppeteer')
+                tokenizer = NystromformerTokenizer.from_pretrained("model_name")
+                tokens = tokenizer.tokenize("He was a puppeteer")
                 '''
-                ['he', 'was', 'a', 'puppet', '##eer']
+                ["he", "was", "a", "puppet", "##eer"]
                 '''
                 strings = tokenizer.convert_tokens_to_string(tokens)
                 '''

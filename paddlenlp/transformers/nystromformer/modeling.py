@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2021 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
@@ -619,8 +619,8 @@ class NystromformerModel(NystromformerPretrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import NystromformerModel, AutoTokenizer
-                tokenizer = AutoTokenizer.from_pretrained('model_weight_name')
-                model = NystromformerModel.from_pretrained('model_weight_name')
+                tokenizer = AutoTokenizer.from_pretrained("model_name")
+                model = NystromformerModel.from_pretrained("model_name")
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
@@ -766,8 +766,8 @@ class NystromformerForMaskedLM(NystromformerPretrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import NystromformerForMaskedLM, AutoTokenizer
-                tokenizer = AutoTokenizer.from_pretrained('model_weight_name')
-                model = NystromformerForMaskedLM.from_pretrained('model_weight_name')
+                tokenizer = AutoTokenizer.from_pretrained("model_name")
+                model = NystromformerForMaskedLM.from_pretrained("model_name")
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
@@ -912,8 +912,8 @@ class NystromformerForSequenceClassification(NystromformerPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import AutoTokenizer, NystromformerForSequenceClassification
 
-                tokenizer = AutoTokenizer.from_pretrained('model_weight_name')
-                model = NystromformerForSequenceClassification.from_pretrained('model_weight_name')
+                tokenizer = AutoTokenizer.from_pretrained("model_name")
+                model = NystromformerForSequenceClassification.from_pretrained("model_name")
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
