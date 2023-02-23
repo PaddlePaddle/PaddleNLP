@@ -131,6 +131,7 @@ class ControlNet(nn.Layer):
         with paddle.amp.auto_cast(enable=False):
             with paddle.no_grad():
                 self.vae.eval()
+                self.text_encoder.eval()
                 latents = self.vae.encode(pixel_values).latent_dist.sample()
                 latents = latents * 0.18215
                 noise = paddle.randn(latents.shape)
