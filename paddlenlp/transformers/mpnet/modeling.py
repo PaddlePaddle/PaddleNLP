@@ -1,5 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2018 Microsoft Research and The HuggingFace Inc. team. All rights reserved.
+# Copyright 2018 The HuggingFace Inc. team, Microsoft Corporation.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
