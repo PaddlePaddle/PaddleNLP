@@ -12,6 +12,7 @@
    * [模型评估](#模型评估)
    * [模型预测](#模型预测)
    * [模型导出预测](#模型导出预测)
+   * [Taskflow一键预测](#Taskflow一键预测)
    * [参考文献](#参考文献)
 
 本项目开源了 **ERNIE-ViL 2.0** 预训练模型及微调方案。
@@ -404,6 +405,17 @@ python deploy/python/infer.py --model_dir ./infer_model/
 [[0.99110764 0.00889209]]
 ```
 可以看到输出的概率值跟前面的预测结果几乎是一致的
+
+<a name="Taskflow一键预测"></a>
+
+## Taskflow一键预测
+
+可以使用PaddleNLP提供的Taskflow工具来使用ERNIE Vil2.0，具体使用可以参考文档[模型特征提取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%A8%A1%E5%9E%8B%E7%89%B9%E5%BE%81%E6%8F%90%E5%8F%96)，下面是使用加载微调的模型的示例：
+
+```
+vision_language = Taskflow("feature_extraction",model="PaddlePaddle/ernie_vil-2.0-base-zh"", task_path="/path/to/checkpoint-4000")
+```
+
 
 <a name="参考文献"></a>
 
