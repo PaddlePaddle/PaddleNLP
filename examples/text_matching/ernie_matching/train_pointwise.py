@@ -92,8 +92,8 @@ def do_train():
 
     train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
-    pretrained_model = AutoModel.from_pretrained("ernie-gram-zh")
-    tokenizer = AutoTokenizer.from_pretrained("ernie-gram-zh")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 

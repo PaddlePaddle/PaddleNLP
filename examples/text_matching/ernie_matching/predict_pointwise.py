@@ -70,8 +70,8 @@ def predict(model, data_loader):
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-    pretrained_model = AutoModel.from_pretrained("ernie-gram-zh")
-    tokenizer = AutoTokenizer.from_pretrained("ernie-gram-zh")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_test=True)
 
