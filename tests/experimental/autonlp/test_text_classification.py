@@ -30,7 +30,7 @@ finetune_model_candidate = {
     "max_steps": 5,
     "per_device_train_batch_size": 2,
     "per_device_eval_batch_size": 2,
-    "model_name_or_path": hp.choice("finetune_models", ["__internal_testing__/tiny-random-bert"]),
+    "model_name_or_path": hp.choice("finetune_models", ["__internal_testing__/ernie"]),
     "report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
 }
 prompt_model_candidate = {
@@ -39,7 +39,7 @@ prompt_model_candidate = {
     "max_steps": 5,
     "per_device_train_batch_size": 2,
     "per_device_eval_batch_size": 2,
-    "model_name_or_path": hp.choice("prompt_models", ["__internal_testing__/tiny-random-bert"]),
+    "model_name_or_path": hp.choice("prompt_models", ["__internal_testing__/ernie"]),
     "report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
 }
 
