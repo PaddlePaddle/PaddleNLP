@@ -18,20 +18,17 @@ import os
 import time
 
 import paddle
-from criterion import Criterion
 from evaluate import evaluate
 from utils import (
     create_dataloader,
     get_label_maps,
     reader,
-    save_model_config,
     set_seed,
     get_eval_golds,
 )
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import GPLinkerForDocExtraction
-from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
+from paddlenlp.transformers import AutoTokenizer, LinearDecayWithWarmup, ErnieLayoutForClosedDomainIE
 from paddlenlp.utils.log import logger
 
 
@@ -45,7 +42,14 @@ def do_train():
     label_maps = get_label_maps(args.label_maps_path)
     golds = get_eval_golds(args.dev_path)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.encoder, do_tokenize_postprocess=True)
+    tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased", do_tokenize_postprocess=True)
+
+    num_ents = len(label_maps["entity2id"])
+    num_rels = len(label_maps["relation2id"])
+
+    model = ErnieLayoutForClosedDomainIE.from_pretrained(
+        "ernie-layoutx-base-uncased", num_ents=num_ents, num_rels=num_rels
+    )
 
     train_ds = load_dataset(
         reader,
@@ -80,11 +84,6 @@ def do_train():
         mode="dev",
     )
 
-    encoder = AutoModel.from_pretrained(args.encoder)
-    model = GPLinkerForDocExtraction(encoder, label_maps)
-
-    model_config = {"label_maps": label_maps, "encoder": args.encoder}
-
     num_training_steps = len(train_dataloader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
@@ -105,17 +104,13 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    criterion = Criterion()
-
     global_step, best_f1 = 1, 0.0
     tr_loss, logging_loss = 0.0, 0.0
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
         for batch in train_dataloader:
             input_ids, attention_masks, bbox, image, _, _, _, _, labels = batch
-            logits = model(input_ids, attention_masks, bbox, image)
-
-            loss = sum([criterion(o, l) for o, l in zip(logits, labels)]) / 3
+            loss, _ = model(input_ids, attention_masks, bbox, image, labels)
 
             loss.backward()
 
@@ -139,9 +134,7 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                paddle.save(model.state_dict(), save_param_path)
-                save_model_config(save_dir, model_config)
+                model.save_pretrained(save_dir)
                 logger.disable()
                 tokenizer.save_pretrained(save_dir)
                 logger.enable()
@@ -155,9 +148,7 @@ def do_train():
                     save_dir = os.path.join(args.save_dir, "model_best")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                    paddle.save(model.state_dict(), save_param_path)
-                    save_model_config(save_dir, model_config)
+                    model.save_pretrained(save_dir)
                     logger.disable()
                     tokenizer.save_pretrained(save_dir)
                     logger.enable()
@@ -181,7 +172,6 @@ if __name__ == "__main__":
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
-    parser.add_argument("--encoder", default="ernie-layoutx-base-uncased", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--eval_steps", default=50, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")

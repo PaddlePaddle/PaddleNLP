@@ -13,3 +13,4 @@
 # limitations under the License.
 
 from .rdrop import RDropLoss
+from .sparse_multilabel_cross_entropy import SparseMultilabelCrossEntropy

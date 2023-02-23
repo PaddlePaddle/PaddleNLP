@@ -24,7 +24,8 @@ from paddle.nn import Layer
 from paddlenlp.utils.log import logger
 
 from ...utils.env import CONFIG_NAME
-from ...layers.globalpointer import GlobalPointer
+from ...layers import GlobalPointer
+from ...losses import SparseMultilabelCrossEntropy
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
@@ -41,6 +42,7 @@ __all__ = [
     "ErnieLayoutForPretraining",
     "ErnieLayoutForQuestionAnswering",
     "UIEX",
+    "ErnieLayoutForClosedDomainIE",
 ]
 
 
@@ -1185,15 +1187,24 @@ class ErnieLayoutForClosedDomainIE(ErnieLayoutPretrainedModel):
                 config.hidden_size, config.num_rels, head_size=config.head_size, RoPE=False, tril_mask=False
             )
 
-    def forward(self, input_ids, attention_mask, bbox, image):
-        sequence_output, _ = self.encoder(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
+    def forward(self, input_ids, attention_mask, bbox, image, labels=None):
+        sequence_output, _ = self.ernie_layout(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
         seq_length = paddle.shape(input_ids)[1]
         sequence_output = sequence_output[:, :seq_length]
 
         entity_output = self.entity_output(sequence_output, attention_mask)
+        loss = None
         if not self.with_rel:
-            return [entity_output]
+            logits = [entity_output]
         else:
             head_output = self.head_output(sequence_output, attention_mask)
             tail_output = self.tail_output(sequence_output, attention_mask)
-            return [entity_output, head_output, tail_output]
+            logits = [entity_output, head_output, tail_output]
+
+        if labels is not None:
+            loss_fct = SparseMultilabelCrossEntropy()
+            loss = sum([loss_fct(o, l) for o, l in zip(logits, labels)]) / len(logits)
+
+        output = (logits,)
+        # TODO: Add return_dict support
+        return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)

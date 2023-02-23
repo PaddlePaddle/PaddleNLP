@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import argparse
-import os
 
 import paddle
 from metric import get_eval
@@ -22,8 +21,7 @@ from tqdm import tqdm
 from utils import create_dataloader, get_label_maps, Processor, reader, get_eval_golds
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import GPLinkerForDocExtraction
-from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, ErnieLayoutForClosedDomainIE
 from paddlenlp.utils.log import logger
 
 
@@ -73,14 +71,9 @@ def do_eval():
     label_maps = get_label_maps(args.label_maps_path)
     golds = get_eval_golds(args.test_path)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.encoder, do_tokenize_postprocess=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 
-    encoder = AutoModel.from_pretrained(args.encoder)
-    model = GPLinkerForDocExtraction(encoder, label_maps)
-
-    if args.model_path:
-        state_dict = paddle.load(os.path.join(args.model_path, "model_state.pdparams"))
-        model.set_dict(state_dict)
+    model = ErnieLayoutForClosedDomainIE.from_pretrained(args.model_path)
 
     test_ds = load_dataset(
         reader,
