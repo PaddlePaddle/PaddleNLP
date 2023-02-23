@@ -26,8 +26,8 @@ from .utils import dygraph_mode_guard, static_mode_guard
 usage = r"""
             from paddlenlp import Taskflow
             from PIL import Image
-            # multi modal feature_extraction with ernie_vil-2.0-base-zh
-            vision_language = Taskflow("feature_extraction")
+            # Multi modal feature_extraction with ernie_vil-2.0-base-zh
+            vision_language = Taskflow("feature_extraction", model='PaddlePaddle/ernie_vil-2.0-base-zh')
             image_embeds = vision_language([Image.open("demo/000000039769.jpg")])
             print(image_embeds)
             '''

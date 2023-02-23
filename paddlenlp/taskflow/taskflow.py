@@ -23,11 +23,11 @@ from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
-from .feature_extraction import MultimodalFeatureExtractionTask
 from .fill_mask import FillMaskTask
 from .information_extraction import GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
 from .lexical_analysis import LacTask
+from .multimodal_feature_extraction import MultimodalFeatureExtractionTask
 from .named_entity_recognition import NERLACTask, NERWordTagTask
 from .poetry_generation import PoetryGenerationTask
 from .pos_tagging import POSTaggingTask

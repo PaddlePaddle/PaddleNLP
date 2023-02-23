@@ -43,6 +43,39 @@ ENCODER_TYPE = {
 }
 
 
+usage = r"""
+            from paddlenlp import Taskflow
+            import paddle.nn.functional as F
+            # Text feature_extraction with rocketqa-zh-base-query-encoder
+            text_encoder = Taskflow("feature_extraction", model='rocketqa-zh-base-query-encoder')
+            text_embeds = text_encoder(['春天适合种什么花？','谁有狂三这张高清的?'])
+            text_features1 = text_embeds["features"]
+            print(text_features1)
+            '''
+            Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                [[ 0.27640465, -0.13405125,  0.00612330, ..., -0.15600294,
+                    -0.18932408, -0.03029604],
+                    [-0.12041329, -0.07424965,  0.07895312, ..., -0.17068857,
+                    0.04485796, -0.18887770]])
+            '''
+            text_embeds = text_encoder('春天适合种什么菜？')
+            text_features2 = text_embeds["features"]
+            print(text_features2)
+            '''
+            Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                [[ 0.32578075, -0.02398480, -0.18929179, -0.18639392, -0.04062131,
+                    0.06708499, -0.04631376, -0.41177100, -0.23074438, -0.23627219,
+                ......
+            '''
+            probs = F.cosine_similarity(text_features1, text_features2)
+            print(probs)
+            '''
+            Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+                [0.86455142, 0.41222256])
+            '''
+         """
+
+
 class TextFeatureExtractionTask(Task):
 
     resource_files_names = {
@@ -107,7 +140,7 @@ class TextFeatureExtractionTask(Task):
         batch_size: int = 1,
         max_seq_len: int = 128,
         _static_mode: bool = True,
-        return_tensors: bool = True,
+        return_tensors: str = "pd",
         reinitialize: bool = False,
         share_parameters: bool = False,
         is_paragraph: bool = False,
@@ -263,7 +296,7 @@ class TextFeatureExtractionTask(Task):
 
     def _postprocess(self, inputs):
         inputs["features"] = np.concatenate(inputs["features"], axis=0)
-        if self.return_tensors:
+        if self.return_tensors == "pd":
             inputs["features"] = paddle.to_tensor(inputs["features"])
         return inputs
 
