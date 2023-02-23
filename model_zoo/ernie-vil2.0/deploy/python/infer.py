@@ -77,7 +77,7 @@ class ErnieVil2Predictor(object):
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
-        self.encode_type = args.encoder_type
+        self.encode_type = args.encode_type
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()

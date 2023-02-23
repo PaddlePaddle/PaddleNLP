@@ -42,6 +42,10 @@ class DataArguments:
         default="./data",
         metadata={"help": "Whether to evaluate model on public test datasets."},
     )
+    max_seq_len: int = field(
+        default=32,
+        metadata={"help": "The length of the text."},
+    )
 
 
 @dataclass
@@ -64,8 +68,9 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     tokenizer = ErnieViLTokenizer.from_pretrained(model_args.model_name_or_path)
-    train_dataset, eval_dataset = get_train_eval_dataset(data_args, tokenizer=tokenizer)
-
+    train_dataset, eval_dataset = get_train_eval_dataset(
+        data_args, tokenizer=tokenizer, max_txt_length=data_args.max_seq_len
+    )
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint

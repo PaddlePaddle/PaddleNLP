@@ -32,6 +32,7 @@ class ErnieViLTest(TestCase):
 
     def test_finetune(self):
         install_package("lmdb", "1.3.0")
+
         # 1. run finetune
         finetune_config = load_test_config(self.config_path, "finetune")
         with argv_context_guard(finetune_config):
@@ -52,8 +53,8 @@ class ErnieViLTest(TestCase):
         # 3. infer model
         infer_config = {
             "image_path": "./tests/fixtures/tests_samples/COCO/000000039769.png",
-            "model_path": export_config["output_path"],
-            "select_device": finetune_config["device"],
+            "model_dir": export_config["output_path"],
+            "device": finetune_config["device"],
         }
         with argv_context_guard(infer_config):
             from deploy.python.infer import main

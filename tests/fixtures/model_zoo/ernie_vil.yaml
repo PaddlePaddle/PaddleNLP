@@ -12,6 +12,7 @@ finetune:
     save_steps: 2
     warmup_steps: 5
     warmup_ratio: 0.01
+    max_seq_len: 32
     label_names: index
     lr_scheduler_type: cosine
     per_device_train_batch_size: 2
