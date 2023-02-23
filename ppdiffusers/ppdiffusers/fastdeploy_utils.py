@@ -26,11 +26,36 @@ from .utils import (
     FASTDEPLOY_MODEL_NAME,
     FASTDEPLOY_WEIGHTS_NAME,
     is_fastdeploy_available,
+    is_paddle_available,
     logging,
 )
 
+if is_paddle_available():
+    import paddle
+
+
 if is_fastdeploy_available():
     import fastdeploy as fd
+
+    def fdtensor2pdtensor(fdtensor: fd.C.FDTensor):
+        dltensor = fdtensor.to_dlpack()
+        pdtensor = paddle.utils.dlpack.from_dlpack(dltensor)
+        return pdtensor
+
+    def pdtensor2fdtensor(pdtensor: paddle.Tensor, name: str = "", share_with_raw_ptr=False):
+        if not share_with_raw_ptr:
+            dltensor = paddle.utils.dlpack.to_dlpack(pdtensor)
+            return fd.C.FDTensor.from_dlpack(name, dltensor)
+        else:
+            return fd.C.FDTensor.from_external_data(
+                name,
+                pdtensor.data_ptr(),
+                pdtensor.shape,
+                pdtensor.dtype.name,
+                str(pdtensor.place),
+                int(pdtensor.place.gpu_device_id()),
+            )
+
 
 logger = logging.get_logger(__name__)
 
@@ -42,6 +67,26 @@ class FastDeployRuntimeModel:
         self.model_save_dir = kwargs.get("model_save_dir", None)
         self.latest_model_name = kwargs.get("latest_model_name", "inference.pdmodel")
         self.latest_params_name = kwargs.get("latest_params_name", "inference.pdiparams")
+
+    def zero_copy_infer(self, prebinded_inputs: dict, prebinded_outputs: dict, share_with_raw_ptr=True, **kwargs):
+        """
+        Execute inference without copying data from cpu to gpu.
+
+        Arguments:
+            kwargs (`dict(name, paddle.Tensor)`):
+                An input map from name to tensor.
+        Return:
+            List of output tensor.
+        """
+        for inputs_name, inputs_tensor in prebinded_inputs.items():
+            input_fdtensor = pdtensor2fdtensor(inputs_tensor, inputs_name, share_with_raw_ptr=share_with_raw_ptr)
+            self.model.bind_input_tensor(inputs_name, input_fdtensor)
+
+        for outputs_name, outputs_tensor in prebinded_outputs.items():
+            output_fdtensor = pdtensor2fdtensor(outputs_tensor, outputs_name, share_with_raw_ptr=share_with_raw_ptr)
+            self.model.bind_output_tensor(outputs_name, output_fdtensor)
+
+            self.model.zero_copy_infer()
 
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}

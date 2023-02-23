@@ -16,8 +16,7 @@
 import os
 import unittest
 
-from paddlenlp.data.vocab import Vocab
-from paddlenlp.transformers.roformer.tokenizer import JiebaBasicTokenizer, RoFormerTokenizer, WordpieceTokenizer
+from paddlenlp.transformers.roformer.tokenizer import RoFormerTokenizer
 
 from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
