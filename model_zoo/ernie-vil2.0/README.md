@@ -101,11 +101,6 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 ├── deploy
 │   └── python
 │       └── infer.py # FastDeploy预测脚本
-├── scripts
-│   ├── extract_features.sh # 提取特征的bash脚本
-│   ├── recall_image_to_text.sh # 以图搜文的bash脚本
-│   ├── recall_text_to_image.sh # 以文搜图的bash脚本
-│   └── run_train.sh # 微调的bash脚本
 └── utils
     ├── evaluation.py # 评估以文搜图的召回脚本
     ├── evaluation_tr.py # 评估以图搜文的召回脚本
