@@ -65,6 +65,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("MobileBertTokenizer", "mobilebert"),
         ("MPNetTokenizer", "mpnet"),
         ("NeZhaTokenizer", "nezha"),
+        ("NystromformerTokenizer", "nystromformer"),
         ("PPMiniLMTokenizer", "ppminilm"),
         ("ProphetNetTokenizer", "prophetnet"),
         ("ReformerTokenizer", "reformer"),

@@ -31,6 +31,7 @@ finetune_model_candidate = {
     "TrainingArguments.per_device_train_batch_size": 2,
     "TrainingArguments.per_device_eval_batch_size": 2,
     "TrainingArguments.model_name_or_path": hp.choice("finetune_models", ["__internal_testing__/tiny-random-bert"]),
+    "TrainingArguments.report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
 }
 prompt_model_candidate = {
     "trainer_type": "PromptTrainer",
@@ -39,6 +40,9 @@ prompt_model_candidate = {
     "PromptTuningArguments.per_device_train_batch_size": 2,
     "PromptTuningArguments.per_device_eval_batch_size": 2,
     "PromptTuningArguments.model_name_or_path": hp.choice("prompt_models", ["__internal_testing__/tiny-random-bert"]),
+    "PromptTuningArguments.report_to": [
+        "visualdl"
+    ],  # report_to autonlp is functional but is problematic in unit tests
 }
 
 
