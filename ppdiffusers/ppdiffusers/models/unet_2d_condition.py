@@ -123,9 +123,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
+        resnet_pre_temb_non_linearity=True
     ):
         super().__init__()
-
+        self.resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity
         self.sample_size = sample_size
         time_embed_dim = block_out_channels[0] * 4
 
@@ -159,6 +160,15 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
 
         # down
+
+        if act_fn == "swish":
+            self.resnet_temb_nonlinearity = lambda x: F.silu(x)
+        elif act_fn == "mish":
+            self.resnet_temb_nonlinearity = Mish()
+        elif act_fn == "silu":
+            self.resnet_temb_nonlinearity = nn.Silu()
+        if resnet_pre_temb_non_linearity == False:
+            self.resnet_temb_nonlinearity = nn.Identity()
         output_channel = block_out_channels[0]
         for i, down_block_type in enumerate(down_block_types):
             input_channel = output_channel
@@ -183,6 +193,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 only_cross_attention=only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
             self.down_blocks.append(down_block)
 
@@ -201,6 +212,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 upcast_attention=upcast_attention,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
         elif mid_block_type == "UNetMidBlock2DSimpleCrossAttn":
             self.mid_block = UNetMidBlock2DSimpleCrossAttn(
@@ -213,6 +225,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 attn_num_head_channels=attention_head_dim[-1],
                 resnet_groups=norm_num_groups,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
+
             )
         else:
             raise ValueError(f"unknown mid_block_type : {mid_block_type}")
@@ -258,6 +272,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 only_cross_attention=reversed_only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
@@ -439,7 +454,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         timesteps = timestep
         if not paddle.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
-            timesteps = paddle.to_tensor([timesteps], dtype="int64")
+            timesteps = paddle.to_tensor([timesteps], dtype="float32")
         elif paddle.is_tensor(timesteps) and len(timesteps.shape) == 0:
             timesteps = timesteps[None]
 
@@ -472,12 +487,13 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         sample = self.conv_in(sample)
 
         # 3. down
-        down_block_res_samples = (sample,)
+        down_block_res_samples = (sample, )
+        down_nonlinear_temb=self.resnet_temb_nonlinearity(emb)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
@@ -510,7 +526,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     res_hidden_states_tuple=res_samples,
                     encoder_hidden_states=encoder_hidden_states,
                     cross_attention_kwargs=cross_attention_kwargs,
