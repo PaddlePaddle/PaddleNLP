@@ -39,15 +39,15 @@ args = parser.parse_args()
 if __name__ == "__main__":
     assert os.path.isdir(args.data_dir), "The data_dir does not exist! Please check the input args..."
 
-    # read specified dataset splits
+    # Read specified dataset splits
     specified_splits = list(set(args.splits.strip().split(",")))
     print("Dataset splits to be processed: {}".format(", ".join(specified_splits)))
 
-    # build LMDB data files
+    # Build LMDB data files
     if args.lmdb_dir is None:
         args.lmdb_dir = os.path.join(args.data_dir, "lmdb")
     for split in specified_splits:
-        # open new LMDB files
+        # Open new LMDB files
         lmdb_split_dir = os.path.join(args.lmdb_dir, split)
         if os.path.isdir(lmdb_split_dir):
             print("We will overwrite an existing LMDB file {}".format(lmdb_split_dir))
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         env_pairs = lmdb.open(lmdb_pairs, map_size=1024**4)
         txn_pairs = env_pairs.begin(write=True)
 
-        # write LMDB file storing (image_id, text_id, text) pairs
+        # Write LMDB file storing (image_id, text_id, text) pairs
         pairs_annotation_path = os.path.join(args.data_dir, "{}_texts.jsonl".format(split))
         with open(pairs_annotation_path, "r", encoding="utf-8") as fin_pairs:
             write_idx = 0
@@ -83,7 +83,7 @@ if __name__ == "__main__":
             env_pairs.close()
         print("Finished serializing {} {} split pairs into {}.".format(write_idx, split, lmdb_pairs))
 
-        # write LMDB file storing image base64 strings
+        # Write LMDB file storing image base64 strings
         base64_path = os.path.join(args.data_dir, "{}_imgs.tsv".format(split))
         with open(base64_path, "r", encoding="utf-8") as fin_imgs:
             write_idx = 0
@@ -100,4 +100,4 @@ if __name__ == "__main__":
             env_img.close()
         print("Finished serializing {} {} split images into {}.".format(write_idx, split, lmdb_img))
 
-    print("done!")
+    print("Done!")

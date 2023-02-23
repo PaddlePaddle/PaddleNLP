@@ -26,9 +26,9 @@ NUM_K = 10
 
 
 def read_submission(submit_path, reference, k=5):
-    # check whether the path of submitted file exists
+    # Check whether the path of submitted file exists
     if not os.path.exists(submit_path):
-        raise Exception("The submission file is not found!")
+        raise Exception("The file is not found!")
 
     submission_dict = {}
     ref_qids = set(reference.keys())
@@ -54,14 +54,14 @@ def read_submission(submit_path, reference, k=5):
                 raise Exception(
                     "The image_ids field of text_id {} is not a list, please check your schema".format(qid)
                 )
-            # check whether there are K products for each text
+            # Check whether there are K products for each text
             if len(image_ids) != k:
                 raise Exception(
                     "Text_id {} has wrong number of predicted image_ids! Require {}, but {} founded.".format(
                         qid, k, len(image_ids)
                     )
                 )
-            # check whether there exist an invalid prediction for any text
+            # Check whether there exist an invalid prediction for any text
             for rank, image_id in enumerate(image_ids):
                 if not isinstance(image_id, int):
                     raise Exception(
@@ -69,14 +69,14 @@ def read_submission(submit_path, reference, k=5):
                             qid, image_id, rank + 1
                         )
                     )
-            # check whether there are duplicate predicted products for a single text
+            # Check whether there are duplicate predicted products for a single text
             if len(set(image_ids)) != k:
                 raise Exception(
                     "Text_id {} has duplicate products in your prediction. Pleace check again!".format(qid)
                 )
             submission_dict[qid] = image_ids  # here we save the list of product ids
 
-    # check if any text is missing in the submission
+    # Check if any text is missing in the submission
     pred_qids = set(submission_dict.keys())
     nopred_qids = ref_qids - pred_qids
     if len(nopred_qids) != 0:
@@ -130,14 +130,14 @@ def read_reference(path):
 
 
 def compute_score(golden_file, predict_file):
-    # read ground-truth
+    # Read ground-truth
     reference = read_reference(golden_file)
 
-    # read predictions
+    # Read predictions
     k = 10
     predictions = read_submission(predict_file, reference, k)
 
-    # compute score for each text
+    # Compute score for each text
     r1_stat, r5_stat, r10_stat = 0, 0, 0
     for qid in reference.keys():
         ground_truth_ids = set(reference[qid])
@@ -148,7 +148,7 @@ def compute_score(golden_file, predict_file):
             r5_stat += 1
         if any([idx in top10_pred_ids[:10] for idx in ground_truth_ids]):
             r10_stat += 1
-    # the higher score, the better
+    # The higher score, the better
     r1, r5, r10 = r1_stat * 1.0 / len(reference), r5_stat * 1.0 / len(reference), r10_stat * 1.0 / len(reference)
     mean_recall = (r1 + r5 + r10) / 3.0
     result = [mean_recall, r1, r5, r10]
@@ -157,25 +157,25 @@ def compute_score(golden_file, predict_file):
 
 
 if __name__ == "__main__":
-    # the path of answer json file (eg. test_queries_answers.jsonl)
+    # The path of answer json file (eg. test_queries_answers.jsonl)
     standard_path = sys.argv[1]
-    # the path of prediction file (eg. example_pred.jsonl)
+    # The path of prediction file (eg. example_pred.jsonl)
     submit_path = sys.argv[2]
-    # the score will be dumped into this output json file
+    # The score will be dumped into this output json file
     out_path = sys.argv[3]
 
     print("Read standard from %s" % standard_path)
     print("Read user submit file from %s" % submit_path)
 
     try:
-        # read ground-truth
+        # Read ground-truth
         reference = read_reference(standard_path)
 
-        # read predictions
+        # Read predictions
         k = 10
         predictions = read_submission(submit_path, reference, k)
 
-        # compute score for each text
+        # Compute score for each text
         r1_stat, r5_stat, r10_stat = 0, 0, 0
         for qid in reference.keys():
             ground_truth_ids = set(reference[qid])
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                 r5_stat += 1
             if any([idx in top10_pred_ids[:10] for idx in ground_truth_ids]):
                 r10_stat += 1
-        # the higher score, the better
+        # The higher score, the better
         r1, r5, r10 = r1_stat * 1.0 / len(reference), r5_stat * 1.0 / len(reference), r10_stat * 1.0 / len(reference)
         report_score(r1, r5, r10, out_path)
         print("The evaluation finished successfully.")

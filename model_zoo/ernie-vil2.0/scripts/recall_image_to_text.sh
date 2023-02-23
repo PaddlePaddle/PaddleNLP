@@ -16,7 +16,7 @@
 DATAPATH=./data
 dataset_name=Flickr30k-CN
 
-split=valid # 指定计算valid或test集特征
+split=valid 
 python -u utils/make_topk_predictions_tr.py \
     --image-feats="${DATAPATH}/datasets/${dataset_name}/${split}_imgs.img_feat.jsonl" \
     --text-feats="${DATAPATH}/datasets/${dataset_name}/${split}_texts.txt_feat.jsonl" \
@@ -27,7 +27,7 @@ python -u utils/make_topk_predictions_tr.py \
 python utils/transform_ir_annotation_to_tr.py \
     --input ${DATAPATH}/datasets/${dataset_name}/${split}_texts.jsonl
 
-split=valid # 指定计算valid或test集特征
+split=valid 
 python utils/evaluation_tr.py \
     ${DATAPATH}/datasets/${dataset_name}/${split}_texts.tr.jsonl \
     ${DATAPATH}/datasets/${dataset_name}/${split}_tr_predictions.jsonl \

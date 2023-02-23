@@ -18,7 +18,6 @@ DATAPATH=./data
 train_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/train
 val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
 
-# 启动方式
 # --test_only \
 log_dir=train_log
 python -u -m paddle.distributed.launch --gpus "0,1" \

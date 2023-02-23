@@ -15,7 +15,7 @@
 # export NCCL_IB_DISABLE=0
 DATAPATH=./data
 
-split=valid # 指定计算valid或test集特征
+split=valid
 
 python -u extract_features.py \
     --extract-image-feats \

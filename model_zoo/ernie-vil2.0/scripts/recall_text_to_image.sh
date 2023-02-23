@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# export NCCL_IB_DISABLE=0
+
 DATAPATH=./data
 dataset_name=Flickr30k-CN
-split=valid # 指定计算valid或test集特征
+split=valid 
 
 python -u utils/make_topk_predictions.py \
     --image-feats="${DATAPATH}/datasets/${dataset_name}/${split}_imgs.img_feat.jsonl" \
