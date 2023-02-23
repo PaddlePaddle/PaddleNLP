@@ -63,6 +63,6 @@ class AutoModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             AutoModel.from_pretrained(model_name, cache_dir=tempdir)
             print(os.listdir(tempdir))
-            print(os.listdir((os.path.join(tempdir, model_name)))
+            print(os.listdir(os.path.join(tempdir, model_name)))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
