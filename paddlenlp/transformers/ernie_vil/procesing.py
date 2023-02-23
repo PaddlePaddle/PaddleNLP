@@ -40,6 +40,10 @@ class ErnieViLProcessor(ProcessorMixin):
     image_processor_class = "ErnieViLImageProcessor"
     tokenizer_class = "ErnieViLTokenizer"
 
+    pretrained_init_configuration = {
+        "PaddlePaddle/ernie_vil-2.0-base-zh": {"do_lower_case": True},
+    }
+
     def __init__(self, image_processor=None, tokenizer=None, **kwargs):
         if "feature_extractor" in kwargs:
             warnings.warn(

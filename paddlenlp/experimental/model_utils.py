@@ -13,25 +13,21 @@
 # limitations under the License.
 
 import copy
+import inspect
 import io
 import json
 import os
-import six
-import logging
-import inspect
 from shutil import copyfile
 
 import paddle
 import paddle.fluid.core as core
-from paddle.nn import Layer
-
-# TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.log import logger
 
 from paddlenlp.transformers import PretrainedModel
-from paddlenlp.experimental import FasterTokenizer
+
+# TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 __all__ = ["FasterPretrainedModel"]
 
@@ -114,10 +110,10 @@ class FasterPretrainedModel(PretrainedModel):
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name)
+                full_file_name = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name])
                 resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file
+            resource_files["model_config_file"] = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
@@ -195,7 +191,7 @@ class FasterPretrainedModel(PretrainedModel):
             vocab_file = resolved_resource_files.pop("vocab_file", None)
             if vocab_file and base_kwargs.get("vocab_file", None) is None:
                 base_kwargs["vocab_file"] = vocab_file
-            assert base_kwargs.get("vocab_file", None) is not None, f"The vocab "
+            assert base_kwargs.get("vocab_file", None) is not None, "The vocab "
             f"file is None. Please reload the class  {cls.__name__} with pretrained_name."
 
             model = cls(*base_args, **base_kwargs)
@@ -209,7 +205,7 @@ class FasterPretrainedModel(PretrainedModel):
             vocab_file = resolved_resource_files.pop("vocab_file", None)
             if vocab_file and base_kwargs.get("vocab_file", None) is None:
                 base_kwargs["vocab_file"] = vocab_file
-            assert base_kwargs.get("vocab_file", None) is not None, f"The vocab "
+            assert base_kwargs.get("vocab_file", None) is not None, "The vocab "
             f"file is None. Please reload the class  {cls.__name__} with pretrained_name."
 
             base_model = cls.base_model_class(*base_args, **base_kwargs)

@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import functools
+import json
 import os
 import shutil
 from typing import Any, Callable, Dict, List
@@ -40,7 +41,9 @@ from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
     PretrainedTokenizer,
+    export_model,
 )
+from paddlenlp.utils.log import logger
 
 from .auto_trainer_base import AutoTrainerBase
 
@@ -54,11 +57,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        language (string, required): language of the text
         metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
         greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
-        output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+            language (string, required): language of the text.
+            output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results".
+            id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
+            multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5.
+            verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs, use verbosity > 0 to set stop the workers from logging to the driver.
     """
 
     def __init__(
@@ -82,12 +89,19 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
         self.text_column = text_column
         self.label_column = label_column
+        self.id2label = self.kwargs.get("id2label", None)
+        self.multilabel_threshold = self.kwargs.get("multilabel_threshold", 0.5)
         if problem_type in ["multi_label", "multi_class"]:
             self.problem_type = problem_type
         else:
             raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
+        self._data_checks_and_inference()
+
+    @property
+    def supported_languages(self) -> List[str]:
+        return ["Chinese", "English"]
 
     @property
     def _default_training_argument(self) -> TrainingArguments:
@@ -100,6 +114,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
         )
 
     @property
@@ -113,20 +128,49 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
         )
 
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
         train_batch_size = hp.choice("batch_size", [2, 4, 8, 16, 32])
-        chinese_models = hp.choice(
-            "models",
+        chinese_finetune_models = hp.choice(
+            "finetune_models",
             [
+                "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
-                "ernie-3.0-base-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
-                "ernie-3.0-medium-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
-                "ernie-3.0-mini-zh",  # 6-layer, 384-hidden, 12-heads, 27M parameters
-                "ernie-3.0-micro-zh",  # 4-layer, 384-hidden, 12-heads, 23M parameters
-                "ernie-3.0-nano-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
+                "ernie-3.0-tiny-base-v2-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+                "ernie-3.0-tiny-medium-v2-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
+                "ernie-3.0-tiny-mini-v2-zh",  # 6-layer, 384-hidden, 12-heads, 27M parameters
+                "ernie-3.0-tiny-micro-v2-zh",  # 4-layer, 384-hidden, 12-heads, 23M parameters
+                "ernie-3.0-tiny-nano-v2-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
+                "ernie-3.0-tiny-pico-v2-zh",  # 3-layer, 128-hidden, 2-heads, 5.9M parameters.
+            ],
+        )
+        english_finetune_models = hp.choice(
+            "finetune_models",
+            [
+                # add deberta-v3 when we have it
+                "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
+                "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
+                "distilroberta-base",  # 6-layer, 768-hidden, 12-heads, 66M parameters. Case-sensitive
+                "ernie-2.0-base-en",  # 12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased English text.
+                "ernie-2.0-large-en",  # 24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased English text.
+            ],
+        )
+        english_prompt_models = hp.choice(
+            "prompt_models",
+            [
+                # add deberta-v3 when we have it
+                "roberta-large",  # 24-layer, 1024-hidden, 16-heads, 334M parameters. Case-sensitive
+                "roberta-base",  # 12-layer, 768-hidden, 12-heads, 110M parameters. Case-sensitive
+            ],
+        )
+        chinese_prompt_models = hp.choice(
+            "prompt_models",
+            [
+                "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
+                "ernie-1.0-base-zh-cw",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
             ],
         )
         return [
@@ -135,11 +179,22 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 2,
+                "EarlyStoppingCallback.early_stopping_patience": 5,
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.model_name_or_path": chinese_finetune_models,
+                "TrainingArguments.learning_rate": 3e-5,
+            },
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_finetune_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             # slow learning: small LR, large early stop patience
@@ -151,33 +206,93 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_models,
+                "TrainingArguments.model_name_or_path": chinese_finetune_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
-            # Note: prompt tuning candidates not included for now due to lack of inference capability
+            {
+                "preset": "finetune",
+                "language": "English",
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": english_finetune_models,
+                "TrainingArguments.learning_rate": 5e-6,
+            },
+            # prompt tuning candidates
+            {
+                "preset": "prompt",
+                "language": "Chinese",
+                "trainer_type": "PromptTrainer",
+                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
+                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "PromptTuningArguments.num_train_epochs": 100,
+                "PromptTuningArguments.model_name_or_path": chinese_prompt_models,
+                "PromptTuningArguments.learning_rate": 1e-5,
+                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+            },
+            {
+                "preset": "prompt",
+                "language": "English",
+                "trainer_type": "PromptTrainer",
+                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
+                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
+                "PromptTuningArguments.num_train_epochs": 100,
+                "PromptTuningArguments.model_name_or_path": english_prompt_models,
+                "PromptTuningArguments.learning_rate": 1e-5,
+                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+            },
         ]
 
     def _data_checks_and_inference(self):
-        self.id2label, self.label2id = {}, {}
-        # TODO: support label ids that is already encoded
-        if self.problem_type == "multi_class":
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    label = example[self.label_column]
-                    if label not in self.label2id:
-                        self.label2id[label] = len(self.label2id)
-                        self.id2label[len(self.id2label)] = label
-        # multi_label
-        else:
-            for dataset in [self.train_dataset, self.eval_dataset]:
-                for example in dataset:
-                    labels = example[self.label_column]
-                    for label in labels:
+        if self.id2label is None:
+            self.id2label, self.label2id = {}, {}
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
                         if label not in self.label2id:
                             self.label2id[label] = len(self.label2id)
                             self.id2label[len(self.id2label)] = label
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                self.label2id[label] = len(self.label2id)
+                                self.id2label[len(self.id2label)] = label
+        else:
+            self.label2id = {}
+            for i in self.id2label:
+                self.label2id[self.id2label[i]] = i
 
-    def _construct_trainer(self, config) -> Trainer:
+            if self.problem_type == "multi_class":
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        label = example[self.label_column]
+                        if label not in self.label2id:
+                            raise ValueError(
+                                f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
+                            )
+            # multi_label
+            else:
+                for dataset in [self.train_dataset, self.eval_dataset]:
+                    for example in dataset:
+                        labels = example[self.label_column]
+                        for label in labels:
+                            if label not in self.label2id:
+                                raise ValueError(
+                                    f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
+                                )
+
+    def _construct_trainer(self, config, eval_dataset=None) -> Trainer:
         if "EarlyStoppingCallback.early_stopping_patience" in config:
             callbacks = [
                 EarlyStoppingCallback(early_stopping_patience=config["EarlyStoppingCallback.early_stopping_patience"])
@@ -187,14 +302,20 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if config["trainer_type"] == "Trainer":
             model_path = config["TrainingArguments.model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
-            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_path, num_labels=len(self.id2label), id2label=self.id2label, label2id=self.label2id
+            )
+            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
             trans_func = functools.partial(
                 self._preprocess_fn,
                 tokenizer=tokenizer,
-                max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
+                max_length=max_length,  # truncate to the max length allowed by the model
             )
             processed_train_dataset = copy.deepcopy(self.train_dataset).map(trans_func, lazy=False)
-            processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(trans_func, lazy=False)
+            if eval_dataset is None:
+                processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(trans_func, lazy=False)
+            else:
+                processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
             training_args = self._override_hp(config, self._default_training_argument)
             trainer = Trainer(
                 model=model,
@@ -208,11 +329,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
         elif config["trainer_type"] == "PromptTrainer":
             model_path = config["PromptTuningArguments.model_name_or_path"]
-            max_length = config.get("PreprocessArguments.max_length", 128)
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             processed_train_dataset = copy.deepcopy(self.train_dataset).map(self._preprocess_labels, lazy=False)
-            processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(self._preprocess_labels, lazy=False)
+            if eval_dataset is None:
+                processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(self._preprocess_labels, lazy=False)
+            else:
+                processed_eval_dataset = copy.deepcopy(eval_dataset).map(self._preprocess_labels, lazy=False)
+
             model = AutoModelForMaskedLM.from_pretrained(model_path)
+            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
             template = AutoTemplate.create_from(
                 prompt=config["template.prompt"],
                 tokenizer=tokenizer,
@@ -251,17 +376,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             # import is required for proper pickling
             from paddlenlp.utils.log import logger
 
-            self.set_log_level()
             config = config["candidates"]
             trainer = self._construct_trainer(config)
             trainer.train()
             eval_metrics = trainer.evaluate()
-            if config["trainer_type"] == "PromptTrainer":
-                # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
-                # We directly export a static model instead of a dynamic model
-                trainer.export_model(self.export_path)
-            else:
-                trainer.save_model(self.export_path)
+            trainer.save_model(self.save_path)
+
             if os.path.exists(self.training_path):
                 logger.info("Removing training checkpoints to conserve disk space")
                 shutil.rmtree(self.training_path)
@@ -280,22 +400,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
-        if model_config["trainer_type"] == "PromptTrainer":
-            raise NotImplementedError(
-                "'PromptTrainer' models do not support 'evaluate' yet because dygraph save model has not been implemented."
-            )
-        model_config["TrainingArguments.model_name_or_path"] = os.path.join(model_result.log_dir, self.export_path)
-        trainer = self._construct_trainer(model_config)
-        if eval_dataset is not None:
-            trans_func = functools.partial(
-                self._preprocess_fn,
-                tokenizer=trainer.tokenizer,
-                max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
-            )
-            processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
-            eval_metrics = trainer.evaluate(processed_eval_dataset)
-        else:
-            eval_metrics = trainer.evaluate()
+
+        trainer = self._construct_trainer(model_config, eval_dataset)
+        trainer.load_state_dict_from_checkpoint(
+            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
+        )
+
+        eval_metrics = trainer.evaluate()
+        if os.path.exists(self.training_path):
+            logger.info(f"Removing {self.training_path} to conserve disk space")
+            shutil.rmtree(self.training_path)
+        trainer.log_metrics("eval", eval_metrics)
         return eval_metrics
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
@@ -319,7 +434,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _compute_multi_label_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         pred_probs = sigmoid(eval_preds.predictions)
-        pred_ids = pred_probs > 0.5
+        pred_ids = pred_probs > self.multilabel_threshold
         metrics = {}
         # In multilabel classification, this function computes subset accuracy:
         # the set of labels predicted for a sample must exactly match the corresponding set of labels in y_true.
@@ -358,19 +473,97 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def to_taskflow(self, trial_id=None):
+    def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, precision="fp32"):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            export_path (str): the filepath to export to.
+            batch_size(int): The sample number of a mini-batch. Defaults to 1.
+            precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
         model_result = self._get_model_result(trial_id=trial_id)
+        trial_id = model_result.metrics["trial_id"]
+
+        if export_path is None:
+            export_path = os.path.join(self.export_path, trial_id)
+
+        taskflow_config = self.export(export_path=export_path, trial_id=trial_id)
+        taskflow_config["task_path"] = export_path
+        taskflow_config["batch_size"] = batch_size
+        taskflow_config["precision"] = precision
+        return Taskflow(**taskflow_config)
+
+    def export(self, export_path, trial_id=None):
+        """
+        Export the model from a certain `trial_id` to the given file path.
+
+        Args:
+            export_path (str, required): the filepath to export to
+            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+        """
+
+        model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
-        if model_config["trainer_type"] == "PromptTrainer":
-            raise NotImplementedError("'Taskflow' inference does not support models trained with PromptTrainer yet.")
-        else:
-            exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-            return Taskflow(
-                "text_classification", model=self.problem_type, task_path=exported_model_path, id2label=self.id2label
+        trial_id = model_result.metrics["trial_id"]
+
+        if os.path.exists(export_path):
+            logger.info(
+                f"Export path for {trial_id} already exists: ({export_path}). The model parameter files will be overwritten."
             )
+
+        # construct trainer
+        trainer = self._construct_trainer(model_config)
+        trainer.load_state_dict_from_checkpoint(
+            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
+        )
+
+        # save static model
+        if model_config["trainer_type"] == "PromptTrainer":
+            trainer.export_model(export_path)
+            trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
+            mode = "prompt"
+            max_length = model_config.get(
+                "PreprocessArguments.max_length", trainer.model.plm.config.max_position_embeddings
+            )
+        else:
+            if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
+                input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
+            else:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                ]
+            export_model(model=trainer.model, input_spec=input_spec, path=export_path)
+            mode = "finetune"
+            max_length = model_config.get(
+                "PreprocessArguments.max_length", trainer.model.config.max_position_embeddings
+            )
+
+        # save tokenizer
+        trainer.tokenizer.save_pretrained(export_path)
+
+        # save taskflow config file
+        taskflow_config = {
+            "task": "text_classification",
+            "mode": mode,
+            "is_static_model": True,
+            "problem_type": self.problem_type,
+            "multilabel_threshold": self.multilabel_threshold,
+            "max_length": max_length,
+            "id2label": self.id2label,
+        }
+
+        with open(os.path.join(export_path, "taskflow_config.json"), "w", encoding="utf-8") as f:
+            json.dump(taskflow_config, f, ensure_ascii=False)
+        logger.info(
+            f"Taskflow config saved to {export_path}. You can use the Taskflow config to create a Taskflow instance for inference"
+        )
+
+        if os.path.exists(self.training_path):
+            logger.info("Removing training checkpoints to conserve disk space")
+            shutil.rmtree(self.training_path)
+
+        logger.info(f"Exported {trial_id} to {export_path}")
+        return taskflow_config

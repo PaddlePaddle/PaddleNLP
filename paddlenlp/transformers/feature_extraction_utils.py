@@ -254,8 +254,8 @@ class FeatureExtractionMixin(object):
                 feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
             else:
                 # Assuming from community-contributed pretrained models
-                feature_extractor_file = os.path.join(
-                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME
+                feature_extractor_file = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
                 )
             default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:

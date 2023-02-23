@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import unittest
 from unittest import TestCase
 
 from tests.testing_utils import argv_context_guard, load_test_config
@@ -29,6 +30,8 @@ class GPTTest(TestCase):
     def tearDown(self) -> None:
         sys.path.remove(self.path)
 
+    # TODO(wj-Mcat): disable old gpt `run_pretrain.py` and will be uncomment in: https://github.com/PaddlePaddle/PaddleNLP/pull/4614
+    @unittest.skip("disable for old gpt")
     def test_pretrain(self):
 
         # 1. run pretrain

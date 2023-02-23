@@ -208,6 +208,7 @@ class SchedulerType(ExplicitEnum):
     COSINE = "cosine"
     CONSTANT = "constant"
     CONSTANT_WITH_WARMUP = "constant_with_warmup"
+    POLYNOMIAL = "polynomial"
 
 
 def get_constant_schedule(learning_rate: float, last_epoch: int = -1):
@@ -306,10 +307,62 @@ def get_cosine_schedule_with_warmup(
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
+def get_polynomial_decay_schedule_with_warmup(
+    learning_rate: float,
+    num_warmup_steps: int,
+    num_training_steps: int,
+    lr_end: float = 1e-7,
+    power: float = 1.0,
+    last_epoch: int = -1,
+):
+    """
+    Create a schedule with a learning rate that decreases as a polynomial decay from the initial lr set in the
+    optimizer to end lr defined by *lr_end*, after a warmup period during which it increases linearly from 0 to the
+    initial lr set in the optimizer.
+    Args:
+        learning_rate (`float`):
+            The base learning rate. It is a python float number.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        num_training_steps (`int`):
+            The total number of training steps.
+        lr_end (`float`, *optional*, defaults to 1e-7):
+            The end LR.
+        power (`float`, *optional*, defaults to 1.0):
+            Power factor.
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+    Note: *power* defaults to 1.0 as in the fairseq implementation, which in turn is based on the original BERT
+    implementation at
+    https://github.com/google-research/bert/blob/f39e881b169b9d53bea03d2d341b31707a6c052b/optimization.py#L37
+    Return:
+        `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
+    """
+
+    lr_init = learning_rate
+    if not (lr_init > lr_end):
+        raise ValueError(f"lr_end ({lr_end}) must be be smaller than initial lr ({lr_init})")
+
+    def lr_lambda(current_step: int):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        elif current_step > num_training_steps:
+            return lr_end / lr_init  # as LambdaLR multiplies by lr_init
+        else:
+            lr_range = lr_init - lr_end
+            decay_steps = num_training_steps - num_warmup_steps
+            pct_remaining = 1 - (current_step - num_warmup_steps) / decay_steps
+            decay = lr_range * pct_remaining**power + lr_end
+            return decay / lr_init  # as LambdaLR multiplies by lr_init
+
+    return LambdaDecay(learning_rate, lr_lambda, last_epoch)
+
+
 TYPE_TO_SCHEDULER_FUNCTION = {
     SchedulerType.LINEAR: get_linear_schedule_with_warmup,
     SchedulerType.COSINE: get_cosine_schedule_with_warmup,
     SchedulerType.CONSTANT: get_constant_schedule,
+    SchedulerType.POLYNOMIAL: get_polynomial_decay_schedule_with_warmup,
     SchedulerType.CONSTANT_WITH_WARMUP: get_constant_schedule_with_warmup,
 }
 

@@ -20,7 +20,7 @@
 
 - **ERNIE 3.0 Tiny** 百度 ERNIE 使用 ERNIE-Tiny 系列的知识蒸馏技术，将 ERNIE 3.0 Titan 大模型的能力传递给小模型，产出并开源了易于部署的 ERNIE 3.0 Tiny 系列预训练模型，刷新了中文小模型的 SOTA 成绩。在这些较少参数量的 ERNIE 3.0 Tiny 系列模型中，有一部分可以直接部署在 CPU 上。
 
-- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小。再经过 [⚡️FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 部署工具和 [FastTokenizer](../../fast_tokenizer/README.md) 对分词阶段的加速，**端到端推理性能**也有显著提升，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱移动端**。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
+- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小。再经过 [⚡️FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 部署工具和 [FastTokenizer](../../fast_tokenizer/README.md) 对分词阶段的加速，**端到端推理性能**也有显著提升，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱端侧**。由于端侧部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
 
 <a name="模型介绍"></a>
 
@@ -28,7 +28,7 @@
 
 百度 ERNIE 团队在 2021 年底发布了百亿级别大模型 ERNIE 3.0 和千亿级别的大模型 ERNIE 3.0 Titan。为了让大模型的能力能够真正在一线业务发挥威力，ERNIE 团队推出了 ERNIE-Tiny 系列的知识蒸馏技术，通过任务无关蒸馏的方法，产出了多个轻量级模型 ERNIE 3.0 Tiny，刷新了中文小模型的成绩，并使这些模型能够直接在 CPU 上进行预测，大大拓展了 ERNIE 模型的使用场景。
 
-2023 年初，ERNIE 团队进一步开源了 ERNIE 3.0 Tiny 模型的 v2 版本，使教师模型预先**注入下游知识**并参与 **多任务训练**，大大提高了小模型在下游任务上的效果。ERNIE 3.0 Tiny v2 模型在 out-domain、low-resourced 的下游任务上比 v1 有了进一步的提升，并且 v2 还开源了 3L128H 结构的模型。
+2023 年初，ERNIE 团队进一步开源了 ERNIE 3.0 Tiny 模型的 v2 版本，使教师模型预先**注入下游知识**并参与 **多任务训练**，大大提高了小模型在下游任务上的效果。ERNIE 3.0 Tiny v2 模型在 in-domain、out-domain、low-resource 的下游任务上比 v1 有了进一步的提升，并且 v2 还开源了 3L128H 结构的模型。
 
 ### 在线蒸馏技术
 
@@ -53,7 +53,7 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 </p>
 <br>
 
-因此，ERNIE 3.0 Tiny v2 相比 ERNIE 3.0 Tiny v1 在 out-domain、low-resourced 数据上获得显著的提升。
+因此，ERNIE 3.0 Tiny v2 相比 ERNIE 3.0 Tiny v1 在 in-domain、out-domain、low-resource 数据上都能获得显著的提升。
 
 <a name="模型效果"></a>
 
@@ -61,24 +61,24 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 
 本项目开源 **ERNIE 3.0 Tiny _Base_** 、**ERNIE 3.0 Tiny _Medium_** 、 **ERNIE 3.0 Tiny _Mini_** 、 **ERNIE 3.0 Tiny _Micro_** 、 **ERNIE 3.0 Tiny _Nano_**、**ERNIE 3.0 Tiny _Pico_** 六种结构的中文模型：
 
-- **ERNIE 3.0-Tiny-_Base_** (_12-layer, 768-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Medium_**(_6-layer, 768-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Mini_** (_6-layer, 384-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Micro_** (_4-layer, 384-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Nano_** (_4-layer, 312-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Pico_** (_3-layer, 128-hidden, 2-heads_)
+- **ERNIE 3.0-Tiny-_Base_**-zh (_12-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Medium_**-zh(_6-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Mini_**-zh (_6-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Micro_**-zh (_4-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Nano_**-zh (_4-layer, 312-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Pico_**-zh (_3-layer, 128-hidden, 2-heads_)
 
 其中，v2 版本开源了 6 种结构的模型，v1 版本开源了前 5 种结构的模型。
 
-ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resourced 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../examples/benchmark/clue) 复现。
+ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resource 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../examples/benchmark/clue) 复现。
 
 <table>
     <tr>
         <td>Arch</td>
         <td>Model</td>
-        <td colspan=11 align=center> In-domain </td>
+        <td colspan=8 align=center> In-domain </td>
         <td colspan=3 align=center> Out-domain </td>
-        <td colspan=4 align=center> Low-resourced</td>
+        <td colspan=4 align=center> Low-resource</td>
     </tr>
     <tr>
         <td>-</td>
@@ -89,11 +89,8 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>iflytek</td>
         <td>cmnli</td>
         <td>ocnli</td>
-        <td>cluewssc2020</td>
+        <td>cluewsc2020</td>
         <td>csl</td>
-        <td>cmrc2018</td>
-        <td>chid</td>
-        <td>c3</td>
         <td>avg.</td>
         <td>CANLI</td>
         <td>shopping_10</td>
@@ -105,7 +102,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=2 align=center>12L768H</td>
         <td>ERNIE 3.0 Tiny-Base-v1-zh</td>
-        <td>76.05</td>
+        <td>75.38</td>
         <td>75.93</td>
         <td>58.26</td>
         <td>61.56</td>
@@ -113,9 +110,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>80.10</td>
         <td>86.18</td>
         <td>82.63</td>
-        <td>70.71/90.41</td>
-        <td>84.26</td>
-        <td>77.88</td>
         <td>97.29</td>
         <td>99.31</td>
         <td>95.26</td>
@@ -126,17 +120,14 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td><b>ERNIE 3.0 Tiny-Base-v2-zh</b></td>
-        <td>76.31</td>
+        <td>75.93</td>
         <td>77.43</td>
         <td>59.11</td>
         <td>61.49</td>
         <td>84.56</td>
         <td>81.86</td>
-        <td>82.57</td>
+        <td>84.54</td>
         <td>82.50</td>
-        <td>68.87/89.96</td>
-        <td>83.55</td>
-        <td><b>81.16</b></td>
         <td>97.30</td>
         <td>99.22</td>
         <td>95.38</td>
@@ -148,7 +139,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=2 align=center>6L768H</td>
         <td>ERNIE 3.0 Tiny-Medium-v1-zh</td>
-        <td>72.49</td>
+        <td>72.78</td>
         <td>73.37</td>
         <td>57.00</td>
         <td>60.67</td>
@@ -156,9 +147,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>76.88</td>
         <td>79.28</td>
         <td>81.60</td>
-        <td>65.83/87.30</td>
-        <td>79.91</td>
-        <td>69.73</td>
         <td>96.99</td>
         <td>99.16</td>
         <td>94.82</td>
@@ -169,7 +157,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td><b>ERNIE 3.0 Tiny-Medium-v2-zh</b></td>
-        <td>74.22</td>
+        <td>74.25</td>
         <td>75.88</td>
         <td>57.86</td>
         <td>61.64</td>
@@ -177,9 +165,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td><b>80.27</b></td>
         <td>79.93</td>
         <td>81.27</td>
-        <td>65.86/87.62</td>
-        <td>80.75</td>
-        <td><b>75.86</b></td>
         <td>97.22</td>
         <td>99.19</td>
         <td>95.24</td>
@@ -191,7 +176,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=2 align=center>6L384H</td>
         <td>ERNIE 3.0 Tiny-Mini-v1-zh</td>
-        <td>66.90</td>
+        <td>68.88</td>
         <td>71.85</td>
         <td>55.24</td>
         <td>54.48</td>
@@ -199,9 +184,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>73.08</td>
         <td>71.05</td>
         <td>79.30</td>
-        <td>58.53/81.97</td>
-        <td>69.71</td>
-        <td>58.60</td>
         <td>96.27</td>
         <td>98.44</td>
         <td>94.10</td>
@@ -212,7 +194,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td><b>ERNIE 3.0 Tiny-Mini-v2-zh</b></td>
-        <td>68.67</td>
+        <td>70.49</td>
         <td><b>74.40</b></td>
         <td>56.20</td>
         <td>55.79</td>
@@ -220,9 +202,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td><b>76.75</b></td>
         <td>72.37</td>
         <td>77.77</td>
-        <td>54.46/81.42</td>
-        <td>71.50</td>
-        <td><b>67.27</b></td>
         <td>96.69</td>
         <td>98.69</td>
         <td>94.68</td>
@@ -234,7 +213,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=2 align=center>4L384H</td>
         <td>ERNIE 3.0 Tiny-Micro-v1-zh</td>
-        <td>64.21</td>
+        <td>67.26</td>
         <td>71.15</td>
         <td>55.05</td>
         <td>53.83</td>
@@ -242,9 +221,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>70.41</td>
         <td>69.08</td>
         <td>76.50</td>
-        <td>53.77/77.82</td>
-        <td>62.26</td>
-        <td>55.53</td>
         <td>95.76</td>
         <td>97.69</td>
         <td>93.83</td>
@@ -255,7 +231,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td><b>ERNIE 3.0 Tiny-Micro-v2-zh</b></td>
-        <td>64.05</td>
+        <td>67.98</td>
         <td>72.52</td>
         <td>55.45</td>
         <td>54.33</td>
@@ -263,9 +239,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td><b>74.85</b></td>
         <td>66.45</td>
         <td>74.43</td>
-        <td>37.50/69.48</td>
-        <td>64.89</td>
-        <td><b>62.24</b></td>
         <td>96.47</td>
         <td>98.41</td>
         <td>94.52</td>
@@ -277,7 +250,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=2 align=center>4L312H</td>
         <td>ERNIE 3.0 Tiny-Nano-v1-zh</td>
-        <td>62.97</td>
+        <td>66.24</td>
         <td>70.51</td>
         <td>54.57</td>
         <td>48.36</td>
@@ -285,9 +258,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>70.61</td>
         <td>68.75</td>
         <td>75.93</td>
-        <td>52.00/76.35</td>
-        <td>58.91</td>
-        <td>55.11</td>
         <td>71.16</td>
         <td>51.87</td>
         <td>91.35</td>
@@ -298,17 +268,14 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td><b>ERNIE 3.0 Tiny-Nano-v2-zh</b></td>
-        <td>63.71</td>
+        <td>67.77</td>
         <td>72.75</td>
         <td>55.38</td>
         <td>48.90</td>
         <td><b>78.01</b></td>
         <td><b>74.54</b></td>
-        <td>66.45</td>
+        <td>68.42</td>
         <td>76.37</td>
-        <td>39.70/73.11</td>
-        <td><b>63.04</b></td>
-        <td><b>61.95</b></td>
         <td><b>96.34</b></td>
         <td><b>98.19</b></td>
         <td><b>94.48</b></td>
@@ -320,7 +287,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     <tr>
         <td rowspan=1 align=center>3L128H2A</td>
         <td><b>ERNIE 3.0 Tiny-Pico-v2-zh</b></td>
-        <td>49.02</td>
+        <td>57.81</td>
         <td>69.35</td>
         <td>52.50</td>
         <td>21.05</td>
@@ -328,9 +295,6 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>64.03</td>
         <td>63.49</td>
         <td>68.60</td>
-        <td>5.96/29.40</td>
-        <td>36.77</td>
-        <td>42.79</td>
         <td>74.13</td>
         <td>54.97</td>
         <td>93.29</td>
@@ -341,6 +305,14 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
 </table>
 
+ERNIE 3.0 Tiny v2 多任务学习、在线蒸馏方案效果显著，刷新了中文小模型的 SOTA 成绩。具体对比数据见如下模型 **精度-时延** 图，横坐标表示在 Arm CPU（高通 865 芯片）上，基于 Arm v8 arch 测试（batch_size=1, seq_len=32）的推理时延（Latency，单位毫秒），纵坐标是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务），其中 CMRC2018 阅读理解任务的评价指标是 Exact Match(EM)，其它任务的评价指标均是 Accuracy。模型名下方标注了模型的参数量。
+
+<p align="center">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/218035834-050c04d4-3b59-468a-910b-aabf543d9c98.png" title="">
+</p>
+
+
+图中越靠左上方的模型，精度和性能水平越高。可以看到 ERNIE 3.0 Tiny v2 在同等规模的开源模型中，综合实力领先其他同类型轻量级模型。与 UER/RoBERTa-Base 相比，12L768H 的 ERNIE 3.0-Base 平均精度提升了 4.5 个点，比同等规模的BERT-Base-Chinese 提升 3.7 个点；6L768H 的 ERNIE 3.0-Medium 相比 12L768H 的 UER/Chinese-RoBERTa 高 2.4，比 BERT-Base-Chinese 高 1.7，并且节省一倍运算时间；另外值得一提的是，这些小模型能够直接部署在 CPU 上。
 
 使用 PaddleNLP 只需要一行代码就可以下载并获取 ERNIE 3.0 Tiny 预训练模型，之后可以用自己的下游数据下进行微调。
 
@@ -382,7 +354,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 │ └── slot_label.txt             # 槽位标签文件
 ├── deploy                       # 部署目录
 │ └── README.md                  # Fastdeploy 部署文档
-│ └── android                    # 移动端部署目录
+│ └── android                    # 端侧部署目录
 │ └── cpp                        # 服务端部署目录（C++）
 │ └── python                     # 服务端部署目录（Python）
 └── README.md                    # 文档
@@ -396,7 +368,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 
 ### 任务介绍
 
-本项目是使用 ERNIE 3.0 Tiny 预训练模型移动端部署方案，任务背景是车载语音场景下的口语理解（Spoken Language Understanding，SLU）。本项目包括微调、压缩和部署的全流程。
+本项目是使用 ERNIE 3.0 Tiny 预训练模型端侧部署方案，任务背景是车载语音场景下的口语理解（Spoken Language Understanding，SLU）。本项目包括微调、压缩和部署的全流程。
 
 SLU 任务主要将用户的自然语言表达解析为结构化信息。结构化信息的解析主要包括意图识别和槽位填充两个步骤。
 
@@ -568,14 +540,14 @@ python run_eval.py  \
 
 ## 🔥端上模型压缩方案
 
-尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至移动端还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
+尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至端侧还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
 
 为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能，模型压缩 API 主要是基于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 模型压缩能力，PaddleSlim 是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
 
 端上模型压缩流程如下图所示：
 
 <p align="center">
-        <img width="1000" alt="image" src="https://user-images.githubusercontent.com/16698950/212007542-b651c57a-9e4e-46c2-8724-cd7a6a20973f.png" title="compression plan">
+        <img width="1000" alt="image" src="https://user-images.githubusercontent.com/26483581/218037457-8b91cac4-e19e-401f-86c8-b64d7247014c.png" title="compression plan">
 </p>
 <br>
 
@@ -637,9 +609,9 @@ python run_train.py \
 <a name="FastDeploy部署"></a>
 
 ## ⚡️FastDeplopy 部署
-能够将深度学习模型部署到性能较低的移动端本身是比较困难的工作，因此在前面我们对小模型做了大量的优化，在精度不降的情况下将 69 MB 的模型压缩至 5.4 MB，但是如果想更好地满足业务上线要求，还需要有部署工具对性能有更多优化。在这里，PaddlePadde 提供了易用高效的云边端推理部署工具 ⚡️FastDeploy，它的 [Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite) 后端基于算子融合和常量折叠进行了深度模型优化，使得模型推理速度可有大幅度提升；它所集成的 FastTokenizer 库能够对分词阶段进行加速，在麒麟 985 芯片上单条文本的分词的推理时延低于 0.1 毫秒；
+能够将深度学习模型部署到性能较低的端侧本身是比较困难的工作，因此在前面我们对小模型做了大量的优化，在精度不降的情况下将 69 MB 的模型压缩至 5.4 MB，但是如果想更好地满足业务上线要求，还需要有部署工具对性能有更多优化。在这里，PaddlePadde 提供了易用高效的云边端推理部署工具 ⚡️FastDeploy，它的 [Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite) 后端基于算子融合和常量折叠进行了深度模型优化，使得模型推理速度可有大幅度提升；它所集成的 FastTokenizer 库能够对分词阶段进行加速，在麒麟 985 芯片上单条文本的分词的推理时延低于 0.1 毫秒；
 
-因此，本项目基于 FastDeploy 部署工具，完成了 ERNIE 3.0 Tiny 移动端和服务端的高效部署，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
+因此，本项目基于 FastDeploy 部署工具，完成了 ERNIE 3.0 Tiny 端侧和服务端的高效部署，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
@@ -648,7 +620,7 @@ python run_train.py \
 想要更多了解 FastDeploy 可参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。它为 NLP 任务提供了一整套完整的部署 Pipeline，提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在云、边、端上部署各类常见的 NLP 任务，如文本分类、序列标注、信息抽取等：
 - 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在麒麟 985 芯片上单条文本的分词延时低于 0.1 毫秒，将本项目模型部署在 GPU 上时，使用 FastTokenizer 工具可使端到端性能提升 **3.56倍**；
 - 在 Runtime 阶段，FastDeploy 集成多款硬件以及推理引擎后端，开发者可以设置 `fastdeploy::RuntimeOption` 以完成在不同硬件以及使用不同的推理引擎进行部署。目前，FastDeploy 支持的后端引擎有：
-    - 移动端： `Paddle Lite`；
+    - 端侧： `Paddle Lite`；
     - 服务端 GPU： `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及 `TensorRT`；
     - 服务端 CPU：`Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO`。
 - 在后处理阶段，FastDeploy 提供了张量级别的 [数值运算模块](https://baidu-paddle.github.io/fastdeploy-api/cpp/html/namespacefastdeploy_1_1function.html)， 基于该模块可以快速完成各类任务的后处理计算，如文本分类任务的 Softmax 等数值计算。

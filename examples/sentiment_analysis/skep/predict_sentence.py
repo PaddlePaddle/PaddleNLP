@@ -78,7 +78,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         encoded_inputs = convert_example_to_feature(text, tokenizer, max_seq_len=args.max_seq_len)
         examples.append(encoded_inputs)
 
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
     data_collator = DataCollatorWithPadding(tokenizer, padding=True)

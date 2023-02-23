@@ -89,6 +89,7 @@ else:
         UnCLIPScheduler,
         VQDiffusionScheduler,
     )
+    from .schedulers.preconfig import PreconfigEulerAncestralDiscreteScheduler
     from .training_utils import EMAModel
 
 try:
@@ -98,6 +99,7 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 else:
     from .schedulers import LMSDiscreteScheduler
+    from .schedulers.preconfig import PreconfigLMSDiscreteScheduler
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available()):

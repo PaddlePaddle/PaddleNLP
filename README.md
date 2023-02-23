@@ -9,7 +9,7 @@
 <p align="center">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202-dfd.svg"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
-    <a href=""><img src="https://img.shields.io/badge/python-3.6.2+-aff.svg"></a>
+    <a href=""><img src="https://img.shields.io/badge/python-3.7+-aff.svg"></a>
     <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-pink.svg"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/graphs/contributors"><img src="https://img.shields.io/github/contributors/PaddlePaddle/PaddleNLP?color=9ea"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/commits"><img src="https://img.shields.io/github/commit-activity/m/PaddlePaddle/PaddleNLP?color=3af"></a>
@@ -277,7 +277,7 @@ outputs, _ = model.generate(
 ### 环境依赖
 
 - python >= 3.7
-- paddlepaddle >= 2.2
+- paddlepaddle >= 2.3
 
 ### pip安装
 
@@ -288,7 +288,7 @@ pip install --upgrade paddlenlp
 或者可通过以下命令安装最新 develop 分支代码：
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。

@@ -86,7 +86,7 @@ class Predictor(object):
             )
             examples.append(encoded_inputs)
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
         data_collator = DataCollatorWithPadding(tokenizer, padding=True, return_tensors="np")
 

@@ -40,7 +40,7 @@ nlp2_build (){
 
     python -m pip install -r requirements.txt
     python setup.py bdist_wheel
-    python -m pip install --force-reinstall dist/paddlenlp****.whl
+    python -m pip install -U dist/paddlenlp****.whl
 }
 nlp2_build
 python -c 'from visualdl import LogWriter'
@@ -95,7 +95,7 @@ else
     P0case_EXCODE=0
 fi
 if [ $P0case_EXCODE -ne 0 ] ; then
-    cd logs
+    cd model_logs/
     FF=`ls *_FAIL*|wc -l`
     echo -e "\033[31m ---- P0case failed number: ${FF} \033[0m"
     ls *_FAIL*

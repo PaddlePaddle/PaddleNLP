@@ -113,7 +113,7 @@ class TextSummarizationTask(Task):
         if self._model_type != "unimo-text":
             pad_right = True
         examples = [self._convert_example(i) for i in data]
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)

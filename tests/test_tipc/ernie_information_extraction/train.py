@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
-import numpy as np
 import time
+from functools import partial
 
+import numpy as np
 import paddle
+from data import load_dataset, load_dict, parse_decodes
 
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
-
-from data import load_dict, load_dataset, parse_decodes
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 
 
 def set_seed(seed):
@@ -181,16 +180,29 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+    parser.add_argument(
+        "--save_dir",
+        default="./checkpoint",
+        type=str,
+        help="The output directory where the model checkpoints will be written.",
+    )
     parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "npu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+    parser.add_argument(
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["cpu", "gpu", "npu", "xpu"],
+        help="The device to select to train the model, is must be cpu/gpu.",
+    )
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
-    parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
+    parser.add_argument(
+        "--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform."
+    )
+    parser.add_argument(
+        "--data_dir", default="./waybill_ie/data", type=str, help="The folder where the dataset is located."
+    )
     args = parser.parse_args()
-    # yapf: enable
 
     do_train(args)

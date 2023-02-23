@@ -41,6 +41,13 @@ class ChineseCLIPProcessor(ProcessorMixin):
     image_processor_class = "ChineseCLIPImageProcessor"
     tokenizer_class = "ChineseCLIPTokenizer"
 
+    pretrained_init_configuration = {
+        "OFA-Sys/chinese-clip-vit-base-patch16": {"do_lower_case": True},
+        "OFA-Sys/chinese-clip-vit-huge-patch14": {"do_lower_case": True},
+        "OFA-Sys/chinese-clip-vit-large-patch14": {"do_lower_case": True},
+        "OFA-Sys/chinese-clip-vit-large-patch14-336px": {"do_lower_case": True},
+    }
+
     def __init__(self, image_processor=None, tokenizer=None, **kwargs):
         if "feature_extractor" in kwargs:
             warnings.warn(
