@@ -18,7 +18,7 @@ import logging
 from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
-
+from typing import List
 import numpy as np
 import paddle
 from paddle import nn
@@ -802,7 +802,7 @@ class FunnelPreTrainedModel(PreTrainedModel):
     base_model_prefix = "funnel"
 
     @classmethod
-    def _get_name_mappings(cls, config: FunnelConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: FunnelConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
