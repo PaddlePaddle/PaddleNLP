@@ -268,7 +268,7 @@ class MegatronBertModelTester:
         model = MegatronBertForCausalLM(config)
         model.eval()
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[0].shape, [self.seq_length, self.vocab_size])
 
     def create_and_check_for_masked_lm(
         self,
