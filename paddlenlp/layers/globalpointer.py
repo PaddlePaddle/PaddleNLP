@@ -32,7 +32,6 @@ class RotaryPositionEmbedding(nn.Layer):
             self.cos[offset : offset + seqlen, :],
         )
         x1, x2 = x[..., 0::2], x[..., 1::2]
-        # 奇偶交错
         return paddle.stack([x1 * cos - x2 * sin, x1 * sin + x2 * cos], axis=-1).flatten(-2, -1)
 
 
@@ -51,20 +50,16 @@ class GlobalPointer(nn.Layer):
     def forward(self, inputs, attention_mask=None):
         inputs = self.dense1(inputs)
         qw, kw = inputs[..., ::2], inputs[..., 1::2]
-        # RoPE编码
         if self.RoPE:
             qw, kw = self.rotary(qw), self.rotary(kw)
 
-        # 计算内积
         logits = paddle.einsum("bmd,bnd->bmn", qw, kw) / self.head_size**0.5
         bias = paddle.transpose(self.dense2(inputs), [0, 2, 1]) / 2
         logits = logits[:, None] + bias[:, ::2, None] + bias[:, 1::2, :, None]
 
-        # 排除padding
         attn_mask = 1 - attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
         logits = logits - attn_mask * 1e12
 
-        # 排除下三角
         if self.tril_mask:
             mask = paddle.tril(paddle.ones_like(logits), diagonal=-1)
 

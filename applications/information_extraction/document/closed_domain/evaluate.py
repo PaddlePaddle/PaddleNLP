@@ -19,60 +19,88 @@ import os
 import paddle
 from metric import get_eval
 from tqdm import tqdm
-from utils import create_dataloader, get_label_maps, postprocess, reader
+from utils import create_dataloader, get_label_maps, Processor, reader, get_eval_golds
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import (
-    GlobalPointerForEntityExtraction,
-    GPLinkerForRelationExtraction,
-)
+from paddlenlp.layers import GPLinkerForDocExtraction
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
 @paddle.no_grad()
-def evaluate(model, dataloader, label_maps):
+def evaluate(model, dataloader, label_maps, golds):
     model.eval()
-    all_preds = ([], [])
+    all_preds = {
+        "entity_list": [],
+        "spo_list": [],
+    }
+    cur_doc_id = -1
     for batch in tqdm(dataloader, desc="Evaluating: ", leave=False):
-        input_ids, attention_masks, bbox, image, offset_mappings, texts = batch
+        input_ids, attention_masks, bbox, image, offset_mappings, texts, doc_ids, doc_offsets, _ = batch
+
         logits = model(input_ids, attention_masks, bbox, image)
-        batch_outputs = postprocess(logits, offset_mappings, texts, label_maps)
-        all_preds[0].extend(batch_outputs[0])  # Entity output
-        all_preds[1].extend(batch_outputs[1])  # Relation output
-    eval_results = get_eval(all_preds, dataloader.dataset.raw_data)
+        batch_outputs = Processor.batch_decode(logits, offset_mappings, texts, doc_offsets, label_maps)
+
+        # Entity Extraction Only
+        if len(batch_outputs) == 1:
+            for doc_id, batch_ent_output in zip(doc_ids, batch_outputs[0]):
+                if doc_id == cur_doc_id:
+                    for ent_pred in batch_ent_output:
+                        if ent_pred not in all_preds["entity_list"][doc_id]:
+                            all_preds["entity_list"][doc_id].append(ent_pred)
+                else:
+                    all_preds["entity_list"].append(batch_ent_output)
+                    cur_doc_id = doc_id
+        else:
+            for doc_id, batch_ent_output, batch_rel_output in zip(doc_ids, batch_outputs[0], batch_outputs[1]):
+                if doc_id == cur_doc_id:
+                    for ent_pred in batch_ent_output:
+                        if ent_pred not in all_preds["entity_list"][doc_id]:
+                            all_preds["entity_list"][doc_id].append(ent_pred)
+                    for rel_pred in batch_ent_output:
+                        if rel_pred not in all_preds["spo_lits"][doc_id]:
+                            all_preds["spo_results"][doc_id].append(rel_pred)
+                else:
+                    all_preds["entity_list"].append(batch_ent_output)
+                    all_preds["spo_lits"].append(batch_rel_output)
+                    cur_doc_id = doc_id
+    eval_results = get_eval(all_preds, golds)
     model.train()
     return eval_results
 
 
 def do_eval():
-    label_maps = get_label_maps(args.task_type, args.label_maps_path)
+    label_maps = get_label_maps(args.label_maps_path)
+    golds = get_eval_golds(args.test_path)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.encoder)
+    tokenizer = AutoTokenizer.from_pretrained(args.encoder, do_tokenize_postprocess=True)
+
     encoder = AutoModel.from_pretrained(args.encoder)
-    if args.task_type == "entity_extraction":
-        model = GlobalPointerForEntityExtraction(encoder, label_maps)
-    else:
-        model = GPLinkerForRelationExtraction(encoder, label_maps)
+    model = GPLinkerForDocExtraction(encoder, label_maps)
 
     if args.model_path:
         state_dict = paddle.load(os.path.join(args.model_path, "model_state.pdparams"))
         model.set_dict(state_dict)
 
-    test_ds = load_dataset(reader, data_path=args.test_path, lazy=False)
+    test_ds = load_dataset(
+        reader,
+        data_path=args.test_path,
+        tokenizer=tokenizer,
+        label_maps=label_maps,
+        max_seq_len=args.max_seq_len,
+        lazy=False,
+    )
 
     test_dataloader = create_dataloader(
         test_ds,
-        tokenizer,
-        max_seq_len=args.max_seq_len,
-        batch_size=args.batch_size,
+        tokenizer=tokenizer,
         label_maps=label_maps,
+        batch_size=args.batch_size,
         mode="test",
-        task_type=args.task_type,
     )
 
-    eval_result = evaluate(model, test_dataloader, label_maps, task_type=args.task_type)
-    logger.info("Evaluation precision: " + str(eval_result))
+    precision, recall, f1 = evaluate(model, test_dataloader, label_maps, golds)
+    logger.info("Evaluation Precision： %.5f, Recall: %.5f, F1: %.5f" % (precision, recall, f1))
 
 
 if __name__ == "__main__":
@@ -81,11 +109,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--encoder", default="ernie-3.0-mini-zh", type=str, help="Select the pretrained encoder model for GP.")
-    parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--encoder", default="ernie-layoutx-base-uncased", type=str, help="Select the pretrained encoder model for GP.")
+    parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
+    parser.add_argument("--max_seq_len", type=int, default=256, help="The maximum total input sequence length after tokenization.")
 
     args = parser.parse_args()
     # yapf: enable

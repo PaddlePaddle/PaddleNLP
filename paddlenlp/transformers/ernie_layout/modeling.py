@@ -24,6 +24,7 @@ from paddle.nn import Layer
 from paddlenlp.utils.log import logger
 
 from ...utils.env import CONFIG_NAME
+from ...layers.globalpointer import GlobalPointer
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
@@ -1159,3 +1160,40 @@ class UIEX(ErnieLayoutPretrainedModel):
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
         return start_prob, end_prob
+
+
+class ErnieLayoutForClosedDomainIE(ErnieLayoutPretrainedModel):
+    r"""
+    ErnieLayout Model with GlobalPointer on top of the output layer,
+    designed for closed domain information extraction tasks.
+
+    Args:
+        config (:class:`ErnieLayoutConfig`):
+            An instance of ErnieLayoutConfig used to construct ErnieLayoutForClosedDomainIE.
+    """
+
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForClosedDomainIE, self).__init__(config)
+        self.ernie_layout = ErnieLayoutModel(config)
+        self.entity_output = GlobalPointer(config.hidden_size, config.num_ents, head_size=config.head_size)
+        self.with_rel = True if config.num_rels > 0 else False
+        if self.with_rel:
+            self.head_output = GlobalPointer(
+                config.hidden_size, config.num_rels, head_size=config.head_size, RoPE=False, tril_mask=False
+            )
+            self.tail_output = GlobalPointer(
+                config.hidden_size, config.num_rels, head_size=config.head_size, RoPE=False, tril_mask=False
+            )
+
+    def forward(self, input_ids, attention_mask, bbox, image):
+        sequence_output, _ = self.encoder(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
+        seq_length = paddle.shape(input_ids)[1]
+        sequence_output = sequence_output[:, :seq_length]
+
+        entity_output = self.entity_output(sequence_output, attention_mask)
+        if not self.with_rel:
+            return [entity_output]
+        else:
+            head_output = self.head_output(sequence_output, attention_mask)
+            tail_output = self.tail_output(sequence_output, attention_mask)
+            return [entity_output, head_output, tail_output]

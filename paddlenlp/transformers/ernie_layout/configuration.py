@@ -179,6 +179,9 @@ class ErnieLayoutConfig(PretrainedConfig):
         enable_recompute=False,
         classifier_dropout=None,
         has_visual_segment_embedding=False,
+        head_size=64,
+        num_ents=2,
+        num_rels=2,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -205,3 +208,6 @@ class ErnieLayoutConfig(PretrainedConfig):
         self.classifier_dropout = classifier_dropout
         self.has_visual_segment_embedding = has_visual_segment_embedding
         self.enable_recompute = enable_recompute
+        self.head_size = head_size
+        self.num_ents = num_ents
+        self.num_rels = num_rels

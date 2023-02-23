@@ -23,7 +23,7 @@ from paddlenlp.transformers.tokenizer_utils_base import (
     PretrainedTokenizerBase,
 )
 
-ignore_list = ["offset_mapping", "text", "image", "bbox"]
+ignore_list = ["bbox", "image", "offset_mapping", "text", "doc_id", "doc_offset"]
 
 
 @dataclass
@@ -42,15 +42,18 @@ class DataCollator:
         )
 
         batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
-        batch.append(paddle.to_tensor([feature["bbox"] for feature in features]))
-        batch.append(paddle.to_tensor([feature["image"] for feature in features]))
 
-        if labels is None:  # for test
-            batch.append([feature["offset_mapping"] for feature in features])
-            batch.append([feature["text"] for feature in features])
-            return batch
+        max_length = batch[1].shape[1]
+        for feature in features:
+            feature["bbox"] = feature["bbox"] + [[0, 0, 0, 0] for _ in range(max_length - len(feature["bbox"]))]
 
-        bs = batch[0].shape[0]
+        for ignore_key in ignore_list:
+            if ignore_key in ["bbox", "image"]:
+                batch.append(paddle.to_tensor([feature[ignore_key] for feature in features]))
+            else:
+                batch.append([feature[ignore_key] for feature in features])
+
+        bs = len(batch[0])
         # Ensure the dimension is greater or equal to 1
         max_ent_num = max(max([len(lb["ent_labels"]) for lb in labels]), 1)
         num_ents = len(self.label_maps["entity2id"])

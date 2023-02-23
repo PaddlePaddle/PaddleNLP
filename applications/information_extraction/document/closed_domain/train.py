@@ -26,6 +26,7 @@ from utils import (
     reader,
     save_model_config,
     set_seed,
+    get_eval_golds,
 )
 
 from paddlenlp.datasets import load_dataset
@@ -42,6 +43,7 @@ def do_train():
     set_seed(args.seed)
 
     label_maps = get_label_maps(args.label_maps_path)
+    golds = get_eval_golds(args.dev_path)
 
     tokenizer = AutoTokenizer.from_pretrained(args.encoder, do_tokenize_postprocess=True)
 
@@ -50,7 +52,7 @@ def do_train():
         data_path=args.train_path,
         tokenizer=tokenizer,
         label_maps=label_maps,
-        max_length=args.max_seq_len,
+        max_seq_len=args.max_seq_len,
         lazy=False,
     )
     dev_ds = load_dataset(
@@ -58,7 +60,7 @@ def do_train():
         data_path=args.dev_path,
         tokenizer=tokenizer,
         label_maps=label_maps,
-        max_length=args.max_seq_len,
+        max_seq_len=args.max_seq_len,
         lazy=False,
     )
 
@@ -110,8 +112,7 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
         for batch in train_dataloader:
-            _, input_ids, attention_masks, bbox, image, labels = batch
-            # import pdb;pdb.set_trace()
+            input_ids, attention_masks, bbox, image, _, _, _, _, labels = batch
             logits = model(input_ids, attention_masks, bbox, image)
 
             loss = sum([criterion(o, l) for o, l in zip(logits, labels)]) / 3
@@ -145,11 +146,9 @@ def do_train():
                 tokenizer.save_pretrained(save_dir)
                 logger.enable()
 
-                eval_result = evaluate(model, dev_dataloader, label_maps)
-                logger.info("Evaluation precision: " + str(eval_result))
+                precision, recall, f1 = evaluate(model, dev_dataloader, label_maps, golds)
+                logger.info("Evaluation Precision： %.5f, Recall: %.5f, F1: %.5f" % (precision, recall, f1))
 
-                # TODO
-                f1 = eval_result["entity_f1"]
                 if f1 > best_f1:
                     logger.info(f"best F1 performance has been updated: {best_f1:.5f} --> {f1:.5f}")
                     best_f1 = f1
@@ -171,20 +170,20 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--train_path", default="./student_data/dev_data.json", type=str, help="The path of train set.")
-    parser.add_argument("--dev_path", default="./student_data/dev_data.json", type=str, help="The path of dev set.")
+    parser.add_argument("--train_path", default="./data/dev_data.json", type=str, help="The path of train set.")
+    parser.add_argument("--dev_path", default="./data/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum input sequence length.")
-    parser.add_argument("--label_maps_path", default="./student_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--encoder", default="ernie-layoutx-base-uncased", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-    parser.add_argument("--eval_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
+    parser.add_argument("--eval_steps", default=50, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 

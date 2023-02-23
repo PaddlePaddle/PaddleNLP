@@ -14,38 +14,29 @@
 # limitations under the License.
 
 
-def get_eval(all_preds, raw_data):
-    all_ent_preds, all_rel_preds = all_preds
+def get_eval(all_preds, golds):
+    all_ent_preds, all_rel_preds = all_preds["entity_list"], all_preds["spo_list"]
+    ent_golds, rel_golds = golds["entity_list"], golds["spo_list"]
 
     ex, ey, ez = 1e-10, 1e-10, 1e-10
-    for ent_preds, data in zip(all_ent_preds, raw_data):
+    for ent_preds, ent_gold in zip(all_ent_preds, ent_golds):
         pred_ent_set = set([tuple(p.values()) for p in ent_preds])
-        gold_ent_set = set([tuple(g.values()) for g in data["entity_list"]])
+        gold_ent_set = set([tuple(g.values()) for g in ent_gold])
         ex += len(pred_ent_set & gold_ent_set)
         ey += len(pred_ent_set)
         ez += len(gold_ent_set)
-    ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.0
-    ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.0
-    ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.0
 
     rx, ry, rz = 1e-10, 1e-10, 1e-10
 
-    for rel_preds, raw_data in zip(all_rel_preds, raw_data):
+    for rel_preds, rel_gold in zip(all_rel_preds, rel_golds):
         pred_rel_set = set([tuple(p.values()) for p in rel_preds])
-        gold_rel_set = set([tuple(g.values()) for g in raw_data["spo_list"]])
+        gold_rel_set = set([tuple(g.values()) for g in rel_gold])
         rx += len(pred_rel_set & gold_rel_set)
         ry += len(pred_rel_set)
         rz += len(gold_rel_set)
 
-    rel_f1 = round(2 * rx / (ry + rz), 5) if rx != 1e-10 else 0.0
-    rel_precision = round(rx / ry, 5) if ry != 1e-10 else 0.0
-    rel_recall = round(rx / rz, 5) if rz != 1e-10 else 0.0
+    f1 = round(2 * (ex + rx) / (ey + ry + ez + rz)) if (ex != 1e-10 or rx != 1e-10) else 0.0
+    precision = round((ex + rx) / (ey + ry), 5) if (ey != 1e-10 or ry != 1e-10) else 0.0
+    recall = round((ex + rx) / (ez + rz), 5) if (ez != 1e-10 or rz != 1e-10) else 0.0
 
-    return {
-        "entity_f1": ent_f1,
-        "entity_precision": ent_precision,
-        "entity_recall": ent_recall,
-        "relation_f1": rel_f1,
-        "relation_precision": rel_precision,
-        "relation_recall": rel_recall,
-    }
+    return precision, recall, f1

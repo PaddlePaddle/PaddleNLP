@@ -275,7 +275,7 @@ class DataConverter(object):
         self.anno_type = anno_type
         self.label_studio_file = label_studio_file
         self.ignore_list = ["属性值", "object"]
-        self.doc_cnt = 1
+        self.doc_cnt = 0
         self.doc_parser = DocParser(layout_analysis=self.layout_analysis, ocr_lang=self.ocr_lang)
 
     def process_text_tag(self, line, task_type="ext"):

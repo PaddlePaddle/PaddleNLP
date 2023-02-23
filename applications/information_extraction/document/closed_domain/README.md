@@ -90,9 +90,7 @@ python train.py \
 ```shell
 python evaluate.py \
     --model_path ./checkpoint/model_best \
-    --test_path student_data/dev_data.json \
-    --label_maps_path student_data/label_maps.json \
-    --encoder ernie-3.0-mini-zh
+    --test_path student_data/dev_data.json
 ```
 
 可配置参数说明：

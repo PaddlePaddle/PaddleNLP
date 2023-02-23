@@ -71,7 +71,7 @@ def do_data_distill():
     # Load trained UIE model
     uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
 
-    if args.synthetic_ratio > 0:
+    if args.synthetic_ratio > 0 and len(train_lines) > 0:
         unlabeled_images_path = os.path.join(args.data_path, "unlabeled_images")
         files_path = [os.path.join(unlabeled_images_path, file) for file in os.listdir(unlabeled_images_path)]
 
