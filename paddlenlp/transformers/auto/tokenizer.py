@@ -339,7 +339,9 @@ class AutoTokenizer:
             )
 
             default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                os.path.join(cache_dir, pretrained_model_name_or_path)
+                if cache_dir is not None
+                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             )
             # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:

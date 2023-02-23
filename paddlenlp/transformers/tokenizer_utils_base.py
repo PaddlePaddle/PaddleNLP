@@ -1483,7 +1483,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = (
+            os.path.join(cache_dir, pretrained_model_name_or_path)
+            if cache_dir is not None
+            else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        )
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -1763,7 +1767,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         self,
         repo_id: str,
         private: Optional[bool] = None,
-        commit_message: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
         revision: Optional[str] = None,
         create_pr: bool = False,
     ):
@@ -1772,6 +1777,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Args:
             repo_id (str): Repository name for your model/tokenizer in the Hub.
             private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
             commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
             revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
             create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
@@ -1794,20 +1800,24 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         except EntryNotFoundError:
             has_readme = False
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
             # save model
-            self.save_pretrained(tmp_dir)
+            self.save_pretrained(save_dir)
             # Add readme if does not exist
             logger.info("README.md not found, adding the default README.md")
             if not has_readme:
-                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
                     f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
             # Upload model and return
             logger.info(f"Pushing to the {repo_id}. This might take a while")
             return upload_folder(
                 repo_id=repo_id,
                 repo_type="model",
-                folder_path=tmp_dir,
+                folder_path=root_dir,
                 commit_message=commit_message,
                 revision=revision,
                 create_pr=create_pr,
@@ -3010,6 +3020,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = encoded_inputs["offset_mapping"] + [(0, 0)] * difference
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = encoded_inputs["position_ids"] + [0] * difference
+                if "start_positions" in encoded_inputs:
+                    encoded_inputs["start_positions"] = encoded_inputs["start_positions"] + [0] * difference
+                if "end_positions" in encoded_inputs:
+                    encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
             elif self.padding_side == "left":
                 if return_attention_mask:
@@ -3024,6 +3038,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = [(0, 0)] * difference + encoded_inputs["offset_mapping"]
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
+                if "start_positions" in encoded_inputs:
+                    encoded_inputs["start_positions"] = [0] * difference + encoded_inputs["start_positions"]
+                if "end_positions" in encoded_inputs:
+                    encoded_inputs["end_positions"] = [0] * difference + encoded_inputs["end_positions"]
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))

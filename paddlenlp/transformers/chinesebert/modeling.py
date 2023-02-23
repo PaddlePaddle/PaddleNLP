@@ -40,7 +40,12 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.bert.modeling import BertPooler, BertPretrainingHeads
+
+from .configuration import (
+    CHINESEBERT_PRETRAINED_INIT_CONFIGURATION,
+    CHINESEBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    ChineseBertConfig,
+)
 
 __all__ = [
     "ChineseBertModel",
@@ -54,22 +59,13 @@ __all__ = [
 
 
 class PinyinEmbedding(nn.Layer):
-    def __init__(self, pinyin_map_len: int, embedding_size: int, pinyin_out_dim: int):
-        """
-        Pinyin Embedding Layer.
-
-        Args:
-            pinyin_map_len (int): the size of pinyin map, which about 26 Romanian characters and 6 numbers.
-            embedding_size (int): the size of each embedding vector.
-            pinyin_out_dim (int): kernel number of conv.
-
-        """
+    def __init__(self, config: ChineseBertConfig):
+        """Pinyin Embedding Layer"""
         super(PinyinEmbedding, self).__init__()
-
-        self.pinyin_out_dim = pinyin_out_dim
-        self.embedding = nn.Embedding(pinyin_map_len, embedding_size)
+        self.embedding = nn.Embedding(config.pinyin_map_len, config.pinyin_embedding_size)
+        self.pinyin_out_dim = config.hidden_size
         self.conv = nn.Conv1D(
-            in_channels=embedding_size,
+            in_channels=config.pinyin_embedding_size,
             out_channels=self.pinyin_out_dim,
             kernel_size=2,
             stride=1,
@@ -103,9 +99,9 @@ class PinyinEmbedding(nn.Layer):
 class GlyphEmbedding(nn.Layer):
     """Glyph2Image Embedding."""
 
-    def __init__(self, num_embeddings, embedding_dim):
+    def __init__(self, config: ChineseBertConfig):
         super(GlyphEmbedding, self).__init__()
-        self.embedding = nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+        self.embedding = nn.Embedding(num_embeddings=config.vocab_size, embedding_dim=config.glyph_embedding_dim)
 
     def forward(self, input_ids):
         """
@@ -118,7 +114,6 @@ class GlyphEmbedding(nn.Layer):
             images (Tensor): Its shape is [batch, sentence_length, self.font_num*self.font_size*self.font_size].
 
         """
-        # return self.embedding(input_ids).reshape([-1, self.font_num, self.font_size, self.font_size])
         return self.embedding(input_ids)
 
 
@@ -127,38 +122,23 @@ class FusionBertEmbeddings(nn.Layer):
     Construct the embeddings from word, position, glyph, pinyin and token_type embeddings.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size,
-        pad_token_id,
-        type_vocab_size,
-        max_position_embeddings,
-        pinyin_map_len,
-        glyph_embedding_dim,
-        layer_norm_eps=1e-12,
-        hidden_dropout_prob=0.1,
-    ):
+    def __init__(self, config: ChineseBertConfig):
         super(FusionBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.pinyin_embeddings = PinyinEmbedding(
-            pinyin_map_len=pinyin_map_len,
-            embedding_size=128,
-            pinyin_out_dim=hidden_size,
-        )
-        self.glyph_embeddings = GlyphEmbedding(vocab_size, glyph_embedding_dim)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.pinyin_embeddings = PinyinEmbedding(config)
+        self.glyph_embeddings = GlyphEmbedding(config)
 
-        self.glyph_map = nn.Linear(glyph_embedding_dim, hidden_size)
-        self.map_fc = nn.Linear(hidden_size * 3, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.glyph_map = nn.Linear(config.glyph_embedding_dim, config.hidden_size)
+        self.map_fc = nn.Linear(config.hidden_size * 3, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
             "position_ids",
-            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"), shape=[1, -1]),
+            paddle.expand(paddle.arange(config.max_position_embeddings, dtype="int64"), shape=[1, -1]),
         )
 
     def forward(self, input_ids, pinyin_ids, token_type_ids=None, position_ids=None):
@@ -192,6 +172,126 @@ class FusionBertEmbeddings(nn.Layer):
         return embeddings
 
 
+# Same as BertLMPredictionHead
+class ChineseBertLMPredictionHead(nn.Layer):
+    """
+    Language Modeling head
+    """
+
+    def __init__(self, config: ChineseBertConfig, embedding_weights=None):
+        super(ChineseBertLMPredictionHead, self).__init__()
+
+        self.transform = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = getattr(nn.functional, config.hidden_act)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.decoder_weight = (
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
+            )
+            if embedding_weights is None
+            else embedding_weights
+        )
+
+        self.decoder_bias = self.create_parameter(
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
+
+    def forward(self, hidden_states, masked_positions=None):
+        if masked_positions is not None:
+            hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states, masked_positions)
+        # gather masked tokens might be more quick
+        hidden_states = self.transform(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        return hidden_states
+
+
+# Same as BertPretrainingHeads
+class ChineseBertPretrainingHeads(nn.Layer):
+    """
+    Perform language modeling task and next sentence classification task.
+
+    Args:
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertPretrainingHeads.
+        embedding_weights (Tensor, optional):
+            Decoding weights used to map hidden_states to logits of the masked token prediction.
+            Its data type should be float32 and its shape is [vocab_size, hidden_size].
+            Defaults to `None`, which means use the same weights of the embedding layer.
+
+    """
+
+    def __init__(self, config: ChineseBertConfig, embedding_weights=None):
+        super(ChineseBertPretrainingHeads, self).__init__()
+        self.predictions = ChineseBertLMPredictionHead(config, embedding_weights)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
+
+    def forward(self, sequence_output, pooled_output, masked_positions=None):
+        """
+        Args:
+            sequence_output(Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+            pooled_output(Tensor):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
+            masked_positions(Tensor, optional):
+                A tensor indicates positions to be masked in the position embedding.
+                Its data type should be int64 and its shape is [batch_size, mask_token_num].
+                `mask_token_num` is the number of masked tokens. It should be no bigger than `sequence_length`.
+                Defaults to `None`, which means we output hidden-states of all tokens in masked token prediction.
+
+        Returns:
+            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
+
+            With the fields:
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and its shape is [batch_size, 2].
+
+        """
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        seq_relationship_score = self.seq_relationship(pooled_output)
+        return prediction_scores, seq_relationship_score
+
+
+# Same as BertPooler
+class ChineseBertPooler(nn.Layer):
+    """
+    Pool the result of ChineseBertEncoder.
+    """
+
+    def __init__(self, config):
+        """init the bert pooler with config & args/kwargs
+
+        Args:
+            config (:class:`ChineseBertConfig`): An instance of ChineseBertConfig.
+        """
+        super(ChineseBertPooler, self).__init__()
+
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = nn.Tanh()
+        self.pool_act = config.pool_act
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        if self.pool_act == "tanh":
+            pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
 class ChineseBertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ChineseBert models. It provides ChineseBert related
@@ -202,50 +302,9 @@ class ChineseBertPretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "chinesebert"
-
-    pretrained_init_configuration = {
-        "ChineseBERT-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 23236,
-            "glyph_embedding_dim": 1728,
-            "pinyin_map_len": 32,
-        },
-        "ChineseBERT-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 23236,
-            "glyph_embedding_dim": 1728,
-            "pinyin_map_len": 32,
-        },
-    }
-
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ChineseBERT-base": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
-            "ChineseBERT-large": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
-        }
-    }
+    pretrained_resource_files_map = CHINESEBERT_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = CHINESEBERT_PRETRAINED_INIT_CONFIGURATION
+    config_class = ChineseBertConfig
 
     def init_weights(self, layer):
         """Initialize the weights."""
@@ -257,16 +316,12 @@ class ChineseBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.chinesebert.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = (
-                self.layer_norm_eps if hasattr(self, "layer_norm_eps") else self.chinesebert.config["layer_norm_eps"]
-            )
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -282,113 +337,28 @@ class ChineseBertModel(ChineseBertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `BChineseBertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ChineseBertModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `2`.
-
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-
-        pooled_act (str, optional):
-            The non-linear activation function in the pooling layer.
-            Defaults to `"tanh"`.
-
-        layer_norm_eps
-            The epsilon of layernorm.
-            Defaults to `1e-12`.
-
-        glyph_embedding_dim (int, optional):
-            The dim of glyph_embedding.
-            Defaults to `1728`.
-
-        pinyin_map_len=32 (int, optional):
-            The length of pinyin map.
-            Defaults to `32`.
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertModel.
 
     """
 
-    def __init__(
-        self,
-        vocab_size=23236,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        pad_token_id=0,
-        pool_act="tanh",
-        layer_norm_eps=1e-12,
-        glyph_embedding_dim=1728,
-        pinyin_map_len=32,
-    ):
-        super(ChineseBertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.layer_norm_eps = layer_norm_eps
-        self.initializer_range = initializer_range
-        self.embeddings = FusionBertEmbeddings(
-            vocab_size,
-            hidden_size,
-            pad_token_id,
-            type_vocab_size,
-            max_position_embeddings,
-            pinyin_map_len,
-            glyph_embedding_dim,
-            layer_norm_eps,
-            hidden_dropout_prob,
-        )
+    def __init__(self, config: ChineseBertConfig):
+        super(ChineseBertModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.layer_norm_eps = config.layer_norm_eps
+        self.initializer_range = config.initializer_range
+        self.embeddings = FusionBertEmbeddings(config)
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, pool_act)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = ChineseBertPooler(config)
         self.apply(self.init_weights)
 
     def forward(
@@ -478,9 +448,13 @@ class ChineseBertModel(ChineseBertPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2],
             )
+        elif attention_mask.ndim == 2:
+            # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -488,6 +462,7 @@ class ChineseBertModel(ChineseBertPretrainedModel):
             position_ids=position_ids,
             token_type_ids=token_type_ids,
         )
+        print(embedding_output.shape)
 
         if output_hidden_states:
             output = embedding_output
@@ -499,12 +474,18 @@ class ChineseBertModel(ChineseBertPretrainedModel):
                 encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
             pooled_output = self.pooler(encoder_outputs[-1])
         else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
+            sequence_output = self.encoder(embedding_output, src_mask=attention_mask)
             pooled_output = self.pooler(sequence_output)
         if output_hidden_states:
             return encoder_outputs, pooled_output
         else:
             return sequence_output, pooled_output
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
 
 class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
@@ -513,21 +494,17 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        ChineseBert (:class:`ChineseBertModel`):
-            An instance of ChineseBertModel.
-        dropout (float, optional):
-            The dropout probability for output of ChineseBert.
-            If None, use the same value as `hidden_dropout_prob` of `ChineseBertModel`
-            instance `chinesebert`. Defaults to `None`.
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertForQuestionAnswering.
     """
 
-    def __init__(self, chinesebert):
-        super(ChineseBertForQuestionAnswering, self).__init__()
-        self.chinesebert = chinesebert  # allow chinesebert to be config
-        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"], 2)
+    def __init__(self, config: ChineseBertConfig):
+        super(ChineseBertForQuestionAnswering, self).__init__(config)
+        self.chinesebert = ChineseBertModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, pinyin_ids=None, token_type_ids=None):
+    def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, attention_mask=None):
         r"""
         The ChineseBertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -537,6 +514,8 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
             pinyin_ids (Tensor, optional):
                 See :class:`ChineseBertModel`.
             token_type_ids (Tensor, optional):
+                See :class:`ChineseBertModel`.
+            attention_mask (Tensor, optional):
                 See :class:`ChineseBertModel`.
 
         Returns:
@@ -569,7 +548,9 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
                 start_logits = outputs[0]
                 end_logits = outputs[1]
         """
-        sequence_output, _ = self.chinesebert(input_ids, pinyin_ids, token_type_ids=token_type_ids, position_ids=None)
+        sequence_output, _ = self.chinesebert(
+            input_ids, pinyin_ids, token_type_ids=token_type_ids, attention_mask=attention_mask, position_ids=None
+        )
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -584,22 +565,18 @@ class ChineseBertForSequenceClassification(ChineseBertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        chinesebert (:class:`ChineseBertModel`):
-            An instance of ChineseBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ChineseBert.
-            If None, use the same value as `hidden_dropout_prob` of `ChineseBertModel`
-            instance `chinesebert`. Defaults to None.
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertForSequenceClassification.e.
     """
 
-    def __init__(self, chinesebert, num_classes=2, dropout=None):
-        super(ChineseBertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.chinesebert = chinesebert  # allow chinesebert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.chinesebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"], self.num_classes)
+    def __init__(self, config: ChineseBertConfig):
+        super(ChineseBertForSequenceClassification, self).__init__(config)
+        self.chinesebert = ChineseBertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -660,22 +637,18 @@ class ChineseBertForTokenClassification(ChineseBertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        chinesebert (:class:`ChineseBertModel`):
-            An instance of ChineseBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ChineseBert.
-            If None, use the same value as `hidden_dropout_prob` of `ChineseBertModel`
-            instance `chinesebert`. Defaults to None.
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertForTokenClassification.e.
     """
 
-    def __init__(self, chinesebert, num_classes=2, dropout=None):
-        super(ChineseBertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.chinesebert = chinesebert  # allow chinesebert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.chinesebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"], self.num_classes)
+    def __init__(self, config: ChineseBertConfig):
+        super(ChineseBertForTokenClassification, self).__init__(config)
+        self.chinesebert = ChineseBertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -734,18 +707,16 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
     ChineseBert Model with pretraining tasks on top.
 
     Args:
-        chinesebert (:class:`ChineseBertModel`):
-            An instance of :class:`ChineseBertModel`.
+        config (:class:`ChineseBertConfig`):
+            An instance of ChineseBertConfig used to construct ChineseBertForPretraining.e.
 
     """
 
-    def __init__(self, chinesebert):
-        super(ChineseBertForPretraining, self).__init__()
-        self.chinesebert = chinesebert
-        self.cls = BertPretrainingHeads(
-            self.chinesebert.config["hidden_size"],
-            self.chinesebert.config["vocab_size"],
-            self.chinesebert.config["hidden_act"],
+    def __init__(self, config: ChineseBertConfig):
+        super(ChineseBertForPretraining, self).__init__(config)
+        self.chinesebert = ChineseBertModel(config)
+        self.cls = ChineseBertPretrainingHeads(
+            config,
             embedding_weights=self.chinesebert.embeddings.word_embeddings.weight,
         )
 

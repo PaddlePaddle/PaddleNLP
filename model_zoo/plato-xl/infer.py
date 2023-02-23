@@ -15,13 +15,13 @@
 import argparse
 import os
 import time
-from distutils.util import strtobool
 from pprint import pprint
 
 import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.ops import enable_ft_para, get_ft_para_conf
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     UnifiedTransformerLMHeadModel,
     UnifiedTransformerTokenizer,

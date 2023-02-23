@@ -15,7 +15,6 @@
 pip install -U ppdiffusers visualdl
 ```
 
-
 ### 1.2 Cat toy 训练 object 的例子
 
 在训练开始之前，我们需要准备需要训练的 3-5 张图片，在这里我们可以从[这里](https://huggingface.co/sd-dreambooth-library/cat-toy) 下载到所需要的图片，然后将里面的内容保存到一个文件夹`cat_toy_images`中。
@@ -38,8 +37,7 @@ python -u train_textual_inversion.py \
   --train_data_dir=$DATA_DIR \
   --learnable_property="object" \
   --placeholder_token="<cat-toy>" --initializer_token="toy" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \
   --max_train_steps=3000 \
@@ -50,22 +48,6 @@ python -u train_textual_inversion.py \
   --seed 42 \
   --output_dir="textual_inversion_cat"
 ```
-或
-```bash
-bash run_single.sh
-```
-
-| ppdiffusers支持的模型名称    | huggingface对应的模型地址                           | Tips备注                                                     |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       | 原版SD模型，模型使用PNDM scheduler。                 |
-| hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-2的模型，模型使用了DDIM scheduler。         |
-| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了PNDM scheduler。         |
-| naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过60k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
-| Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
-| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
 
 `train_textual_inversion.py`代码可传入的参数解释如下：
 > 主要修改的参数
@@ -87,20 +69,29 @@ bash run_single.sh
 > * `--lr_warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
 > * `--train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--center_crop`: 在调整图片宽和高之前是否将裁剪图像居中，默认值为`False`。
-> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`512`。
-> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`512`。
+> * `--height`: 输入给模型的图片`高度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`高度`的图片，默认值为`None`。
+> * `--width`: 输入给模型的图片`宽度`，由于用户输入的并不是固定大小的图片，因此代码中会将原始大小的图片压缩成指定`宽度`的图片，默认值为`None`。
+> * `--resolution`: 输入给模型图片的`分辨率`，当`高度`或`宽度`为`None`时，我们将会使用`resolution`，默认值为`512`。
 > * `--repeats`: 由于图片数量只有3-5张，因此我们需要重复训练图片数据，默认设置为重复`100遍`。
+> * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`text-inversion-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
+> * `--validation_prompt`: 训练过程中评估所使用的prompt文本。
+> * `--validation_epochs`: 每隔多少个epoch评估模型。
+
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
-> * `--adam_beta1`: AdamW 优化器时的 beta1 超参数。默认为 `0.9`。
-> * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
-> * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
-> * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--adam_beta1`: `AdamW` 优化器时的 `beta1` 超参数。默认为 `0.9`。
+> * `--adam_beta2`: `AdamW` 优化器时的 `beta2` 超参数。默认为 `0.999`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `weight_decay` 超参数。 默认为`0.02`。
+> * `--adam_weight_decay`: `AdamW` 优化器时的 `epsilon` 超参数。默认为 `1e-8`。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1` 表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--push_to_hub`: 是否将模型上传到 `huggingface hub`，默认值为 `False`。
+> * `--hub_token`: 上传到 `huggingface hub` 所需要使用的 `token`，如果我们已经登录了，那么我们就无需填写。
+> * `--hub_model_id`: 上传到 `huggingface hub` 的模型库名称， 如果为 `None` 的话表示我们将使用 `output_dir` 的名称作为模型库名称。
+
 
 #### 1.2.3 单机多卡训练
 通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。这里我们只训练了`1000step`，因为这里的`1000 step x 4卡`近似于`单卡训练 4000 step`。
@@ -115,8 +106,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_textual_inversion.
   --train_data_dir=$DATA_DIR \
   --learnable_property="object" \
   --placeholder_token="<cat-toy>" --initializer_token="toy" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \
   --max_train_steps=1000 \
@@ -125,12 +115,11 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_textual_inversion.
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --seed 42 \
-  --output_dir="textual_inversion_cat"
+  --output_dir="textual_inversion_cat" \
+  --validation_prompt "A <cat-toy> backpack" \
+  --validation_epochs 1
 ```
-或
-```bash
-bash run_multi.sh
-```
+
 
 #### 1.2.4 预测生成图片
 
@@ -164,7 +153,7 @@ model_path = "CompVis/stable-diffusion-v1-4"
 pipe = StableDiffusionPipeline.from_pretrained(model_path)
 
 # 需要加载的风格或物体的权重
-learned_embeded_path = "./textual_inversion_cat/learned_embeds.pdparams"
+learned_embeded_path = "./textual_inversion_cat/learned_embeds-steps-1000.pdparams"
 for token, embeds in paddle.load(learned_embeded_path).items():
     pipe.tokenizer.add_tokens(token)
     pipe.text_encoder.resize_token_embeddings(len(pipe.tokenizer))
@@ -200,8 +189,7 @@ python -u train_textual_inversion.py \
   --train_data_dir=$DATA_DIR \
   --learnable_property="style" \
   --placeholder_token="<huang-guang-jian-style>" --initializer_token="style" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \
   --max_train_steps=3000 \
@@ -228,8 +216,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_textual_inversion.
   --train_data_dir=$DATA_DIR \
   --learnable_property="style" \
   --placeholder_token="<huang-guang-jian-style>" --initializer_token="style" \
-  --height=512 \
-  --width=512 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \
   --max_train_steps=1000 \
@@ -269,7 +256,7 @@ model_path = "CompVis/stable-diffusion-v1-4"
 pipe = StableDiffusionPipeline.from_pretrained(model_path)
 
 # 需要加载的风格或物体的权重
-learned_embeded_path = "./huang_guang_jian_style/learned_embeds.pdparams"
+learned_embeded_path = "./huang_guang_jian_style/learned_embeds-steps-1000.pdparams"
 for token, embeds in paddle.load(learned_embeded_path).items():
     pipe.tokenizer.add_tokens(token)
     pipe.text_encoder.resize_token_embeddings(len(pipe.tokenizer))
