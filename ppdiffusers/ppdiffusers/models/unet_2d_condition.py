@@ -22,6 +22,7 @@ from ..configuration_utils import ConfigMixin, register_to_config
 from ..loaders import UNet2DConditionLoadersMixin
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
+from .controlnet_blocks import ControlNetInputHintBlock, ControlNetZeroConvBlock
 from .cross_attention import AttnProcessor
 from .embeddings import TimestepEmbedding, Timesteps
 from .unet_2d_blocks import (
@@ -123,11 +124,17 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
+        controlnet_hint_channels: Optional[int] = None,
     ):
         super().__init__()
 
         self.sample_size = sample_size
         time_embed_dim = block_out_channels[0] * 4
+
+        if controlnet_hint_channels is None and len(down_block_types) != len(up_block_types):
+            raise ValueError(
+                f"Must provide the same number of `down_block_types` as `up_block_types`. `down_block_types`: {down_block_types}. `up_block_types`: {up_block_types}."
+            )
 
         # input
         self.conv_in = nn.Conv2D(in_channels, block_out_channels[0], kernel_size=3, padding=(1, 1))
@@ -219,6 +226,17 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # count how many layers upsample the images
         self.num_upsamplers = 0
+        if controlnet_hint_channels is not None:
+            # ControlNet: add input_hint_block, zero_conv_block
+            self.controlnet_input_hint_block = ControlNetInputHintBlock(
+                hint_channels=controlnet_hint_channels, channels=block_out_channels[0]
+            )
+            self.controlnet_zero_conv_block = ControlNetZeroConvBlock(
+                block_out_channels=block_out_channels,
+                down_block_types=down_block_types,
+                layers_per_block=layers_per_block,
+            )
+            return
 
         # up
         reversed_block_out_channels = list(reversed(block_out_channels))
@@ -397,6 +415,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         class_labels: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        controlnet_hint: Optional[paddle.Tensor] = None,
+        control: Optional[List[paddle.Tensor]] = None,
         return_dict: bool = True,
     ):
         r"""
@@ -471,6 +491,9 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         # 2. pre-process
         sample = self.conv_in(sample)
 
+        if controlnet_hint is not None:
+            sample += self.controlnet_input_hint_block(controlnet_hint)
+
         # 3. down
         down_block_res_samples = (sample,)
         for downsample_block in self.down_blocks:
@@ -495,12 +518,28 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
         )
+
+        if controlnet_hint is not None:
+            # ControlNet: zero convs
+            return self.controlnet_zero_conv_block(
+                down_block_res_samples=down_block_res_samples, mid_block_sample=sample
+            )
+
+        if control is not None:
+            # ControlledUnet: apply mid_zero_conv output
+            sample += control.pop()
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
 
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
+
+            if control is not None:
+                # ControlledUnet: apply ControlNet downblock zero_convs output
+                control_samples = control[-len(upsample_block.resnets) :]
+                control = control[: -len(upsample_block.resnets)]
+                res_samples = [r + c for r, c in zip(res_samples, control_samples)]
 
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
@@ -521,6 +560,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
+
+        # TODO: remove this block
+        if control is not None:
+            assert len(control) == 0, f"must consume all control array ({len(control)})"
+
         # 6. post-process
         sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)
