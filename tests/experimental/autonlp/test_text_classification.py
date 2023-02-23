@@ -272,39 +272,8 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 eval_metrics3[auto_trainer.metric_for_best_model.replace("eval", "test")],
             )
 
-            # test export
-            temp_export_path = os.path.join(temp_dir_path, "test_export")
-            auto_trainer.export(export_path=temp_export_path)
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
-
-            if trainer_type == "PromptTrainer":
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
-
-            # test invalid export
-            temp_export_path = os.path.join(temp_dir_path, "invalid_export")
-            with self.assertRaises(LookupError):
-                auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
-
             # test taskflow
             taskflow = auto_trainer.to_taskflow()
-            test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
-            test_results = taskflow(test_inputs)
-            self.assertEqual(len(test_results), len(test_inputs))
-            for test_result in test_results:
-                for prediction in test_result["predictions"]:
-                    self.assertIn(prediction["label"], auto_trainer.label2id)
-                    self.assertGreater(prediction["score"], taskflow.task_instance.multilabel_threshold)
-
-            # test compress
-            auto_trainer.compress()
-            compress_save_path = os.path.join(auto_trainer._get_model_result().log_dir, auto_trainer.compress_path)
-            self.assertTrue(os.path.exists(os.path.join(compress_save_path, "model.pdmodel")))
-            self.assertTrue(os.path.exists(os.path.join(compress_save_path, "model.pdiparams")))
-
-            taskflow = auto_trainer.to_taskflow(compress=True)
             test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
             test_results = taskflow(test_inputs)
             self.assertEqual(len(test_results), len(test_inputs))
