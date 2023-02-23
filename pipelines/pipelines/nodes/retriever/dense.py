@@ -116,7 +116,6 @@ class DensePassageRetriever(BaseRetriever):
         )
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
-
         if batch_size < len(self.devices):
             logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
 
@@ -151,22 +150,24 @@ class DensePassageRetriever(BaseRetriever):
                 model=query_embedding_model,
                 batch_size=self.batch_size,
                 _static_mode=True,
-                return_tensors=False,
+                return_tensors="np",
                 max_len=max_seq_len_query,
                 output_emb_size=output_emb_size,
                 reinitialize=reinitialize,
                 share_parameters=share_parameters,
+                device_id=0 if use_gpu else -1,
             )
             self.passage_encoder = Taskflow(
                 "feature_extraction",
                 model=passage_embedding_model,
                 batch_size=self.batch_size,
                 _static_mode=True,
-                return_tensors=False,
+                return_tensors="np",
                 max_len=max_seq_len_passage,
                 output_emb_size=output_emb_size,
                 reinitialize=reinitialize,
                 share_parameters=share_parameters,
+                device_id=0 if use_gpu else -1,
             )
 
     def retrieve(

@@ -70,13 +70,16 @@ class ErnieRanker(BaseRanker):
         self.use_en = use_en
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
+
         print("Loading Parameters from:{}".format(model_name_or_path))
         self.embed_title = embed_title
         self.progress_bar = progress_bar
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
         # self.transformer_model = ErnieCrossEncoder(model_name_or_path, reinitialize=reinitialize)
-        self.transformer_model = Taskflow("text_similarity", model=model_name_or_path, batch_size=self.batch_size)
+        self.transformer_model = Taskflow(
+            "text_similarity", model=model_name_or_path, batch_size=self.batch_size, device_id=0 if use_gpu else -1
+        )
 
     def predict(self, query: str, documents: List[Document], top_k: Optional[int] = None) -> List[Document]:
         """

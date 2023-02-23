@@ -122,7 +122,7 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
                             --embed_title True \
-                            --delete_index \
+                            --delete_index
 ```
 可以使用下面的命令来查看数据：
 

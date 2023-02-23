@@ -41,12 +41,13 @@ parser.add_argument("--delete_index", action="store_true", help="Whether to dele
 parser.add_argument("--share_parameters", action="store_true", help="Use to control the query and title models sharing the same parameters",)
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select devices, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
 
 def offline_ann(index_name, doc_dir):
-
+    use_gpu = True if args.device == "gpu" else False
     if args.search_engine == "milvus":
         document_store = MilvusDocumentStore(
             embedding_dim=args.embedding_dim,
@@ -87,7 +88,7 @@ def offline_ann(index_name, doc_dir):
         max_seq_len_query=64,
         max_seq_len_passage=256,
         batch_size=16,
-        use_gpu=True,
+        use_gpu=use_gpu,
         embed_title=args.embed_title,
     )
 
