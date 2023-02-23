@@ -25,7 +25,7 @@ from paddlenlp.utils.log import logger
 
 from ...utils.env import CONFIG_NAME
 from ...layers import GlobalPointer
-from ...losses import SparseMultilabelCrossEntropy
+from ...losses import SparseMultiLabelCrossEntropy
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
@@ -1202,7 +1202,7 @@ class ErnieLayoutForClosedDomainIE(ErnieLayoutPretrainedModel):
             logits = [entity_output, head_output, tail_output]
 
         if labels is not None:
-            loss_fct = SparseMultilabelCrossEntropy()
+            loss_fct = SparseMultiLabelCrossEntropy()
             loss = sum([loss_fct(o, l) for o, l in zip(logits, labels)]) / len(logits)
 
         output = (logits,)
