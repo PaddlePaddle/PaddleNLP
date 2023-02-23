@@ -14,10 +14,12 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from unittest import TestCase
 
 from paddlenlp.utils import install_package
+from paddlenlp.utils.downloader import get_path_from_url
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
@@ -32,6 +34,9 @@ class ErnieViLTest(TestCase):
 
     def test_finetune(self):
         install_package("lmdb", "1.3.0")
+        if not os.path.exists("./tests/fixtures/Flickr30k-CN"):
+            URL = "https://paddlenlp.bj.bcebos.com/tests/Flickr30k-CN-small.zip"
+            get_path_from_url(URL, root_dir="./tests/fixtures")
 
         # 1. run finetune
         finetune_config = load_test_config(self.config_path, "finetune")
