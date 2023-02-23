@@ -115,6 +115,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
         )
 
     @property
@@ -128,6 +129,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
         )
 
     @property
