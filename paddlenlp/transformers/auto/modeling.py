@@ -85,6 +85,7 @@ MAPPING_NAMES = OrderedDict(
         ("MobileBert", "mobilebert"),
         ("MPNet", "mpnet"),
         ("NeZha", "nezha"),
+        ("Nystromformer", "nystromformer"),
         ("PPMiniLM", "ppminilm"),
         ("ProphetNet", "prophetnet"),
         ("Reformer", "reformer"),
