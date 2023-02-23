@@ -51,7 +51,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
     training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
     save_path = "trained_model"  # filepath for the trained dygraph model
     export_path = "exported_model"  # filepath for the exported static model
-    results_filename = "experiment_results.csv"
+    results_filename = "experiment_results.csv"  # filepath for storing experiment results
+    experiment_path = None  # filepath for the experiment results
 
     def __init__(
         self,
@@ -79,6 +80,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.language = language
         self.output_dir = output_dir
         self.kwargs = kwargs
+        # Per default, Ray Tune creates JSON, CSV and TensorBoardX logger callbacks, turning it off
+        os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
         # use log_to_driver to control verbosity
         ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >= 1 else False)
 
@@ -293,6 +296,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
+        self.experiment_path = os.path.join(self.output_dir, experiment_name)
 
         self.tuner = tune.Tuner(
             trainable,
@@ -301,7 +305,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 name=experiment_name,
                 log_to_file=True,
                 local_dir=self.output_dir if self.output_dir else None,
-                callbacks=[tune.logger.CSVLoggerCallback()],
+                callbacks=[tune.logger.CSVLoggerCallback(), tune.logger.JsonLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
