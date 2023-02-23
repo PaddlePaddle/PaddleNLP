@@ -3020,6 +3020,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = encoded_inputs["offset_mapping"] + [(0, 0)] * difference
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = encoded_inputs["position_ids"] + [0] * difference
+                if "start_positions" in encoded_inputs:
+                    encoded_inputs["start_positions"] = encoded_inputs["start_positions"] + [0] * difference
+                if "end_positions" in encoded_inputs:
+                    encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
             elif self.padding_side == "left":
                 if return_attention_mask:
@@ -3034,6 +3038,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = [(0, 0)] * difference + encoded_inputs["offset_mapping"]
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
+                if "start_positions" in encoded_inputs:
+                    encoded_inputs["start_positions"] = [0] * difference + encoded_inputs["start_positions"]
+                if "end_positions" in encoded_inputs:
+                    encoded_inputs["end_positions"] = [0] * difference + encoded_inputs["end_positions"]
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))

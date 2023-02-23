@@ -818,7 +818,7 @@ class CLIPVisionTransformer(nn.Layer):
 
     def forward_post(self, x):
         x = self.ln_post(x)
-        return
+        return x
 
 
 class CLIPVisionModel(CLIPPretrainedModel):
