@@ -15,6 +15,7 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     MegatronBertConfig,
@@ -169,7 +170,6 @@ class MegatronBertModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             token_type_ids=multiple_choice_token_type_ids,
-            labels=choice_labels,
         )
         if paddle.is_tensor(result):
             result = [result]
@@ -192,9 +192,6 @@ class MegatronBertModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
-            return_dict=self.return_dict,
         )
         start_logits, end_logits = result[0], result[1]
 
@@ -213,7 +210,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
         if paddle.is_tensor(result):
             result = [result]
 
@@ -231,7 +228,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForNextSentencePrediction(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
         if paddle.is_tensor(result):
             result = [result]
         self.parent.assertEqual(result[0].shape, [self.batch_size, 2])
@@ -248,7 +245,11 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForTokenClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+        )
         if paddle.is_tensor(result):
             result = [result]
 
@@ -266,7 +267,7 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForCausalLM(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_masked_lm(
@@ -281,8 +282,8 @@ class MegatronBertModelTester:
     ):
         model = MegatronBertForMaskedLM(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
+        self.parent.assertEqual(result[0].shape, [self.seq_length, self.vocab_size])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -299,6 +300,15 @@ class MegatronBertModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class MegatronBertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = MegatronBertModel
     return_dict: bool = False
