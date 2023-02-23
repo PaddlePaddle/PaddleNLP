@@ -81,10 +81,10 @@ def count_file_lines(filename):
     return cnt
 
 
-def print_tensors(tag="*", **kwrags):
-    """print tensors for debuging"""
+def print_tensors(tag="*", **kwargs):
+    """print tensors for debugging"""
     print(tag * 50)
-    for key, value in kwrags.items():
+    for key, value in kwargs.items():
         print(key, ":", value)
 
 
