@@ -106,12 +106,12 @@ class ErnieForCSC(nn.Layer):
         )
         pinyin_embedding_output = self.pinyin_embeddings(pinyin_ids)
 
-        # Detection module aims to detect whether each Chinese charater has spelling error.
+        # Detection module aims to detect whether each Chinese character has spelling error.
         detection_outputs = self.ernie.encoder(embedding_output, attention_mask)
-        # detection_error_probs shape: [B, T, 2]. It indicates the erroneous probablity of each
+        # detection_error_probs shape: [B, T, 2]. It indicates the erroneous probability of each
         # word in the sequence from 0 to 1.
         detection_error_probs = self.softmax(self.detection_layer(detection_outputs))
-        # Correction module aims to correct each potential wrong charater to right charater.
+        # Correction module aims to correct each potential wrong character to right character.
         word_pinyin_embedding_output = (
             detection_error_probs[:, :, 0:1] * embedding_output
             + detection_error_probs[:, :, 1:2] * pinyin_embedding_output

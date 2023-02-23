@@ -34,7 +34,7 @@ class BoWModel(nn.Layer):
         padding_idx(int, optional): The padding value in the embedding, the padding_idx of embedding value will
             not be updated, the default value is 0.
         hidden_size(int, optional): The output size of linear that after the bow, default value is 128.
-        fc_hidden_size(int, optional): The output size of linear that after the fisrt linear, default value is 96.
+        fc_hidden_size(int, optional): The output size of linear that after the first linear, default value is 96.
     """
 
     def __init__(self, vocab_size, num_classes, emb_dim=128, padding_idx=0, hidden_size=128, fc_hidden_size=96):
@@ -71,15 +71,15 @@ class LSTMModel(nn.Layer):
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     Args:
         vocab_size(int): The vocab size that used to create the embedding.
-        num_class(int):  The num clas of the classifier.
+        num_class(int):  The num class of the classifier.
         emb_dim(int. optional): The size of the embedding, default value is 128.
         padding_idx(int, optional): The padding value in the embedding, the padding_idx of embedding value will
             not be updated, the default value is 0.
-        lstm_hidden_size(int, optional): The output size of the lstm, defalut value 198.
+        lstm_hidden_size(int, optional): The output size of the lstm, default value 198.
         direction(string, optional): The direction of lstm, default value is `forward`.
         lstm_layers(string, optional): The num of lstm layer.
         dropout(float, optional): The dropout rate of lstm.
-        pooling_type(float, optional): The pooling type of lstm. Defalut value is None,
+        pooling_type(float, optional): The pooling type of lstm. Default value is None,
             if `pooling_type` is None, then the LSTMEncoder will return the hidden state of the last time step at last layer as a single vector.
     """
 
