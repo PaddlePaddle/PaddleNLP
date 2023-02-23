@@ -34,7 +34,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu', 'mlu'], def
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
-    default="bilstm", help="Select which network to train, defaults to bilstm.")
+                    default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
 args = parser.parse_args()
 # yapf: enable

@@ -20,7 +20,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 from data import convert_pointwise_example as convert_example
 from data import create_dataloader
 from model import PointwiseMatching
@@ -33,7 +32,7 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarm
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")

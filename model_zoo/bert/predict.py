@@ -17,10 +17,9 @@ import os
 
 import numpy as np
 import paddle
-from paddle import inference
 from scipy.special import softmax
 
-from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.transformers import BertTokenizer
 
 

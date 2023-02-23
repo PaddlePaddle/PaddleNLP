@@ -14,8 +14,6 @@
 
 import argparse
 import os
-import random
-import time
 from functools import partial
 
 import paddle

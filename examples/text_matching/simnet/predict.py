@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-from functools import partial
 
 import paddle
 import paddle.nn.functional as F

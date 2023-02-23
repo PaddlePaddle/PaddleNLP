@@ -14,14 +14,12 @@
 
 import argparse
 import os
-from functools import partial
 
 import paddle
 from datasets import load_dataset
-from paddle import inference
 from run_glue import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
 
-from paddlenlp.data import Dict, Pad, Stack, Tuple
+from paddlenlp.data import Dict, Pad
 
 
 def parse_args():

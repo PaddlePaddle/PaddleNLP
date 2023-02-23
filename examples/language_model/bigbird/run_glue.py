@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import distutils.util
-import logging
-import math
 import os
 import random
-import sys
 import time
 from functools import partial
 
@@ -26,15 +21,13 @@ import args
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-from paddle.metric import Accuracy, Metric, Precision, Recall
+from paddle.metric import Accuracy
 
-from paddlenlp.data import Dict, Pad, Stack, Tuple
-from paddlenlp.data.sampler import SamplerHelper
+from paddlenlp.data import Stack
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.transformers import (
     BigBirdForSequenceClassification,
-    BigBirdModel,
     BigBirdTokenizer,
     LinearDecayWithWarmup,
     create_bigbird_rand_mask_idx_list,
@@ -193,7 +186,7 @@ def do_train(args):
     train_ds = load_dataset("glue", args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     # In finetune task, bigbird performs better when setting dropout to zero.
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes, attn_dropout=0.0, hidden_dropout_prob=0.0

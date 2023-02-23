@@ -14,18 +14,14 @@
 
 import argparse
 import os
-import random
-import sys
-import time
 from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 from data import convert_example, create_dataloader, read_text_pair
 from model import SimCSE
 
-from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 
@@ -35,7 +31,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'npu'], default="gpu", he
 parser.add_argument("--text_pair_file", type=str, required=True, help="The full path of input file")
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--margin", default=0.0, type=float, help="Margin between pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")

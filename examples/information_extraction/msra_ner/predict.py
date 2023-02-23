@@ -13,14 +13,7 @@
 # limitations under the License.
 
 import argparse
-import ast
-import math
-import os
-import random
-import time
-from functools import partial
 
-import numpy as np
 import paddle
 from datasets import load_dataset
 from paddle.io import DataLoader
@@ -35,7 +28,7 @@ parser.add_argument("--model_name_or_path", default=None, type=str, required=Tru
 parser.add_argument("--init_checkpoint_path", default=None, type=str, required=True, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu", "npu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu/npu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu", "npu"] , help="The device to select to train the model, is must be cpu/gpu/xpu/npu.")
 # yapf: enable
 
 
@@ -100,7 +93,6 @@ def do_predict(args):
         tokenized_inputs["labels"] = labels
         return tokenized_inputs
 
-    ignore_label = -100
     batchify_fn = DataCollatorForTokenClassification(tokenizer)
 
     id2label = dict(enumerate(label_list))
