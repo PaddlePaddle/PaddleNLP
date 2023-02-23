@@ -34,7 +34,7 @@ from ..testing_utils import slow
 
 def ids_tensor(shape, vocab_size, dtype="int32"):
     #  Creates a random int32 tensor of the shape within the vocab size
-    return paddle.randint(low=0, high=vocab_size, dtype=dtype, shape=shape)
+    return paddle.randint(low=1, high=vocab_size, dtype=dtype, shape=shape)
 
 
 def random_attention_mask(shape, dtype="int32"):

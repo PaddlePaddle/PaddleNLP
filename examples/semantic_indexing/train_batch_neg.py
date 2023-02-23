@@ -41,13 +41,13 @@ parser.add_argument("--output_emb_size", default=None, type=int, help="output_em
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint.")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file.")
-parser.add_argument("--margin", default=0.3, type=float, help="Margin beteween pos_sample and neg_samples.")
+parser.add_argument("--margin", default=0.3, type=float, help="Margin between pos_sample and neg_samples.")
 parser.add_argument("--scale", default=30, type=int, help="Scale for pair-wise margin_rank_loss")
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
 parser.add_argument("--amp_loss_scale", default=32768, type=float, help="The value of scale_loss for fp16. This is only used for AMP training.")
@@ -84,7 +84,7 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(

@@ -279,8 +279,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         init_timestep = min(init_timestep, num_inference_steps)
 
         t_start = max(num_inference_steps - init_timestep + offset, 0)
-        timesteps = self.scheduler.timesteps.numpy()
-        timesteps = timesteps[t_start:]
+        timesteps = self.scheduler.timesteps[t_start:]
 
         return timesteps, num_inference_steps - t_start
 
@@ -291,9 +290,10 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         image = image.astype(dtype)
         init_latents = self.vae_encoder(sample=image)[0]
         init_latents = 0.18215 * init_latents
+        init_latents = paddle.to_tensor(init_latents)
 
         # Expand init_latents for batch_size and num_images_per_prompt
-        init_latents = np.concatenate([init_latents] * batch_size * num_images_per_prompt, axis=0)
+        init_latents = paddle.concat([init_latents] * batch_size * num_images_per_prompt, axis=0)
         init_latents_orig = paddle.to_tensor(init_latents)
 
         # add noise to latents using the timesteps
@@ -304,8 +304,8 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         elif isinstance(noise, np.ndarray):
             noise = paddle.to_tensor(noise, dtype=dtype)
 
-        init_latents = self.scheduler.add_noise(paddle.to_tensor(init_latents), noise, paddle.to_tensor(timestep))
-        latents = init_latents.numpy()
+        init_latents = self.scheduler.add_noise(init_latents, noise, timestep)
+        latents = init_latents
         return latents, init_latents_orig, noise
 
     def __call__(
@@ -414,7 +414,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
-        latent_timestep = timesteps[:1].repeat(batch_size * num_images_per_prompt)
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
@@ -423,8 +423,8 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         )
 
         # 7. Prepare mask latent
-        mask = mask_image.astype(latents.dtype)
-        mask = np.concatenate([mask] * batch_size * num_images_per_prompt)
+        mask = paddle.to_tensor(mask_image, dtype=latents.dtype)
+        mask = paddle.concat([mask] * batch_size * num_images_per_prompt)
 
         # 8. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
@@ -432,34 +432,26 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # 9. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
-                tensor_t = paddle.to_tensor(t)
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
-                latent_model_input = latent_model_input.numpy()
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                latent_model_input = latent_model_input
 
                 # predict the noise residual
-                noise_pred = self.unet(
-                    sample=latent_model_input.astype(np.float32),
-                    timestep=np.array([t], dtype=np.int64),
-                    encoder_hidden_states=text_embeddings.astype(np.float32),
+                noise_pred = self.unet.zero_copy_infer(
+                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
                 )[0]
-
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), tensor_t, paddle.to_tensor(latents), **extra_step_kwargs
-                )
-                latents = scheduler_output.prev_sample.numpy()
-
-                init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, tensor_t)
-
-                init_latents_proper = init_latents_proper.numpy()
+                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
+                init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
 
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
@@ -470,7 +462,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                         callback(i, t, latents)
 
         # 10. Post-processing
-        image = self.decode_latents(latents)
+        image = self.decode_latents(latents.numpy())
 
         # 11. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)

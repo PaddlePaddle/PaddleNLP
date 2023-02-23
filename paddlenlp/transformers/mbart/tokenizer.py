@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import os
-import json
-import itertools
 from shutil import copyfile
-from contextlib import contextmanager
+
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, AddedToken
-from ...utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from ...utils.env import MODEL_HOME
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = ["MBartTokenizer", "MBart50Tokenizer"]
 
@@ -282,6 +277,26 @@ class MBartTokenizer(PretrainedTokenizer):
             return self.prefix_tokens + token_ids_0 + self.suffix_tokens
         # We don't expect to process pairs, but leave the pair logic for API consistency
         return self.prefix_tokens + token_ids_0 + token_ids_1 + self.suffix_tokens
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            offset_mapping_0 (List[tuple]):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (List[tuple], optional):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + offset_mapping_1 + [(0, 0)]
 
     def set_src_lang_special_tokens(self, src_lang):
         """Reset the special tokens to the source lang setting. No prefix and suffix=[eos, src_lang_code]."""
@@ -572,6 +587,26 @@ class MBart50Tokenizer(PretrainedTokenizer):
             return self.prefix_tokens + token_ids_0 + self.suffix_tokens
         # We don't expect to process pairs, but leave the pair logic for API consistency
         return self.prefix_tokens + token_ids_0 + token_ids_1 + self.suffix_tokens
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            offset_mapping_0 (List[tuple]):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (List[tuple], optional):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + offset_mapping_1 + [(0, 0)]
 
     def set_src_lang_special_tokens(self, src_lang):
         """Reset the special tokens to the source lang setting. prefix=[src_lang_code] and suffix=[eos]."""

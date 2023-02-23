@@ -93,12 +93,12 @@ def gen_pair(dataset, pool_size=100):
 
     Args:
         dataset: A `MapDataset` or `IterDataset` or a tuple of those.
-            Each example is composed of 2 texts: exampe["query"], example["title"]
+            Each example is composed of 2 texts: example["query"], example["title"]
         pool_size: the number of example to sample negative example randomly
 
     Return:
         dataset: A `MapDataset` or `IterDataset` or a tuple of those.
-        Each example is composed of 2 texts: exampe["query"], example["pos_title"]、example["neg_title"]
+        Each example is composed of 2 texts: example["query"], example["pos_title"]、example["neg_title"]
     """
 
     if len(dataset) < pool_size:
@@ -106,7 +106,7 @@ def gen_pair(dataset, pool_size=100):
 
     new_examples = []
     pool = []
-    tmp_exmaples = []
+    tmp_examples = []
 
     for example in dataset:
         label = example["label"]
@@ -115,15 +115,15 @@ def gen_pair(dataset, pool_size=100):
         if label == 0:
             continue
 
-        tmp_exmaples.append(example)
+        tmp_examples.append(example)
         pool.append(example["title"])
 
         if len(pool) >= pool_size:
             np.random.shuffle(pool)
-            for idx, example in enumerate(tmp_exmaples):
+            for idx, example in enumerate(tmp_examples):
                 example["neg_title"] = pool[idx]
                 new_examples.append(example)
-            tmp_exmaples = []
+            tmp_examples = []
             pool = []
         else:
             continue

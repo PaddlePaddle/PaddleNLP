@@ -13,17 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
-import unittest
 import tempfile
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
+import unittest
+from typing import List
 
-from paddlenlp.transformers import UNIMOTokenizer, PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer, UNIMOTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-from ..test_tokenizer_common import TokenizerTesterMixin
-from ...testing_utils import slow, get_tests_dir
+from ...testing_utils import get_tests_dir
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/vocab.zh.unimo.txt")
 

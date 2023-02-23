@@ -370,6 +370,7 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieMModel
     use_labels = False
     return_dict = False
+    use_inputs_embeds = True
 
     all_model_classes = (
         ErnieMModel,

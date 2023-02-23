@@ -35,7 +35,7 @@ from .log import logger
 
 __all__ = ["get_weights_path_from_url"]
 
-COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community"
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 DOWNLOAD_RETRY_LIMIT = 3
 DOWNLOAD_CHECK = False
@@ -174,8 +174,7 @@ def _download(url, path, md5sum=None):
     url (str): download url
     path (str): download to given path
     """
-    if not osp.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
     fname = osp.split(url)[-1]
     fullname = osp.join(path, fname)
