@@ -14,26 +14,31 @@
 
 import argparse
 import logging
-import os
-import sys
-import random
-import time
 import math
+import os
+import random
+import sys
+import time
 from functools import partial
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy, Metric, Precision, Recall
 
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Dict, Pad, Stack, Tuple
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ElectraForSequenceClassification,
+    ElectraTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -136,8 +141,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu"],
-        help="The device to select to train the model, is must be cpu/gpu.",
+        choices=["cpu", "gpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/npu.",
     )
     args = parser.parse_args()
     return args

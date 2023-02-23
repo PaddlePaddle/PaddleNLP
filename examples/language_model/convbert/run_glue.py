@@ -24,14 +24,20 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import ConvBertForSequenceClassification, ConvBertTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ConvBertForSequenceClassification,
+    ConvBertTokenizer,
+    ElectraForSequenceClassification,
+    ElectraTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -135,8 +141,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu"],
-        help="The device to select to train the model, is must be cpu/gpu.",
+        choices=["cpu", "gpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/npu.",
     )
     args = parser.parse_args()
     return args

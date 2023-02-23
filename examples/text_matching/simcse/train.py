@@ -12,26 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import sys
 import random
+import sys
 import time
+from functools import partial
 
-from scipy import stats
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-
+from data import (
+    convert_example,
+    create_dataloader,
+    read_simcse_text,
+    read_text_pair,
+    word_repetition,
+)
 from model import SimCSE
-from data import read_simcse_text, read_text_pair, convert_example, create_dataloader
-from data import word_repetition
+from scipy import stats
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -46,7 +49,7 @@ parser.add_argument("--epochs", default=1, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Step interval for saving checkpoint.")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override ecpochs.")
 parser.add_argument('--eval_steps', type=int, default=10000, help="Step interval for evaluation.")

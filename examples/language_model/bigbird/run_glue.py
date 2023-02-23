@@ -13,30 +13,33 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
-import sys
-import random
-import time
-import math
 import distutils.util
+import logging
+import math
+import os
+import random
+import sys
+import time
 from functools import partial
 
+import args
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy, Metric, Precision, Recall
 
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Dict, Pad, Stack, Tuple
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BigBirdModel, BigBirdForSequenceClassification, BigBirdTokenizer
-from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BigBirdForSequenceClassification,
+    BigBirdModel,
+    BigBirdTokenizer,
+    LinearDecayWithWarmup,
+    create_bigbird_rand_mask_idx_list,
+)
 from paddlenlp.utils.log import logger
-
-import args
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -327,5 +330,10 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = args.parse_args()
     print_arguments(args)
-    assert args.device in ["cpu", "gpu", "xpu"], "Invalid device! Available device should be cpu, gpu, or xpu."
+    assert args.device in [
+        "cpu",
+        "gpu",
+        "xpu",
+        "npu",
+    ], "Invalid device! Available device should be cpu, gpu, xpu or npu."
     do_train(args)

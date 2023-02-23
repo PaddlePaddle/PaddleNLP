@@ -13,23 +13,28 @@
 # limitations under the License.
 
 import argparse
+import math
 import os
 import random
 import time
-import math
 from functools import partial
 
 import numpy as np
 import paddle
+from datasets import load_dataset
 from paddle.io import DataLoader
 
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
-from datasets import load_dataset
-from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
-from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.transformers import (
+    BertForTokenClassification,
+    BertTokenizer,
+    ErnieCtmForTokenClassification,
+    ErnieCtmTokenizer,
+    ErnieForTokenClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -57,7 +62,7 @@ parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup o
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu", "npu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu/npu.")
 # yapf: enable
 
 

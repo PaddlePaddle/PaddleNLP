@@ -17,11 +17,11 @@ import os
 from functools import partial
 
 import paddle
-from paddle import inference
 from datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-
+from paddle import inference
 from run_glue import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
+
+from paddlenlp.data import Dict, Pad, Stack, Tuple
 
 
 def parse_args():
@@ -52,7 +52,7 @@ def parse_args():
     parser.add_argument(
         "--device",
         default="gpu",
-        choices=["gpu", "cpu", "xpu"],
+        choices=["gpu", "cpu", "xpu", "npu"],
         help="Device selected for inference.",
     )
     parser.add_argument(
