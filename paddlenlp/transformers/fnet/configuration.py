@@ -14,11 +14,9 @@
 """ FNet model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["FNET_PRETRAINED_INIT_CONFIGURATION", "FnetConfig", "FNET_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["FNET_PRETRAINED_INIT_CONFIGURATION", "FNetConfig", "FNET_PRETRAINED_RESOURCE_FILES_MAP"]
 
 FNET_PRETRAINED_INIT_CONFIGURATION = {
     "fnet-base": {
