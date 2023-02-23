@@ -21,7 +21,7 @@ import re
 
 import paddle
 
-param_name_to_exclue_from_weight_decay = re.compile(r".*layer_norm_scale|.*layer_norm_bias|.*b_0")
+param_name_to_exclude_from_weight_decay = re.compile(r".*layer_norm_scale|.*layer_norm_bias|.*b_0")
 
 
 def get_warmup_and_linear_decay(max_steps, warmup_steps):
@@ -43,7 +43,7 @@ def init_optimizer(model, config, train_steps, scale_params_lr=None):
         lr_scheduler,
         parameters=model.parameters(),
         weight_decay=config.weight_decay,
-        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
+        apply_decay_param_fun=lambda n: not param_name_to_exclude_from_weight_decay.match(n),
         grad_clip=paddle.nn.ClipGradByGlobalNorm(config.grad_clip),
     )
     return optimizer
