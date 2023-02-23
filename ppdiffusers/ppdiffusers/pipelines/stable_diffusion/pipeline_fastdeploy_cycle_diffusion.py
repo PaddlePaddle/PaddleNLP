@@ -596,7 +596,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
 
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
-        height, width = image[-2:]
+        height, width = image.shape[-2:]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 concat_noise_pred = paddle.zeros(

@@ -196,7 +196,7 @@ if __name__ == "__main__":
         paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
 
     # 1. Init scheduler
-    scheduler = DDIMScheduler.from_pretrained(os.path.join(args.model_dir, "scheduler"))
+    scheduler = DDIMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")
 
     # 2. Init tokenizer
     tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
