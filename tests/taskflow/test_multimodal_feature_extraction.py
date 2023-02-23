@@ -21,7 +21,9 @@ import paddle
 from PIL import Image
 
 from paddlenlp.taskflow import Taskflow
-from paddlenlp.taskflow.feature_extraction import MultimodalFeatureExtractionTask
+from paddlenlp.taskflow.multimodal_feature_extraction import (
+    MultimodalFeatureExtractionTask,
+)
 
 
 class TestMultimodalFeatureExtractionTask(unittest.TestCase):
