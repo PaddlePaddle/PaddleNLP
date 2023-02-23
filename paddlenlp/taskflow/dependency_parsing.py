@@ -163,7 +163,7 @@ class DDParserTask(Task):
         else:
             raise ValueError(
                 "The encoding model should be one of \
-                ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh"
+                ddparser, ddparser-ernie-1.0 and ddparser-ernie-gram-zh"
             )
         self._check_task_files()
         self._construct_vocabs()
@@ -528,9 +528,9 @@ def eisner(scores, mask):
     s_i = np.full_like(scores, float("-inf"))
     # Score for complete span
     s_c = np.full_like(scores, float("-inf"))
-    # Incompelte span position for backtrack
+    # Incomplete span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # Compelte span position for backtrack
+    # Complete span position for backtrack
     p_c = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
     # Set 0 to s_c.diagonal
     s_c = fill_diagonal(s_c, 0)
