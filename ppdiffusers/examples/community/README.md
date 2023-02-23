@@ -6,6 +6,7 @@
 |-|-|-|-|
 |CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#clip-guided-stable-diffusion)||
 |Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
+|Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、修补|[Stable Diffusion Mega](#stable-diffusion-mega)||
 
 ## Example usages
 
@@ -83,9 +84,10 @@ import paddle
 
 pipe = StableDiffusionWalkPipeline.from_pretrained(
     "CompVis/stable-diffusion-v1-4",
-    revision='fp16',
     paddle_dtype=paddle.float16,
-    safety_checker=None,  # Very important for videos...lots of false positives while interpolating
+    safety_checker=
+    None,  # Very important for videos...lots of false positives while interpolating
+    # custom_pipeline="interpolate_stable_diffusion",
 )
 pipe.enable_attention_slicing()
 
@@ -111,7 +113,81 @@ with paddle.amp.auto_cast(True, level="O2"):
 
 `walk(...)`方法将生成一系列图片，保存在`output_dir`指定的目录下，并返回这些图片的路径。你可以使用这些图片来制造stable diffusion视频。上述代码生成的效果如下：
 
-![dreams](https://user-images.githubusercontent.com/40912707/220613501-df579ae1-c3a3-4f22-8865-d899c4732fe7.gif)
-
+<center class="half">
+<img src="https://user-images.githubusercontent.com/40912707/220613501-df579ae1-c3a3-4f22-8865-d899c4732fe7.gif">
+</center>
 
 > 关于如何使用 stable diffusion 制作视频详细介绍以及更多完整的功能，请参考 [https://github.com/nateraw/stable-diffusion-videos](https://github.com/nateraw/stable-diffusion-videos)。
+
+
+### Stable Diffusion Mega
+
+`StableDiffusionMegaPipeline`可以让你在一个类里使用stable diffusion的主要用例。下述示例代码中展示了在一个pipeline中运行"text-to-image", "image-to-image", and "inpainting"。
+
+```python
+from stable_diffusion_mega import StableDiffusionMegaPipeline
+import PIL
+import requests
+from io import BytesIO
+import paddle
+
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+
+pipe = StableDiffusionMegaPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float16)
+# pipe.to("gpu")
+pipe.enable_attention_slicing()
+generator = paddle.Generator().manual_seed(2022)
+
+# Text-to-Image
+with paddle.amp.auto_cast(True, level="O2"):
+    images = pipe.text2img("An astronaut riding a horse",
+                           generator=generator).images
+
+images[0].save("text2img.png")
+
+# Image-to-Image
+
+init_image = download_image(
+    "https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/img2img/sketch-mountains-input.jpg"
+)
+prompt = "A fantasy landscape, trending on artstation"
+with paddle.amp.auto_cast(True, level="O2"):
+    images = pipe.img2img(prompt=prompt,
+                          image=init_image,
+                          strength=0.75,
+                          guidance_scale=7.5,
+                          generator=generator).images
+images[0].save("img2img.png")
+
+# Inpainting
+
+img_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png"
+mask_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png"
+init_image = download_image(img_url).resize((512, 512))
+mask_image = download_image(mask_url).resize((512, 512))
+
+prompt = "a cat sitting on a bench"
+with paddle.amp.auto_cast(True, level="O2"):
+    images = pipe.inpaint(prompt=prompt,
+                          image=init_image,
+                          mask_image=mask_image,
+                          strength=0.75,
+                          generator=generator).images
+images[0].save("inpainting.png")
+```
+上述代码生成效果如下：
+
+|使用|源|效果|
+|:-:|:-:|:-:|
+|text-to-image|An astronaut riding a horse|<img src="https://user-images.githubusercontent.com/40912707/220876185-4c2c01f8-90f3-45c4-813a-7143541ec456.png" width="500" />|
+|image-to-image|<img src="https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/img2img/sketch-mountains-input.jpg" width="500" /> </br> A fantasy landscape, trending on artstation|<img src="https://user-images.githubusercontent.com/40912707/220876054-5eca5e9a-340e-40a4-a28e-b97af1b006e9.png" width="500" />|
+|inpainting|<img src="https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png" width="250" /><img src="https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png" width="250" /> </br>a cat sitting on a bench|<img src="https://user-images.githubusercontent.com/40912707/220876220-ee044a56-6455-4566-9f42-580e29555497.png" width="500" />|
+
+[text2img]: https://user-images.githubusercontent.com/40912707/220876185-4c2c01f8-90f3-45c4-813a-7143541ec456.png
+[img2img]: https://user-images.githubusercontent.com/40912707/220876054-5eca5e9a-340e-40a4-a28e-b97af1b006e9.png
+[inpainting]: https://user-images.githubusercontent.com/40912707/220876220-ee044a56-6455-4566-9f42-580e29555497.png
