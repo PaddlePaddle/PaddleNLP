@@ -665,7 +665,9 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                 latents = self.scheduler.step(
                     noise_pred, t, latents, variance_noise=noise, **extra_step_kwargs
                 ).prev_sample
-
+                if i == len(timesteps) - 1:
+                    # sync for accuracy it/s measure
+                    paddle.device.cuda.synchronize()
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
