@@ -26,7 +26,7 @@ from ray.tune.result_grid import ResultGrid
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.hyperopt import HyperOptSearch
 
-from paddlenlp.trainer import TrainingArguments
+from paddlenlp.trainer import CompressionArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.utils.log import logger
@@ -51,6 +51,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
     save_path = "trained_model"  # filepath for the trained dygraph model
     export_path = "exported_model"  # filepath for the exported static model
+    compress_path = "compressed_model"  # filepath for the compressed static model
     results_filename = "experiment_results.csv"
 
     def __init__(
@@ -91,9 +92,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def _default_training_argument(self) -> TrainingArguments:
+    def _default_training_argument(self) -> CompressionArguments:
         """
-        Default TrainingArguments for the Trainer
+        Default CompressionArguments for the Trainer
         """
 
     @property
@@ -105,13 +106,13 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self, dataset_list: List[Dataset]):
         """
-        Performs different data checks and inferences on the training and eval datasets
+        Performs different data checks and inferences on the datasets
         """
 
     @abstractmethod
-    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
+    def _construct_trainable(self) -> Callable:
         """
         Returns the Trainable functions that contains the main preprocessing and training logic
         """
@@ -135,36 +136,46 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    def export(self, export_path, trial_id=None):
+    def export(self, export_path: str, trial_id: Optional[str] = None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
         Args:
             export_path (str, required): the filepath to export to
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
 
         raise NotImplementedError
 
     @abstractmethod
-    def to_taskflow(self, trial_id=None):
+    def to_taskflow(self, trial_id: Optional[str] = None):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, trial_id=None, eval_dataset=None) -> Dict[str, float]:
+    def evaluate(self, eval_dataset: Optional[Dataset] = None, trial_id: Optional[str] = None) -> Dict[str, float]:
         """
-        Evaluate the models from a certain `trial_id` on the given dataset
+        Run evaluation and returns metrics from a certain `trial_id` on the given dataset.
 
         Args:
             trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
             eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
-                If not provided, defaults to the evaluation dataset used at construction
+                If not provided, defaults to the evaluation dataset used at construction.
+        """
+        raise NotImplementedError
+
+    def predict(self, test_dataset: Dataset, trial_id: Optional[str] = None):
+        """
+        Run prediction and returns predictions and potential metrics from a certain `trial_id` on the given dataset
+
+        Args:
+            test_dataset (Dataset, required): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
+            trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
         """
         raise NotImplementedError
 
@@ -174,9 +185,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
-            if key.startswith(default_hp.__class__.__name__):
-                _, hp_key = key.split(".")
-                setattr(new_hp, hp_key, value)
+            if key in new_hp.to_dict():
+                setattr(new_hp, key, value)
         return new_hp
 
     def _filter_model_candidates(
@@ -261,7 +271,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
             hp_overrides: (dict[str, Any], optional): Advanced users only.
-                override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
+                override the hyperparameters of every model candidate.  For example, {"max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
                 Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
 
