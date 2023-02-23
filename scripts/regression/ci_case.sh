@@ -21,13 +21,9 @@ export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
 if [ ! -d "model_logs" ];then 
     mkdir model_logs
-else 
-    echo 'model_logs/ exists'
 fi
 if [ ! -d "unittest_logs" ];then 
     mkdir model_logs
-else 
-    echo 'unittest_logs/ exists'
 fi
 
 print_info(){
@@ -1200,7 +1196,7 @@ fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
-mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json
+mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json && cd ../
 python doccano.py --doccano_file ./data/doccano_ext.json --task_type ext --save_dir ./data --splits 0.8 0.2 0 --schema_lang ch >${log_path}/uie_doccano>>${log_path}/uie_doccano 2>&1
 print_info $? uie_doccano
 python -u -m paddle.distributed.launch finetune.py --device gpu --logging_steps 2 --save_steps 2 --eval_steps 2 --seed 42 \

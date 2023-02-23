@@ -139,7 +139,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 
 Parameters:
 
-* `device`: Training device, one of 'cpu' and 'gpu' can be selected; the default is GPU training.
+* `device`: Training device, one of 'cpu', 'gpu' and 'npu' can be selected; the default is GPU training.
 * `logging_steps`: The interval steps of log printing during training, the default is 10.
 * `save_steps`: The number of interval steps to save the model checkpoint during training, the default is 100.
 * `eval_steps`: The number of interval steps to save the model checkpoint during training, the default is 100.
@@ -149,8 +149,8 @@ Parameters:
 * `train_path`: training set path; defaults to `None`.
 * `dev_path`: Development set path; defaults to `None`.
 * `max_seq_len`: The maximum segmentation length of the text. When the input exceeds the maximum length, the input text will be automatically segmented. The default is 512.
-* `per_device_train_batch_size`: The batch size of each GPU core/CPU used for training, the default is 8.
-* `per_device_eval_batch_size`: Batch size per GPU core/CPU for evaluation, default is 8.
+* `per_device_train_batch_size`: The batch size of each GPU core//NPU core/CPU used for training, the default is 8.
+* `per_device_eval_batch_size`: Batch size per GPU core/NPU core/CPU for evaluation, default is 8.
 * `num_train_epochs`: Training rounds, 100 can be selected when using early stopping method; the default is 10.
 * `learning_rate`: The maximum learning rate for training, UIE-X recommends setting it to 1e-5; the default value is 3e-5.
 * `label_names`: the name of the training data label, UIE-X is set to 'start_positions' 'end_positions'; the default value is None.
@@ -219,6 +219,7 @@ Output print example:
 
 Parameters:
 
+- `device`: Evaluation device, one of 'cpu', 'gpu' and 'npu' can be selected; the default is GPU evaluation.
 - `model_path`: The path of the model folder for evaluation, which must contain the model weight file `model_state.pdparams` and the configuration file `model_config.json`.
 - `test_path`: The test set file for evaluation.
 - `batch_size`: batch size, please adjust according to the machine situation, the default is 16.

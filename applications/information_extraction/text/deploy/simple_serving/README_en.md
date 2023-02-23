@@ -45,14 +45,14 @@ schema = {"Weapon Name": ["Country of Production", "Type", "R&D Unit"]}
 #### Set model path
 ```
 # Default task_path
-uie = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema)
+uie = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema)
 ```
 
 #### Doka Service Prediction
 PaddleNLP SimpleServing supports multi-card load balancing prediction, mainly during service registration, just register two Taskflow tasks, the following is the sample code
 ```
-uie1 = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
-uie2 = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
+uie1 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
+uie2 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
 service. register_taskflow('uie', [uie1, uie2])
 ```
 

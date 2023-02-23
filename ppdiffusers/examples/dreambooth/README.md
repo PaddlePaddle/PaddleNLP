@@ -241,6 +241,7 @@ python train_dreambooth_lora.py \
   --max_train_steps=500 \
   --validation_prompt="A photo of sks dog in a bucket" \
   --validation_epochs=50 \
+  --lora_rank=4 \
   --seed=0
 ```
 
