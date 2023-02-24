@@ -15,13 +15,12 @@
 
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
+
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
-from paddlenlp.utils.tools import compare_version
 
 try:
     from paddle.text import ViterbiDecoder
-except:
+except Exception:
     raise ImportError(
         "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".format(
             paddle.version.full_version

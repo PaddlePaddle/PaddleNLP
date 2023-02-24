@@ -13,19 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
-
-import numpy as np
-from .utils import download_file
 from .text_generation import TextGenerationTask
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            qa = Taskflow("question_answering")
            qa("中国的国土面积有多大？")
@@ -37,7 +28,7 @@ usage = r"""
            '''
            [{'text': '中国国土面积有多大？', 'answer': '960万平方公里。'}, {'text': '中国的首都在哪里？', 'answer': '北京。'}]
            '''
-           
+
          """
 
 URLS = {
