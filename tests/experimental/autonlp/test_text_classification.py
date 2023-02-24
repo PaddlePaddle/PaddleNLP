@@ -269,15 +269,21 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             )
 
             # test predict
-            copy_test_ds = copy.deepcopy(self.multi_label_dev_ds)
-            test_output = auto_trainer.predict(test_dataset=copy_test_ds)
+            dev_output = auto_trainer.predict(test_dataset=copy_dev_ds)
             self.assertEqual(
                 eval_metrics1[auto_trainer.metric_for_best_model],
-                test_output.metrics[auto_trainer.metric_for_best_model.replace("eval", "test")],
+                dev_output.metrics[auto_trainer.metric_for_best_model.replace("eval", "test")],
             )
+            self.assertEqual(len(copy_dev_ds), len(dev_output.label_ids))
+            self.assertEqual(len(copy_dev_ds), len(dev_output.predictions))
+            self.assertEqual(len(auto_trainer.id2label), len(dev_output.predictions[0]))
+
+            copy_test_ds = copy.deepcopy(self.test_ds)
+            test_output = auto_trainer.predict(test_dataset=copy_test_ds)
+            self.assertFalse(auto_trainer.metric_for_best_model.replace("eval", "test") in test_output.metrics)
+            self.assertEqual(None, test_output.label_ids)
             self.assertEqual(len(copy_test_ds), len(test_output.predictions))
             self.assertEqual(len(auto_trainer.id2label), len(test_output.predictions[0]))
-            self.assertEqual(len(copy_test_ds), len(test_output.label_ids))
 
             # test taskflow
             taskflow = auto_trainer.to_taskflow()
@@ -371,12 +377,21 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             )
 
             # test predict
-            copy_test_ds = copy.deepcopy(self.multi_class_dev_ds)
-            eval_metrics3 = auto_trainer.predict(test_dataset=copy_test_ds).metrics
+            dev_output = auto_trainer.predict(test_dataset=copy_dev_ds)
             self.assertEqual(
                 eval_metrics1[auto_trainer.metric_for_best_model],
-                eval_metrics3[auto_trainer.metric_for_best_model.replace("eval", "test")],
+                dev_output.metrics[auto_trainer.metric_for_best_model.replace("eval", "test")],
             )
+            self.assertEqual(len(copy_dev_ds), len(dev_output.label_ids))
+            self.assertEqual(len(copy_dev_ds), len(dev_output.predictions))
+            self.assertEqual(len(auto_trainer.id2label), len(dev_output.predictions[0]))
+
+            copy_test_ds = copy.deepcopy(self.test_ds)
+            test_output = auto_trainer.predict(test_dataset=copy_test_ds)
+            self.assertFalse(auto_trainer.metric_for_best_model.replace("eval", "test") in test_output.metrics)
+            self.assertEqual(None, test_output.label_ids)
+            self.assertEqual(len(copy_test_ds), len(test_output.predictions))
+            self.assertEqual(len(auto_trainer.id2label), len(test_output.predictions[0]))
 
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
