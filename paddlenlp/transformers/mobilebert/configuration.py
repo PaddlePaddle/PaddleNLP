@@ -148,6 +148,7 @@ class MobileBertConfig(PretrainedConfig):
         trigram_input=True,
         classifier_activation=False,
         classifier_dropout=None,
+        add_pooling_layer=True,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -181,3 +182,4 @@ class MobileBertConfig(PretrainedConfig):
             self.true_hidden_size = hidden_size
 
         self.classifier_dropout = classifier_dropout
+        self.add_pooling_layer = add_pooling_layer

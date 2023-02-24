@@ -66,16 +66,12 @@ NORM2FN = {"layer_norm": nn.LayerNorm, "no_norm": NoNorm}
 class MobileBertEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(
-        self,
-        config,
-        pad_token_id=1,
-    ):
+    def __init__(self, config):
         super().__init__()
         self.trigram_input = config.trigram_input
         self.embedding_size = config.embedding_size
         self.hidden_size = config.hidden_size
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
@@ -543,9 +539,7 @@ class MobileBertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.mobilebert.config.initializer_range,
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -599,8 +593,7 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
     def __init__(self, config):
         super(MobileBertForPreTraining, self).__init__(config)
         self.mobilebert = MobileBertModel(config)
-        self.cls = MobileBertPreTrainingHeads(self.mobilebert.config)
-
+        self.cls = MobileBertPreTrainingHeads(config)
         self.init_weights()
 
     def get_output_embeddings(self):
@@ -766,14 +759,14 @@ class MobileBertModel(MobileBertPretrainedModel):
 
     """
 
-    def __init__(self, config, pad_token_id=1, add_pooling_layer=True):
+    def __init__(self, config):
         super(MobileBertModel, self).__init__(config)
 
         self.initializer_range = config.initializer_range
-        self.embeddings = MobileBertEmbeddings(config, pad_token_id=pad_token_id)
+        self.embeddings = MobileBertEmbeddings(config)
         self.encoder = MobileBertEncoder(config)
         self.num_hidden_layers = config.num_hidden_layers
-        self.pooler = MobileBertPooler(config) if add_pooling_layer else None
+        self.pooler = MobileBertPooler(config) if config.add_pooling_layer else None
 
         self.init_weights()
 
@@ -1082,7 +1075,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
         super(MobileBertForQuestionAnswering, self).__init__(config)
         self.num_labels = 2
         self.mobilebert = MobileBertModel(config)
-        self.qa_outputs = nn.Linear(self.mobilebert.config.hidden_size, self.num_labels)
+        self.qa_outputs = nn.Linear(self.config.hidden_size, self.num_labels)
 
         self.init_weights()
 

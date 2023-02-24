@@ -13,25 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tempfile
 import unittest
-from typing import List
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    AutoModel,
-    AutoModelForQuestionAnswering,
-    AutoModelForSequenceClassification,
     MobileBertConfig,
     MobileBertForQuestionAnswering,
     MobileBertForSequenceClassification,
     MobileBertModel,
+    PretrainedModel,
 )
 
-from ...testing_utils import require_package, slow
+from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class MobileBertModelTester:
@@ -179,6 +181,15 @@ class MobileBertModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class MobileBertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = MobileBertModel
     return_dict = False
@@ -216,44 +227,55 @@ class MobileBertModelTest(ModelTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
 
-class MobileBertCompatibilityTest(unittest.TestCase):
-    test_model_id = "google/mobilebert-uncased"
-
-    @classmethod
-    @require_package("transformers", "torch")
-    def setUpClass(cls) -> None:
-        from transformers import AutoModel
-
-        cls.torch_model_path = tempfile.TemporaryDirectory().name
-        model = AutoModel.from_pretrained(cls.test_model_id)
-        model.save_pretrained(cls.torch_model_path)
-
-    def test_model_config_mapping(self):
-        config = MobileBertConfig(num_labels=22, hidden_dropout_prob=0.99)
-        self.assertEqual(config.num_labels, 22)
-        self.assertEqual(config.hidden_dropout_prob, 0.99)
-
-    def setUp(self) -> None:
-        self.tempdirs: List[tempfile.TemporaryDirectory] = []
-
-    def tearDown(self) -> None:
-        for tempdir in self.tempdirs:
-            tempdir.cleanup()
-
-    def get_tempdir(self) -> str:
-        tempdir = tempfile.TemporaryDirectory()
-        self.tempdirs.append(tempdir)
-        return tempdir.name
+class MobileBertModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
+    base_model_class: PretrainedModel = MobileBertModel
+    hf_remote_test_model_path: str = "google/mobilebert-uncased"
+    paddlehub_remote_test_model_name: str = "mobilebert-uncased"
 
     @slow
-    def test_auto_model(self):
-        AutoModel.from_pretrained("mobilebert-uncased")
-        model = AutoModelForSequenceClassification.from_pretrained("mobilebert-uncased", num_labels=4, dropout=0.3)
-        self.assertEqual(model.num_labels, 4)
-        self.assertEqual(model.dropout.p, 0.3)
+    def test_inference_no_attention(self):
+        model = MobileBertModel.from_pretrained("mobilebert-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[101, 7110, 1005, 1056, 2023, 11333, 17413, 1029, 102]])
+        with paddle.no_grad():
+            output = model(input_ids)[0]
+        expected_shape = [1, 9, 512]
+        self.assertEqual(output.shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [-2.4736526e07, 8.2691656e04, 1.6521838e05],
+                    [-5.7541704e-01, 3.9056022e00, 4.4011507e00],
+                    [2.6047359e00, 1.5677652e00, -1.7324188e-01],
+                ]
+            ]
+        )
+        lower_bound = paddle.all((expected_slice / output[..., :3, :3]) >= 1 - 1e-3)
+        upper_bound = paddle.all((expected_slice / output[..., :3, :3]) <= 1 + 1e-3)
 
-        model = AutoModelForQuestionAnswering.from_pretrained("mobilebert-uncased", dropout=0.3)
-        self.assertEqual(model.dropout.p, 0.3)
+        self.assertTrue(lower_bound and upper_bound)
+
+    @slow
+    def test_inference_with_attention(self):
+        model = MobileBertModel.from_pretrained("mobilebert-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[101, 7110, 1005, 1056, 2023, 11333, 17413, 1029, 102]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 9, 512]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [2.96605349, 3.73147392, -0.20700839],
+                    [2.02441382, 0.04513174, 3.61004543],
+                    [4.02399778, -0.25662401, 1.62328660],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":
