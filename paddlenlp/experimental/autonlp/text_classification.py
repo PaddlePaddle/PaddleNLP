@@ -115,6 +115,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property
@@ -129,6 +130,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property
@@ -642,3 +644,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         logger.info(f"Exported {trial_id} to {export_path}")
         return taskflow_config
+
+    def visualdl(self, trial_id: Optional[str] = None):
+        """
+        Return visualdl path to represent the results of the taskflow training.
+        """
+        model_result = self._get_model_result(trial_id=trial_id)
+        return os.path.join(model_result.log_dir, self.visualdl_path)

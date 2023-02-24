@@ -53,6 +53,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     export_path = "exported_model"  # filepath for the exported static model
     results_filename = "experiment_results.csv"  # filepath for storing experiment results
     experiment_path = None  # filepath for the experiment results
+    visualdl_path = "visualdl"  # filepath for the visualdl
 
     def __init__(
         self,
