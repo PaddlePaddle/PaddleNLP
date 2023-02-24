@@ -16,7 +16,7 @@ import functools
 import json
 import os
 import shutil
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import paddle
@@ -97,7 +97,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
-        self._data_checks_and_inference()
+        self._data_checks_and_inference([self.train_dataset, self.eval_dataset])
 
     @property
     def supported_languages(self) -> List[str]:
@@ -179,46 +179,46 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "TrainingArguments.per_device_train_batch_size": train_batch_size,
-                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_finetune_models,
-                "TrainingArguments.learning_rate": 3e-5,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": chinese_finetune_models,
+                "learning_rate": 3e-5,
             },
             {
                 "preset": "finetune",
                 "language": "English",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "TrainingArguments.per_device_train_batch_size": train_batch_size,
-                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": english_finetune_models,
-                "TrainingArguments.learning_rate": 3e-5,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": english_finetune_models,
+                "learning_rate": 3e-5,
             },
             # slow learning: small LR, large early stop patience
             {
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "TrainingArguments.per_device_train_batch_size": train_batch_size,
-                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": chinese_finetune_models,
-                "TrainingArguments.learning_rate": 5e-6,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": chinese_finetune_models,
+                "learning_rate": 5e-6,
             },
             {
                 "preset": "finetune",
                 "language": "English",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "TrainingArguments.per_device_train_batch_size": train_batch_size,
-                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": english_finetune_models,
-                "TrainingArguments.learning_rate": 5e-6,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": english_finetune_models,
+                "learning_rate": 5e-6,
             },
             # prompt tuning candidates
             {
@@ -226,125 +226,125 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "Chinese",
                 "trainer_type": "PromptTrainer",
                 "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
-                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "PromptTuningArguments.num_train_epochs": 100,
-                "PromptTuningArguments.model_name_or_path": chinese_prompt_models,
-                "PromptTuningArguments.learning_rate": 1e-5,
-                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": chinese_prompt_models,
+                "learning_rate": 1e-5,
+                "ppt_learning_rate": 1e-4,
             },
             {
                 "preset": "prompt",
                 "language": "English",
                 "trainer_type": "PromptTrainer",
                 "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
-                "PromptTuningArguments.per_device_train_batch_size": train_batch_size,
-                "PromptTuningArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "PromptTuningArguments.num_train_epochs": 100,
-                "PromptTuningArguments.model_name_or_path": english_prompt_models,
-                "PromptTuningArguments.learning_rate": 1e-5,
-                "PromptTuningArguments.ppt_learning_rate": 1e-4,
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": english_prompt_models,
+                "learning_rate": 1e-5,
+                "ppt_learning_rate": 1e-4,
             },
         ]
 
-    def _data_checks_and_inference(self):
+    def _data_checks_and_inference(self, dataset_list: List[Dataset]):
+        """
+        Performs different data checks and generate id to label mapping on the datasets.
+        """
+        generate_id2label = True
         if self.id2label is None:
             self.id2label, self.label2id = {}, {}
-            if self.problem_type == "multi_class":
-                for dataset in [self.train_dataset, self.eval_dataset]:
-                    for example in dataset:
-                        label = example[self.label_column]
-                        if label not in self.label2id:
-                            self.label2id[label] = len(self.label2id)
-                            self.id2label[len(self.id2label)] = label
-            # multi_label
-            else:
-                for dataset in [self.train_dataset, self.eval_dataset]:
-                    for example in dataset:
-                        labels = example[self.label_column]
-                        for label in labels:
-                            if label not in self.label2id:
-                                self.label2id[label] = len(self.label2id)
-                                self.id2label[len(self.id2label)] = label
         else:
+            generate_id2label = False
             self.label2id = {}
             for i in self.id2label:
                 self.label2id[self.id2label[i]] = i
 
-            if self.problem_type == "multi_class":
-                for dataset in [self.train_dataset, self.eval_dataset]:
-                    for example in dataset:
-                        label = example[self.label_column]
-                        if label not in self.label2id:
+        for dataset in dataset_list:
+            for example in dataset:
+                if self.text_column not in example or self.label_column not in example:
+                    raise ValueError(
+                        f"Text column: {self.text_column} and label columns:{self.label_column} must exist for example: {example}"
+                    )
+                if self.problem_type == "multi_class":
+                    label = example[self.label_column]
+                    if label not in self.label2id:
+                        if generate_id2label:
+                            self.label2id[label] = len(self.label2id)
+                            self.id2label[len(self.id2label)] = label
+                        else:
                             raise ValueError(
                                 f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                             )
-            # multi_label
-            else:
-                for dataset in [self.train_dataset, self.eval_dataset]:
-                    for example in dataset:
-                        labels = example[self.label_column]
-                        for label in labels:
-                            if label not in self.label2id:
+                else:
+                    labels = example[self.label_column]
+                    for label in labels:
+                        if label not in self.label2id:
+                            if generate_id2label:
+                                self.label2id[label] = len(self.label2id)
+                                self.id2label[len(self.id2label)] = label
+                            else:
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
 
-    def _construct_trainer(self, config, eval_dataset=None) -> Trainer:
-        if "EarlyStoppingCallback.early_stopping_patience" in config:
-            callbacks = [
-                EarlyStoppingCallback(early_stopping_patience=config["EarlyStoppingCallback.early_stopping_patience"])
-            ]
+    def _construct_trainer(self, model_config) -> Trainer:
+        if "early_stopping_patience" in model_config:
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=model_config["early_stopping_patience"])]
         else:
             callbacks = None
-        if config["trainer_type"] == "Trainer":
-            model_path = config["TrainingArguments.model_name_or_path"]
+
+        if self.problem_type == "multi_class":
+            criterion = paddle.nn.CrossEntropyLoss()
+        else:
+            criterion = paddle.nn.BCEWithLogitsLoss()
+
+        if model_config["trainer_type"] == "Trainer":
+            model_path = model_config["model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_path, num_labels=len(self.id2label), id2label=self.id2label, label2id=self.label2id
             )
-            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
-            trans_func = functools.partial(
-                self._preprocess_fn,
-                tokenizer=tokenizer,
-                max_length=max_length,  # truncate to the max length allowed by the model
+            max_length = model_config.get("max_length", model.config.max_position_embeddings)
+
+            training_args = self._override_hp(model_config, self._default_training_argument)
+            processed_train_dataset = self._preprocess_dataset(
+                self.train_dataset, max_length, tokenizer, model_config["trainer_type"]
             )
-            processed_train_dataset = copy.deepcopy(self.train_dataset).map(trans_func, lazy=False)
-            if eval_dataset is None:
-                processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(trans_func, lazy=False)
-            else:
-                processed_eval_dataset = copy.deepcopy(eval_dataset).map(trans_func, lazy=False)
-            training_args = self._override_hp(config, self._default_training_argument)
+            processed_eval_dataset = self._preprocess_dataset(
+                self.eval_dataset, max_length, tokenizer, model_config["trainer_type"]
+            )
+
             trainer = Trainer(
                 model=model,
                 tokenizer=tokenizer,
                 args=training_args,
+                criterion=criterion,
                 train_dataset=processed_train_dataset,
                 eval_dataset=processed_eval_dataset,
                 data_collator=DataCollatorWithPadding(tokenizer),
                 compute_metrics=self._compute_metrics,
                 callbacks=callbacks,
             )
-        elif config["trainer_type"] == "PromptTrainer":
-            model_path = config["PromptTuningArguments.model_name_or_path"]
+        elif model_config["trainer_type"] == "PromptTrainer":
+            model_path = model_config["model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
-            processed_train_dataset = copy.deepcopy(self.train_dataset).map(self._preprocess_labels, lazy=False)
-            if eval_dataset is None:
-                processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(self._preprocess_labels, lazy=False)
-            else:
-                processed_eval_dataset = copy.deepcopy(eval_dataset).map(self._preprocess_labels, lazy=False)
-
             model = AutoModelForMaskedLM.from_pretrained(model_path)
-            max_length = config.get("PreprocessArguments.max_length", model.config.max_position_embeddings)
-            template = AutoTemplate.create_from(
-                prompt=config["template.prompt"],
-                tokenizer=tokenizer,
-                max_length=max_length,
-                model=model,
+            max_length = model_config.get("max_length", model.config.max_position_embeddings)
+
+            training_args = self._override_hp(model_config, self._default_prompt_tuning_arguments)
+            processed_train_dataset = self._preprocess_dataset(
+                self.train_dataset, max_length, tokenizer, model_config["trainer_type"]
             )
-            training_args = self._override_hp(config, self._default_prompt_tuning_arguments)
+            processed_eval_dataset = self._preprocess_dataset(
+                self.eval_dataset, max_length, tokenizer, model_config["trainer_type"]
+            )
+
+            template = AutoTemplate.create_from(
+                prompt=model_config["template.prompt"], tokenizer=tokenizer, max_length=max_length, model=model
+            )
             verbalizer = SoftVerbalizer(label_words=self.id2label, tokenizer=tokenizer, model=model)
             prompt_model = PromptModelForSequenceClassification(
                 model,
@@ -353,10 +353,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 freeze_plm=training_args.freeze_plm,
                 freeze_dropout=training_args.freeze_dropout,
             )
-            if self.problem_type == "multi_class":
-                criterion = paddle.nn.CrossEntropyLoss()
-            else:  # multi_label
-                criterion = paddle.nn.BCEWithLogitsLoss()
             trainer = PromptTrainer(
                 model=prompt_model,
                 tokenizer=tokenizer,
@@ -372,14 +368,22 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return trainer
 
     def _construct_trainable(self) -> Callable:
-        def trainable(config):
+        """
+        Returns the Trainable functions that contains the main preprocessing and training logic
+        """
+
+        def trainable(model_config):
             # import is required for proper pickling
             from paddlenlp.utils.log import logger
 
-            config = config["candidates"]
-            trainer = self._construct_trainer(config)
+            # construct trainer
+            model_config = model_config["candidates"]
+            trainer = self._construct_trainer(model_config)
+            # train
             trainer.train()
+            # evaluate
             eval_metrics = trainer.evaluate()
+            # save dygraph model
             trainer.save_model(self.save_path)
 
             if os.path.exists(self.training_path):
@@ -389,29 +393,79 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         return trainable
 
-    def evaluate(self, trial_id=None, eval_dataset=None):
+    def evaluate(self, eval_dataset: Optional[Dataset] = None, trial_id: Optional[str] = None):
         """
-        Evaluate the models from a certain `trial_id` on the given dataset
-
+        Run evaluation and returns metrics from a certain `trial_id` on the given dataset.
         Args:
+            eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields. If not provided, defaults to the evaluation dataset used at construction.
             trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
-            eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
-                If not provided, defaults to the evaluation dataset used at construction
         """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
-
-        trainer = self._construct_trainer(model_config, eval_dataset)
+        trainer = self._construct_trainer(model_config)
         trainer.load_state_dict_from_checkpoint(
             resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
         )
 
-        eval_metrics = trainer.evaluate()
+        if eval_dataset is not None:
+            self._data_checks_and_inference([eval_dataset])
+            if model_config["trainer_type"] == "PromptTrainer":
+                max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+            else:
+                max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
+            processed_eval_dataset = self._preprocess_dataset(
+                eval_dataset, max_length, trainer.tokenizer, model_config["trainer_type"]
+            )
+            eval_metrics = trainer.evaluate(eval_dataset=processed_eval_dataset)
+        else:
+            eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+
         if os.path.exists(self.training_path):
             logger.info(f"Removing {self.training_path} to conserve disk space")
             shutil.rmtree(self.training_path)
-        trainer.log_metrics("eval", eval_metrics)
+
         return eval_metrics
+
+    def predict(self, test_dataset: Dataset, trial_id: Optional[str] = None):
+        """
+        Run prediction and returns predictions and potential metrics from a certain `trial_id` on the given dataset
+        Args:
+            test_dataset (Dataset): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
+            trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
+        """
+        is_test = False
+        if self.label_column in test_dataset[0]:
+            self._data_checks_and_inference([test_dataset])
+        else:
+            is_test = True
+            for example in test_dataset:
+                if self.text_column not in example:
+                    raise ValueError(f"Text column: {self.text_column} must exist for example: {example}")
+
+        model_result = self._get_model_result(trial_id=trial_id)
+        model_config = model_result.metrics["config"]["candidates"]
+
+        trainer = self._construct_trainer(model_config)
+        trainer.load_state_dict_from_checkpoint(
+            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
+        )
+
+        if model_config["trainer_type"] == "PromptTrainer":
+            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+        else:
+            max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
+        processed_test_dataset = self._preprocess_dataset(
+            test_dataset, max_length, trainer.tokenizer, model_config["trainer_type"], is_test=is_test
+        )
+        test_output = trainer.predict(test_dataset=processed_test_dataset)
+        trainer.log_metrics("test", test_output.metrics)
+
+        if os.path.exists(self.training_path):
+            logger.info(f"Removing {self.training_path} to conserve disk space")
+            shutil.rmtree(self.training_path)
+
+        return test_output
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         if self.problem_type == "multi_class":
@@ -469,9 +523,34 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
         if not is_test:
-            example_with_labels = self._preprocess_labels(example)
-            result["labels"] = example_with_labels["labels"]
+            result["labels"] = self._preprocess_labels(example)["labels"]
         return result
+
+    def _preprocess_dataset(
+        self,
+        dataset: Dataset,
+        max_length: int,
+        tokenizer: PretrainedTokenizer,
+        trainer_type: str,
+        is_test: bool = False,
+    ):
+        """
+        Preprocess dataset from raw features to input features used by the Trainer or PromptTrainer.
+        """
+
+        if trainer_type == "PromptTrainer":
+            if is_test:
+                return dataset
+            trans_func = self._preprocess_labels
+        elif trainer_type == "Trainer":
+            trans_func = functools.partial(
+                self._preprocess_fn,
+                tokenizer=tokenizer,
+                max_length=max_length,  # truncate to the max length allowed by the model
+                is_test=is_test,
+            )
+        processed_dataset = copy.deepcopy(dataset).map(trans_func, lazy=False)
+        return processed_dataset
 
     def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, precision="fp32"):
         """
@@ -524,9 +603,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trainer.export_model(export_path)
             trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
             mode = "prompt"
-            max_length = model_config.get(
-                "PreprocessArguments.max_length", trainer.model.plm.config.max_position_embeddings
-            )
+            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
         else:
             if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
                 input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
@@ -537,9 +614,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 ]
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
             mode = "finetune"
-            max_length = model_config.get(
-                "PreprocessArguments.max_length", trainer.model.config.max_position_embeddings
-            )
+            max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
 
         # save tokenizer
         trainer.tokenizer.save_pretrained(export_path)
