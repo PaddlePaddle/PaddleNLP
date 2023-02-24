@@ -176,7 +176,7 @@ class BertModelTester:
         model = BertForMaskedLM(config)
         model.eval()
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[1].shape, [self.seq_length, self.vocab_size])
 
     def create_and_check_model_past_large_inputs(
         self,
