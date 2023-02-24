@@ -15,9 +15,7 @@
 
 
 import unittest
-import numpy as np
 from paddlenlp.transformers.tokenization_utils import AddedToken
-
 from paddlenlp.transformers.fnet.tokenizer import FNetTokenizer
 
 from ...testing_utils import get_tests_dir, slow
