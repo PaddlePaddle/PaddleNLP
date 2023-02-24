@@ -458,19 +458,23 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         )
         image_embeds = vision_outputs[1]
         text_embeds = text_outputs[1]
-
         # normalized features
         image_embeds = F.normalize(image_embeds)
         text_embeds = F.normalize(text_embeds)
-
-        if dist.get_world_size() > 1:
-            feature_list_img = []
-            feature_list_txt = []
-            dist.all_gather(feature_list_img, image_embeds)
-            dist.all_gather(feature_list_txt, text_embeds)
-            image_embeds = paddle.concat(x=feature_list_img, axis=0)
-            text_embeds = paddle.concat(x=feature_list_txt, axis=0)
-
+        if paddle.distributed.is_initialized() and dist.get_world_size() > 1:
+            world_size = dist.get_world_size()
+            rank = dist.get_rank()
+            gathered_image_features = [paddle.zeros_like(image_embeds) for _ in range(world_size)]
+            gathered_text_features = [paddle.zeros_like(text_embeds) for _ in range(world_size)]
+            dist.all_gather(gathered_image_features, image_embeds)
+            dist.all_gather(gathered_text_features, text_embeds)
+            # Add current text_embeds image_embeds into the batch for gradient update
+            image_embeds = paddle.concat(
+                [image_embeds] + gathered_image_features[:rank] + gathered_image_features[rank + 1 :]
+            )
+            text_embeds = paddle.concat(
+                [text_embeds] + gathered_text_features[:rank] + gathered_text_features[rank + 1 :]
+            )
         # cosine similarity as logits
         logit_scale = self.temperature.exp()
 

@@ -13,19 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
-
-import numpy as np
-from .utils import download_file
-from .lexical_analysis import load_vocab, LacTask
+from .lexical_analysis import LacTask
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            pos = Taskflow("pos_tagging")
            pos("第十四届全运会在西安举办")
@@ -56,13 +47,11 @@ class POSTaggingTask(LacTask):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
         """
-        batch_out = []
         lengths = inputs["lens"]
         preds = inputs["result"]
         sents = inputs["text"]
         final_results = []
         for sent_index in range(len(lengths)):
-            single_result = {}
             tags = [self._id2tag_dict[str(index)] for index in preds[sent_index][: lengths[sent_index]]]
             sent = sents[sent_index]
             if self._custom:

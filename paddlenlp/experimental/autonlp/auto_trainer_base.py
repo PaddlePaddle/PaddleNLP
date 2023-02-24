@@ -139,6 +139,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
+    @abstractmethod
     def export(self, export_path: str, trial_id: Optional[str] = None):
         """
         Export the model from a certain `trial_id` to the given file path.
@@ -172,10 +173,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    @abstractmethod
     def predict(self, test_dataset: Dataset, trial_id: Optional[str] = None):
         """
         Run prediction and returns predictions and potential metrics from a certain `trial_id` on the given dataset
-
         Args:
             test_dataset (Dataset, required): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
             trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
