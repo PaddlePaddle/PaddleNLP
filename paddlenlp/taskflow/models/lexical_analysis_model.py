@@ -20,7 +20,7 @@ from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 
 try:
     from paddle.text import ViterbiDecoder
-except ImportError:
+except Exception:
     raise ImportError(
         "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".format(
             paddle.version.full_version
