@@ -382,6 +382,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieModel
     return_dict: bool = False
     use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     all_model_classes = (
         ErnieModel,

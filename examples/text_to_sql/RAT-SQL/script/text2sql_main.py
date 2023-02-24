@@ -149,12 +149,12 @@ def evaluate(config):
 
 def init_env(config):
     log_level = logging.INFO if not config.general.is_debug else logging.DEBUG
-    formater = logging.Formatter("%(levelname)s %(asctime)s %(filename)s:%(lineno)03d * %(message)s")
+    formatter = logging.Formatter("%(levelname)s %(asctime)s %(filename)s:%(lineno)03d * %(message)s")
     logger = logging.getLogger()
     logger.setLevel(log_level)
     handler = logger.handlers[0]
     handler.setLevel(log_level)
-    handler.setFormatter(formater)
+    handler.setFormatter(formatter)
 
     seed = config.train.random_seed
     if seed is not None:

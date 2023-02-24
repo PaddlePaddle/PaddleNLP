@@ -14,10 +14,10 @@
 import copy
 import datetime
 import os
-import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import ray
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
@@ -44,11 +44,15 @@ class AutoTrainerBase(metaclass=ABCMeta):
         metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
         greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+        verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
+                use verbosity > 0 to set stop the workers from logging to the driver.
     """
 
-    training_path = "training"
-    export_path = "exported_model"
-    results_filename = "experiment_results.csv"
+    training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
+    save_path = "trained_model"  # filepath for the trained dygraph model
+    export_path = "exported_model"  # filepath for the exported static model
+    results_filename = "experiment_results.csv"  # filepath for storing experiment results
+    experiment_path = None  # filepath for the experiment results
 
     def __init__(
         self,
@@ -56,8 +60,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         eval_dataset: Dataset,
         metric_for_best_model: str,
         greater_is_better: bool,
-        language: str,
-        output_dir: str = None,
+        language: str = "Chinese",
+        output_dir: str = "autonlp_results",
+        verbosity: int = 1,
         **kwargs,
     ):
         if not metric_for_best_model.startswith("eval_"):
@@ -67,8 +72,25 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.greater_is_better = greater_is_better
+        if language not in self.supported_languages:
+            raise ValueError(
+                f"'{language}' is not supported. Please choose among the following: {self.supported_languages}"
+            )
+
         self.language = language
         self.output_dir = output_dir
+        self.kwargs = kwargs
+        # Per default, Ray Tune creates JSON, CSV and TensorBoardX logger callbacks, turning it off
+        os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
+        # use log_to_driver to control verbosity
+        ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >= 1 else False)
+
+    @property
+    @abstractmethod
+    def supported_languages(self) -> List[str]:
+        """
+        Override to store the supported languages for each auto trainer class
+        """
 
     @property
     @abstractmethod
@@ -116,6 +138,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
+    @abstractmethod
     def export(self, export_path, trial_id=None):
         """
         Export the model from a certain `trial_id` to the given file path.
@@ -124,10 +147,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             export_path (str, required): the filepath to export to
             trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
-        model_result = self._get_model_result(trial_id=trial_id)
-        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-        shutil.copytree(exported_model_path, export_path)
-        logger.info(f"Exported to {export_path}")
+
+        raise NotImplementedError
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
@@ -151,15 +172,24 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def predict(self, test_dataset: Dataset, trial_id: Optional[str] = None):
+        """
+        Run prediction and returns predictions and potential metrics from a certain `trial_id` on the given dataset
+        Args:
+            test_dataset (Dataset, required): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
+            trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
+        """
+        raise NotImplementedError
+
     def _override_hp(self, config: Dict[str, Any], default_hp: Any) -> Any:
         """
         Overrides the arguments with the provided hyperparameter config
         """
         new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
-            if key.startswith(default_hp.__class__.__name__):
-                _, hp_key = key.split(".")
-                setattr(new_hp, hp_key, value)
+            if key in new_hp.to_dict():
+                setattr(new_hp, key, value)
         return new_hp
 
     def _filter_model_candidates(
@@ -198,12 +228,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
             )
 
-    def set_log_level(self):
-        if self.verbosity > 0:
-            logger.set_level("WARNING")
-        else:
-            logger.set_level("INFO")
-
     def show_training_results(self):
         if hasattr(self, "training_results"):
             return self.training_results.get_dataframe()
@@ -220,8 +244,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             path (str, required): The filepath to load the previous experiments
         """
         logger.info(f"Restoring from {path}")
-        self.training_results = self.tuner.get_results()
         self.tuner = tune.Tuner.restore(path)
+        self.training_results = self.tuner.get_results()
         logger.info("Found existing training results.")
 
     def train(
@@ -233,7 +257,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
         experiment_name: str = None,
-        verbosity: int = 0,
         hp_overrides: Dict[str, Any] = None,
         custom_model_candidates: List[Dict[str, Any]] = None,
     ) -> ResultGrid:
@@ -250,23 +273,17 @@ class AutoTrainerBase(metaclass=ABCMeta):
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
-            verbosity: (int, optional): controls the verbosity of the logger. Defaults to 0, which set the logger level at INFO. To reduce the amount of logs,
-                use verbosity > 0 to set the logger level to WARNINGS
             hp_overrides: (dict[str, Any], optional): Advanced users only.
-                override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
+                override the hyperparameters of every model candidate.  For example, {"max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
                 Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
 
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
-        # Changing logger verbosity here doesn't work. Need to change in the worker's code via the _construct_trainable method.
-        self.verbosity = verbosity
-
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting the existing Tuner and any previous training results")
 
-        self._data_checks_and_inference()
         trainable = self._construct_trainable()
         model_candidates = self._filter_model_candidates(
             language=self.language, preset=preset, custom_model_candidates=custom_model_candidates
@@ -275,7 +292,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             for model_candidate in model_candidates:
                 model_candidate.update(hp_overrides)
         search_space = {"candidates": hp.choice("candidates", model_candidates)}
-        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode="max")
+        mode = "max" if self.greater_is_better else "min"
+        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode=mode)
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
@@ -288,16 +306,21 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
+        self.experiment_path = os.path.join(self.output_dir, experiment_name)
 
         self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
             run_config=RunConfig(
-                name=experiment_name, log_to_file=True, local_dir=self.output_dir if self.output_dir else None
+                name=experiment_name,
+                log_to_file=True,
+                local_dir=self.output_dir if self.output_dir else None,
+                callbacks=[tune.logger.CSVLoggerCallback(), tune.logger.JsonLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
         self.show_training_results().to_csv(
             path_or_buf=os.path.join(self.output_dir, experiment_name, self.results_filename), index=False
         )
+
         return self.training_results

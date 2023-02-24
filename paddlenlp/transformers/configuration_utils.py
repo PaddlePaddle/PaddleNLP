@@ -248,17 +248,18 @@ def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
     return "init_class" not in config and "architectures" in config
 
 
-def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
+def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     """resolve config file from hf hub
 
     Args:
         repo_id (str): the repo name from huggingface hub
         cache_dir (str): the cachedir
+        subfolder (str, optional) An optional value corresponding to a folder inside the repo.
 
     Returns:
         str: the downloaded config file
     """
-    if hf_file_exists(repo_id, CONFIG_NAME):
+    if hf_file_exists(repo_id=repo_id, filename=CONFIG_NAME, subfolder=subfolder):
         file_name = CONFIG_NAME
     else:
         raise EntryNotFoundError(f"can not find the paddle/pytorch config file from: https://huggingface.co/{repo_id}")
@@ -267,6 +268,7 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
         repo_id=repo_id,
         filename=file_name,
         cache_dir=cache_dir,
+        subfolder=subfolder,
         library_name="PaddleNLP",
         library_version=__version__,
     )
@@ -730,7 +732,6 @@ class PretrainedConfig:
         assert unused_kwargs == {"foo": False}
         ```"""
         kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
-
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         return cls.from_dict(config_dict, **kwargs)
@@ -752,11 +753,18 @@ class PretrainedConfig:
 
         """
         original_kwargs = copy.deepcopy(kwargs)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
         # Get config dict associated with the base config file
-        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls._get_config_dict(
+            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub, **kwargs
+        )
 
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
+            original_kwargs["cache_dir"] = cache_dir
             configuration_file = get_configuration_file(config_dict["configuration_files"])
             config_dict, kwargs = cls._get_config_dict(
                 pretrained_model_name_or_path, _configuration_file=configuration_file, **original_kwargs
@@ -770,7 +778,7 @@ class PretrainedConfig:
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        subfolder = kwargs.pop("subfolder", None)
 
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -813,14 +821,15 @@ class PretrainedConfig:
 
         # 4. get the configuration file from HF hub
         elif from_hf_hub:
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
-
+            resolved_config_file = resolve_hf_config_path(
+                repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
+            )
         else:
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
+            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME])
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME])
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
@@ -984,7 +993,7 @@ class PretrainedConfig:
             config_dict = self.to_diff_dict()
         else:
             config_dict = self.to_dict()
-        return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
+        return json.dumps(config_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
     def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True):
         """

@@ -14,30 +14,29 @@
 """
 Pretrain  GPT in static graph mode.
 """
-import argparse
-import math
 import os
 import random
 import time
 
-os.path.expandvars("$HOME")
-os.path.expanduser("~")
-
+import lr
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
+from args import parse_args
+from dataset import create_pretrained_dataset
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.ops import Topology, get_rng_state_tracker
-from paddlenlp.utils.log import logger
-from paddlenlp.utils import profiler
-import paddlenlp.ops as ops
 from visualdl import LogWriter
 
-from dataset import create_pretrained_dataset
-from args import parse_args
-import lr
+from paddlenlp.ops import Topology, get_rng_state_tracker
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTConfig,
+    GPTForPretraining,
+    GPTPretrainingCriterion,
+    GPTTokenizer,
+)
+from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -267,7 +266,7 @@ def do_train(args):
                     model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
 
-                    model = GPTForPretraining(GPTModel(**model_config))
+                    model = GPTForPretraining(GPTConfig(**model_config))
                 else:
                     model, _ = GPTForPretraining.from_pretrained(
                         args.model_name_or_path,
@@ -363,7 +362,7 @@ def do_train(args):
             logger.error("No checkpoint load.")
 
     global_step = 0
-    tic_train = time.time()
+    # tic_train = time.time()
     epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
     while True:
@@ -418,7 +417,7 @@ def do_train(args):
                     )
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("learning_rate", lr_return[0], global_step)
-                tic_train = time.time()
+                # tic_train = time.time()
                 train_reader_cost = 0.0
                 train_run_cost = 0.0
 
@@ -447,7 +446,7 @@ def do_train(args):
                     eval_fetch,
                     "valid",
                 )
-                tic_train = time.time()
+                # tic_train = time.time()
 
             if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                 output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
@@ -458,7 +457,7 @@ def do_train(args):
                     model.init_config["init_args"][0].init_config.pop("topo", None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
-                tic_train = time.time()
+                # tic_train = time.time()
 
             if global_step >= args.max_steps:
                 eval_fetch = []

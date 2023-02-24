@@ -1,0 +1,10 @@
+paddlenlp>=2.5.0
+ppdiffusers>=0.9.0
+scipy
+pyyaml
+opencv-python
+albumentations
+fastcore
+visualdl
+Pillow
+opencv-python-headless<=4.3

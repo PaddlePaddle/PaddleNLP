@@ -15,23 +15,40 @@
 # limitations under the License.
 
 import os
+import tempfile
 from functools import partial
 from typing import Callable, Optional, Union
 
 import paddle
 import paddle.nn as nn
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 from requests import HTTPError
 
 from .download_utils import ppdiffusers_bos_download
 from .utils import (
     CONFIG_NAME,
     DOWNLOAD_SERVER,
+    HF_CACHE,
     PPDIFFUSERS_CACHE,
     WEIGHTS_NAME,
     logging,
 )
+from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
+
+
+def unfreeze_params(params):
+    for param in params:
+        param.stop_gradient = False
 
 
 def freeze_params(params):
@@ -188,6 +205,68 @@ class ModelMixin(nn.Layer):
 
         logger.info(f"Model weights saved in {os.path.join(save_directory, WEIGHTS_NAME)}")
 
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this model to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(save_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=root_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
+
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: Optional[Union[str, os.PathLike]], **kwargs):
         r"""
@@ -223,24 +302,31 @@ class ModelMixin(nn.Layer):
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
-
+            from_hf_hub (bool, *optional*):
+                Whether to load from Hugging Face Hub. Defaults to False
         """
-        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        if from_hf_hub:
+            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
+        else:
+            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         output_loading_info = kwargs.pop("output_loading_info", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         subfolder = kwargs.pop("subfolder", None)
+        ignore_keys = kwargs.pop("ignore_keys", [])
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
 
         model_file = None
         if model_file is None:
-            model_file = cls._get_model_file(
+            model_file = _get_model_file(
                 pretrained_model_name_or_path,
                 weights_name=WEIGHTS_NAME,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
+                from_hf_hub=from_hf_hub,
             )
 
         config, unused_kwargs = cls.load_config(
@@ -248,11 +334,19 @@ class ModelMixin(nn.Layer):
             cache_dir=cache_dir,
             return_unused_kwargs=True,
             subfolder=subfolder,
+            from_hf_hub=from_hf_hub,
             **kwargs,
         )
         model = cls.from_config(config, **unused_kwargs)
 
         state_dict = load_dict(model_file, map_location="cpu")
+
+        keys = list(state_dict.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    logger.warning("Deleting key {} from state_dict.".format(k))
+                    del state_dict[k]
 
         dtype = set(v.dtype for v in state_dict.values())
 
@@ -299,60 +393,6 @@ class ModelMixin(nn.Layer):
             return model, loading_info
 
         return model
-
-    @classmethod
-    def _get_model_file(
-        cls,
-        pretrained_model_name_or_path,
-        *,
-        weights_name,
-        subfolder,
-        cache_dir,
-    ):
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        if os.path.isdir(pretrained_model_name_or_path):
-            if os.path.isfile(os.path.join(pretrained_model_name_or_path, weights_name)):
-                # Load from a PyTorch checkpoint
-                model_file = os.path.join(pretrained_model_name_or_path, weights_name)
-            elif subfolder is not None and os.path.isfile(
-                os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
-            ):
-                model_file = os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
-            else:
-                raise EnvironmentError(
-                    f"Error no file named {weights_name} found in directory {pretrained_model_name_or_path}."
-                )
-            return model_file
-        else:
-            try:
-                # Load from URL or cache if already cached
-                model_file = ppdiffusers_bos_download(
-                    pretrained_model_name_or_path,
-                    filename=WEIGHTS_NAME,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                )
-            except HTTPError as err:
-                raise EnvironmentError(
-                    "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}"
-                )
-            except ValueError:
-                raise EnvironmentError(
-                    f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
-                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
-                    f" directory containing a file named {WEIGHTS_NAME} or"
-                    " \nCheckout your internet connection or see how to run the library in"
-                    " offline mode at 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
-                )
-            except EnvironmentError:
-                raise EnvironmentError(
-                    f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
-                    "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a file named {WEIGHTS_NAME}"
-                )
-            return model_file
 
     @classmethod
     def _load_pretrained_model(
@@ -514,3 +554,66 @@ def unwrap_model(model: nn.Layer) -> nn.Layer:
         return unwrap_model(model._layers)
     else:
         return model
+
+
+def _get_model_file(
+    pretrained_model_name_or_path,
+    *,
+    weights_name,
+    subfolder,
+    cache_dir,
+    from_hf_hub,
+):
+    pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+    if os.path.isdir(pretrained_model_name_or_path):
+        if os.path.isfile(os.path.join(pretrained_model_name_or_path, weights_name)):
+            # Load from a PyTorch checkpoint
+            model_file = os.path.join(pretrained_model_name_or_path, weights_name)
+        elif subfolder is not None and os.path.isfile(
+            os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
+        ):
+            model_file = os.path.join(pretrained_model_name_or_path, subfolder, weights_name)
+        else:
+            raise EnvironmentError(
+                f"Error no file named {weights_name} found in directory {pretrained_model_name_or_path}."
+            )
+        return model_file
+    elif from_hf_hub:
+        model_file = hf_hub_download(
+            repo_id=pretrained_model_name_or_path,
+            filename=weights_name,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            library_name="PPDiffusers",
+            library_version=__version__,
+        )
+        return model_file
+    else:
+        try:
+            # Load from URL or cache if already cached
+            model_file = ppdiffusers_bos_download(
+                pretrained_model_name_or_path,
+                filename=weights_name,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
+            )
+        except HTTPError as err:
+            raise EnvironmentError(
+                "There was a specific connection error when trying to load" f" {pretrained_model_name_or_path}:\n{err}"
+            )
+        except ValueError:
+            raise EnvironmentError(
+                f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
+                f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
+                f" directory containing a file named {weights_name} or"
+                " \nCheckout your internet connection or see how to run the library in"
+                " offline mode at 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
+            )
+        except EnvironmentError:
+            raise EnvironmentError(
+                f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
+                "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
+                f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
+                f"containing a file named {weights_name}"
+            )
+        return model_file

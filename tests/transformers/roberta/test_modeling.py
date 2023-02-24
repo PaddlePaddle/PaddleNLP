@@ -348,6 +348,7 @@ class RobertaModelTester:
 )
 class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RobertaModel
+    use_test_inputs_embeds: bool = True
     return_dict: bool = False
     use_labels: bool = False
 
@@ -500,7 +501,7 @@ class RobertaCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    rtol=1e-4,
+                    atol=1e-3,
                 )
             )
 

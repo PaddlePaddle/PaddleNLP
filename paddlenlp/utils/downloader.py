@@ -16,7 +16,6 @@ import json
 import os
 import os.path as osp
 import shutil
-import sys
 import tarfile
 import threading
 import time
@@ -26,41 +25,17 @@ from collections import OrderedDict
 from typing import Optional, Union
 
 import requests
+from filelock import FileLock
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
+from tqdm.auto import tqdm
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
-from .file_lock import FileLock
-
-try:
-    from tqdm import tqdm
-except:  # noqa: E722
-
-    class tqdm(object):
-        def __init__(self, total=None, **kwargs):
-            self.total = total
-            self.n = 0
-
-        def update(self, n):
-            self.n += n
-            if self.total is None:
-                sys.stderr.write("\r{0:.1f} bytes".format(self.n))
-            else:
-                sys.stderr.write("\r{0:.1f}%".format(100 * self.n / float(self.total)))
-            sys.stderr.flush()
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            sys.stderr.write("\n")
-
-
 from .log import logger
 
 __all__ = ["get_weights_path_from_url"]
 
-COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community"
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 DOWNLOAD_RETRY_LIMIT = 3
 DOWNLOAD_CHECK = False
@@ -199,8 +174,7 @@ def _download(url, path, md5sum=None):
     url (str): download url
     path (str): download to given path
     """
-    if not osp.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
     fname = osp.split(url)[-1]
     fullname = osp.join(path, fname)
@@ -467,7 +441,9 @@ def url_file_exists(url: str) -> bool:
     return result.status_code == requests.codes.ok
 
 
-def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = None) -> bool:
+def hf_file_exists(
+    repo_id: str, filename: str, token: Union[bool, str, None] = None, subfolder: Optional[str] = None
+) -> bool:
     """Check whether the HF file exists
 
     Args:
@@ -477,11 +453,12 @@ def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = 
             - If `True`, the token is read from the HuggingFace config folder.
             - If `False` or `None`, no token is provided.
             - If a string, it's used as the authentication token.
+        subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     Returns:
         bool: whether the HF file exists
     """
 
-    url = hf_hub_url(repo_id, filename)
+    url = hf_hub_url(repo_id=repo_id, filename=filename, subfolder=subfolder)
     try:
         _ = get_hf_file_metadata(
             url=url,

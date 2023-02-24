@@ -17,8 +17,10 @@ import contextlib
 import copy
 import functools
 import time
+import weakref
+from collections import OrderedDict
 from types import FunctionType, MethodType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .utils import is_paddle_available, is_paddlenlp_available
 
@@ -162,6 +164,67 @@ if is_paddle_available():
             if not isinstance(mod, nn.Layer):
                 raise AttributeError("`" + item + "` is not " "an nn.Layer")
         return mod
+
+    class _WrappedHook:
+        def __init__(self, hook: Callable, module: Optional["nn.Layer"] = None):
+            self.hook: Callable = hook
+            functools.update_wrapper(self, hook)
+
+            self.with_module: bool = False
+
+            if module is not None:
+                self.module: weakref.ReferenceType["nn.Layer"] = weakref.ref(module)
+                self.with_module = True
+
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            if self.with_module:
+                module = self.module()
+                if module is None:
+                    raise RuntimeError("You are trying to call the hook of a dead Module!")
+                return self.hook(module, *args, **kwargs)
+            return self.hook(*args, **kwargs)
+
+        def __getstate__(self) -> Dict:
+            result = {"hook": self.hook, "with_module": self.with_module}
+            if self.with_module:
+                result["module"] = self.module()
+
+            return result
+
+        def __setstate__(self, state: Dict):
+            self.hook = state["hook"]
+            self.with_module = state["with_module"]
+
+            if self.with_module:
+                if state["module"] is None:
+                    raise RuntimeError("You are trying to revive the hook of a dead Module!")
+                self.module = weakref.ref(state["module"])
+
+    from paddle.fluid.dygraph.layers import HookRemoveHelper
+
+    @patch_to(nn.Layer)
+    def register_load_state_dict_pre_hook(self, hook, with_module=False):
+        handle = HookRemoveHelper(self.load_state_dict_pre_hooks)
+        self.load_state_dict_pre_hooks[handle._hook_id] = _WrappedHook(hook, self if with_module else None)
+        return handle
+
+    raw_set_state_dict = nn.Layer.set_state_dict
+
+    @patch_to(nn.Layer)
+    def set_state_dict(self, state_dict, use_structured_name: bool = True):
+        for hook in self.load_state_dict_pre_hooks.values():
+            hook(state_dict)
+        return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
+
+    nn.Layer.load_dict = nn.Layer.set_state_dict
+    nn.Layer.set_dict = nn.Layer.set_state_dict
+
+    raw_init = nn.Layer.__init__
+
+    @patch_to(nn.Layer)
+    def __init__(self, name_scope=None, dtype="float32"):
+        raw_init(self, name_scope=name_scope, dtype=dtype)
+        self.load_state_dict_pre_hooks = OrderedDict()
 
 
 if is_paddle_available() and is_paddlenlp_available():

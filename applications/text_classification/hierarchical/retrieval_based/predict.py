@@ -57,7 +57,7 @@ def predict(model, data_loader):
 
     Args:
         model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
-        data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
+        data_loader (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # title_segment
     ): [data for data in fn(samples)]
     valid_ds = load_dataset(read_text_pair, data_path=args.text_pair_file, lazy=False)
     valid_data_loader = create_dataloader(

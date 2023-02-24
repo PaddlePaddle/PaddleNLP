@@ -60,6 +60,12 @@ from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
+from .blip.modeling import *
+from .blip.modeling_text import *
+from .blip.configuration import *
+from .blip.processing import *
+from .blip.image_processing import *
+from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
 from .convbert.modeling import *
@@ -104,12 +110,16 @@ from .mbart.tokenizer import *
 from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
+from .mt5.configuration import *
+from .mt5.modeling import *
 from .nezha.configuration import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
@@ -117,6 +127,7 @@ from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
+from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
@@ -150,12 +161,14 @@ from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
+from .gau_alpha.configuration import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+from .auto.processing import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
@@ -182,6 +195,10 @@ from .pegasus.tokenizer import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
+from .auto.configuration import *
+from .nystromformer.configuration import *
+from .nystromformer.modeling import *
+from .nystromformer.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
