@@ -18,13 +18,27 @@ import paddle
 
 from paddlenlp.transformers import SkepForSequenceClassification
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--ckpt_dir", type=str, required=True, default='./checkpoint/model_100', help="The directory of saved model checkpoint.")
-parser.add_argument("--output_path", type=str, default='./static_graph_params', help="The path of model parameter in static graph to be saved.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'], default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
+parser.add_argument(
+    "--ckpt_dir",
+    type=str,
+    required=True,
+    default="./checkpoint/model_100",
+    help="The directory of saved model checkpoint.",
+)
+parser.add_argument(
+    "--output_path",
+    type=str,
+    default="./static_graph_params",
+    help="The path of model parameter in static graph to be saved.",
+)
+parser.add_argument(
+    "--model_name",
+    choices=["skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"],
+    default="skep_ernie_1.0_large_ch",
+    help="Select which model to train, defaults to skep_ernie_1.0_large_ch.",
+)
 args = parser.parse_args()
-# yapf: enable
 
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
