@@ -14,6 +14,7 @@
 
 import base64
 import json
+from typing import List, Optional
 
 import numpy as np
 
@@ -126,7 +127,26 @@ def reader(data_path, max_seq_len=512):
                     yield json_line
 
 
-def convert_example(example, tokenizer, max_seq_len, pad_id=1, c_sep_id=2, summary_token_num=4):
+def get_dynamic_max_len(examples, default_max_len: int, dynamic_max_length: List[int]) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    cur_length = len(examples[0]["input_ids"])
+    max_length = default_max_len
+    for max_length_option in sorted(dynamic_max_length):
+        if cur_length <= max_length_option:
+            max_length = max_length_option
+            break
+    return max_length
+
+
+def convert_example(
+    example,
+    tokenizer,
+    max_seq_len,
+    pad_id=1,
+    c_sep_id=2,
+    summary_token_num=4,
+    dynamic_max_length: Optional[List[int]] = None,
+):
 
     content = example["content"]
     prompt = example["prompt"]
@@ -134,17 +154,45 @@ def convert_example(example, tokenizer, max_seq_len, pad_id=1, c_sep_id=2, summa
     image_buff_string = example.get("image", None)
     # Text
     if bbox_lines is None or image_buff_string is None:
-        encoded_inputs = tokenizer(
-            text=[example["prompt"]],
-            text_pair=[example["content"]],
-            truncation=True,
-            max_seq_len=max_seq_len,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_position_ids=True,
-            return_offsets_mapping=True,
-            return_dict=False,
-        )
+        if dynamic_max_length is not None:
+            temp_encoded_inputs = tokenizer(
+                text=[example["prompt"]],
+                text_pair=[example["content"]],
+                truncation=True,
+                max_seq_len=max_seq_len,
+                return_attention_mask=True,
+                return_position_ids=True,
+                return_dict=False,
+                return_offsets_mapping=True,
+            )
+            max_length = get_dynamic_max_len(
+                examples=temp_encoded_inputs, default_max_len=max_seq_len, dynamic_max_length=dynamic_max_length
+            )
+            # always pad to max_length
+            encoded_inputs = tokenizer(
+                text=[example["prompt"]],
+                text_pair=[example["content"]],
+                truncation=True,
+                max_seq_len=max_length,
+                pad_to_max_seq_len=True,
+                return_attention_mask=True,
+                return_position_ids=True,
+                return_dict=False,
+                return_offsets_mapping=True,
+            )
+            max_seq_len = max_length
+        else:
+            encoded_inputs = tokenizer(
+                text=[example["prompt"]],
+                text_pair=[example["content"]],
+                truncation=True,
+                max_seq_len=max_seq_len,
+                pad_to_max_seq_len=True,
+                return_attention_mask=True,
+                return_position_ids=True,
+                return_offsets_mapping=True,
+                return_dict=False,
+            )
 
         encoded_inputs = encoded_inputs[0]
 

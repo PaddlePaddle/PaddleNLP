@@ -969,6 +969,7 @@ if [ ! -f 'test.py' ];then
         --do_train \
         --do_eval \
         --do_export \
+        --device gpu \
         --task_type cross-lingual-transfer \
         --model_name_or_path __internal_testing__/ernie-m \
         --use_test_data True \
@@ -984,7 +985,7 @@ if [ ! -f 'test.py' ];then
     print_info $? ernie-m_clt
     # inference for cross-lingual-transfer
     python deploy/predictor/inference.py \
-        --device cpu \
+        --device gpu \
         --task_name seq_cls \
         --model_path output_clt/export/model >${log_path}/ernie-m_clt_infer >>${log_path}/ernie-m_clt_infer 2>&1
     print_info $? ernie-m_clt_infer
@@ -993,6 +994,7 @@ if [ ! -f 'test.py' ];then
         --do_train \
         --do_eval \
         --do_export \
+        --device gpu \
         --task_type translate-train-all \
         --model_name_or_path __internal_testing__/ernie-m \
         --use_test_data True \
@@ -1008,7 +1010,7 @@ if [ ! -f 'test.py' ];then
     print_info $? ernie-m_tta
     # inference for translate-train-all
     python deploy/predictor/inference.py \
-        --device cpu \
+        --device gpu \
         --task_name seq_cls \
         --model_path output_tta/export/model >${log_path}/ernie-m_tta_infer >>${log_path}/ernie-m_tta_infer 2>&1
     print_info $? ernie-m_tta_infer
@@ -1196,7 +1198,7 @@ fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
-mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json
+mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json && cd ../
 python doccano.py --doccano_file ./data/doccano_ext.json --task_type ext --save_dir ./data --splits 0.8 0.2 0 --schema_lang ch >${log_path}/uie_doccano>>${log_path}/uie_doccano 2>&1
 print_info $? uie_doccano
 python -u -m paddle.distributed.launch finetune.py --device gpu --logging_steps 2 --save_steps 2 --eval_steps 2 --seed 42 \

@@ -41,13 +41,13 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
-| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |      ✅        |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 | [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
-| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |            |          | 集成文本，图片的特征抽取工具       |
+| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |     ✅       |          | 集成文本，图片的特征抽取工具       |
 
 ## QuickStart
 
