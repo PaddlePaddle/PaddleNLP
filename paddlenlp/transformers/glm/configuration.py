@@ -137,7 +137,7 @@ class GLMConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "glm"
-    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers"}
+    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers", "torch_dtype": "paddle_dtype"}
     pretrained_init_configuration = GLM_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -162,6 +162,7 @@ class GLMConfig(PretrainedConfig):
         initializer_range=0.02,
         pool_token="cls",
         layernorm_epsilon=1e-5,
+        paddle_dtype="float32",
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -185,3 +186,4 @@ class GLMConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pool_token = pool_token
         self.layernorm_epsilon = layernorm_epsilon
+        self.paddle_dtype = paddle_dtype
