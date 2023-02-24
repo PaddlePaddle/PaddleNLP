@@ -189,7 +189,8 @@ class MultimodalFeatureExtractionTask(Task):
         self.export_type = "text"
         self._batch_size = batch_size
         self.return_tensors = return_tensors
-        self._check_task_files()
+        if not self._custom_model:
+            self._check_task_files()
         self._construct_tokenizer()
         self.is_static_model = is_static_model
         self._config_map = {}
@@ -214,7 +215,7 @@ class MultimodalFeatureExtractionTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._processor = AutoProcessor.from_pretrained(self.model)
+        self._processor = AutoProcessor.from_pretrained(self._task_path)
 
     def _batchify(self, data, batch_size):
         """

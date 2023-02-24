@@ -81,16 +81,16 @@ class DialogueTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
-        if not self.from_hf_hub:
+        if not self._custom_model:
             self._check_task_files()
-        self._construct_tokenizer(self._task_path if self.from_hf_hub else model)
+        self._construct_tokenizer(self._task_path if self._custom_model else model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._interactive_mode = False
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(self._task_path if self.from_hf_hub else model)
+            self._construct_model(self._task_path if self._custom_model else model)
 
     def _construct_input_spec(self):
         """

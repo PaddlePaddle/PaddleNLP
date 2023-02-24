@@ -127,7 +127,8 @@ class TextSimilarityTask(Task):
     def __init__(self, task, model, batch_size=1, max_seq_len=384, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
-        self._check_task_files()
+        if not self._custom_model:
+            self._check_task_files()
         self._get_inference_model()
         if self._static_mode:
             self._get_inference_model()
