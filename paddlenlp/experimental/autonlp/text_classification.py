@@ -179,7 +179,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -190,7 +190,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "English",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -202,7 +202,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -213,7 +213,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "finetune",
                 "language": "English",
                 "trainer_type": "Trainer",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -226,7 +226,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "Chinese",
                 "trainer_type": "PromptTrainer",
                 "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -239,7 +239,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "English",
                 "trainer_type": "PromptTrainer",
                 "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
-                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,
@@ -253,55 +253,46 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         Performs different data checks and generate id to label mapping on the datasets.
         """
+        generate_id2label = True
         if self.id2label is None:
             self.id2label, self.label2id = {}, {}
-            if self.problem_type == "multi_class":
-                for dataset in dataset_list:
-                    for example in dataset:
-                        label = example[self.label_column]
-                        if label not in self.label2id:
-                            self.label2id[label] = len(self.label2id)
-                            self.id2label[len(self.id2label)] = label
-            # multi_label
-            else:
-                for dataset in dataset_list:
-                    for example in dataset:
-                        labels = example[self.label_column]
-                        for label in labels:
-                            if label not in self.label2id:
-                                self.label2id[label] = len(self.label2id)
-                                self.id2label[len(self.id2label)] = label
         else:
+            generate_id2label = False
             self.label2id = {}
             for i in self.id2label:
                 self.label2id[self.id2label[i]] = i
 
-            if self.problem_type == "multi_class":
-                for dataset in dataset_list:
-                    for example in dataset:
-                        label = example[self.label_column]
-                        if label not in self.label2id:
+        for dataset in dataset_list:
+            for example in dataset:
+                if self.text_column not in example or self.label_column not in example:
+                    raise ValueError(
+                        f"Text column: {self.text_column} and label columns:{self.label_column} must exist for example: {example}"
+                    )
+                if self.problem_type == "multi_class":
+                    label = example[self.label_column]
+                    if label not in self.label2id:
+                        if generate_id2label:
+                            self.label2id[label] = len(self.label2id)
+                            self.id2label[len(self.id2label)] = label
+                        else:
                             raise ValueError(
                                 f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                             )
-            # multi_label
-            else:
-                for dataset in dataset_list:
-                    for example in dataset:
-                        labels = example[self.label_column]
-                        for label in labels:
-                            if label not in self.label2id:
+                else:
+                    labels = example[self.label_column]
+                    for label in labels:
+                        if label not in self.label2id:
+                            if generate_id2label:
+                                self.label2id[label] = len(self.label2id)
+                                self.id2label[len(self.id2label)] = label
+                            else:
                                 raise ValueError(
                                     f"Label {label} is not found in the user-provided id2label argument: {self.id2label}"
                                 )
 
     def _construct_trainer(self, model_config) -> Trainer:
-        if "EarlyStoppingCallback.early_stopping_patience" in model_config:
-            callbacks = [
-                EarlyStoppingCallback(
-                    early_stopping_patience=model_config["EarlyStoppingCallback.early_stopping_patience"]
-                )
-            ]
+        if "early_stopping_patience" in model_config:
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=model_config["early_stopping_patience"])]
         else:
             callbacks = None
 
@@ -443,7 +434,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             test_dataset (Dataset): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
             trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
         """
-        self._data_checks_and_inference([test_dataset])
+        is_test = False
+        if self.label_column in test_dataset[0]:
+            self._data_checks_and_inference([test_dataset])
+        else:
+            is_test = True
+            for example in test_dataset:
+                if self.text_column not in example:
+                    raise ValueError(f"Text column: {self.text_column} must exist for example: {example}")
+
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
 
@@ -457,7 +456,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         else:
             max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
         processed_test_dataset = self._preprocess_dataset(
-            test_dataset, max_length, trainer.tokenizer, model_config["trainer_type"]
+            test_dataset, max_length, trainer.tokenizer, model_config["trainer_type"], is_test=is_test
         )
         test_output = trainer.predict(test_dataset=processed_test_dataset)
         trainer.log_metrics("test", test_output.metrics)
@@ -524,23 +523,31 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
         if not is_test:
-            example_with_labels = self._preprocess_labels(example)
-            result["labels"] = example_with_labels["labels"]
+            result["labels"] = self._preprocess_labels(example)["labels"]
         return result
 
     def _preprocess_dataset(
-        self, dataset: Dataset, max_length: int, tokenizer: PretrainedTokenizer, trainer_type: str
+        self,
+        dataset: Dataset,
+        max_length: int,
+        tokenizer: PretrainedTokenizer,
+        trainer_type: str,
+        is_test: bool = False,
     ):
         """
         Preprocess dataset from raw features to input features used by the Trainer or PromptTrainer.
         """
+
         if trainer_type == "PromptTrainer":
+            if is_test:
+                return dataset
             trans_func = self._preprocess_labels
         elif trainer_type == "Trainer":
             trans_func = functools.partial(
                 self._preprocess_fn,
                 tokenizer=tokenizer,
                 max_length=max_length,  # truncate to the max length allowed by the model
+                is_test=is_test,
             )
         processed_dataset = copy.deepcopy(dataset).map(trans_func, lazy=False)
         return processed_dataset
