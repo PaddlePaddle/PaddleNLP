@@ -217,7 +217,7 @@ python run_classifier.py \
 
 </div>
 
-目前 ERNIE-M 模型已提供基于 FastDeploy 的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及 Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
+目前 ERNIE-M 模型已提供基于 FastDeploy 的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及 Graphcore IPU）以及推理引擎后端进行部署。
 
 <a name="Python部署"></a>
 
