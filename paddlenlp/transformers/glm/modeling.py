@@ -533,6 +533,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
 
         loss = None
         if labels is not None:
+            print(type(lm_logits), type(labels))
             loss = F.cross_entropy(
                 lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
             )

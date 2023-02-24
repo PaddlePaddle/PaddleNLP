@@ -375,17 +375,17 @@ class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
         # "glm-large": 512,
     }
 
-    @property
-    def gmask_token_id(self) -> int:
-        raise NotImplementedError("The model doesn't support gMASK")
+    # @property
+    # def gmask_token_id(self) -> int:
+    #     raise NotImplementedError("The model doesn't support gMASK")
 
-    @property
-    def smask_token_id(self) -> int:
-        raise NotImplementedError("The model doesn't support sMASK")
+    # @property
+    # def smask_token_id(self) -> int:
+    #     raise NotImplementedError("The model doesn't support sMASK")
 
-    @property
-    def mask_token_ids(self):
-        return [self.mask_token_id]
+    # @property
+    # def mask_token_ids(self):
+    #     return [self.mask_token_id]
 
 
 class GLMTokenizer:

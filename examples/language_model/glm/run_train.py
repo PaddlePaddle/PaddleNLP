@@ -19,7 +19,7 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 from data import cnn_dm_convert_example, load_local_dataset
-from utils import CacheCallback, GLMTrainer
+from utils import GLMTrainer
 
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
@@ -34,10 +34,14 @@ class DataArgument:
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
+    out_seq_length: int = field(default=256, metadata={"help": "The length of decoded prediction."})
     length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
     no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
     select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
+    top_p: float = field(default=0.0)
+    top_k: int = field(default=0)
+    no_block_position: bool = field(default=False)
 
 
 @dataclass
@@ -58,6 +62,8 @@ def main():
     training_args.print_config(data_args, "Data")
     for field_item in fields(model_args):
         setattr(training_args, field_item.name, getattr(model_args, field_item.name))
+    for field_item in fields(data_args):
+        setattr(training_args, field_item.name, getattr(data_args, field_item.name))
 
     paddle.set_device(training_args.device)
 
@@ -80,26 +86,17 @@ def main():
     criterion = nn.loss.CrossEntropyLoss(reduction="none")
 
     def compute_metrics(eval_preds):
-        def beam_search_decode(logits, beam_size=4):
-            pass
-
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
-        evaluated_sentences_ids = []
-        reference_sentences_ids = eval_preds.label_ids
-        for pred in eval_preds.predictions:
-            evaluated_sentences_ids.append(beam_search_decode(pred))
-        rouge1_score = rouge1.score(evaluated_sentences_ids, reference_sentences_ids)
-        rouge2_score = rouge2.score(evaluated_sentences_ids, reference_sentences_ids)
-        rougel_score = rougel.score(evaluated_sentences_ids, reference_sentences_ids)
+        rouge1_score = rouge1.score(eval_preds.predictions, eval_preds.label_ids)
+        rouge2_score = rouge2.score(eval_preds.predictions, eval_preds.label_ids)
+        rougel_score = rougel.score(eval_preds.predictions, eval_preds.label_ids)
         return {
             "rouge1": rouge1_score,
             "rouge2": rouge2_score,
             "rougel": rougel_score,
         }
-
-    callbacks = [CacheCallback()]
 
     trainer = GLMTrainer(
         model=model,
@@ -109,21 +106,20 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
-        callbacks=callbacks,
+        do_generation=True,
     )
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=None)
         trainer.save_model()
-        trainer.save_tokenizer()
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
 
     if training_args.do_eval:
         eval_result = trainer.evaluate()
-        trainer.log_metrics("eval", eval_result.metrics)
-        trainer.save_metrics("eval", eval_result.metrics)
+        # trainer.save_metrics("eval", eval_result.metrics)
+        print(eval_result)
 
     if training_args.do_export:
         export_path = os.path.join(training_args.output_dir, "export")

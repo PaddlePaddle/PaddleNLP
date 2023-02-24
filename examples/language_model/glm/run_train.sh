@@ -13,14 +13,14 @@
 # limitations under the License.
 
 device=$1
-model=515m
+model="./local"
 
 CUDA_VISIBLE_DEVICES=$device python run_train.py \
---model_name_or_path glm-$model \
+--model_name_or_path $model \
 --task_name cnn_dm \
 --data_path ./cnn_dm \
---num_train_epochs 15 \
---learning_rate 1e-5 \
+--num_train_epochs 4 \
+--learning_rate 3e-5 \
 --warmup_ratio 0.06 \
 --weight_decay 0.1 \
 --label_smoothing 0.1 \
@@ -35,6 +35,8 @@ CUDA_VISIBLE_DEVICES=$device python run_train.py \
 --no_repeat_ngram_size 3 \
 --num_beams 5 \
 --select_topk True \
+--fp16 \
+--recompute \
 --per_device_eval_batch_size 1 \
 --per_device_train_batch_size 1 \
 --max_grad_norm 1.0 \
@@ -46,5 +48,3 @@ CUDA_VISIBLE_DEVICES=$device python run_train.py \
 #--per_device_eval_batch_size 4 \
 #--logging_steps 50 \
 #--eval_steps 1000 \
---fp16 \
---recompute \
