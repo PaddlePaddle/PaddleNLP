@@ -144,5 +144,6 @@ if __name__ == "__main__":
         outputs = predictor.predict(texts, texts_pair)
         for i, (sentence1, sentence2) in enumerate(zip(texts, texts_pair)):
             print(
-                f"Batch id:{bs}, example id:{i}, sentence1:\"{sentence1}\", sentence2:\"{sentence2}\", label:{label_list[outputs['label'][i]]}, similarity:{outputs['confidence'][i]:.4f}"
+                f'Batch id:{bs}, example id:{i}, sentence1:"{sentence1}", sentence2:"{sentence2}", '
+                f"label:{label_list[outputs['label'][i]]}, confidence:{outputs['confidence'][i]:.4f}"
             )
