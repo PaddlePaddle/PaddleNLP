@@ -16,7 +16,7 @@
 
 import unittest
 
-from transformers.tokenization_utils import AddedToken
+from paddlenlp.transformers.tokenization_utils import AddedToken
 
 from paddlenlp.transformers.fnet.tokenizer import FNetTokenizer
 
