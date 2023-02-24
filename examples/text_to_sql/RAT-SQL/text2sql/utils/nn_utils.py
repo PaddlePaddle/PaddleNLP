@@ -53,7 +53,7 @@ def lstm_init(num_layers, hidden_size, *batch_sizes):
 
 
 def batch_gather_2d(var, indices):
-    """Gather slices from var in each batch, according to corrensponding
+    """Gather slices from var in each batch, according to corresponding
     index in indices. Currently, it only support 2d Tensor.
 
     Args:
@@ -156,7 +156,7 @@ def pad_sequences_for_3d(seqs, max_col, max_num, dtype=np.int64):
 
 
 def pad_index_sequences(seqs, max_col, max_row, dtype=np.int64):
-    """padding squences for column token indexs"""
+    """padding sequences for column token indexes"""
     padded = []
     for query in seqs:
         new_cols = []
