@@ -23,7 +23,7 @@ class TestSentimentAnalysis(unittest.TestCase):
         cls.senta = Taskflow(
             task="sentiment_analysis",
             model="skep_ernie_1.0_large_ch",
-            task_path="__internal_testing__/skep_ernie_1.0_large_ch",
+            task_path="__internal_testing__/tiny-random-skep",
         )
 
     def test_single(self):
@@ -37,3 +37,7 @@ class TestSentimentAnalysis(unittest.TestCase):
         output_texts = self.senta(input_texts)
         self.assertTrue(len(output_texts) == len(input_texts))
         self.assertIsInstance(output_texts[0], dict)
+
+
+if __name__ == "__main__":
+    unittest.main()

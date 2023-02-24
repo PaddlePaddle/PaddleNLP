@@ -249,12 +249,13 @@ class SkepTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._label_map = {0: "negative", 1: "positive"}
-        self._check_task_files()
-        self._construct_tokenizer(model)
+        if not self._custom_model:
+            self._check_task_files()
+        self._construct_tokenizer(self._task_path if self._custom_model else model)
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(model)
+            self._construct_model(self._task_path if self._custom_model else model)
         self._usage = usage
 
     def _construct_model(self, model):
