@@ -217,7 +217,6 @@ if __name__ == "__main__":
     else:
         paddle.set_device(f"gpu:{device_id}")
         paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
-
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
