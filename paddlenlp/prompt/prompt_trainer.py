@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.io import DataLoader, Dataset
 
 from ..data import DataCollator
 from ..datasets import MapDataset
@@ -151,6 +152,11 @@ class PromptTrainer(Trainer):
     def get_test_dataloader(self, test_dataset):
         test_dataset = self._map_dataset(test_dataset)
         return super(PromptTrainer, self).get_test_dataloader(test_dataset)
+
+    def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
+        if eval_dataset is not None:
+            eval_dataset = self._map_dataset(eval_dataset)
+        return super(PromptTrainer, self).get_eval_dataloader(eval_dataset)
 
     def create_optimizer(self, lr_scheduler=None):
         """
