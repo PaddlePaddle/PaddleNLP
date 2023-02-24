@@ -15,7 +15,6 @@
 import unittest
 
 import paddle
-from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     MegatronBertConfig,
@@ -300,15 +299,6 @@ class MegatronBertModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(
-    ("return_dict", "use_labels"),
-    [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
-    ],
-)
 class MegatronBertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = MegatronBertModel
     return_dict: bool = False

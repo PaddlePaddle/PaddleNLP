@@ -55,10 +55,8 @@ MegatronBert_PRETRAINED_INIT_CONFIGURATION = {
 
 MegatronBert_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "megatronbert-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/"
-        "megatron-bert/megatronbert-cased/model_state.pdparams",
-        "megatronbert-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/"
-        "megatron-bert/megatronbert-cased/model_state.pdparams",
+        "megatronbert-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/megatron-bert/megatronbert-cased/model_state.pdparams",
+        "megatronbert-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/megatron-bert/megatronbert-uncased/model_state.pdparams",
     }
 }
 

@@ -596,7 +596,7 @@ class MegatronBertLMPredictionHead(nn.Layer):
         # an output-only bias for each token.
 
         self.decoder_weight = self.create_parameter(
-            shape=[config.vocab_size, config.hidden_size], dtype=nn.Embedding(1, 1)._dtype, is_bias=False
+            shape=[config.vocab_size, config.hidden_size], dtype=self.transform.dense.weight.dtype, is_bias=False
         )
         self.decoder_bias = self.create_parameter(
             shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
