@@ -58,7 +58,6 @@ parser.add_argument(
     help="Select which device to train model, defaults to gpu.",
 )
 args = parser.parse_args()
-print(args)
 
 
 def set_seed(seed):
