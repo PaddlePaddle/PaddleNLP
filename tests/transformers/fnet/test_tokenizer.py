@@ -20,7 +20,7 @@ from transformers.tokenization_utils import AddedToken
 
 from paddlenlp.transformers.fnet.tokenizer import FNetTokenizer
 
-from ...testing_utils import get_tests_dir, slow, tooslow
+from ...testing_utils import get_tests_dir, slow
 from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/spiece.model")
@@ -167,7 +167,7 @@ class FNetTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     self.assertTrue(special_token_id in p_output)
                     self.assertTrue(special_token_id in cr_output)
 
-    @tooslow
+    @slow
     def test_special_tokens_initialization_from_slow(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
