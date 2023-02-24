@@ -15,7 +15,7 @@
 
 
 import unittest
-
+import numpy as np
 from paddlenlp.transformers.tokenization_utils import AddedToken
 
 from paddlenlp.transformers.fnet.tokenizer import FNetTokenizer
