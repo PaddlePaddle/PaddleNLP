@@ -17,18 +17,28 @@
 import inspect
 import sys
 from collections import namedtuple
+from dataclasses import dataclass
 from functools import reduce
 from operator import mul
+from typing import Optional, Tuple
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 from paddle.autograd import PyLayer
 
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
+from ..model_outputs import (
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    MaskedLMOutput,
+    ModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+)
 from .configuration import (
     REFORMER_PRETRAINED_INIT_CONFIGURATION,
     REFORMER_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1911,6 +1921,37 @@ class ReformerClassificationHead(nn.Layer):
         return hidden_states
 
 
+@dataclass
+class ReformerForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`ReformerForPreTraining`].
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+            (classification) loss.
+        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
+            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    prediction_logits: paddle.Tensor = None
+    seq_relationship_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
 class ReformerPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained Reformer models. It provides Reformer related
@@ -2141,8 +2182,9 @@ class ReformerModel(ReformerPretrainedModel):
         num_hashes=None,
         cache=None,
         use_cache=False,
-        output_hidden_states=False,
-        output_attentions=False,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The ReformerModel forward method, overrides the `__call__()` special method.
@@ -2187,34 +2229,15 @@ class ReformerModel(ReformerPretrainedModel):
             output_hidden_states (bool, optional):
                 Whether or not to return the output of all hidden layers.
                 Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`last_hidden_state`, `cache`, `hidden_states`, `attentions`)
-
-            With the fields:
-
-            - `last_hidden_state` (Tensor):
-                Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and
-                its shape is [batch_size, sequence_length, hidden_size].
-
-            - `cache` (List[tuple(Tensor, Tensor)], optional):
-                returned when `use_cache=True` is passed.
-                List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`,
-                with the first element being the previous `buckets` of shape
-                `[batch_size, num_heads, num_hashes, sequence_length]` and the second
-                being the previous `hidden_states` of shape `[batch_size, sequence_length, hidden_size]`.
-
-            - `hidden_states` (tuple(Tensor), optional):
-                returned when `output_hidden_states=True` is passed.
-                tuple of `Tensor` (one for the output of the embeddings + one for the
-                output of each layer). Each Tensor has a data type of float32
-                and its shape is [batch_size, sequence_length, hidden_size].
-
-            - `attentions` (tuple(Tensor), optional):
-                returned when `output_attentions=True` is passed.
-                tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data
-                type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -2233,6 +2256,9 @@ class ReformerModel(ReformerPretrainedModel):
                 last_hidden_state = outputs[0]
 
         """
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
 
         input_shape = input_ids.shape
 
@@ -2312,15 +2338,23 @@ class ReformerModel(ReformerPretrainedModel):
         hidden_states = encoder_outputs.all_hidden_states if output_hidden_states else None
         attentions = encoder_outputs.all_attentions if output_attentions else None
 
-        return tuple(
-            v
-            for v in [
-                sequence_output,
-                cache,
-                hidden_states,
-                attentions,
-            ]
-            if v is not None
+        if not return_dict:
+            return tuple(
+                v
+                for v in [
+                    sequence_output,
+                    cache,
+                    hidden_states,
+                    attentions,
+                ]
+                if v is not None
+            )
+
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=sequence_output,
+            past_key_values=cache,
+            hidden_states=hidden_states,
+            attentions=attentions,
         )
 
     def _pad_to_mult_of_chunk_length(
@@ -2567,8 +2601,9 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
         attention_mask=None,
         num_hashes=None,
         labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
 
@@ -2592,6 +2627,9 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             output_hidden_states (bool, optional):
                 See :class:`ReformerModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple: Returns tuple `(loss, logits, hidden_states, attentions)`.
@@ -2642,6 +2680,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             use_cache=False,  # no causal mask
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
+            return_dict=return_dict,
         )
 
         sequence_output = reformer_outputs[0]
@@ -2655,8 +2694,16 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 labels.flatten(),
             )
 
-        output = (logits,) + reformer_outputs[1:]
-        return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
+        if not return_dict:
+            output = (logits,) + reformer_outputs[1:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
+
+        return MaskedLMOutput(
+            loss=masked_lm_loss,
+            logits=logits,
+            hidden_states=reformer_outputs.hidden_states,
+            attentions=reformer_outputs.attentions,
+        )
 
 
 class ReformerForSequenceClassification(ReformerPretrainedModel):
@@ -2697,9 +2744,10 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         position_ids=None,
         attention_mask=None,
         num_hashes=None,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
 
@@ -2722,6 +2770,9 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             output_hidden_states (bool, optional):
                 See :class:`ReformerModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple: Returns tuple `(loss, logits, hidden_states, attentions)`.
@@ -2769,6 +2820,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
             num_hashes=num_hashes,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
+            return_dict=return_dict,
         )
 
         sequence_output = outputs[0]
@@ -2784,8 +2836,16 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 loss_fct = nn.CrossEntropyLoss()
                 loss = loss_fct(logits.reshape([-1, self.num_classes]), labels.flatten())
 
-        output = (logits,) + outputs[1:]
-        return ((loss,) + output) if loss is not None else output
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ReformerForQuestionAnswering(ReformerPretrainedModel):
@@ -2820,10 +2880,11 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
         position_ids=None,
         attention_mask=None,
         num_hashes=None,
-        start_positions=None,
-        end_positions=None,
-        output_hidden_states=False,
-        output_attentions=False,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
 
@@ -2854,6 +2915,10 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             output_hidden_states (bool, optional):
                 See :class:`ReformerModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
 
         Returns:
             tuple: Returns tuple `(loss, logits, hidden_states, attentions)`.
@@ -2908,6 +2973,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
             use_cache=False,  # no causal mask
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
+            return_dict=return_dict,
         )
 
         sequence_output = reformer_outputs[0]
@@ -2929,5 +2995,14 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
             end_loss = loss_fct(end_logits, end_positions)
             total_loss = (start_loss + end_loss) / 2
 
-        output = (start_logits, end_logits) + reformer_outputs[1:]
-        return ((total_loss,) + output) if total_loss is not None else output
+        if not return_dict:
+            output = (start_logits, end_logits) + reformer_outputs[1:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=reformer_outputs.hidden_states,
+            attentions=reformer_outputs.attentions,
+        )
