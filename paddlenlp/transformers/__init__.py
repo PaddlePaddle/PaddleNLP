@@ -110,8 +110,10 @@ from .mbart.tokenizer import *
 from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
@@ -191,6 +193,9 @@ from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 from .auto.configuration import *
+from .nystromformer.configuration import *
+from .nystromformer.modeling import *
+from .nystromformer.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

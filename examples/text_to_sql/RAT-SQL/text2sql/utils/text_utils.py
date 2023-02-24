@@ -191,7 +191,7 @@ class CandidateValueExtractor:
         all_candidate = []
         for col_id in range(len(table.header)):
             header = table.header[col_id]
-            # 提取col出现在quesiton中的cell
+            # 提取col出现在question中的cell
             # TODO 这里存在一个问题，一个text类型cell必须完全在question中出现才会被当做候选cell
             value_in_column = cls.extract_values_from_column(question, table, col_id, header.type)
             if header.type == "text":
