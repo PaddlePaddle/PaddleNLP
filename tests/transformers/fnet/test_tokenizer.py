@@ -31,6 +31,7 @@ class FNetTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     test_rust_tokenizer = False
     test_sentencepiece = True
     test_sentencepiece_ignore_case = True
+    from_pretrained_vocab_key = "sentencepiece_model_file"
     test_seq2seq = False
 
     def setUp(self):

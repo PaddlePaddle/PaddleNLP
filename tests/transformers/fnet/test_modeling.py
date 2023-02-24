@@ -29,10 +29,10 @@ from paddlenlp.transformers import (
     FNetModel,
     FNetPretrainedModel,
 )
-from paddlenlp.transformers.testing_utils import slow
 
 from ...test_configuration_common import ConfigTester
 from ...test_modeling_common import ModelTesterMixin, ids_tensor
+from ...testing_utils import slow
 
 
 # Override ConfigTester
