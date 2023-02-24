@@ -14,6 +14,7 @@
 
 import copy
 import math
+from typing import List
 
 import paddle
 import paddle.nn as nn
@@ -307,8 +308,8 @@ class MPNetPretrainedModel(PretrainedModel):
     base_model_prefix = "mpnet"
 
     @classmethod
-    def _get_name_mappings(cls, config: MPNetConfig) -> list[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
+    def _get_name_mappings(cls, config: MPNetConfig) -> List[StateDictNameMapping]:
+        mappings: List[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
