@@ -345,7 +345,7 @@ class SamplerHelper(object):
                 Default: None.
             rank (int, optional): The id of current training process. Equal
                 to the value of the environment variable PADDLE_TRAINER_ID. If
-                None, it will be intialized by :meth:`paddle.distributed.get_rank`
+                None, it will be initialized by :meth:`paddle.distributed.get_rank`
                 method. Default: None.
 
         Returns:
