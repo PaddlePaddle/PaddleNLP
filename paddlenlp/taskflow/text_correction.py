@@ -13,24 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
 import os
-import copy
-import itertools
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..transformers import ErnieTokenizer, ErnieModel
-from ..transformers import is_chinese_char
-from ..datasets import load_dataset
-from ..data import Stack, Pad, Tuple, Vocab
-from .utils import download_file, add_docstrings, static_mode_guard
+
+from ..data import Pad, Stack, Tuple, Vocab
+from ..transformers import ErnieModel, ErnieTokenizer, is_chinese_char
 from .models import ErnieForCSC
 from .task import Task
+from .utils import static_mode_guard
 
 usage = r"""
            from paddlenlp import Taskflow
@@ -47,11 +38,11 @@ usage = r"""
            text_correction(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
                             '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。'])
            '''
-           [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 
-             'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 
-             'errors': [{'position': 3, 'correction': {'竟': '境'}}]}, 
-            {'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。', 
-             'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。', 
+           [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+             'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+             'errors': [{'position': 3, 'correction': {'竟': '境'}}]},
+            {'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
+             'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。',
              'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}
            ]
            '''
@@ -93,7 +84,7 @@ class CSCTask(Task):
         self._construct_tokenizer(model)
         try:
             import pypinyin
-        except:
+        except ImportError:
             raise ImportError("Please install the dependencies first, pip install pypinyin --upgrade")
         self._pypinyin = pypinyin
         self._batchify_fn = lambda samples, fn=Tuple(
