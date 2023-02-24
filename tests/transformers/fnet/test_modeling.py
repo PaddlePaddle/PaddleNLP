@@ -29,15 +29,15 @@ from paddlenlp.transformers import (
     AutoModel,
     AutoModelForQuestionAnswering,
     AutoModelForTokenClassification,
-    FNetPretrainedModel,
-    FNetModel,
-    FNetForSequenceClassification,
-    FNetForPreTraining,
     FNetForMaskedLM,
-    FNetForNextSentencePrediction,
     FNetForMultipleChoice,
-    FNetForTokenClassification,
+    FNetForNextSentencePrediction,
+    FNetForPreTraining,
     FNetForQuestionAnswering,
+    FNetForSequenceClassification,
+    FNetForTokenClassification,
+    FNetModel,
+    FNetPretrainedModel,
 )
 from paddlenlp.transformers.fnet.configuration import FNetConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
@@ -501,21 +501,21 @@ class FNetCompatibilityTest(unittest.TestCase):
 
         from paddlenlp.transformers import FNetForTokenClassification, FNetModel
 
-        # bert: from old bert
+        # fnet: from old fnet
         model = FNetModel.from_pretrained(old_model_path)
         self.compare_two_model(old_model, model)
 
-        # bert: from old bert-for-token
+        # fnet: from old fnet-for-token
         model = FNetModel.from_pretrained(old_model_for_token_path)
         self.compare_two_model(old_model, model)
 
-        # bert-for-token: from old bert
+        # fnet-for-token: from old fnet
         model = FNetForTokenClassification.from_pretrained(old_model_path)
         self.compare_two_model(old_model_for_token, model)
         self.assertNotEqual(model.num_labels, 4)
         self.assertNotEqual(model.dropout.p, 0.3)
 
-        # bert-for-token: from old bert-for-token
+        # fnet-for-token: from old fnet-for-token
         model = FNetForTokenClassification.from_pretrained(old_model_for_token_path)
         self.compare_two_model(old_model_for_token, model)
         self.assertEqual(model.num_labels, 4)
@@ -523,11 +523,11 @@ class FNetCompatibilityTest(unittest.TestCase):
 
     def compare_two_model(self, first_model: PretrainedModel, second_model: PretrainedModel):
 
-        first_weight_name = "encoder.layers.8.linear2.weight"
+        first_weight_name = "encoder.layers.0.linear2.weight"
         if first_model.__class__.__name__ != "FNetModel":
             first_weight_name = "fnet." + first_weight_name
 
-        second_weight_name = "encoder.layers.8.linear2.weight"
+        second_weight_name = "encoder.layers.0.linear2.weight"
         if second_model.__class__.__name__ != "FNetModel":
             second_weight_name = "fnet." + second_weight_name
 
@@ -548,61 +548,61 @@ class FNetCompatibilityTest(unittest.TestCase):
             uninstall_package("paddlenlp")
 
     @slow
-    def test_bert_save_token_load(self):
-        """bert -> token"""
+    def test_fnet_save_token_load(self):
+        """fnet -> token"""
         from paddlenlp.transformers import FNetForTokenClassification, FNetModel
 
-        saved_dir = os.path.join(self.get_tempdir(), "bert-saved")
-        bert: FNetModel = FNetModel.from_pretrained("bert-base-uncased")
-        bert.save_pretrained(saved_dir)
+        saved_dir = os.path.join(self.get_tempdir(), "fnet-saved")
+        fnet: FNetModel = FNetModel.from_pretrained("fnet-base")
+        fnet.save_pretrained(saved_dir)
 
-        bert_for_token = FNetForTokenClassification.from_pretrained(saved_dir)
-        self.compare_two_model(bert, bert_for_token)
-
-    @slow
-    def test_bert_save_bert_load(self):
-        """bert -> bert"""
-        saved_dir = os.path.join(self.get_tempdir(), "bert-saved")
-        bert: FNetModel = FNetModel.from_pretrained("bert-base-uncased")
-        bert.save_pretrained(saved_dir)
-
-        bert_loaded = FNetModel.from_pretrained(saved_dir)
-        self.compare_two_model(bert, bert_loaded)
+        fnet_for_token = FNetForTokenClassification.from_pretrained(saved_dir)
+        self.compare_two_model(fnet, fnet_for_token)
 
     @slow
-    def test_token_saved_bert_load(self):
-        """token -> bert"""
+    def test_fnet_save_fnet_load(self):
+        """fnet -> fnet"""
+        saved_dir = os.path.join(self.get_tempdir(), "fnet-saved")
+        fnet: FNetModel = FNetModel.from_pretrained("fnet-base")
+        fnet.save_pretrained(saved_dir)
+
+        fnet_loaded = FNetModel.from_pretrained(saved_dir)
+        self.compare_two_model(fnet, fnet_loaded)
+
+    @slow
+    def test_token_saved_fnet_load(self):
+        """token -> fnet"""
         from paddlenlp.transformers import FNetForTokenClassification, FNetModel
 
-        saved_dir = os.path.join(self.get_tempdir(), "bert-token-saved")
-        bert_for_token = FNetForTokenClassification.from_pretrained("bert-base-uncased")
-        bert_for_token.save_pretrained(saved_dir)
+        saved_dir = os.path.join(self.get_tempdir(), "fnet-token-saved")
+        fnet_for_token = FNetForTokenClassification.from_pretrained("fnet-base")
+        fnet_for_token.save_pretrained(saved_dir)
 
-        bert = FNetModel.from_pretrained(saved_dir)
-        self.compare_two_model(bert, bert_for_token)
+        fnet = FNetModel.from_pretrained(saved_dir)
+        self.compare_two_model(fnet, fnet_for_token)
 
     @slow
     def test_token_saved_token_load(self):
         """token -> token"""
-        saved_dir = os.path.join(self.get_tempdir(), "bert-token-saved")
-        bert_for_token = FNetForTokenClassification.from_pretrained("bert-base-uncased")
-        bert_for_token.save_pretrained(saved_dir)
+        saved_dir = os.path.join(self.get_tempdir(), "fnet-token-saved")
+        fnet_for_token = FNetForTokenClassification.from_pretrained("fnet-base")
+        fnet_for_token.save_pretrained(saved_dir)
 
-        bert_for_token_loaded = FNetForTokenClassification.from_pretrained(saved_dir)
-        self.compare_two_model(bert_for_token, bert_for_token_loaded)
+        fnet_for_token_loaded = FNetForTokenClassification.from_pretrained(saved_dir)
+        self.compare_two_model(fnet_for_token, fnet_for_token_loaded)
 
     @slow
     def test_auto_model(self):
-        AutoModel.from_pretrained("bert-base-uncased")
-        model = AutoModelForTokenClassification.from_pretrained("bert-base-uncased", num_classes=4, dropout=0.3)
+        AutoModel.from_pretrained("fnet-base")
+        model = AutoModelForTokenClassification.from_pretrained("fnet-base", num_classes=4, dropout=0.3)
         self.assertEqual(model.num_labels, 4)
         self.assertEqual(model.dropout.p, 0.3)
 
-        model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased", dropout=0.3)
+        model = AutoModelForQuestionAnswering.from_pretrained("fnet-base", dropout=0.3)
         self.assertEqual(model.dropout.p, 0.3)
 
     @require_package("transformers", "torch")
-    def test_bert_converter(self):
+    def test_fnet_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
@@ -634,7 +634,7 @@ class FNetCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_bert_converter_from_local_dir_with_enable_torch(self):
+    def test_fnet_converter_from_local_dir_with_enable_torch(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 2. forward the torch  model
@@ -654,7 +654,7 @@ class FNetCompatibilityTest(unittest.TestCase):
             model_utils.ENABLE_TORCH_CHECKPOINT = True
 
     @require_package("transformers", "torch")
-    def test_bert_converter_from_local_dir(self):
+    def test_fnet_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
@@ -696,7 +696,7 @@ class FNetCompatibilityTest(unittest.TestCase):
         ]
     )
     @require_package("transformers", "torch")
-    def test_bert_classes_from_local_dir(self, class_name, pytorch_class_name: str | None = None):
+    def test_fnet_classes_from_local_dir(self, class_name, pytorch_class_name: str | None = None):
         pytorch_class_name = pytorch_class_name or class_name
         with tempfile.TemporaryDirectory() as tempdir:
 
@@ -745,12 +745,12 @@ class FNetCompatibilityTest(unittest.TestCase):
 
 class FNetModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = FNetModel
-    hf_remote_test_model_path = "PaddleCI/tiny-random-bert"
-    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-bert"
+    hf_remote_test_model_path = "PaddleCI/tiny-random-fnet"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-fnet"
 
     @slow
     def test_inference_no_attention(self):
-        model = FNetModel.from_pretrained("bert-base-uncased")
+        model = FNetModel.from_pretrained("fnet-base")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
@@ -766,7 +766,7 @@ class FNetModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_with_attention(self):
-        model = FNetModel.from_pretrained("bert-base-uncased")
+        model = FNetModel.from_pretrained("fnet-base")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
@@ -779,7 +779,3 @@ class FNetModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
             [[[0.4249, 0.1008, 0.7531], [0.3771, 0.1188, 0.7467], [0.4152, 0.1098, 0.7108]]]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-
-if __name__ == "__main__":
-    unittest.main()
