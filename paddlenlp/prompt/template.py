@@ -507,7 +507,7 @@ class SoftTemplate(Template):
             `Tuple[Dict[int, int], List[List[int]], int]`:
                 - Mapping from continuous ids to word ids for initialization.
                 - Continuous ids for each part. Id 0 denotes none-continuous part.
-                - Number of unique coutinuous tokens.
+                - Number of unique continuous tokens.
         """
         prompt = self._prompt.copy()
         num_soft_token = 1
@@ -560,7 +560,7 @@ class SoftTemplate(Template):
                     else:
                         soft_id_reindex[part["soft_id"]] = soft_id_list
 
-            # Deal with continous prompt defined by `soft_id`.
+            # Deal with continuous prompt defined by `soft_id`.
             elif "soft_id" in part and part["soft_id"] in soft_id_reindex:
                 soft_id_list = soft_id_reindex[part["soft_id"]]
                 if "length" in part:
@@ -568,7 +568,7 @@ class SoftTemplate(Template):
                 soft_token_ids.append(soft_id_list)
                 part_prompt = {"soft": [self.tokenizer.unk_token] * len(soft_id_list)}
 
-            # Deal with continous prompt with random initialization.
+            # Deal with continuous prompt with random initialization.
             else:
                 if "length" not in part:
                     part["length"] = 1
