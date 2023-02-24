@@ -90,7 +90,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 - 文本摘要应用提供了基于Paddle Inference的本地部署predictor，并且支持在GPU设备使用FastGeneration进行加速。
 
-- 文本摘要应用提供了基于Paddle Serving的服务端部署方案。
+- 文本摘要应用提供了基于Simple Serving的服务端部署方案。
 
 ### 环境依赖
 
@@ -107,11 +107,9 @@ finetune/
 │   ├── paddle_inference # PaddleInference高性能推理部署
 │   │   ├── inference_pegasus.py # 推理部署脚本
 │   │   └── README.md # 说明文档
-│   └── paddle_serving
-│       ├── config.yml # 配置文件
-│       ├── pipeline_client.py # 客户端程序
-│       ├── pipeline_service.py # 服务器程序
-│       ├── export_serving.sh # serving模型导出脚本
+│   └── simple_serving
+│       ├── client.py # 客户端程序
+│       ├── server.py # 服务器程序
 │       └── README.md # 说明文档
 ├── run_prepare.py # 小数据集获取脚本
 ├── export_model.py # 动态图参数导出静态图参数脚本
@@ -208,7 +206,7 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
 - `eval_batch_size` 表示每次验证**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
-- `warmup_propotion`
+- `warmup_proportion`
   表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)
   。
 - `max_source_length` 模型输入序列的最大长度。
@@ -305,7 +303,7 @@ inference_model/
 文本摘要应用已打通多种场景部署方案，点击链接获取具体的使用教程。
 
 - [Paddle Inference 推理 (Python)](./deploy/paddle_inference/README.md)
-- [Paddle Serving 服务化部署（Python）](./deploy/paddle_serving/README.md)
+- [Simple Serving 服务化部署（Python）](./deploy/simple_serving/README.md)
 
 ## References
 

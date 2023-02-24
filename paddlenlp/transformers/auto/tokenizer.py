@@ -65,6 +65,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("MobileBertTokenizer", "mobilebert"),
         ("MPNetTokenizer", "mpnet"),
         ("NeZhaTokenizer", "nezha"),
+        ("NystromformerTokenizer", "nystromformer"),
         ("PPMiniLMTokenizer", "ppminilm"),
         ("ProphetNetTokenizer", "prophetnet"),
         ("ReformerTokenizer", "reformer"),
@@ -338,7 +339,9 @@ class AutoTokenizer:
             )
 
             default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                os.path.join(cache_dir, pretrained_model_name_or_path)
+                if cache_dir is not None
+                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             )
             # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:

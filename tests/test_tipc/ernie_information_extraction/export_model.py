@@ -14,18 +14,28 @@
 
 import argparse
 import os
+
 import paddle
-from paddlenlp.transformers import AutoModelForTokenClassification
 from data import load_dict
 
+from paddlenlp.transformers import AutoModelForTokenClassification
+
 if __name__ == "__main__":
-    # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900', help="The path to model parameters to be loaded.")
-    parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
-    parser.add_argument("--data_dir", type=str, default="./waybill_ie/data", help="The folder where the dataset is located.")
+    parser.add_argument(
+        "--params_path",
+        type=str,
+        required=True,
+        default="./checkpoint/model_900",
+        help="The path to model parameters to be loaded.",
+    )
+    parser.add_argument(
+        "--output_path", type=str, default="./output", help="The path of model parameter in static graph to be saved."
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default="./waybill_ie/data", help="The folder where the dataset is located."
+    )
     args = parser.parse_args()
-    # yapf: enable
 
     # The number of labels should be in accordance with the training dataset.
     label_vocab = load_dict(os.path.join(args.data_dir, "tag.dic"))

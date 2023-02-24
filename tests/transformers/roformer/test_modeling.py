@@ -14,25 +14,25 @@
 # limitations under the License.
 
 import unittest
+from dataclasses import Field, dataclass, fields
 from typing import Optional, Tuple
-from dataclasses import dataclass, fields, Field
-from parameterized import parameterized_class
 
 import paddle
 from paddle import Tensor
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    RoFormerModel,
-    RoFormerPretrainedModel,
+    RoFormerForMaskedLM,
+    RoFormerForMultipleChoice,
+    RoFormerForQuestionAnswering,
     RoFormerForSequenceClassification,
     RoFormerForTokenClassification,
-    RoFormerForQuestionAnswering,
-    RoFormerForMultipleChoice,
-    RoFormerForMaskedLM,
+    RoFormerModel,
+    RoFormerPretrainedModel,
 )
 
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 @dataclass
@@ -473,7 +473,6 @@ class RoFormerModelIntegrationTest(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
-        past_key_value = output.past_key_values[0][0]
         expected_shape = [1, 11, 384]
         self.assertEqual(output[0].shape, expected_shape)
         expected_slice = paddle.to_tensor(

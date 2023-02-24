@@ -12,8 +12,9 @@ ___Tips: Stable Diffusion 是基于以下的 License: The CreativeML OpenRAIL M 
 可执行以下命令行完成模型导出。
 
 ```shell
-python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 --output_path stable-diffusion-v1-5
+python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 --output_path stable-diffusion-v1-5 --height=512 --width=512
 ```
+注: 上述指令导出固定尺寸的模型，固定尺寸的导出模型有利于优化模型推理性能，但会牺牲一定灵活性。若要导出支持多种推理尺寸的模型，可取消参数--height和--width的设置。
 
 输出的模型目录结构如下：
 

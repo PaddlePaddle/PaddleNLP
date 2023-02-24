@@ -87,22 +87,21 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-  --model_name_or_path gpt2-en \
-  --input_dir ./data \
-  --output_dir ./output_dir/pretrain \
-  --weight_decay 0.01 \
-  --max_steps 500000 \
-  --save_steps 100000 \
-  --device gpu \
-  --warmup_steps 320000 \
-  --warmup_ratio 0.01 \
-  --mirco_batch_size 4 \
-  --eval_steps 100 \
-  --do_train true \
-  --do_predict true
+    --model_type gpt \
+    --model_name_or_path gpt2-en \
+    --input_dir "./data"\
+    --output_dir "output"\
+    --weight_decay 0.01\
+    --grad_clip 1.0\
+    --max_steps 500000\
+    --save_steps 100000\
+    --decay_steps 320000\
+    --warmup_rate 0.01\
+    --micro_batch_size 4\
+    --device gpu
 ```
 
- 配置文件中参数释义如下：
+其中参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
@@ -113,6 +112,8 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 - `mirco_batch_size` 训练的batch大小
 - `device` 训练设备
 
+用户也可以使用提供的shell脚本直接训练`sh scripts/run.sh`.
+
 #### 单机多卡
 
 同样，可以执行如下命令实现八卡训练：
@@ -120,20 +121,21 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
-  --model_name_or_path gpt2-en \
-  --input_dir ./data \
-  --output_dir ./output_dir/pretrain \
-  --weight_decay 0.01 \
-  --max_steps 500000 \
-  --save_steps 100000 \
-  --device gpu \
-  --warmup_steps 320000 \
-  --warmup_ratio 0.01 \
-  --mirco_batch_size 8 \
-  --eval_steps 100 \
-  --do_train true \
-  --do_predict true
+    --model_type gpt \
+    --model_name_or_path gpt2-en \
+    --input_dir "./data"\
+    --output_dir "output"\
+    --weight_decay 0.01\
+    --grad_clip 1.0\
+    --max_steps 500000\
+    --save_steps 100000\
+    --decay_steps 320000\
+    --warmup_rate 0.01\
+    --micro_batch_size 4\
+    --device gpu
 ```
+
+用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
 
 ### 模型评估
 

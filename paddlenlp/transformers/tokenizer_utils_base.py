@@ -1483,7 +1483,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        default_root = (
+            os.path.join(cache_dir, pretrained_model_name_or_path)
+            if cache_dir is not None
+            else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        )
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -3016,6 +3020,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = encoded_inputs["offset_mapping"] + [(0, 0)] * difference
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = encoded_inputs["position_ids"] + [0] * difference
+                # NOTE: In ernie3.0-qa, the type of `*_positions` is int.
+                if "start_positions" in encoded_inputs and isinstance(encoded_inputs["start_positions"], list):
+                    encoded_inputs["start_positions"] = encoded_inputs["start_positions"] + [0] * difference
+                if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
+                    encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
             elif self.padding_side == "left":
                 if return_attention_mask:
@@ -3030,6 +3039,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = [(0, 0)] * difference + encoded_inputs["offset_mapping"]
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
+                if "start_positions" in encoded_inputs and isinstance(encoded_inputs["start_positions"], list):
+                    encoded_inputs["start_positions"] = [0] * difference + encoded_inputs["start_positions"]
+                if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
+                    encoded_inputs["end_positions"] = [0] * difference + encoded_inputs["end_positions"]
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))
