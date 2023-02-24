@@ -6,7 +6,9 @@
 |-|-|-|-|
 |CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#clip-guided-stable-diffusion)||
 |Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
-|Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、修补|[Stable Diffusion Mega](#stable-diffusion-mega)||
+|Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
+|Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
+
 
 ## Example usages
 
@@ -191,3 +193,48 @@ images[0].save("inpainting.png")
 [text2img]: https://user-images.githubusercontent.com/40912707/220876185-4c2c01f8-90f3-45c4-813a-7143541ec456.png
 [img2img]: https://user-images.githubusercontent.com/40912707/220876054-5eca5e9a-340e-40a4-a28e-b97af1b006e9.png
 [inpainting]: https://user-images.githubusercontent.com/40912707/220876220-ee044a56-6455-4566-9f42-580e29555497.png
+
+
+### Long Prompt Weighting Stable Diffusion
+
+该自定义管线特征如下：
+* 输入提示没有77 token的长度限制#TODO: [ WARNING] - Token indices sequence length is longer than the specified maximum sequence length for this model (108 > 77). Running this sequence through the model will result in indexing errors
+* 包括文生图、图生图、图像修复三种管道
+* 给提示片段加上强调，例如 `a baby deer with (big eyes)`
+* 给提示片段加上淡化，例如 `a [baby] deer with big eyes`
+* 给提示片段加上精确的权重，例如 `a baby deer with (big eyes:1.3)`
+
+prompt加权公示：
+* `a baby deer with` == `(a baby deer with:1.0)`
+* `(big eyes)` == `(big eyes:1.1)`
+* `((big eyes))` == `(big eyes:1.21)`
+* `[big eyes]` == `(big eyes:0.91)`
+
+代码示例如下：
+
+```python
+import paddle
+from lpw_stable_diffusion import StableDiffusionLongPromptWeightingPipeline
+
+pipe = StableDiffusionLongPromptWeightingPipeline.from_pretrained(
+    "hakurei/waifu-diffusion", paddle_dtype=paddle.float16)
+
+prompt = "(masterpiece:1.3)(best_quality:1.3)(girl:1.3) bow bride brown_hair closed_mouth frilled_bow frilled_hair_tubes frills (full_body:1.3) fox_ear hair_bow hair_tubes happy hood japanese_clothes kimono long_sleeves red_bow smile solo tabi uchikake white_kimono wide_sleeves cherry_blossoms"
+neg_prompt = "lowres, bad_anatomy, error_body, error_hair, error_arm, error_hands, bad_hands, error_fingers, bad_fingers, missing_fingers, error_legs, bad_legs, multiple_legs, missing_legs, error_lighting, error_shadow, error_reflection, text, error, extra_digit, fewer_digits, cropped, worst_quality, low_quality, normal_quality, jpeg_artifacts, signature, watermark, username, blurry"
+
+generator = paddle.Generator().manual_seed(0)
+
+with paddle.amp.auto_cast(True, level="O2"):
+    images = pipe.text2img(prompt,
+                           negative_prompt=neg_prompt,
+                           width=512,
+                           height=512,
+                           max_embeddings_multiples=3,
+                           generator=generator).images
+
+images[0].save("lpw.png")
+```
+
+上述代码生成结果如下
+
+<center><img src="https://user-images.githubusercontent.com/40912707/221176773-e33044c6-f8e1-449c-bd20-9aae9fcbdf64.png" style="zoom:50%"/></center>

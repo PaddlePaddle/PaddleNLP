@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import re
 from typing import Callable, List, Optional, Union
 
@@ -23,15 +22,16 @@ import PIL
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from paddlenlp.utils.tools import compare_version
-from ppdiffusers.configuration_utils import FrozenDict
 from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
-from ppdiffusers.pipeline_utils import DiffusionPipeline
-from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
+from ppdiffusers.pipelines.stable_diffusion import (
+    StableDiffusionPipeline,
+    StableDiffusionPipelineOutput,
+)
 from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
 from ppdiffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
-from ppdiffusers.utils import deprecate, logging
+from ppdiffusers.utils import logging
 
 if compare_version(PIL.__version__, "9.1.0") >= 0:
     Resampling = PIL.Image.Resampling
@@ -146,7 +146,7 @@ def parse_prompt_attention(text):
     return res
 
 
-def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str], max_length: int):
+def get_prompts_with_weights(pipe: StableDiffusionPipeline, prompt: List[str], max_length: int):
     r"""
     Tokenize a list of prompts and return its tokens with weights of each token.
     No padding, starting or ending token is included.
@@ -206,7 +206,7 @@ def pad_tokens_and_weights(tokens, weights, max_length, bos, eos, pad, no_boseos
 
 
 def get_unweighted_text_embeddings(
-    pipe: DiffusionPipeline,
+    pipe: StableDiffusionPipeline,
     text_input: paddle.Tensor,
     chunk_length: int,
     no_boseos_middle: Optional[bool] = True,
@@ -225,8 +225,7 @@ def get_unweighted_text_embeddings(
             # cover the head and the tail by the starting and the ending tokens
             text_input_chunk[:, 0] = text_input[0, 0]
             text_input_chunk[:, -1] = text_input[0, -1]
-            attention_mask = paddle.ones_like(text_input_chunk)
-            text_embedding = pipe.text_encoder(text_input_chunk, attention_mask=attention_mask)[0]
+            text_embedding = pipe.text_encoder(text_input_chunk)[0]
 
             if no_boseos_middle:
                 if i == 0:
@@ -242,13 +241,12 @@ def get_unweighted_text_embeddings(
             text_embeddings.append(text_embedding)
         text_embeddings = paddle.concat(text_embeddings, axis=1)
     else:
-        attention_mask = paddle.ones_like(text_input)
-        text_embeddings = pipe.text_encoder(text_input, attention_mask=attention_mask)[0]
+        text_embeddings = pipe.text_encoder(text_input)[0]
     return text_embeddings
 
 
 def get_weighted_text_embeddings(
-    pipe: DiffusionPipeline,
+    pipe: StableDiffusionPipeline,
     prompt: Union[str, List[str]],
     uncond_prompt: Optional[Union[str, List[str]]] = None,
     max_embeddings_multiples: Optional[int] = 1,
@@ -388,11 +386,11 @@ def preprocess_image(image):
     return 2.0 * image - 1.0
 
 
-def preprocess_mask(mask):
+def preprocess_mask(mask, scale_factor=8):
     mask = mask.convert("L")
     w, h = mask.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    mask = mask.resize((w // 8, h // 8), resample=Resampling.NEAREST)
+    mask = mask.resize((w // scale_factor, h // scale_factor), resample=Resampling.NEAREST)
     mask = np.array(mask).astype(np.float32) / 255.0
     mask = np.tile(mask, (4, 1, 1))
     mask = mask[None].transpose(0, 1, 2, 3)  # what does this step do?
@@ -401,7 +399,7 @@ def preprocess_mask(mask):
     return mask
 
 
-class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
+class StableDiffusionLongPromptWeightingPipeline(StableDiffusionPipeline):
     r"""
     Pipeline for text-to-image generation using Stable Diffusion without tokens length limit, and support parsing
     weighting in prompt.
@@ -437,34 +435,9 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
+        requires_safety_checker: Optional[bool] = True,
     ):
-        super().__init__()
-
-        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
-            deprecation_message = (
-                f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
-                f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
-                "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
-                " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
-                " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file"
-            )
-            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
-            new_config = dict(scheduler.config)
-            new_config["steps_offset"] = 1
-            scheduler._internal_dict = FrozenDict(new_config)
-
-        if safety_checker is None:
-            logger.warn(
-                f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
-                " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
-                " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
-                " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
-                " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
-            )
-
-        self.register_modules(
+        super().__init__(
             vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
@@ -472,7 +445,13 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
+            requires_safety_checker=requires_safety_checker,
         )
+        self.__init__additional__()
+
+    def __init__additional__(self):
+        if not hasattr(self, "vae_scale_factor"):
+            setattr(self, "vae_scale_factor", 2 ** (len(self.vae.config.block_out_channels) - 1))
 
     def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
@@ -499,6 +478,125 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         # set slice_size = `None` to disable `attention slicing`
         self.enable_attention_slicing(None)
 
+    def check_inputs(self, prompt, height, width, strength, callback_steps):
+        if not isinstance(prompt, str) and not isinstance(prompt, list):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if strength < 0 or strength > 1:
+            raise ValueError(f"The value of strength should in [0.0, 1.0] but is {strength}")
+
+        if height % 8 != 0 or width % 8 != 0:
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
+
+    def _encode_prompt(
+        self,
+        prompt: Union[str, List[str]],
+        num_images_per_prompt: int,
+        do_classifier_free_guidance: bool,
+        negative_prompt: Union[str, List[str]],
+        max_embeddings_multiples: Optional[int] = 3,
+        **kwargs,
+    ):
+        r"""
+        Encodes the prompt into text encoder hidden states.
+
+        Args:
+            prompt (`str` or `list(int)`):
+                prompt to be encoded
+            num_images_per_prompt (`int`):
+                number of images that should be generated per prompt
+            do_classifier_free_guidance (`bool`):
+                whether to use classifier free guidance or not
+            negative_prompt (`str` or `List[str]`):
+                The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
+                if `guidance_scale` is less than `1`).
+            max_embeddings_multiples (`int`, *optional*, defaults to `3`):
+                The max multiple length of prompt embeddings compared to the max output length of text encoder.
+        """
+        batch_size = len(prompt) if isinstance(prompt, list) else 1
+
+        if negative_prompt is None:
+            negative_prompt = [""] * batch_size
+        elif isinstance(negative_prompt, str):
+            negative_prompt = [negative_prompt] * batch_size
+        if batch_size != len(negative_prompt):
+            raise ValueError(
+                f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
+                f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
+                " the batch size of `prompt`."
+            )
+
+        text_embeddings, uncond_embeddings = get_weighted_text_embeddings(
+            pipe=self,
+            prompt=prompt,
+            uncond_prompt=negative_prompt if do_classifier_free_guidance else None,
+            max_embeddings_multiples=max_embeddings_multiples,
+            **kwargs,
+        )
+        bs_embed, seq_len, _ = text_embeddings.shape
+        text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
+        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+
+        if do_classifier_free_guidance:
+            seq_len = uncond_embeddings.shape[1]
+            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
+
+        return text_embeddings
+
+    def get_timesteps(self, num_inference_steps, strength, is_text2img):
+        if is_text2img:
+            return self.scheduler.timesteps, num_inference_steps
+        else:
+            # get the original timestep using init_timestep
+            offset = self.scheduler.config.get("steps_offset", 0)
+            init_timestep = int(num_inference_steps * strength) + offset
+            init_timestep = min(init_timestep, num_inference_steps)
+
+            t_start = max(num_inference_steps - init_timestep + offset, 0)
+            timesteps = self.scheduler.timesteps[t_start:]
+            return timesteps, num_inference_steps - t_start
+
+    def prepare_latents(self, image, timestep, batch_size, height, width, dtype, generator, latents=None):
+        if image is None:
+            shape = (
+                batch_size,
+                self.unet.in_channels,
+                height // self.vae_scale_factor,
+                width // self.vae_scale_factor,
+            )
+
+            if latents is None:
+                latents = paddle.randn(shape, generator=generator, dtype=dtype)
+            else:
+                if latents.shape != shape:
+                    raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+
+            # scale the initial noise by the standard deviation required by the scheduler
+            latents = latents * self.scheduler.init_noise_sigma
+            return latents, None, None
+        else:
+            init_latent_dist = self.vae.encode(image).latent_dist
+            init_latents = init_latent_dist.sample(generator=generator)
+            init_latents = 0.18215 * init_latents
+            init_latents = paddle.concat([init_latents] * batch_size, axis=0)
+            init_latents_orig = init_latents
+            shape = init_latents.shape
+
+            # add noise to latents using the timesteps
+            noise = paddle.randn(shape, generator=generator, dtype=dtype)
+            latents = self.scheduler.add_noise(init_latents, noise, timestep)
+            return latents, init_latents_orig, noise
+
     @paddle.no_grad()
     def __call__(
         self,
@@ -506,19 +604,20 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         image: Union[paddle.Tensor, PIL.Image.Image] = None,
         mask_image: Union[paddle.Tensor, PIL.Image.Image] = None,
-        height: int = 512,
-        width: int = 512,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 7.5,
-        strength: float = 0.8,
+        height: Optional[int] = 512,
+        width: Optional[int] = 512,
+        num_inference_steps: Optional[int] = 50,
+        guidance_scale: Optional[int] = 7.5,
+        strength: Optional[int] = 0.8,
         num_images_per_prompt: Optional[int] = 1,
-        eta: float = 0.0,
-        seed: Optional[int] = None,
+        eta: Optional[int] = 0.0,
+        generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
         max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
-        return_dict: bool = True,
+        return_dict: Optional[bool] = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -562,8 +661,8 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A paddle.Generator to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -589,153 +688,65 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
+        # 0. Default height and width to unet
+        height = height or self.unet.config.sample_size * self.vae_scale_factor
+        width = width or self.unet.config.sample_size * self.vae_scale_factor
 
-        if isinstance(prompt, str):
-            batch_size = 1
-            prompt = [prompt]
-        elif isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+        # 1. Check inputs. Raise error if not correct
+        self.check_inputs(prompt, height, width, strength, callback_steps)
 
-        if strength < 0 or strength > 1:
-            raise ValueError(f"The value of strength should in [0.0, 1.0] but is {strength}")
-
-        if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
-        ):
-            raise ValueError(
-                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}."
-            )
-
-        # get prompt text embeddings
+        # 2. Define call parameters
+        batch_size = 1 if isinstance(prompt, str) else len(prompt)
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
-        # get unconditional embeddings for classifier free guidance
-        if negative_prompt is None:
-            negative_prompt = [""] * batch_size
-        elif isinstance(negative_prompt, str):
-            negative_prompt = [negative_prompt] * batch_size
-        if batch_size != len(negative_prompt):
-            raise ValueError(
-                f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                " the batch size of `prompt`."
-            )
 
-        text_embeddings, uncond_embeddings = get_weighted_text_embeddings(
-            pipe=self,
-            prompt=prompt,
-            uncond_prompt=negative_prompt if do_classifier_free_guidance else None,
-            max_embeddings_multiples=max_embeddings_multiples,
-            **kwargs,
+        # 3. Encode input prompt
+        text_embeddings = self._encode_prompt(
+            prompt,
+            num_images_per_prompt,
+            do_classifier_free_guidance,
+            negative_prompt,
+            max_embeddings_multiples,
         )
-        bs_embed, seq_len, _ = text_embeddings.shape
-        text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+        dtype = text_embeddings.dtype
 
-        if do_classifier_free_guidance:
-            bs_embed, seq_len, _ = uncond_embeddings.shape
-            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
-            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
-
-        # set timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-
-        latents_dtype = text_embeddings.dtype
-        init_latents_orig = None
-        mask = None
-        noise = None
-
-        if image is None:
-            # get the initial random noise unless the user supplied it
-
-            # Unlike in other pipelines, latents need to be generated in the target device
-            # for 1-to-1 results reproducibility with the CompVis implementation.
-            # However this currently doesn't work in `mps`.
-            latents_shape = [
-                batch_size * num_images_per_prompt,
-                self.unet.in_channels,
-                height // 8,
-                width // 8,
-            ]
-
-            if latents is None:
-                if seed is not None:
-                    paddle.seed(seed)
-                latents = paddle.randn(
-                    latents_shape,
-                    dtype=latents_dtype,
-                )
-            else:
-                if latents.shape != latents_shape:
-                    raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
-
-            timesteps = self.scheduler.timesteps
-
-            # scale the initial noise by the standard deviation required by the scheduler
-            latents = latents * self.scheduler.init_noise_sigma
+        # 4. Preprocess image and mask
+        if isinstance(image, PIL.Image.Image):
+            image = preprocess_image(image)
+        if image is not None:
+            image = image.astype(dtype=dtype)
+        if isinstance(mask_image, PIL.Image.Image):
+            mask_image = preprocess_mask(mask_image, self.vae_scale_factor)
+        if mask_image is not None:
+            mask_image = mask_image.astype(dtype=dtype)
+            mask = paddle.concat([mask_image] * batch_size * num_images_per_prompt)
         else:
-            if isinstance(image, PIL.Image.Image):
-                image = preprocess_image(image)
-            # encode the init image into latents and scale the latents
-            image = image.astype(dtype=latents_dtype)
-            init_latent_dist = self.vae.encode(image).latent_dist
-            init_latents = init_latent_dist.sample()
-            init_latents = 0.18215 * init_latents
-            init_latents = paddle.concat([init_latents] * batch_size * num_images_per_prompt, axis=0)
-            init_latents_orig = init_latents
+            mask = None
 
-            # preprocess mask
-            if mask_image is not None:
-                if isinstance(mask_image, PIL.Image.Image):
-                    mask_image = preprocess_mask(mask_image)
-                mask_image = mask_image.astype(dtype=latents_dtype)
-                mask = paddle.concat([mask_image] * batch_size * num_images_per_prompt)
+        # 5. set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength, image is None)
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
-                # check sizes
-                if not mask.shape == init_latents.shape:
-                    raise ValueError("The mask and image should be the same size!")
+        # 6. Prepare latent variables
+        latents, init_latents_orig, noise = self.prepare_latents(
+            image,
+            latent_timestep,
+            batch_size * num_images_per_prompt,
+            height,
+            width,
+            dtype,
+            generator,
+            latents,
+        )
 
-            # get the original timestep using init_timestep
-            offset = self.scheduler.config.get("steps_offset", 0)
-            init_timestep = int(num_inference_steps * strength) + offset
-            init_timestep = min(init_timestep, num_inference_steps)
+        # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
-            timesteps = self.scheduler.timesteps[-init_timestep]
-            timesteps = timesteps.tile(
-                [
-                    batch_size * num_images_per_prompt,
-                ]
-            )
-            if seed is not None:
-                paddle.seed(seed)
-            noise = paddle.randn(
-                init_latents.shape,
-                dtype=latents_dtype,
-            )
-            latents = self.scheduler.add_noise(init_latents, noise, timesteps)
-
-            t_start = max(num_inference_steps - init_timestep + offset, 0)
-            timesteps = self.scheduler.timesteps[t_start:]
-
-        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-        # and should be between [0, 1]
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-        extra_step_kwargs = {}
-        if accepts_eta:
-            extra_step_kwargs["eta"] = eta
-
+        # 8. Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
@@ -758,31 +769,24 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
             # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+            if i % callback_steps == 0:
+                if callback is not None:
+                    callback(i, t, latents)
+                if is_cancelled_callback is not None and is_cancelled_callback():
+                    return None
 
-        latents = 1 / 0.18215 * latents
-        image = self.vae.decode(latents).sample
+        # 9. Post-processing
+        image = self.decode_latents(latents)
 
-        image = (image / 2 + 0.5).clip(0, 1)
+        # 10. Run safety checker
+        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
-        image = image.transpose([0, 2, 3, 1]).astype("float32").numpy()
-
-        if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
-            image, has_nsfw_concept = self.safety_checker(
-                images=image,
-                clip_input=safety_checker_input.pixel_values.astype(text_embeddings.dtype),
-            )
-        else:
-            has_nsfw_concept = None
-
+        # 11. Convert to PIL
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, has_nsfw_concept)
+            return image, has_nsfw_concept
 
         return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
 
@@ -790,18 +794,19 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         self,
         prompt: Union[str, List[str]],
         negative_prompt: Optional[Union[str, List[str]]] = None,
-        height: int = 512,
-        width: int = 512,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 7.5,
+        height: Optional[int] = 512,
+        width: Optional[int] = 512,
+        num_inference_steps: Optional[int] = 50,
+        guidance_scale: Optional[float] = 7.5,
         num_images_per_prompt: Optional[int] = 1,
-        eta: float = 0.0,
-        seed: Optional[int] = None,
+        eta: Optional[int] = 0.0,
+        generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
         max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
-        return_dict: bool = True,
+        return_dict: Optional[bool] = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -831,8 +836,8 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A paddle.Generator to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -848,6 +853,9 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
@@ -867,7 +875,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             guidance_scale=guidance_scale,
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
-            seed=seed,
+            generator=generator,
             latents=latents,
             max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
@@ -882,16 +890,17 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         prompt: Union[str, List[str]],
         image: Union[paddle.Tensor, PIL.Image.Image],
         negative_prompt: Optional[Union[str, List[str]]] = None,
-        strength: float = 0.8,
+        strength: Optional[float] = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
-        return_dict: bool = True,
+        return_dict: Optional[bool] = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -926,8 +935,8 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A paddle.Generator to make generation deterministic.
             max_embeddings_multiples (`int`, *optional*, defaults to `3`):
                 The max multiple length of prompt embeddings compared to the max output length of text encoder.
             output_type (`str`, *optional*, defaults to `"pil"`):
@@ -939,6 +948,9 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
@@ -958,11 +970,12 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             strength=strength,
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
-            seed=seed,
+            generator=generator,
             max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
+            is_cancelled_callback=is_cancelled_callback,
             callback_steps=callback_steps,
             **kwargs,
         )
@@ -973,16 +986,17 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         negative_prompt: Optional[Union[str, List[str]]] = None,
-        strength: float = 0.8,
+        strength: Optional[float] = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
-        return_dict: bool = True,
+        return_dict: Optional[bool] = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -1021,8 +1035,8 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A paddle.Generator to make generation deterministic.
             max_embeddings_multiples (`int`, *optional*, defaults to `3`):
                 The max multiple length of prompt embeddings compared to the max output length of text encoder.
             output_type (`str`, *optional*, defaults to `"pil"`):
@@ -1054,7 +1068,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             strength=strength,
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
-            seed=seed,
+            generator=generator,
             max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
