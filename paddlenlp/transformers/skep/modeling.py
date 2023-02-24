@@ -28,7 +28,6 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
-from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -137,9 +136,7 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = CONFIG_NAME
     config_class = SkepConfig
-    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "skep"
 
     pretrained_init_configuration = SKEP_PRETRAINED_INIT_CONFIGURATION
