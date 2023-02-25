@@ -772,7 +772,7 @@ class FNetForPreTraining(FNetPretrainedModel):
                 "seq_relationship_logits": seq_relationship_score,
                 "hidden_states": outputs["all_hidden_states"],
             }
-        return prediction_scores, seq_relationship_score, outputs["all_hidden_states"]
+        return prediction_scores, seq_relationship_score, outputs[2]
 
 
 class FNetForMaskedLM(FNetPretrainedModel):
@@ -860,7 +860,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
 
         if return_dict:
             return {"prediction_logits": prediction_scores, "hidden_states": outputs["all_hidden_states"]}
-        return prediction_scores, outputs["all_hidden_states"]
+        return prediction_scores, outputs[2]
 
 
 class FNetForNextSentencePrediction(FNetPretrainedModel):
@@ -1067,9 +1067,9 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
         )
         sequence_output = outputs[0] if not return_dict else outputs["last_hidden_state"]
         logits = self.qa_outputs(sequence_output)
-        start_logits, end_logits = paddle.split(logits, num_or_sections=1, axis=-1)
+        start_logits, end_logits = paddle.split(logits, num_or_sections=2, axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
-        end_logits = start_logits.squeeze(axis=-1)
+        end_logits = end_logits.squeeze(axis=-1)
         if return_dict:
             return {
                 "start_logits": start_logits,

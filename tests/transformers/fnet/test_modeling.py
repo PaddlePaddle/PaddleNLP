@@ -125,8 +125,10 @@ class FNetModelTester:
         model = FNetModel(config=config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        result = model(input_ids, return_dict=True)
+        self.parent.assertEqual(
+            result["last_hidden_state"].shape, [self.batch_size, self.seq_length, self.hidden_size]
+        )
 
     def create_and_check_for_pretraining(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -138,17 +140,18 @@ class FNetModelTester:
             token_type_ids=token_type_ids,
             labels=token_labels,
             next_sentence_label=sequence_labels,
+            return_dict=True,
         )
-        self.parent.assertEqual(result.prediction_logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
-        self.parent.assertEqual(result.seq_relationship_logits.shape, [self.batch_size, 2])
+        self.parent.assertEqual(result["prediction_logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result["seq_relationship_logits"].shape, [self.batch_size, 2])
 
     def create_and_check_for_masked_lm(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
     ):
         model = FNetForMaskedLM(config=config)
         model.eval()
-        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels, return_dict=True)
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_next_sentence_prediction(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -159,8 +162,9 @@ class FNetModelTester:
             input_ids,
             token_type_ids=token_type_ids,
             next_sentence_label=sequence_labels,
+            return_dict=True,
         )
-        self.parent.assertEqual(result.logits.shape, (self.batch_size, 2))
+        self.parent.assertEqual(result["logits"].shape, (self.batch_size, 2))
 
     def create_and_check_for_question_answering(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -172,9 +176,10 @@ class FNetModelTester:
             token_type_ids=token_type_ids,
             start_positions=sequence_labels,
             end_positions=sequence_labels,
+            return_dict=True,
         )
-        self.parent.assertEqual(result.start_logits.shape, (self.batch_size, self.seq_length))
-        self.parent.assertEqual(result.end_logits.shape, (self.batch_size, self.seq_length))
+        self.parent.assertEqual(result["start_logits"].shape, (self.batch_size, self.seq_length))
+        self.parent.assertEqual(result["end_logits"].shape, (self.batch_size, self.seq_length))
 
     def create_and_check_for_sequence_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -182,8 +187,8 @@ class FNetModelTester:
         config.num_labels = self.num_labels
         model = FNetForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, token_type_ids=token_type_ids, labels=sequence_labels)
-        self.parent.assertEqual(result.logits.shape, (self.batch_size, self.num_labels))
+        result = model(input_ids, token_type_ids=token_type_ids, labels=sequence_labels, return_dict=True)
+        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.num_labels))
 
     def create_and_check_for_token_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -192,7 +197,7 @@ class FNetModelTester:
         model = FNetForTokenClassification(config=config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result.logits.shape, (self.batch_size, self.seq_length, self.num_labels))
+        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.seq_length, self.num_labels))
 
     def create_and_check_for_multiple_choice(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -207,7 +212,7 @@ class FNetModelTester:
             token_type_ids=multiple_choice_token_type_ids,
             labels=choice_labels,
         )
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.num_choices])
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.num_choices])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
