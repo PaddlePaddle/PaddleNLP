@@ -235,6 +235,9 @@ class FNetModelTest(ModelTesterMixin, unittest.TestCase):
         FNetForTokenClassification,
     )
 
+    base_model_class = FNetModel
+    return_dict = False
+    use_labels = False
     # Skip Tests
     test_pruning = False
     test_head_masking = False
