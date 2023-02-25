@@ -164,7 +164,7 @@ class FNetModelTester:
             next_sentence_label=sequence_labels,
             return_dict=True,
         )
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, 2))
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, 2])
 
     def create_and_check_for_question_answering(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -178,8 +178,8 @@ class FNetModelTester:
             end_positions=sequence_labels,
             return_dict=True,
         )
-        self.parent.assertEqual(result["start_logits"].shape, (self.batch_size, self.seq_length))
-        self.parent.assertEqual(result["end_logits"].shape, (self.batch_size, self.seq_length))
+        self.parent.assertEqual(result["start_logits"].shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result["end_logits"].shape, [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -188,7 +188,7 @@ class FNetModelTester:
         model = FNetForSequenceClassification(config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids, labels=sequence_labels, return_dict=True)
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.num_labels))
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.num_labels])
 
     def create_and_check_for_token_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
