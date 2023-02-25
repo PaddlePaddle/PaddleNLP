@@ -452,13 +452,13 @@ class FNetModel(FNetPretrainedModel):
             Whether or not to add the pooling layer. Defaults to `True`.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, add_pooling_layer=True):
         super(FNetModel, self).__init__()
         self.initializer_range = config.initializer_range
         self.num_hidden_layers = config.num_hidden_layers
         self.embeddings = FNetEmbeddings(config)
         self.encoder = FNetEncoder(config)
-        self.pooler = FNetPooler(config.hidden_size) if config.add_pooling_layer else None
+        self.pooler = FNetPooler(config.hidden_size) if add_pooling_layer else None
         self.init_weights()
 
     def get_input_embeddings(self):
