@@ -211,6 +211,7 @@ class FNetModelTester:
             multiple_choice_inputs_ids,
             token_type_ids=multiple_choice_token_type_ids,
             labels=choice_labels,
+            return_dict=True,
         )
         self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.num_choices])
 
