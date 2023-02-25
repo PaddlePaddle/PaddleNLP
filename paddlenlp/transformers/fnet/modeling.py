@@ -680,7 +680,7 @@ class FNetForSequenceClassification(FNetPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        pooled_output = outputs[1]
+        pooled_output = outputs[1] if not return_dict else outputs["pooler_output"]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 

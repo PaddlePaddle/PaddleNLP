@@ -151,7 +151,7 @@ class FNetModelTester:
         model = FNetForMaskedLM(config=config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels, return_dict=True)
-        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result["prediction_logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_next_sentence_prediction(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -196,8 +196,8 @@ class FNetModelTester:
         config.num_labels = self.num_labels
         model = FNetForTokenClassification(config=config)
         model.eval()
-        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.seq_length, self.num_labels))
+        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels, return_dict=True)
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_for_multiple_choice(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
