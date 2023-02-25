@@ -772,7 +772,7 @@ class FNetForPreTraining(FNetPretrainedModel):
                 "seq_relationship_logits": seq_relationship_score,
                 "hidden_states": outputs["all_hidden_states"],
             }
-        return prediction_scores, seq_relationship_score, outputs[2]
+        return prediction_scores, seq_relationship_score
 
 
 class FNetForMaskedLM(FNetPretrainedModel):
@@ -860,7 +860,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
 
         if return_dict:
             return {"prediction_logits": prediction_scores, "hidden_states": outputs["all_hidden_states"]}
-        return prediction_scores, outputs[2]
+        return prediction_scores
 
 
 class FNetForNextSentencePrediction(FNetPretrainedModel):
@@ -914,7 +914,7 @@ class FNetForNextSentencePrediction(FNetPretrainedModel):
 
         if return_dict:
             return {"seq_relationship_logits": seq_relationship_score, "hidden_states": outputs["all_hidden_states"]}
-        return seq_relationship_score, outputs["all_hidden_states"]
+        return seq_relationship_score
 
 
 class FNetForMultipleChoice(FNetPretrainedModel):
