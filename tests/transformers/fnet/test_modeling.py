@@ -29,6 +29,7 @@ from paddlenlp.transformers import (
     FNetModel,
     FNetPretrainedModel,
 )
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
@@ -107,7 +108,7 @@ class FNetModelTester:
 
         return config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
 
-    def get_config(self):
+    def get_config(self) -> FNetConfig:
         return FNetConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
@@ -226,6 +227,7 @@ class FNetModelTester:
             choice_labels,
         ) = config_and_inputs
         inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids}
+        self.parent.assertTrue(isinstance(config, PretrainedConfig))
         return config, inputs_dict
 
 
