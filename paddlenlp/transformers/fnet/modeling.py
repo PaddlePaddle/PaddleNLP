@@ -379,9 +379,7 @@ class FNetPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.fnet.config["initializer_range"],
+                    std=self.initializer_range if hasattr(self, "initializer_range") else self.fnet.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -391,9 +389,7 @@ class FNetPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.fnet.config["initializer_range"],
+                    std=self.initializer_range if hasattr(self, "initializer_range") else self.fnet.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -598,7 +594,7 @@ class FNetForSequenceClassification(FNetPretrainedModel):
 
     def __init__(self, config):
         super(FNetForSequenceClassification, self).__init__()
-        self.num_labels = config.labels
+        self.num_labels = config.num_labels
         self.fnet = FNetModel(config)
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
