@@ -15,10 +15,12 @@
 
 import os
 import unicodedata
-import sentencepiece as spm
-from shutil import copyfile
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from shutil import copyfile
+from typing import Any, Dict, List, Optional
+
+import sentencepiece as spm
+
 from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ["FNetTokenizer"]
@@ -130,7 +132,7 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         **kwargs
     ):
         # Mask token behave like a normal word, i.e. include the space before it
-        # mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
         super().__init__(
             sentencepiece_model_file,
