@@ -29,6 +29,7 @@ from paddlenlp.transformers import (
     FNetModel,
     FNetPretrainedModel,
 )
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
@@ -228,6 +229,12 @@ class FNetModelTester:
         inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids}
         return config, inputs_dict
 
+    def create_and_check_config_and_inputs_for_common(self, config):
+
+        self.parent.assertTrue(isinstance(config, FNetConfig))
+        self.parent.assertTrue(issubclass(FNetConfig, PretrainedConfig))
+        self.parent.assertTrue(isinstance(config, PretrainedConfig))
+
 
 class FNetModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
@@ -256,6 +263,10 @@ class FNetModelTest(ModelTesterMixin, unittest.TestCase):
     def setUp(self):
         self.model_tester = FNetModelTester(self)
         self.config_tester = FNetConfigTester(self, config_class=FNetConfig, hidden_size=37)
+
+    def test_config_for_common(self):
+        config, inputs = self.model_tester.prepare_config_and_inputs_for_common()
+        self.model_tester.create_and_check_config_and_inputs_for_common(config)
 
     def test_config(self):
         self.config_tester.run_common_tests()

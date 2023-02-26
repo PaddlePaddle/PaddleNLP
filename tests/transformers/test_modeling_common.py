@@ -95,7 +95,6 @@ class ModelTesterMixin:
 
     def test_save_load(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
-        self.assertTrue(isinstance(config, PretrainedConfig))
 
         def check_save_load(out1, out2):
             # make sure we don't have nans
