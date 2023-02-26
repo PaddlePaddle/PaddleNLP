@@ -13,13 +13,11 @@
 # limitations under the License.
 """Modeling classes for FNet model."""
 
-from typing import List
 
 import paddle
 import paddle.nn as nn
 from paddle.nn import Layer
 
-from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 from .configuration import (
@@ -282,92 +280,7 @@ class FNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = FNET_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = FNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "fnet"
-
-    @classmethod
-    def _get_name_mappings(cls, config: FNetConfig) -> List[StateDictNameMapping]:
-        mappings: List[StateDictNameMapping] = []
-        model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
-            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
-            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["embedding.projection.weight", "embedding.projection.weight", "transpose"],
-            ["embedding.bias", "embedding.bias"],
-            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
-            ["pooler.dense.bias", "pooler.dense.bias"],
-            # for TokenClassification
-        ]
-        for layer_index in range(config.num_hidden_layers):
-            layer_mappings = [
-                [
-                    f"encoder.layer.{layer_index}.fourier.output.LayerNorm.weight",
-                    f"encoder.layers.{layer_index}.norm1.weight",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.fourier.output.LayerNorm.bias",
-                    f"encoder.layers.{layer_index}.norm1.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
-                    f"encoder.layers.{layer_index}.linear1.weight",
-                    "transpose",
-                ],
-                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
-                [
-                    f"encoder.layer.{layer_index}.output.dense.weight",
-                    f"encoder.layers.{layer_index}.linear2.weight",
-                    "transpose",
-                ],
-                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
-            ]
-            model_mappings.extend(layer_mappings)
-
-        # base-model prefix "FNetModel"
-        if "FNetModel" not in config.architectures:
-            for mapping in model_mappings:
-                mapping[0] = "fnet." + mapping[0]
-                mapping[1] = "fnet." + mapping[1]
-
-        # downstream mappings
-        if "FNetForQuestionAnswering" in config.architectures:
-            model_mappings.extend(
-                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
-            )
-        if "FNetForMaskedLM" in config.architectures:
-            model_mappings.extend(
-                [
-                    ["cls.predictions.bias", "classifier.predictions.bias"],
-                    [
-                        "cls.predictions.transform.dense.weight",
-                        "classifier.predictions.transform.dense.weight",
-                        "transpose",
-                    ],
-                    ["cls.predictions.transform.dense.bias", "classifier.predictions.transform.dense.bias"],
-                    ["cls.predictions.transform.LayerNorm.weight", "classifier.predictions.transform.norm.weight"],
-                    ["cls.predictions.transform.LayerNorm.bias", "classifier.predictions.transform.norm.bias"],
-                    ["cls.predictions.decoder.LayerNorm.weight", "classifier.predictions.decoder.norm.weight"],
-                    ["cls.predictions.decoder.LayerNorm.bias", "classifier.predictions.decoder.norm.bias"],
-                ]
-            )
-        if "FNetForNextSentencePrediction" in config.architectures:
-            model_mappings.extend(
-                [
-                    ["cls.seq_relationship.weight", "classifier.weight", "transpose"],
-                    ["cls.seq_relationship.bias", "classifier.bias"],
-                ]
-            )
-        if (
-            "FNetForMultipleChoice" in config.architectures
-            or "FNetForSequenceClassification" in config.architectures
-            or "FNetForTokenClassification" in config.architectures
-        ):
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
-
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
-        return mappings
+    config_class = FNetConfig
 
     def init_weights(self):
         # Initialize weights
