@@ -20,9 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import sentencepiece as spm
 
-from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
-
-from .. import AddedToken
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = ["FNetTokenizer"]
 
@@ -31,7 +29,7 @@ SPIECE_UNDERLINE = "▁"
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"fnet-base": 512, "fnet-large": 512}
 
 
-class FNetTokenizer(AlbertEnglishTokenizer):
+class FNetTokenizer(PretrainedTokenizer):
     """
     Construct a FNet tokenizer. Inherit from :class:`AlbertEnglishTokenizer`. Based on `SentencePiece
     <https://github.com/google/sentencepiece>`__.
