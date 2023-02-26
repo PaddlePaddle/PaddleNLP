@@ -449,7 +449,7 @@ class FNetModel(FNetPretrainedModel):
     """
 
     def __init__(self, config, add_pooling_layer=True):
-        super(FNetModel, self).__init__()
+        super(FNetModel, self).__init__(config)
         self.initializer_range = config.initializer_range
         self.num_hidden_layers = config.num_hidden_layers
         self.embeddings = FNetEmbeddings(config)
