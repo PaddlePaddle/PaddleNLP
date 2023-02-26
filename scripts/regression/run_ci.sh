@@ -66,10 +66,17 @@ esac
 python -c 'import sys; print(sys.version_info[:])'
 echo "python="${python}
 ####################################
+# Install fastdeploy-gpu-python
+install_fastdeploy() {
+    # fastdeploy-gpu-python is not in pypi, so define a function to install fastdeploy individually
+    echo -e "\033[35m ---- Install fastdeploy-gpu-python  \033[0m"
+    python -m pip install --user fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
+}
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
+    install_fastdeploy
     python -m pip uninstall paddlepaddle -y
     python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
