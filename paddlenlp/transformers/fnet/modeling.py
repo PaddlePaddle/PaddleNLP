@@ -506,7 +506,7 @@ class FNetForSequenceClassification(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super(FNetForSequenceClassification, self).__init__()
+        super(FNetForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
         self.fnet = FNetModel(config)
 
@@ -612,7 +612,7 @@ class FNetForPreTraining(FNetPretrainedModel):
     """
 
     def __init__(self, config: FNetConfig):
-        super().__init__()
+        super().__init__(config)
 
         self.fnet = FNetModel(config)
         self.cls = FNetPreTrainingHeads(config)
@@ -787,7 +787,7 @@ class FNetForNextSentencePrediction(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
 
         self.fnet = FNetModel(config)
         self.cls = FNetOnlyNSPHead(config)
@@ -842,7 +842,7 @@ class FNetForMultipleChoice(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super(FNetForMultipleChoice, self).__init__()
+        super(FNetForMultipleChoice, self).__init__(config)
         self.fnet = FNetModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
@@ -901,7 +901,7 @@ class FNetForTokenClassification(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super(FNetForTokenClassification, self).__init__()
+        super(FNetForTokenClassification, self).__init__(config)
         self.fnet = FNetModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -952,7 +952,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super(FNetForQuestionAnswering, self).__init__()
+        super(FNetForQuestionAnswering, self).__init__(config)
         self.num_labels = config.num_labels
         self.fnet = FNetModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
