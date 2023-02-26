@@ -594,8 +594,8 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
 
-        unet_output_name = self.unet.model.get_output_info(0).name
-        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
+        # unet_output_name = self.unet.model.get_output_info(0).name
+        # unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         height, width = image.shape[-2:]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -629,15 +629,20 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                 )
 
                 # predict the noise residual
-                self.unet.zero_copy_infer(
-                    prebinded_inputs={
-                        unet_input_names[0]: concat_latent_model_input,
-                        unet_input_names[1]: t,
-                        unet_input_names[2]: concat_prompt_embeds,
-                    },
-                    prebinded_outputs={unet_output_name: concat_noise_pred},
-                    share_with_raw_ptr=True,
-                )
+                # TODO(zhoushunjie): Use zero copy infer in the future
+                # self.unet.zero_copy_infer(
+                #     prebinded_inputs={
+                #         unet_input_names[0]: concat_latent_model_input,
+                #         unet_input_names[1]: t,
+                #         unet_input_names[2]: concat_prompt_embeds,
+                #     },
+                #     prebinded_outputs={unet_output_name: concat_noise_pred},
+                #     share_with_raw_ptr=True,
+                # )
+                concat_noise_pred = self.unet(
+                    sample=concat_latent_model_input, timestep=t, encoder_hidden_states=concat_prompt_embeds
+                )[0]
+                concat_noise_pred = paddle.to_tensor(concat_noise_pred)
 
                 # perform guidance
                 (
