@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import re
-import tempfile
 import unittest
 
 from paddlenlp.transformers import ArtistTokenizer
 
-from ...transformers.test_tokenizer_common import AddedToken, TokenizerTesterMixin
+from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 
 class ArtistTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
@@ -268,80 +266,6 @@ class ArtistTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 self.assertEqual(len(special_tokens_mask), len(encoded_sequence_w_special))
                 filtered_sequence = [x for i, x in enumerate(encoded_sequence_w_special) if not special_tokens_mask[i]]
                 self.assertEqual(encoded_sequence, filtered_sequence)
-
-    def test_special_tokens_initialization_with_non_empty_additional_special_tokens(self):
-        tokenizer_list = [(self.tokenizer_class, self.get_tokenizer())]
-
-        for tokenizer_class, tokenizer_utils in tokenizer_list:
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tokenizer_utils.save_pretrained(tmp_dir)
-
-                with open(os.path.join(tmp_dir, "special_tokens_map.json"), encoding="utf-8") as json_file:
-                    special_tokens_map = json.load(json_file)
-
-                with open(os.path.join(tmp_dir, "tokenizer_config.json"), encoding="utf-8") as json_file:
-                    tokenizer_config = json.load(json_file)
-
-                special_tokens_map["additional_special_tokens"] = ["an_additional_special_token"]
-                tokenizer_config["additional_special_tokens"] = ["an_additional_special_token"]
-
-                with open(os.path.join(tmp_dir, "special_tokens_map.json"), "w", encoding="utf-8") as outfile:
-                    json.dump(special_tokens_map, outfile)
-                with open(os.path.join(tmp_dir, "tokenizer_config.json"), "w", encoding="utf-8") as outfile:
-                    json.dump(tokenizer_config, outfile)
-
-                # the following checks allow us to verify that our test works as expected, i.e. that the tokenizer takes
-                # into account the new value of additional_special_tokens given in the "tokenizer_config.json" and
-                # "special_tokens_map.json" files
-                tokenizer_without_change_in_init = tokenizer_class.from_pretrained(
-                    tmp_dir,
-                )
-                self.assertIn(
-                    "an_additional_special_token", tokenizer_without_change_in_init.additional_special_tokens
-                )
-
-                self.assertIn("an_additional_special_token", tokenizer_without_change_in_init.get_vocab())
-                self.assertEqual(
-                    ["an_additional_special_token"],
-                    tokenizer_without_change_in_init.convert_ids_to_tokens(
-                        tokenizer_without_change_in_init.convert_tokens_to_ids(["an_additional_special_token"])
-                    ),
-                )
-                print(tokenizer_without_change_in_init.vocab._idx_to_token)
-                # Now we test that we can change the value of additional_special_tokens in the from_pretrained
-                new_added_tokens = [AddedToken("a_new_additional_special_token", lstrip=True)]
-                tokenizer = tokenizer_class.from_pretrained(
-                    tmp_dir,
-                    additional_special_tokens=new_added_tokens,
-                )
-
-                self.assertIn("a_new_additional_special_token", tokenizer.additional_special_tokens)
-                self.assertEqual(
-                    ["a_new_additional_special_token"],
-                    tokenizer.convert_ids_to_tokens(
-                        tokenizer.convert_tokens_to_ids(["a_new_additional_special_token"])
-                    ),
-                )
-
-    def test_encode_decode_with_spaces(self):
-        tokenizers = self.get_tokenizers(do_lower_case=False)
-        for tokenizer in tokenizers:
-            with self.subTest(f"{tokenizer.__class__.__name__}"):
-
-                new_toks = [
-                    AddedToken("[ABC]", normalized=False),
-                    AddedToken("[DEF]", normalized=False),
-                    AddedToken("GHI IHG", normalized=False),
-                ]
-                tokenizer.add_tokens(new_toks)
-                input = "[ABC][DEF][ABC]GHI IHG[DEF]"
-                if self.space_between_special_tokens:
-                    output = "[ABC] [DEF] [ABC] GHI IHG [DEF]"
-                else:
-                    output = input
-                encoded = tokenizer.encode(input, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
-                decoded = tokenizer.decode(encoded, spaces_between_special_tokens=self.space_between_special_tokens)
-                self.assertIn(decoded, [output, output.lower()])
 
     def test_padding_to_multiple_of(self):
         tokenizers = self.get_tokenizers()
