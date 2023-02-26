@@ -20,10 +20,10 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    ArtistConfig,
     ArtistForConditionalGeneration,
     ArtistForImageGeneration,
     ArtistModel,
-    GPTConfig,
 )
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -109,7 +109,7 @@ class ArtistModelTester:
         )
 
     def get_config(self):
-        return GPTConfig(
+        return ArtistConfig(
             **{
                 "vocab_size": self.vocab_size,
                 "hidden_size": self.hidden_size,

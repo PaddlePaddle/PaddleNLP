@@ -14,10 +14,9 @@
 """ MBart model configuration"""
 from __future__ import annotations
 
-__all__ = [
-    "Artist_PRETRAINED_INIT_CONFIGURATION",
-    "Artist_PRETRAINED_RESOURCE_FILES_MAP",
-]
+from paddlenlp.transformers import GPTConfig
+
+__all__ = ["Artist_PRETRAINED_INIT_CONFIGURATION", "Artist_PRETRAINED_RESOURCE_FILES_MAP", "ArtistConfig"]
 
 Artist_PRETRAINED_INIT_CONFIGURATION = {
     "pai-painter-base-zh": {
@@ -115,3 +114,5 @@ Artist_PRETRAINED_RESOURCE_FILES_MAP = {
         "pai-painter-large-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
     }
 }
+
+ArtistConfig = GPTConfig

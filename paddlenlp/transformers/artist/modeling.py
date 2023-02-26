@@ -23,6 +23,7 @@ from ..gpt.modeling import GPTLMHead, GPTLMHeadModel, GPTModel
 from .configuration import (
     Artist_PRETRAINED_INIT_CONFIGURATION,
     Artist_PRETRAINED_RESOURCE_FILES_MAP,
+    ArtistConfig,
 )
 
 __all__ = [
@@ -53,9 +54,9 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
     pretrained_init_configuration = Artist_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = Artist_PRETRAINED_RESOURCE_FILES_MAP
 
-    def __init__(self, gpt):
-        super().__init__(gpt)
-        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"], self.gpt.config["vocab_size"])
+    def __init__(self, config: ArtistConfig):
+        super().__init__(config)
+        self.lm_head = GPTLMHead(config["hidden_size"], config["vocab_size"])
         self.apply(self.init_weights)
 
     @staticmethod
@@ -78,8 +79,8 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
     pretrained_init_configuration = Artist_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = Artist_PRETRAINED_RESOURCE_FILES_MAP
 
-    def __init__(self, gpt, image_vocab_size=16384):
-        super().__init__(gpt)
+    def __init__(self, config: ArtistConfig, image_vocab_size=16384):
+        super().__init__(config)
         logger.warning(
             f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
             "Please Refer to PPDiffusers for Text-to-Image Capabilities"
