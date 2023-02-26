@@ -699,7 +699,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
     """
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
 
         self.fnet = FNetModel(config)
         self.cls = FNetOnlyMLMHead(config)
