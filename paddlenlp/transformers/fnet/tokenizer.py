@@ -116,7 +116,6 @@ class FNetTokenizer(PretrainedTokenizer):
         mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
         super().__init__(
-            sentencepiece_model_file,
             do_lower_case,
             remove_space,
             keep_accents,
