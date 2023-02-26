@@ -15,7 +15,6 @@
 
 import os
 import unicodedata
-from dataclasses import dataclass, field
 from shutil import copyfile
 from typing import Any, Dict, List, Optional
 
@@ -23,29 +22,13 @@ import sentencepiece as spm
 
 from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
 
+from .. import AddedToken
+
 __all__ = ["FNetTokenizer"]
 
 SPIECE_UNDERLINE = "▁"
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"fnet-base": 512, "fnet-large": 512}
-
-
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    Copied from transformers.tokenization_utils_base
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
 
 
 class FNetTokenizer(AlbertEnglishTokenizer):
