@@ -29,6 +29,7 @@ from paddlenlp.transformers import (
     FNetModel,
     FNetPretrainedModel,
 )
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
@@ -107,7 +108,7 @@ class FNetModelTester:
 
         return config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
 
-    def get_config(self):
+    def get_config(self) -> FNetConfig:
         return FNetConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
@@ -151,7 +152,7 @@ class FNetModelTester:
         model = FNetForMaskedLM(config=config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels, return_dict=True)
-        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result["prediction_logits"].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_next_sentence_prediction(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -164,7 +165,7 @@ class FNetModelTester:
             next_sentence_label=sequence_labels,
             return_dict=True,
         )
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, 2))
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, 2])
 
     def create_and_check_for_question_answering(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -178,8 +179,8 @@ class FNetModelTester:
             end_positions=sequence_labels,
             return_dict=True,
         )
-        self.parent.assertEqual(result["start_logits"].shape, (self.batch_size, self.seq_length))
-        self.parent.assertEqual(result["end_logits"].shape, (self.batch_size, self.seq_length))
+        self.parent.assertEqual(result["start_logits"].shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result["end_logits"].shape, [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -188,7 +189,7 @@ class FNetModelTester:
         model = FNetForSequenceClassification(config)
         model.eval()
         result = model(input_ids, token_type_ids=token_type_ids, labels=sequence_labels, return_dict=True)
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.num_labels))
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.num_labels])
 
     def create_and_check_for_token_classification(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -196,8 +197,8 @@ class FNetModelTester:
         config.num_labels = self.num_labels
         model = FNetForTokenClassification(config=config)
         model.eval()
-        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result["logits"].shape, (self.batch_size, self.seq_length, self.num_labels))
+        result = model(input_ids, token_type_ids=token_type_ids, labels=token_labels, return_dict=True)
+        self.parent.assertEqual(result["logits"].shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_for_multiple_choice(
         self, config, input_ids, token_type_ids, sequence_labels, token_labels, choice_labels
@@ -228,6 +229,12 @@ class FNetModelTester:
         inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids}
         return config, inputs_dict
 
+    def create_and_check_config_and_inputs_for_common(self, config):
+
+        self.parent.assertTrue(isinstance(config, FNetConfig))
+        self.parent.assertTrue(issubclass(FNetConfig, PretrainedConfig))
+        self.parent.assertTrue(isinstance(config, PretrainedConfig))
+
 
 class FNetModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
@@ -256,6 +263,10 @@ class FNetModelTest(ModelTesterMixin, unittest.TestCase):
     def setUp(self):
         self.model_tester = FNetModelTester(self)
         self.config_tester = FNetConfigTester(self, config_class=FNetConfig, hidden_size=37)
+
+    def test_config_for_common(self):
+        config, inputs = self.model_tester.prepare_config_and_inputs_for_common()
+        self.model_tester.create_and_check_config_and_inputs_for_common(config)
 
     def test_config(self):
         self.config_tester.run_common_tests()
