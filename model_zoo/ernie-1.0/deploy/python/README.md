@@ -2,7 +2,7 @@
 
 在部署前，参考 [FastDeploy SDK 安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装 FastDeploy Python SDK。
 
-本目录下分别提供 `seq_cls_infer.py` 快速完成在 CPU/GPU 的中文情感分类任务的 Python 部署示例。
+本目录下提供 `seq_cls_infer.py` 快速完成在 CPU/GPU 的中文情感分类任务的 Python 部署示例。
 
 ## 依赖安装
 
@@ -15,19 +15,25 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 
 ## 快速开始
 
-以下示例展示如何基于 FastDeploy 库完成 ERNIE 1.0 模型在 ChnSenticorp 数据集上进行自然语言推断任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 1.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-1.0/finetuned_models/export`（用户可按实际情况设置）。
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 1.0 模型在 ChnSenticorp 数据集上进行文本分类任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 1.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-1.0/finetune/tmp/export`（用户可按实际情况设置）。
 
 
 ```bash
 # CPU 推理
-python seq_cls_infer.py --model_dir ../../finetuned_models/export/ --device cpu --backend paddle
+python seq_cls_infer.py --model_dir ../../finetune/tmp/chnsenticorp_v2/export/ --device cpu --backend paddle
 # GPU 推理
-python seq_cls_infer.py --model_dir ../../finetuned_models/export/model --device gpu --backend paddle
+python seq_cls_infer.py --model_dir ../../finetune/tmp/chnsenticorp_v2/export/ --device gpu --backend paddle
 ```
 
 运行完成后返回的结果如下：
 
 ```bash
+[2023-02-26 13:38:46,370] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.fast_tokenizer.ErnieFastTokenizer'> to load '../../finetune/tmp/chnsenticorp_v2/export/'.
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend  Runtime initialized with Backend::PDINFER in Device::GPU.
+Batch id: 0, example id: 0, sentence: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+Batch id: 1, example id: 0, sentence: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片！开始还怀疑是不是赠送的个别现象，可是后来发现每张DVD后面都有！真不知道生产商怎么想的，我想看的是猫和老鼠，不是米老鼠！如果厂家是想赠送的话，那就全套米老鼠和唐老鸭都赠送，只在每张DVD后面添加一集算什么？？简直是画蛇添足！！, label: negative, negative prob: 0.9998, positive prob: 0.0002.
+Batch id: 2, example id: 0, sentence: 还稍微重了点，可能是硬盘大的原故，还要再轻半斤就好了。其他要进一步验证。贴的几种膜气泡较多，用不了多久就要更换了，屏幕膜稍好点，但比没有要强多了。建议配赠几张膜让用用户自己贴。, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+......
 ```
 
 ## 参数说明
