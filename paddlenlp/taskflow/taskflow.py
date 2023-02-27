@@ -255,8 +255,23 @@ TASKS = {
                 "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
                 "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
             },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese-V1",
+                "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+            },
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+            },
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+            },
         },
-        "default": {"model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"},
+        "default": {"model": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"},
     },
     "word_segmentation": {
         "modes": {
