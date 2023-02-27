@@ -17,6 +17,7 @@ import time
 from io import BytesIO
 
 import fastdeploy as fd
+import numpy as np
 import paddle
 import requests
 from fastdeploy import ModelFormat
@@ -49,8 +50,11 @@ def parse_arguments():
     parser.add_argument(
         "--text_encoder_model_prefix", default="text_encoder", help="The file prefix of text_encoder model."
     )
-    parser.add_argument("--inference_steps", type=int, default=50, help="The number of unet inference steps.")
+    parser.add_argument("--inference_steps", type=int, default=100, help="The number of unet inference steps.")
     parser.add_argument("--benchmark_steps", type=int, default=1, help="The number of performance benchmark steps.")
+    parser.add_argument(
+        "--image_path", default="horse_to_elephant.png", help="The model directory of diffusion_model."
+    )
     parser.add_argument(
         "--backend",
         type=str,
@@ -365,14 +369,39 @@ if __name__ == "__main__":
     prompt = "An astronaut riding an elephant"
 
     # 7. Call the pipeline
-    image = pipe(
+    # Warm up
+    pipe.scheduler.set_timesteps(10)
+    pipe(
         prompt=prompt,
         source_prompt=source_prompt,
         image=init_image,
-        num_inference_steps=100,
+        num_inference_steps=10,
         eta=0.1,
         strength=0.8,
         guidance_scale=2,
         source_guidance_scale=1,
-    ).images[0]
-    image.save("horse_to_elephant.png")
+    )
+    time_costs = []
+    print(f"Run the cycle diffusion pipeline {args.benchmark_steps} times to test the performance.")
+    pipe.scheduler.set_timesteps(args.inference_steps)
+    for step in range(args.benchmark_steps):
+        start = time.time()
+        image = pipe(
+            prompt=prompt,
+            source_prompt=source_prompt,
+            image=init_image,
+            num_inference_steps=args.inference_steps,
+            eta=0.1,
+            strength=0.8,
+            guidance_scale=2,
+            source_guidance_scale=1,
+        ).images[0]
+        latency = time.time() - start
+        time_costs += [latency]
+        print(f"No {step:3d} time cost: {latency:2f} s")
+    print(
+        f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+        f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+    )
+    image.save(f"{args.image_path}")
+    print(f"Image saved in {args.image_path}!")
