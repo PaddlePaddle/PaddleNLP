@@ -19,7 +19,7 @@ import unittest
 
 from transformers import FunnelTokenizer
 
-from ...transformers.test_tokenization_common import TokenizerTesterMixin
+from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 
 class FunnelTokenizationTest(TokenizerTesterMixin, unittest.TestCase):

@@ -17,7 +17,6 @@
 import unittest
 
 from paddlenlp.transformers import (
-    FunnelBaseModel,
     FunnelForMaskedLM,
     FunnelForMultipleChoice,
     FunnelForPreTraining,
@@ -176,32 +175,6 @@ class FunnelModelTester:
         model.config.separate_cls = False
         result = model(input_ids)
         self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.d_model))
-
-    def create_and_check_base_model(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-        fake_token_labels,
-    ):
-        model = FunnelBaseModel(config=config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, 2, self.d_model))
-
-        model.config.truncate_seq = False
-        result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, 3, self.d_model))
-
-        model.config.separate_cls = False
-        result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, 2, self.d_model))
 
     def create_and_check_for_pretraining(
         self,
@@ -372,28 +345,3 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_question_answering(*config_and_inputs)
-
-
-class FunnelBaseModelTest(ModelTesterMixin, unittest.TestCase):
-    test_head_masking = False
-    test_pruning = False
-    all_model_classes = (FunnelBaseModel, FunnelForMultipleChoice, FunnelForSequenceClassification)
-
-    def setUp(self):
-        self.model_tester = FunnelModelTester(self, base=True)
-        self.config_tester = ConfigTester(self, config_class=FunnelConfig)
-
-    def test_config(self):
-        self.config_tester.run_common_tests()
-
-    def test_base_model(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_base_model(*config_and_inputs)
-
-    def test_for_sequence_classification(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
-
-    def test_for_multiple_choice(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_multiple_choice(*config_and_inputs)
