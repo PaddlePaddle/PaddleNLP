@@ -112,7 +112,7 @@ class VisualDLCallback(TrainerCallback):
             return
 
         if self.vdl_writer is None:
-            self._init_summary_writer(args)
+            return
 
         if self.vdl_writer is not None:
             logs = rewrite_logs(logs)

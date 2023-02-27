@@ -150,6 +150,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
                 self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
 
+            # test visualdl
+            self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
+
             # test evaluate
             copy_dev_ds = copy.deepcopy(self.multi_class_dev_ds)
             eval_metrics1 = auto_trainer.evaluate()
@@ -259,6 +262,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
                 self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
 
+            # test visualdl
+            self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
+
             # test evaluate
             copy_dev_ds = copy.deepcopy(self.multi_label_dev_ds)
             eval_metrics1 = auto_trainer.evaluate()
@@ -366,6 +372,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             if trainer_type == "PromptTrainer":
                 self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
                 self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
+
+            # test visualdl
+            self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
 
             # test evaluate
             copy_dev_ds = copy.deepcopy(self.multi_class_dev_ds)

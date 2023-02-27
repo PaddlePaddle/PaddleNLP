@@ -105,6 +105,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     @property
     def _default_training_argument(self) -> TrainingArguments:
+        """
+        Default TrainingArguments for the Trainer
+        """
         return TrainingArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
@@ -115,6 +118,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property
@@ -129,6 +133,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property
