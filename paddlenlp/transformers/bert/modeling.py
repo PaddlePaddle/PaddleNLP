@@ -77,14 +77,18 @@ class BertEmbeddings(Layer):
 
     def forward(
         self,
-        input_ids: Tensor,
+        input_ids: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         past_key_values_length: Optional[int] = None,
+        inputs_embeds: Optional[int] = None,
     ):
 
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            if inputs_embeds is None:
+                ones = paddle.ones_like(input_ids, dtype="int64")
+            else:
+                ones = paddle.ones(inputs_embeds.shape[:-1], dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
 
             position_ids = seq_length - ones
@@ -92,13 +96,17 @@ class BertEmbeddings(Layer):
                 position_ids += past_key_values_length
             position_ids.stop_gradient = True
         if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            if inputs_embeds is None:
+                token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            else:
+                token_type_ids = paddle.zeros(inputs_embeds.shape[:-1], dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -329,10 +337,11 @@ class BertModel(BertPretrainedModel):
 
     def forward(
         self,
-        input_ids: Tensor,
+        input_ids: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
         use_cache: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -343,7 +352,7 @@ class BertModel(BertPretrainedModel):
         The BertModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -417,18 +426,36 @@ class BertModel(BertPretrainedModel):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = input_ids.shape
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.shape[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        batch_size, seq_length = input_shape
+
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
         if attention_mask is None:
-            attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
-            )
-            if past_key_values is not None:
-                batch_size = past_key_values[0][0].shape[0]
-                past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
-                attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
-
+            if input_ids is not None:
+                attention_mask = paddle.unsqueeze(
+                    (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+                )
+                if past_key_values is not None:
+                    batch_size = past_key_values[0][0].shape[0]
+                    past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
+                    attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
+            else:
+                if past_key_values is not None:
+                    attention_mask = paddle.ones((batch_size, seq_length + past_key_values_length))
+                else:
+                    attention_mask = paddle.ones((batch_size, seq_length))
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
+                attention_mask = (1.0 - attention_mask) * -1e4
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
@@ -439,6 +466,7 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
             past_key_values_length=past_key_values_length,
         )
         if self.fuse:
