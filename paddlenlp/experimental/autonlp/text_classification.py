@@ -105,6 +105,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     @property
     def _default_training_argument(self) -> TrainingArguments:
+        """
+        Default TrainingArguments for the Trainer
+        """
         return TrainingArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
@@ -644,10 +647,3 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         logger.info(f"Exported {trial_id} to {export_path}")
         return taskflow_config
-
-    def visualdl(self, trial_id: Optional[str] = None):
-        """
-        Return visualdl path to represent the results of the taskflow training.
-        """
-        model_result = self._get_model_result(trial_id=trial_id)
-        return os.path.join(model_result.log_dir, self.visualdl_path)
