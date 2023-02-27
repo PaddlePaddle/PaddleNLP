@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import sentencepiece as spm
 
-from .. import AddedToken, PretrainedTokenizer
+from .. import PretrainedTokenizer
 
 __all__ = ["FNetTokenizer"]
 
@@ -112,11 +112,9 @@ class FNetTokenizer(PretrainedTokenizer):
         sp_model_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs
     ):
-        # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
-
+        self.sentencepiece_model_file = sentencepiece_model_file
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
