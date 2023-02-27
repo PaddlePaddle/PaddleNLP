@@ -370,7 +370,6 @@ if __name__ == "__main__":
 
     # 7. Call the pipeline
     # Warm up
-    pipe.scheduler.set_timesteps(10)
     pipe(
         prompt=prompt,
         source_prompt=source_prompt,
@@ -383,7 +382,6 @@ if __name__ == "__main__":
     )
     time_costs = []
     print(f"Run the cycle diffusion pipeline {args.benchmark_steps} times to test the performance.")
-    pipe.scheduler.set_timesteps(args.inference_steps)
     for step in range(args.benchmark_steps):
         start = time.time()
         image = pipe(

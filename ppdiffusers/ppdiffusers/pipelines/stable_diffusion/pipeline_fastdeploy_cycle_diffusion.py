@@ -242,7 +242,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                 return_tensors="pd",
             )
             text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
+            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
 
             if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
                 text_input_ids, untruncated_ids
@@ -254,8 +254,6 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                     "The following part of your input was truncated because CLIP can only handle sequences up to"
                     f" {self.tokenizer.model_max_length} tokens: {removed_text}"
                 )
-            text_input_ids = text_input_ids.numpy()
-
             prompt_embeds = self.text_encoder(input_ids=text_input_ids.astype(np.int64))
             prompt_embeds = paddle.to_tensor(prompt_embeds[0])
 
