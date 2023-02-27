@@ -20,11 +20,7 @@ from paddlenlp.taskflow import Taskflow
 class TestSentimentAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.senta = Taskflow(
-            task="sentiment_analysis",
-            model="skep_ernie_1.0_large_ch",
-            task_path="__internal_testing__/tiny-random-skep",
-        )
+        cls.senta = Taskflow(task="sentiment_analysis", model="skep_ernie_1.0_large_ch")
 
     def test_single(self):
         input_text = ["蛋糕味道不错"]
