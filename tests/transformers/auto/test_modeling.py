@@ -62,9 +62,6 @@ class AutoModelTest(unittest.TestCase):
         model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:
             AutoModel.from_pretrained(model_name, cache_dir=tempdir)
-            for path, currentDirectory, files in os.walk(tempdir):
-                for file in files:
-                    print(os.path.join(path, file))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
             # check against double appending model_name in cache_dir
