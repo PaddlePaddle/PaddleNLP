@@ -45,7 +45,7 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from .utils import resolve_cache_dir
@@ -1292,7 +1292,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     pretrained_init_configuration: Dict[str, Dict[str, Any]] = {}
     max_model_input_sizes: Dict[str, Optional[int]] = {}
     _auto_class: Optional[str] = None
-    tokenizer_config_file = "tokenizer_config.json"
+    tokenizer_config_file = TOKENIZER_CONFIG_NAME
 
     # first name has to correspond to main model input name
     # to make sure `tokenizer.pad(...)` works correctly
@@ -1483,11 +1483,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = (
-            os.path.join(cache_dir, pretrained_model_name_or_path)
-            if cache_dir is not None
-            else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-        )
+        # we already handled the cache_dir logic through resolve_cache_dir
+        default_root = cache_dir
+        # default_root = (
+        #     os.path.join(cache_dir, pretrained_model_name_or_path)
+        #     if cache_dir is not None
+        #     else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        # )
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):

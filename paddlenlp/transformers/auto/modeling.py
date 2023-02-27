@@ -29,7 +29,6 @@ from paddlenlp.utils.downloader import (
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from ..utils import resolve_cache_dir
@@ -331,11 +330,8 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            default_root = (
-                os.path.join(cache_dir, pretrained_model_name_or_path)
-                if cache_dir is not None
-                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            )
+            # we already handled the cache_dir logic through resolve_cache_dir
+            default_root = cache_dir
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
