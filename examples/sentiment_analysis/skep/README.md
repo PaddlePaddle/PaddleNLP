@@ -161,6 +161,7 @@ senta("怀着十分激动的心情放映，可是看着看着发现，在放映�
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数。在进行模型转换时，需要通过参数`ckpt_dir`指定训练好的模型存放目录，通过`output_path`指定静态图模型参数保存路径，详情请参考export_model.py。模型转换命令如下：
 
 ```shell
+export CUDA_VISIBLE_DEVICES=0
 python export_model.py \
     --model_name="skep_ernie_1.0_large_ch" \
     --ckpt_dir="./checkpoints/model_100" \
@@ -170,10 +171,11 @@ python export_model.py \
 可以将导出的静态图模型进行部署，deploy/python/predict.py展示了python部署预测示例。运行方式如下：
 
 ```shell
+export CUDA_VISIBLE_DEVICES=0
 python deploy/python/predict.py \
     --model_name="skep_ernie_1.0_large_ch" \
-    --model_file="static_graph_params.pdmodel" \
-    --params_file="static_graph_params.pdiparams"
+    --model_file="./static/static_graph_params.pdmodel" \
+    --params_file="./static/static_graph_params.pdiparams"
 ```
 
 ### 评价对象级情感分类
