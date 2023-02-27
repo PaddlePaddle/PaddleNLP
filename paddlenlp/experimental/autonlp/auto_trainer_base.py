@@ -53,6 +53,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     export_path = "exported_model"  # filepath for the exported static model
     results_filename = "experiment_results.csv"  # filepath for storing experiment results
     experiment_path = None  # filepath for the experiment results
+    visualdl_path = "visualdl"  # filepath for the visualdl
 
     def __init__(
         self,
@@ -98,6 +99,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         Default TrainingArguments for the Trainer
         """
+        return TrainingArguments(
+            output_dir=self.training_path,
+            disable_tqdm=True,
+            load_best_model_at_end=True,
+            save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,  # if logging_dir is redefined, the function visualdl() should be redefined as well.
+        )
 
     @property
     @abstractmethod
@@ -189,7 +198,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
             if key in new_hp.to_dict():
-                setattr(new_hp, key, value)
+                if key in ["output_dir", "logging_dir"]:
+                    logger.warning(f"{key} cannot be overridden")
+                else:
+                    setattr(new_hp, key, value)
         return new_hp
 
     def _filter_model_candidates(
@@ -324,3 +336,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         )
 
         return self.training_results
+
+    def visualdl(self, trial_id: Optional[str] = None):
+        """
+        Return visualdl path to represent the results of the taskflow training.
+        """
+        model_result = self._get_model_result(trial_id=trial_id)
+        return os.path.join(model_result.log_dir, self.visualdl_path)
