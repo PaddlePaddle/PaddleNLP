@@ -8,7 +8,7 @@ components:    # define all the building-blocks for Pipeline
       port: 9200
       index: dureader_robust_query_encoder
       embedding_dim: 312
-      search_fields: ['content', 'meta']
+      search_fields: ['content', 'name']
   - name: BMRetriever
     type: BM25Retriever
     params:
