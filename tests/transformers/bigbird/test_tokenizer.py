@@ -19,7 +19,7 @@ import unittest
 
 from paddlenlp.transformers import SPIECE_UNDERLINE, AddedToken, BigBirdTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import BatchEncoding
-from tests.testing_utils import get_tests_dir
+from tests.testing_utils import get_tests_dir, slow
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
@@ -131,20 +131,23 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             ],
         )
 
-    def BigBird_base_tokenizer(self):
+    @slow
+    def bigbird_base_tokenizer(self):
         return BigBirdTokenizer.from_pretrained("bigbird-base-uncased")
 
     def get_tokenizer(self, **kwargs) -> BigBirdTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, pad_token=None, **kwargs)
 
+    @slow
     def test_eos_treatment(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
         batch_with_eos_added = tokenizer(["hi</s>", "I went to the gym</s>", "</s>"])
         batch_without_eos_added = tokenizer(["hi", "I went to the gym", ""])
         self.assertListEqual(batch_with_eos_added["input_ids"], batch_without_eos_added["input_ids"])
 
+    @slow
     def test_prepare_batch(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
         src_text = ["A long paragraph for summarization.", "Another paragraph for summarization."]
         expected_src_tokens = [418, 991, 7423, 430, 15777, 1735, 114, 1]
         batch = tokenizer(src_text, padding=True, return_tensors=FRAMEWORK)
@@ -157,8 +160,9 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertEqual([2, 8], batch["input_ids"].shape)
         self.assertEqual([2, 8], batch.attention_mask.shape)
 
+    @slow
     def test_empty_target_text(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
         src_text = ["A long paragraph for summarization.", "Another paragraph for summarization."]
         batch = tokenizer(src_text, padding=True, return_tensors=FRAMEWORK)
         # check if input_ids are returned and no decoder_input_ids
@@ -167,8 +171,9 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertNotIn("decoder_input_ids", batch)
         self.assertNotIn("decoder_attention_mask", batch)
 
+    @slow
     def test_max_length(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
         tgt_text = [
             "Summary of the text.",
             "Another summary.",
@@ -178,8 +183,9 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         )
         self.assertEqual(32, targets["input_ids"].shape[1])
 
+    @slow
     def test_outputs_not_longer_than_maxlen(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
 
         batch = tokenizer(
             ["I am a small frog" * 1000, "I am a small frog"], padding=True, truncation=True, return_tensors=FRAMEWORK
@@ -190,8 +196,9 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # self.assertEqual(batch["input_ids"].shape, (2, 8001))
         self.assertEqual(batch["input_ids"].shape, [2, 4096])
 
+    @slow
     def test_eos_in_input(self):
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
         src_text = ["A long paragraph for summarization. </s>"]
         tgt_text = ["Summary of the text. </s>"]
         expected_src_tokens = [418, 991, 7423, 430, 15777, 1735, 114, 1]
@@ -204,11 +211,12 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertEqual(expected_src_tokens, batch["input_ids"][0])
         # self.assertEqual(expected_tgt_tokens, batch["labels"][0])
 
+    @slow
     def test_token_type_ids(self):
         src_text_1 = ["A first paragraph for summarization."]
         src_text_2 = ["A second paragraph for summarization."]
 
-        tokenizer = self.BigBird_base_tokenizer()
+        tokenizer = self.bigbird_base_tokenizer()
 
         slow_token_type_ids = tokenizer(src_text_1, src_text_2, add_special_tokens=True, return_token_type_ids=True)[
             "token_type_ids"
@@ -282,9 +290,6 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # We should specify the max input length as well (used in some part to list the pretrained checkpoints)
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
-
-    def test_offsets_mapping(self):
-        pass
 
     def test_consecutive_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
