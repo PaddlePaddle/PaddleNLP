@@ -217,10 +217,12 @@ import paddle
 from lpw_stable_diffusion import StableDiffusionLongPromptWeightingPipeline
 
 pipe = StableDiffusionLongPromptWeightingPipeline.from_pretrained(
-    "hakurei/waifu-diffusion", paddle_dtype=paddle.float16)
+    "hakurei/waifu-diffusion",
+    paddle_dtype=paddle.float16,
+    )
 
-prompt = "(masterpiece:1.3)(best_quality:1.3)(girl:1.3) bow bride brown_hair closed_mouth frilled_bow frilled_hair_tubes frills (full_body:1.3) fox_ear hair_bow hair_tubes happy hood japanese_clothes kimono long_sleeves red_bow smile solo tabi uchikake white_kimono wide_sleeves cherry_blossoms"
-neg_prompt = "lowres, bad_anatomy, error_body, error_hair, error_arm, error_hands, bad_hands, error_fingers, bad_fingers, missing_fingers, error_legs, bad_legs, multiple_legs, missing_legs, error_lighting, error_shadow, error_reflection, text, error, extra_digit, fewer_digits, cropped, worst_quality, low_quality, normal_quality, jpeg_artifacts, signature, watermark, username, blurry"
+prompt = "1girl, aqua eyes, baseball cap, blonde hair, closed mouth, earrings, green background, hat, hoop earrings, jewelry, looking at viewer, shirt, short hair, simple background, solo, upper body, yellow shirt"
+neg_prompt = "lowres, bad_anatomy, error_body, error_hair, error_arm, (error_hands, bad_hands, error_fingers, bad_fingers, missing_fingers) error_legs, bad_legs, multiple_legs, missing_legs, error_lighting, error_shadow, error_reflection, text, error, extra_digit, fewer_digits, cropped, worst_quality, low_quality, normal_quality, jpeg_artifacts, signature, watermark, username, blurry"
 
 generator = paddle.Generator().manual_seed(0)
 
@@ -237,4 +239,4 @@ images[0].save("lpw.png")
 
 上述代码生成结果如下
 
-<center><img src="https://user-images.githubusercontent.com/40912707/221176773-e33044c6-f8e1-449c-bd20-9aae9fcbdf64.png" style="zoom:50%"/></center>
+<center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
