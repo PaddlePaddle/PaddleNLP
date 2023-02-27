@@ -115,17 +115,6 @@ class FNetTokenizer(PretrainedTokenizer):
         # Mask token behave like a normal word, i.e. include the space before it
         mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
-        super().__init__(
-            do_lower_case,
-            remove_space,
-            keep_accents,
-            unk_token,
-            sep_token,
-            pad_token,
-            cls_token,
-            mask_token,
-            **kwargs,
-        )
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
         self.do_lower_case = do_lower_case
