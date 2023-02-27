@@ -263,11 +263,10 @@ if __name__ == "__main__":
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
         use_trt = True if args.backend == "paddle-tensorrt" else False
-        # Note(zhoushunjie): Will change to paddle runtime later
         text_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
             args.text_encoder_model_prefix,
-            use_trt,
+            False,  # use_trt
             text_encoder_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
