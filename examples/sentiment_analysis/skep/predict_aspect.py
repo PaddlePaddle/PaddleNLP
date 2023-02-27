@@ -30,7 +30,7 @@ parser.add_argument(
     default="skep_ernie_1.0_large_ch",
     help="Select which model to train, defaults to skep_ernie_1.0_large_ch.",
 )
-parser.add_argument("--ckpt_dir", type=str, required=True, help="The directory of saved model checkpoint.")
+parser.add_argument("--ckpt_dir", type=str, default=None, help="The directory of saved model checkpoint.")
 parser.add_argument(
     "--max_seq_len",
     default=400,

@@ -21,14 +21,14 @@ from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--ckpt_dir", type=str, required=True, help="The directory of saved model checkpoint.")
 parser.add_argument(
     "--max_seq_len",
     default=128,
     type=int,
     help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
 )
-parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--ckpt_dir", type=str, default=None, help="The directory of saved model checkpoint.")
+parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
 parser.add_argument(
     "--device",
     choices=["cpu", "gpu", "xpu"],
