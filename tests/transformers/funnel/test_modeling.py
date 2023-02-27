@@ -114,7 +114,7 @@ class FunnelModelTester:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
-            fake_token_labels = ids_tensor([self.batch_size, self.seq_length], 1)
+            fake_token_labels = ids_tensor([self.batch_size, self.seq_length], 2)
 
         config = self.get_config()
 
