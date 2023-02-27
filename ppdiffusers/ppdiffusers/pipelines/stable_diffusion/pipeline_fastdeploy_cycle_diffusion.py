@@ -638,7 +638,9 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
                 #     share_with_raw_ptr=True,
                 # )
                 concat_noise_pred = self.unet(
-                    sample=concat_latent_model_input, timestep=t, encoder_hidden_states=concat_prompt_embeds
+                    sample=concat_latent_model_input.numpy(),
+                    timestep=t.numpy(),
+                    encoder_hidden_states=concat_prompt_embeds.numpy(),
                 )[0]
                 concat_noise_pred = paddle.to_tensor(concat_noise_pred)
 
