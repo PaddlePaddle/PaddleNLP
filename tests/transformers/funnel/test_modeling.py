@@ -17,9 +17,6 @@
 import unittest
 
 from paddlenlp.transformers import (
-    FunnelForMaskedLM,
-    FunnelForMultipleChoice,
-    FunnelForPreTraining,
     FunnelForQuestionAnswering,
     FunnelForSequenceClassification,
     FunnelForTokenClassification,
@@ -176,39 +173,6 @@ class FunnelModelTester:
         result = model(input_ids)
         self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.d_model))
 
-    def create_and_check_for_pretraining(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-        fake_token_labels,
-    ):
-        config.num_labels = self.num_labels
-        model = FunnelForPreTraining(config=config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=fake_token_labels)
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length])
-
-    def create_and_check_for_masked_lm(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-        fake_token_labels,
-    ):
-        model = FunnelForMaskedLM(config=config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
-
     def create_and_check_for_sequence_classification(
         self,
         config,
@@ -225,30 +189,6 @@ class FunnelModelTester:
         model.eval()
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
         self.parent.assertEqual(result.logits.shape, [self.batch_size, self.num_labels])
-
-    def create_and_check_for_multiple_choice(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-        fake_token_labels,
-    ):
-        model = FunnelForMultipleChoice(config=config)
-        model.eval()
-        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_input_mask = input_mask.unsqueeze(1).expand([-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-            labels=choice_labels,
-        )
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.num_choices])
 
     def create_and_check_for_token_classification(
         self,
@@ -312,8 +252,7 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     test_pruning = False
     all_model_classes = (
         FunnelModel,
-        FunnelForMaskedLM,
-        FunnelForPreTraining,
+        FunnelForSequenceClassififcation,
         FunnelForQuestionAnswering,
         FunnelForTokenClassification,
     )
@@ -329,14 +268,10 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
-
-    def test_for_pretraining(self):
+    
+    def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_pretraining(*config_and_inputs)
-
-    def test_for_masked_lm(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
+        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
