@@ -12,31 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import logging
 import os
-import sys
 import random
 import time
-import math
-import distutils.util
 from functools import partial
 
+import args
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy
 
+from paddlenlp.data import Stack
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BigBirdModel, BigBirdForSequenceClassification, BigBirdTokenizer
-from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BigBirdForSequenceClassification,
+    BigBirdTokenizer,
+    LinearDecayWithWarmup,
+    create_bigbird_rand_mask_idx_list,
+)
 from paddlenlp.utils.log import logger
-
-import args
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -190,7 +186,7 @@ def do_train(args):
     train_ds = load_dataset("glue", args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     # In finetune task, bigbird performs better when setting dropout to zero.
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes, attn_dropout=0.0, hidden_dropout_prob=0.0
@@ -327,5 +323,10 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = args.parse_args()
     print_arguments(args)
-    assert args.device in ["cpu", "gpu", "xpu"], "Invalid device! Available device should be cpu, gpu, or xpu."
+    assert args.device in [
+        "cpu",
+        "gpu",
+        "xpu",
+        "npu",
+    ], "Invalid device! Available device should be cpu, gpu, xpu or npu."
     do_train(args)

@@ -55,7 +55,7 @@ python -m paddle.distributed.launch --gpus "0" examples/language_model/roformer/
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 基于`roformer-chinese-base`在THUCNews分类任务上Fine-tuning后，在验证集上有如下结果：
@@ -100,7 +100,7 @@ python -m paddle.distributed.launch --gpus "0" examples/language_model/roformer/
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 基于`roformer-chinese-base`在Cail2019_Scm任务上Fine-tuning后，有如下结果：

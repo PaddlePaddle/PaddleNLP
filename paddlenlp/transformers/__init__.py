@@ -110,8 +110,10 @@ from .mbart.tokenizer import *
 from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
