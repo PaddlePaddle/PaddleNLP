@@ -252,7 +252,7 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     test_pruning = False
     all_model_classes = (
         FunnelModel,
-        FunnelForSequenceClassififcation,
+        FunnelForSequenceClassification,
         FunnelForQuestionAnswering,
         FunnelForTokenClassification,
     )
@@ -268,7 +268,7 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
-    
+
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
