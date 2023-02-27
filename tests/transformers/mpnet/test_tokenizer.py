@@ -19,11 +19,10 @@ import unittest
 
 from paddlenlp.transformers.mpnet.tokenizer import MPNetTokenizer
 
-from ...testing_utils import require_tokenizers, slow
-from ..test_tokenization_common import TokenizerTesterMixin
+from ...testing_utils import slow
+from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 
-@require_tokenizers
 class MPNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = MPNetTokenizer
     test_rust_tokenizer = False
