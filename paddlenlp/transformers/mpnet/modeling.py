@@ -14,13 +14,11 @@
 
 import copy
 import math
-from typing import List
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 
@@ -37,7 +35,6 @@ __all__ = [
 from .configuration import (
     MPNET_PRETRAINED_INIT_CONFIGURATION,
     MPNET_PRETRAINED_RESOURCE_FILES_MAP,
-    MPNetConfig,
 )
 
 
@@ -306,123 +303,6 @@ class MPNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = MPNET_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = MPNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "mpnet"
-
-    @classmethod
-    def _get_name_mappings(cls, config: MPNetConfig) -> List[StateDictNameMapping]:
-        mappings: List[StateDictNameMapping] = []
-        model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
-            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
-            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["encoder.relative_attention_bias.weight", "encoder.relative_attn_bias.weight", "transpose"],
-            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
-            ["pooler.dense.bias", "pooler.dense.bias"],
-            # for TokenClassification
-        ]
-        for layer_index in range(config.num_hidden_layers):
-            layer_mappings = [
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.q.weight",
-                    f"encoder.layers.{layer_index}.attn.q_proj.weight",
-                    "transpose",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.q.bias",
-                    f"encoder.layers.{layer_index}.attn.q_proj.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.k.weight",
-                    f"encoder.layers.{layer_index}.attn.k_proj.weight",
-                    "transpose",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.k.bias",
-                    f"encoder.layers.{layer_index}.attn.k_proj.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.v.weight",
-                    f"encoder.layers.{layer_index}.attn.v_proj.weight",
-                    "transpose",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.v.bias",
-                    f"encoder.layers.{layer_index}.attn.v_proj.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.o.weight",
-                    f"encoder.layers.{layer_index}.attn.out_proj.weight",
-                    "transpose",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.attn.o.bias",
-                    f"encoder.layers.{layer_index}.attn.out_proj.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.LayerNorm.weight",
-                    f"encoder.layers.{layer_index}.attn.layer_norm.weight",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.LayerNorm.bias",
-                    f"encoder.layers.{layer_index}.attn.layer_norm.bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
-                    f"encoder.layers.{layer_index}.linear1.weight",
-                    "transpose",
-                ],
-                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
-                [
-                    f"encoder.layer.{layer_index}.output.dense.weight",
-                    f"encoder.layers.{layer_index}.linear2.weight",
-                    "transpose",
-                ],
-                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
-                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
-            ]
-            model_mappings.extend(layer_mappings)
-
-        # base-model prefix "BertModel"
-        if "MPNetModel" not in config.architectures:
-            for mapping in model_mappings:
-                mapping[0] = "mpnet." + mapping[0]
-                mapping[1] = "mpnet." + mapping[1]
-
-        # downstream mappings
-        if "MPNetForQuestionAnswering" in config.architectures:
-            model_mappings.extend(
-                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
-            )
-        if "MPNetForMultipleChoice" in config.architectures or "MPNetForTokenClassification" in config.architectures:
-            model_mappings.extend(
-                [["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias", "classifier.bias"]]
-            )
-        if "MPNetForSequenceClassification" in config.architetures:
-            model_mappings.extend(
-                [
-                    ["classifier.dense.weight", "classifier.dense.weight", "transpose"],
-                    ["classifier.dense.bias", "classifier.dense.bias"],
-                    ["classifier.out_proj.weight", "classifier.out_proj.weight", "transpose"],
-                    ["classifier.out_proj.bias", "classifier.out_proj.bias"],
-                ]
-            )
-        "lm_head.bias", "lm_head.dense.weight", "lm_head.dense.bias", "lm_head.layer_norm.weight", "lm_head.layer_norm.bias", "lm_head.decoder.weight", "lm_head.decoder.bias"
-        if "MPNetForMaskedLM" in config.architectures:
-            model_mappings.extend(
-                [
-                    ["lm_head.bias", "lm_head.bias"],
-                    ["lm_head.dense.weight", "lm_head.dense.weight", "transpose"],
-                    ["lm_head.dense.bias", "lm_head.dense.bias"],
-                    ["lm_head.layer_norm.weight", "lm_head.layer_norm.weight"],
-                    ["lm_head.layer_norm.bias", "lm_head.layer_norm.bias"],
-                    ["lm_head.decoder.weight", "lm_head.decoder.weight", "transpose"],
-                    ["lm_head.decoder.bias", "lm_head.decoder.bias"],
-                ]
-            )
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
-        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
