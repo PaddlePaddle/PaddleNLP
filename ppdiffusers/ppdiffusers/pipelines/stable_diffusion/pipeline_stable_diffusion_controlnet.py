@@ -36,7 +36,8 @@ from ...schedulers import (
     PNDMScheduler,
 )
 from ...utils import deprecate, logging
-from . import StableDiffusionPipelineOutput, StableDiffusionSafetyChecker
+from . import StableDiffusionPipelineOutput
+from .safety_checker import StableDiffusionSafetyChecker
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
