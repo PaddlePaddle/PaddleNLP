@@ -185,7 +185,7 @@ print_info $? skep_train_opinion
 time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --ckpt_dir checkpoints/model_100 >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
 print_info $? skep_predict_sentence
 ## predict_aspect
-time (python predict_aspect.py --device 'gpu' --ckpt_dir ./aspect_checkpoint/model_100  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
+time (python predict_aspect.py --device 'gpu' --ckpt_dir ./aspect_checkpoints/model_100  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
 print_info $? skep_predict_aspect
 # # predict_opinion
 time (python predict_opinion.py --device 'gpu' --ckpt_dir ./opinion_checkpoints/model_100 >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
