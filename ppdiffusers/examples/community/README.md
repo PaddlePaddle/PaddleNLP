@@ -198,7 +198,7 @@ images[0].save("inpainting.png")
 ### Long Prompt Weighting Stable Diffusion
 
 该自定义管线特征如下：
-* 输入提示没有77 token的长度限制#TODO: [ WARNING] - Token indices sequence length is longer than the specified maximum sequence length for this model (108 > 77). Running this sequence through the model will result in indexing errors
+* 输入提示没有77 token的长度限制
 * 包括文生图、图生图、图像修复三种管道
 * 给提示片段加上强调，例如 `a baby deer with (big eyes)`
 * 给提示片段加上淡化，例如 `a [baby] deer with big eyes`
