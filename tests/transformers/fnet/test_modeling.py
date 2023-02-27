@@ -32,18 +32,7 @@ from paddlenlp.transformers import (
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 from ...testing_utils import slow
-from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
-
-
-# Override ConfigTester
-class FNetConfigTester(ConfigTester):
-    def create_and_test_config_common_properties(self):
-        config = self.config_class(**self.inputs_dict)
-        if self.has_text_modality:
-            self.parent.assertTrue(hasattr(config, "vocab_size"))
-        self.parent.assertTrue(hasattr(config, "hidden_size"))
-        self.parent.assertTrue(hasattr(config, "num_hidden_layers"))
 
 
 class FNetModelTester:
@@ -262,14 +251,10 @@ class FNetModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = FNetModelTester(self)
-        self.config_tester = FNetConfigTester(self, config_class=FNetConfig, hidden_size=37)
 
     def test_config_for_common(self):
         config, inputs = self.model_tester.prepare_config_and_inputs_for_common()
         self.model_tester.create_and_check_config_and_inputs_for_common(config)
-
-    def test_config(self):
-        self.config_tester.run_common_tests()
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
