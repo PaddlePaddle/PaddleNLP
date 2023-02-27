@@ -102,12 +102,12 @@ def process(
             img = pipe(
                 prompt + ", " + a_prompt,
                 negative_prompt=n_prompt,
-                controlnet_hint=control,
+                image=control,
                 num_inference_steps=ddim_steps,
                 height=H,
                 width=W,
                 eta=eta,
-                control_scales=control_scales,
+                controlnet_conditioning_scale=control_scales,
                 guidance_scale=scale,
             ).images[0]
             results.append(img)

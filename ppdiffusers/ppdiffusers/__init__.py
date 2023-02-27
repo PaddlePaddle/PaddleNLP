@@ -42,6 +42,7 @@ else:
     from .modeling_utils import ModelMixin
     from .models import (
         AutoencoderKL,
+        ControlNetModel,
         PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
