@@ -258,7 +258,7 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        super.setUp()
+        super().setUp()
         self.model_tester = FunnelModelTester(self)
         self.config_tester = ConfigTester(self, config_class=FunnelConfig)
 
