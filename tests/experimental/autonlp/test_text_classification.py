@@ -141,7 +141,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            model_result = auto_trainer._get_model_result()
             trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
@@ -363,7 +362,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            model_result = auto_trainer._get_model_result()
             trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))

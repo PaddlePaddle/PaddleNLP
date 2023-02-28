@@ -1,0 +1,1 @@
+{"do_lower_case": true, "unk_token": "[UNK]", "sep_token": "[SEP]", "pad_token": "[PAD]", "cls_token": "[CLS]", "mask_token": "[MASK]", "model_max_length": 513, "tokenizer_class": "ErnieTokenizer", "special_tokens_map_file": "/root/.paddlenlp/models/__internal_testing__/ernie/special_tokens_map.json"}
