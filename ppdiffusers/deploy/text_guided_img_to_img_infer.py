@@ -122,17 +122,15 @@ def create_paddle_inference_runtime(
         if use_fp16:
             option.trt_option.enable_fp16 = True
         cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
-        option.set_trt_cache_file(cache_file)
+        option.trt_option.serialize_file = cache_file
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
-            option.enable_paddle_trt_collect_shape()
+            option.paddle_infer_option.collect_trt_shape = True
             for key, shape_dict in dynamic_shape.items():
-                option.set_trt_input_shape(
-                    key,
-                    min_shape=shape_dict["min_shape"],
-                    opt_shape=shape_dict.get("opt_shape", None),
-                    max_shape=shape_dict.get("max_shape", None),
+                option.trt_option.set_shape(
+                    key, shape_dict["min_shape"], shape_dict.get("opt_shape", None), shape_dict.get("max_shape", None)
                 )
+
     model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
     params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")
     option.set_model_path(model_file, params_file)
@@ -144,9 +142,8 @@ def create_paddle_lite_runtime(model_dir, model_prefix, device="cpu", device_id=
     option.use_lite_backend()
     if device == "huawei_ascend_npu":
         option.use_ascend()
-        option.set_lite_device_names(["huawei_ascend_npu"])
-        option.set_lite_model_cache_dir(os.path.join(model_dir, model_prefix))
-        option.set_lite_context_properties(
+        option.paddle_lite_option.nnadapter_model_cache_dir = os.path.join(model_dir, model_prefix)
+        option.paddle_lite_option.nnadapter_context_properties = (
             "HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={};HUAWEI_ASCEND_NPU_PRECISION_MODE=allow_mix_precision".format(
                 device_id
             )
@@ -166,15 +163,12 @@ def create_trt_runtime(model_dir, model_prefix, model_format, workspace=(1 << 31
     option = fd.RuntimeOption()
     option.use_trt_backend()
     option.use_gpu(device_id)
-    option.enable_trt_fp16()
-    option.set_trt_max_workspace_size(workspace)
+    option.trt_option.enable_fp16 = True
+    option.trt_option.max_workspace_size = workspace
     if dynamic_shape is not None:
         for key, shape_dict in dynamic_shape.items():
-            option.set_trt_input_shape(
-                key,
-                min_shape=shape_dict["min_shape"],
-                opt_shape=shape_dict.get("opt_shape", None),
-                max_shape=shape_dict.get("max_shape", None),
+            option.trt_option.set_shape(
+                key, shape_dict["min_shape"], shape_dict.get("opt_shape", None), shape_dict.get("max_shape", None)
             )
     if model_format == "paddle":
         model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
@@ -184,7 +178,7 @@ def create_trt_runtime(model_dir, model_prefix, model_format, workspace=(1 << 31
         onnx_file = os.path.join(model_dir, model_prefix, "inference.onnx")
         option.set_model_path(onnx_file, model_format=ModelFormat.ONNX)
     cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
-    option.set_trt_cache_file(cache_file)
+    option.trt_option.serialize_file = cache_file
     return fd.Runtime(option)
 
 
