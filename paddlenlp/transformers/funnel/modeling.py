@@ -173,7 +173,7 @@ class FunnelAttentionStructure(nn.Layer):
 
     def __init__(self, config):
         super().__init__()
-        self.config2 = config
+        self.config = config
         self.sin_dropout = nn.Dropout(config.hidden_dropout)
         self.cos_dropout = nn.Dropout(config.hidden_dropout)
         # Track where we are at in terms of pooling from the original input, e.g., by how much the sequence length was
@@ -192,7 +192,7 @@ class FunnelAttentionStructure(nn.Layer):
             pad(
                 paddle.ones([seq_len - 1, seq_len - 1], dtype=inputs_embeds.dtype), (1, 0, 1, 0)
             )  # nn.functional.pad(inputs_embeds.new_ones([seq_len - 1, seq_len - 1]), (1, 0, 1, 0))
-            if self.config2.separate_cls
+            if self.config.separate_cls
             else None
         )
         return (position_embeds, token_type_mat, attention_mask, cls_mask)
@@ -220,8 +220,8 @@ class FunnelAttentionStructure(nn.Layer):
 
         Paper link: https://arxiv.org/abs/2006.03236
         """
-        d_model = self.config2.d_model
-        if self.config2.attention_type == "factorized":
+        d_model = self.config.d_model
+        if self.config.attention_type == "factorized":
             # Notations from the paper, appending A.2.2, final formula.
             # We need to create and return the matrices phi, psi, pi and omega.
             pos_seq = paddle.arange(0, seq_len, 1.0, dtype=dtype)
@@ -254,7 +254,7 @@ class FunnelAttentionStructure(nn.Layer):
             pos = paddle.arange(0, seq_len, dtype=dtype)
             pooled_pos = pos
             position_embeds_list = []
-            for block_index in range(0, self.config2.num_blocks):
+            for block_index in range(0, self.config.num_blocks):
                 # For each block with block_index > 0, we need two types position embeddings:
                 #   - Attention(pooled-q, unpooled-kv)
                 #   - Attention(pooled-q, pooled-kv)
@@ -289,13 +289,13 @@ class FunnelAttentionStructure(nn.Layer):
         """
         Pool `pos_id` while keeping the cls token separate (if `config.separate_cls=True`).
         """
-        if self.config2.separate_cls:
+        if self.config.separate_cls:
             # Under separate <cls>, we treat the <cls> as the first token in
             # the previous block of the 1st real block. Since the 1st real
             # block always has position 1, the position of the previous block
             # will be at `1 - 2 ** block_index`.
             cls_pos = paddle.to_tensor([-(2**block_index) + 1]).astype(pos_id.dtype)
-            pooled_pos_id = pos_id[1:-1] if self.config2.truncate_seq else pos_id[1:]
+            pooled_pos_id = pos_id[1:-1] if self.config.truncate_seq else pos_id[1:]
             return paddle.concat([cls_pos, pooled_pos_id[::2]], axis=0)
         else:
             return pos_id[::2]
@@ -334,7 +334,7 @@ class FunnelAttentionStructure(nn.Layer):
         # Deal with negative axis
         axis %= tensor.ndim
 
-        if self.config2.separate_cls:
+        if self.config.separate_cls:
             # tensor = paddle.cat([tensor[cls_slice], tensor], axis=axis)
             if axis == 1:
                 tensor = paddle.concat([tensor[:, :1], tensor], axis=axis)
@@ -358,8 +358,8 @@ class FunnelAttentionStructure(nn.Layer):
         if isinstance(tensor, (tuple, list)):
             return type(tensor)(self.pool_tensor(tensor, mode=mode, stride=stride) for x in tensor)
 
-        if self.config2.separate_cls:
-            suffix = tensor[:, :-1] if self.config2.truncate_seq else tensor
+        if self.config.separate_cls:
+            suffix = tensor[:, :-1] if self.config.truncate_seq else tensor
             tensor = paddle.concat([tensor[:, :1], suffix], axis=1)
 
         ndim = tensor.ndim
@@ -388,21 +388,21 @@ class FunnelAttentionStructure(nn.Layer):
     def pre_attention_pooling(self, output, attention_inputs):
         """Pool `output` and the proper parts of `attention_inputs` before the attention layer."""
         position_embeds, token_type_mat, attention_mask, cls_mask = attention_inputs
-        if self.config2.pool_q_only:
-            if self.config2.attention_type == "factorized":
+        if self.config.pool_q_only:
+            if self.config.attention_type == "factorized":
                 position_embeds = self.stride_pool(position_embeds[:2], 0) + position_embeds[2:]
             token_type_mat = self.stride_pool(token_type_mat, 1)
             cls_mask = self.stride_pool(cls_mask, 0)
-            output = self.pool_tensor(output, mode=self.config2.pooling_type)
+            output = self.pool_tensor(output, mode=self.config.pooling_type)
 
         else:
             self.pooling_mult *= 2
-            if self.config2.attention_type == "factorized":
+            if self.config.attention_type == "factorized":
                 position_embeds = self.stride_pool(position_embeds, 0)
             token_type_mat = self.stride_pool(token_type_mat, [1, 2])
             cls_mask = self.stride_pool(cls_mask, [1, 2])
             attention_mask = self.pool_tensor(attention_mask, mode="min")
-            output = self.pool_tensor(output, mode=self.config2.pooling_type)
+            output = self.pool_tensor(output, mode=self.config.pooling_type)
 
         attention_inputs = (position_embeds, token_type_mat, attention_mask, cls_mask)
         return output, attention_inputs
@@ -410,9 +410,9 @@ class FunnelAttentionStructure(nn.Layer):
     def post_attention_pooling(self, attention_inputs):
         """Pool the proper parts of `attention_inputs` after the attention layer."""
         position_embeds, token_type_mat, attention_mask, cls_mask = attention_inputs
-        if self.config2.pool_q_only:
+        if self.config.pool_q_only:
             self.pooling_mult *= 2
-            if self.config2.attention_type == "factorized":
+            if self.config.attention_type == "factorized":
                 position_embeds = position_embeds[:2] + self.stride_pool(position_embeds[2:], 0)
             token_type_mat = self.stride_pool(token_type_mat, 2)
             cls_mask = self.stride_pool(cls_mask, 1)
@@ -460,7 +460,7 @@ def Parameter(shape_or_tensor, fill_value=None, requires_grad=True):
 class FunnelRelMultiheadAttention(nn.Layer):
     def __init__(self, config, block_index):
         super().__init__()
-        self.config2 = config
+        self.config = config
         self.block_index = block_index
         d_model, n_head, d_head = config.d_model, config.n_head, config.d_head
 
@@ -484,7 +484,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
     def relative_positional_attention(self, position_embeds, q_head, context_len, cls_mask=None):
         """Relative attention score for the positional encodings"""
         # q_head has shape batch_size x sea_len x n_head x d_head
-        if self.config2.attention_type == "factorized":
+        if self.config.attention_type == "factorized":
             # Notations from the paper, appending A.2.2, final formula (https://arxiv.org/abs/2006.03236)
             # phi and pi have shape seq_len x d_model, psi and omega have shape context_len x d_model
             phi, pi, psi, omega = position_embeds
@@ -558,7 +558,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
 
         batch_size, seq_len, _ = query.shape
         context_len = key.shape[1]
-        n_head, d_head = self.config2.n_head, self.config2.d_head
+        n_head, d_head = self.config.n_head, self.config.d_head
 
         # Shape batch_size x seq_len x n_head x d_head
         q_head = paddle.reshape(
@@ -639,7 +639,7 @@ class FunnelLayer(nn.Layer):
 class FunnelEncoder(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.config2 = config
+        self.config = config
         self.attention_structure = FunnelAttentionStructure(config)
         self.blocks = nn.LayerList(
             [
@@ -670,18 +670,18 @@ class FunnelEncoder(nn.Layer):
         all_attentions = () if output_attentions else None
 
         for block_index, block in enumerate(self.blocks):
-            pooling_flag = hidden.shape[1] > (2 if self.config2.separate_cls else 1)
+            pooling_flag = hidden.shape[1] > (2 if self.config.separate_cls else 1)
             pooling_flag = pooling_flag and block_index > 0
             if pooling_flag:
                 pooled_hidden, attention_inputs = self.attention_structure.pre_attention_pooling(
                     hidden, attention_inputs
                 )
             for (layer_index, layer) in enumerate(block):
-                for repeat_index in range(self.config2.block_repeats[block_index]):
+                for repeat_index in range(self.config.block_repeats[block_index]):
                     do_pooling = (repeat_index == 0) and (layer_index == 0) and pooling_flag
                     if do_pooling:
                         query = pooled_hidden
-                        key = value = hidden if self.config2.pool_q_only else pooled_hidden
+                        key = value = hidden if self.config.pool_q_only else pooled_hidden
                     else:
                         query = key = value = hidden
                     # if layer_index==8 and block_index==0 and repeat_index==0 :
@@ -725,7 +725,7 @@ def upsample(x, stride, target_len, separate_cls=True, truncate_seq=False):
 class FunnelDecoder(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.config2 = config
+        self.config = config
         self.attention_structure = FunnelAttentionStructure(config)
         self.layers = nn.LayerList([FunnelLayer(config, 0) for _ in range(config.num_decoder_layers)])
 
@@ -741,10 +741,10 @@ class FunnelDecoder(nn.Layer):
     ):
         upsampled_hidden = upsample(
             final_hidden,
-            stride=2 ** (len(self.config2.block_sizes) - 1),
+            stride=2 ** (len(self.config.block_sizes) - 1),
             target_len=first_block_hidden.shape[1],
-            separate_cls=self.config2.separate_cls,
-            truncate_seq=self.config2.truncate_seq,
+            separate_cls=self.config.separate_cls,
+            truncate_seq=self.config.truncate_seq,
         )
 
         hidden = upsampled_hidden + first_block_hidden
@@ -776,13 +776,13 @@ class FunnelDiscriminatorPredictions(nn.Layer):
 
     def __init__(self, config):
         super().__init__()
-        self.config2 = config
+        self.config = config
         self.dense = nn.Linear(config.d_model, config.d_model)
         self.dense_prediction = nn.Linear(config.d_model, 1)
 
     def forward(self, discriminator_hidden_states):
         hidden_states = self.dense(discriminator_hidden_states)
-        hidden_states = ACT2FN[self.config2.hidden_act](hidden_states)
+        hidden_states = ACT2FN[self.config.hidden_act](hidden_states)
         logits = self.dense_prediction(hidden_states).squeeze()
         return logits
 
@@ -804,22 +804,22 @@ class FunnelPreTrainedModel(PreTrainedModel):
         classname = module.__class__.__name__
         if classname.find("Linear") != -1:
             if getattr(module, "weight", None) is not None:
-                if self.config2.initializer_std is None:
+                if self.config.initializer_std is None:
                     fan_out, fan_in = module.weight.shape
                     std = np.sqrt(1.0 / float(fan_in + fan_out))
                 else:
-                    std = self.config2.initializer_std
+                    std = self.config.initializer_std
                 normal_(module.weight, std=std)
             if getattr(module, "bias", None) is not None:
                 constant_(module.bias, 0.0)
         elif classname == "FunnelRelMultiheadAttention":
-            uniform_(module.r_w_bias, b=self.config2.initializer_range)
-            uniform_(module.r_r_bias, b=self.config2.initializer_range)
-            uniform_(module.r_kernel, b=self.config2.initializer_range)
-            uniform_(module.r_s_bias, b=self.config2.initializer_range)
-            uniform_(module.seg_embed, b=self.config2.initializer_range)
+            uniform_(module.r_w_bias, b=self.config.initializer_range)
+            uniform_(module.r_r_bias, b=self.config.initializer_range)
+            uniform_(module.r_kernel, b=self.config.initializer_range)
+            uniform_(module.r_s_bias, b=self.config.initializer_range)
+            uniform_(module.seg_embed, b=self.config.initializer_range)
         elif classname == "FunnelEmbeddings":
-            std = 1.0 if self.config2.initializer_std is None else self.config2.initializer_std
+            std = 1.0 if self.config.initializer_std is None else self.config.initializer_std
             normal_(module.word_embeddings.weight, std=std)
             if module.word_embeddings._padding_idx is not None:
                 module.word_embeddings.weight.data[module._padding_idx].zero_()
@@ -829,8 +829,8 @@ class FunnelPreTrainedModel(PreTrainedModel):
         If needed prunes and maybe initializes weights.
         """
         # Prune heads if needed
-        if self.config2.pruned_heads:
-            self.prune_heads(self.config2.pruned_heads)
+        if self.config.pruned_heads:
+            self.prune_heads(self.config.pruned_heads)
         _init_weights = True
         if _init_weights:
             # Initialize weights
@@ -852,8 +852,8 @@ class FunnelPreTrainedModel(PreTrainedModel):
         """
         # save new sets of pruned heads as union of previously stored pruned heads and newly pruned heads
         for layer, heads in heads_to_prune.items():
-            union_heads = set(self.config2.pruned_heads.get(layer, [])) | set(heads)
-            self.config2.pruned_heads[layer] = list(union_heads)  # Unfortunately we have to store it as list for JSON
+            union_heads = set(self.config.pruned_heads.get(layer, [])) | set(heads)
+            self.config.pruned_heads[layer] = list(union_heads)  # Unfortunately we have to store it as list for JSON
 
         self.base_model._prune_heads(heads_to_prune)
 
@@ -907,7 +907,7 @@ class FunnelBaseModel(FunnelPreTrainedModel):
             config = config.config
         if isinstance(config, dict):
             config = FunnelConfig(**config)
-        self.config2 = config
+        self.config = config
         self.embeddings = FunnelEmbeddings(config)
         self.encoder = FunnelEncoder(config)
 
@@ -931,11 +931,11 @@ class FunnelBaseModel(FunnelPreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
-        output_attentions = output_attentions if output_attentions is not None else self.config2.output_attentions
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config2.output_hidden_states
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -977,10 +977,10 @@ class FunnelModel(FunnelPreTrainedModel):
             config = config.config
         if isinstance(config, dict):
             config = FunnelConfig(**config)
-        self.config2 = config
-        # self.config2.hidden_dropout=0
-        # self.config2.attention_dropout=0
-        # self.config2.activation_dropout=0
+        self.config = config
+        # self.config.hidden_dropout=0
+        # self.config.attention_dropout=0
+        # self.config.activation_dropout=0
         self.embeddings = FunnelEmbeddings(config)
         self.encoder = FunnelEncoder(config)
         self.decoder = FunnelDecoder(config)
@@ -1004,11 +1004,11 @@ class FunnelModel(FunnelPreTrainedModel):
         return_dict=None,
     ):
 
-        output_attentions = output_attentions if output_attentions is not None else self.config2.output_attentions
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config2.output_hidden_states
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -1040,7 +1040,7 @@ class FunnelModel(FunnelPreTrainedModel):
 
         decoder_outputs = self.decoder(
             final_hidden=encoder_outputs.last_hidden_state,
-            first_block_hidden=encoder_outputs.hidden_states[self.config2.block_sizes[0]],
+            first_block_hidden=encoder_outputs.hidden_states[self.config.block_sizes[0]],
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             output_attentions=output_attentions,
@@ -1099,7 +1099,7 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
 
 
         """
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         discriminator_hidden_states = self.funnel(
             input_ids,
@@ -1174,7 +1174,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
             (masked), the loss is only computed for the tokens with labels in ``[0, ..., config.vocab_size]``
         """
 
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.funnel(
             input_ids,
@@ -1192,7 +1192,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_logits.reshape(-1, self.config2.vocab_size), labels.reshape(-1))
+            masked_lm_loss = loss_fct(prediction_logits.reshape(-1, self.config.vocab_size), labels.reshape(-1))
 
         if not return_dict:
             output = (prediction_logits,) + outputs[1:]
@@ -1204,19 +1204,17 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
 class FunnelForSequenceClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
-    def __init__(self, basemodel, num_classes=2):
+    def __init__(self, config):
         super().__init__()
-        config = basemodel.init_config
-        self.num_classes = num_classes
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
             config = FunnelConfig(**config)
         self.num_labels = config.num_labels
-        self.config2 = config
-        # self.config2.hidden_dropout=0
-        # self.config2.attention_dropout=0
-        # self.config2.activation_dropout=0
+        self.config = config
+        # self.config.hidden_dropout=0
+        # self.config.attention_dropout=0
+        # self.config.activation_dropout=0
 
         self.funnel = FunnelBaseModel(config)
         self.classifier = FunnelClassificationHead(config, config.num_labels)
@@ -1240,7 +1238,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
             If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
         """
 
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.funnel(
             input_ids,
@@ -1258,24 +1256,24 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config2.problem_type is None:
+            if self.config.problem_type is None:
                 if self.num_labels == 1:
-                    self.config2.problem_type = "regression"
+                    self.config.problem_type = "regression"
                 elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
-                    self.config2.problem_type = "single_label_classification"
+                    self.config.problem_type = "single_label_classification"
                 else:
-                    self.config2.problem_type = "multi_label_classification"
+                    self.config.problem_type = "multi_label_classification"
 
-            if self.config2.problem_type == "regression":
+            if self.config.problem_type == "regression":
                 loss_fct = MSELoss()
                 if self.num_labels == 1:
                     loss = loss_fct(logits.squeeze(), labels.squeeze())
                 else:
                     loss = loss_fct(logits, labels)
-            elif self.config2.problem_type == "single_label_classification":
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(logits.reshape(-1, self.num_labels), labels.reshape(-1))
-            elif self.config2.problem_type == "multi_label_classification":
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
@@ -1316,7 +1314,7 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
             :obj:`input_ids` above)
         """
 
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
 
         input_ids = input_ids.reshape(-1, input_ids.shape[-1]) if input_ids is not None else None
@@ -1389,7 +1387,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
             1]``.
         """
 
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.funnel(
             input_ids,
@@ -1435,7 +1433,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
             config = config.config
         if isinstance(config, dict):
             config = FunnelConfig(**config)
-        self.config2 = config
+        self.config = config
         self.num_labels = config.num_labels
 
         self.funnel = FunnelModel(config)
@@ -1466,7 +1464,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
             sequence are not taken into account for computing the loss.
         """
 
-        return_dict = return_dict if return_dict is not None else self.config2.use_return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.funnel(
             input_ids,
