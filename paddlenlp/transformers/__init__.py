@@ -134,6 +134,7 @@ from .rembert.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
+from .skep.configuration import *
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
