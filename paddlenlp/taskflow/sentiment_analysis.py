@@ -242,7 +242,17 @@ class SkepTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/model_config.json",
                 "847b84ab08611a2f5a01a22c18b0be23",
             ],
-        }
+        },
+        "__internal_testing__/tiny-random-skep": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-skep/model_state.pdparams",
+                "3bedff32b4de186252094499d1c8ede3",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-skep/model_config.json",
+                "f891e4a927f946c23bc32653f535510b",
+            ],
+        },
     }
 
     def __init__(self, task, model, **kwargs):
