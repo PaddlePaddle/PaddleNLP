@@ -14,8 +14,10 @@
 import copy
 import functools
 import json
+import logging
 import os
 import shutil
+import sys
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
@@ -380,6 +382,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         def trainable(model_config):
             # import is required for proper pickling
             from paddlenlp.utils.log import logger
+
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setFormatter(logger.format)
+            logger.logger.addHandler(stdout_handler)
 
             # construct trainer
             model_config = model_config["candidates"]
