@@ -180,19 +180,44 @@ class MultimodalFeatureExtractionTask(Task):
                 "573ba0466e15cdb5bd423ff7010735ce",
             ],
         },
+        "__internal_testing__/tiny-random-ernievil2": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/model_state.pdparams",
+                "771c844e7b75f61123d9606c8c17b1d6",
+            ],
+            "config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/config.json",
+                "ae27a68336ccec6d3ffd14b48a6d1f25",
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
+            ],
+            "preprocessor_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/preprocessor_config.json",
+                "9a2e8da9f41896fedb86756b79355ee2",
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-ernievil2/tokenizer_config.json",
+                "2333f189cad8dd559de61bbff4d4a789",
+            ],
+        },
     }
 
-    def __init__(
-        self, task, model, batch_size=1, is_static_model=True, max_seq_len=128, return_tensors="pd", **kwargs
-    ):
+    def __init__(self, task, model, batch_size=1, is_static_model=True, max_length=128, return_tensors="pd", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
         self.return_tensors = return_tensors
-        self._max_seq_len = max_seq_len
-        self._check_task_files()
+        if not self.from_hf_hub:
+            self._check_task_files()
+        self._max_length = max_length
         self._construct_tokenizer()
         self.is_static_model = is_static_model
         self._config_map = {}
@@ -217,7 +242,7 @@ class MultimodalFeatureExtractionTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._processor = AutoProcessor.from_pretrained(self.model)
+        self._processor = AutoProcessor.from_pretrained(self._task_path)
 
     def _batchify(self, data, batch_size):
         """
@@ -238,7 +263,7 @@ class MultimodalFeatureExtractionTask(Task):
                     images=batch_images,
                     return_tensors="np",
                     padding="max_length",
-                    max_seq_len=self._max_seq_len,
+                    max_length=self._max_length,
                     truncation=True,
                 )
             else:
@@ -248,7 +273,7 @@ class MultimodalFeatureExtractionTask(Task):
                     images=batch_images,
                     return_tensors="pd",
                     padding="max_length",
-                    max_seq_len=self._max_seq_len,
+                    max_length=self._max_length,
                     truncation=True,
                 )
             return tokenized_inputs
