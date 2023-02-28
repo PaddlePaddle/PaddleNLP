@@ -182,13 +182,16 @@ class MultimodalFeatureExtractionTask(Task):
         },
     }
 
-    def __init__(self, task, model, batch_size=1, is_static_model=True, return_tensors="pd", **kwargs):
+    def __init__(
+        self, task, model, batch_size=1, is_static_model=True, max_seq_len=128, return_tensors="pd", **kwargs
+    ):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
         self.return_tensors = return_tensors
+        self._max_seq_len = max_seq_len
         self._check_task_files()
         self._construct_tokenizer()
         self.is_static_model = is_static_model
@@ -231,12 +234,22 @@ class MultimodalFeatureExtractionTask(Task):
             if self.is_static_model:
                 # The input of static model is numpy array
                 tokenized_inputs = self._processor(
-                    text=batch_texts, images=batch_images, return_tensors="np", padding="max_length", truncation=True
+                    text=batch_texts,
+                    images=batch_images,
+                    return_tensors="np",
+                    padding="max_length",
+                    max_seq_len=self._max_seq_len,
+                    truncation=True,
                 )
             else:
                 # The input of dygraph model is padddle.Tensor
                 tokenized_inputs = self._processor(
-                    text=batch_texts, images=batch_images, return_tensors="pd", padding="max_length", truncation=True
+                    text=batch_texts,
+                    images=batch_images,
+                    return_tensors="pd",
+                    padding="max_length",
+                    max_seq_len=self._max_seq_len,
+                    truncation=True,
                 )
             return tokenized_inputs
 
