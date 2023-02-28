@@ -51,7 +51,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
     training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
     save_path = "trained_model"  # filepath for the trained dygraph model
     export_path = "exported_model"  # filepath for the exported static model
-    results_filename = "experiment_results.csv"
+    results_filename = "experiment_results.csv"  # filepath for storing experiment results
+    experiment_path = None  # filepath for the experiment results
+    visualdl_path = "visualdl"  # filepath for the visualdl
 
     def __init__(
         self,
@@ -79,6 +81,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.language = language
         self.output_dir = output_dir
         self.kwargs = kwargs
+        # Per default, Ray Tune creates JSON, CSV and TensorBoardX logger callbacks, turning it off
+        os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
         # use log_to_driver to control verbosity
         ray.init(ignore_reinit_error=True, log_to_driver=True if verbosity >= 1 else False)
 
@@ -95,6 +99,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         Default TrainingArguments for the Trainer
         """
+        return TrainingArguments(
+            output_dir=self.training_path,
+            disable_tqdm=True,
+            load_best_model_at_end=True,
+            save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,  # if logging_dir is redefined, the function visualdl() should be redefined as well.
+        )
 
     @property
     @abstractmethod
@@ -135,6 +147,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
+    @abstractmethod
     def export(self, export_path, trial_id=None):
         """
         Export the model from a certain `trial_id` to the given file path.
@@ -168,15 +181,27 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def predict(self, test_dataset: Dataset, trial_id: Optional[str] = None):
+        """
+        Run prediction and returns predictions and potential metrics from a certain `trial_id` on the given dataset
+        Args:
+            test_dataset (Dataset, required): Custom test dataset and must contains the 'text_column' and 'label_column' fields.
+            trial_id (str, optional): Specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`.
+        """
+        raise NotImplementedError
+
     def _override_hp(self, config: Dict[str, Any], default_hp: Any) -> Any:
         """
         Overrides the arguments with the provided hyperparameter config
         """
         new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
-            if key.startswith(default_hp.__class__.__name__):
-                _, hp_key = key.split(".")
-                setattr(new_hp, hp_key, value)
+            if key in new_hp.to_dict():
+                if key in ["output_dir", "logging_dir"]:
+                    logger.warning(f"{key} cannot be overridden")
+                else:
+                    setattr(new_hp, key, value)
         return new_hp
 
     def _filter_model_candidates(
@@ -261,7 +286,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
             hp_overrides: (dict[str, Any], optional): Advanced users only.
-                override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
+                override the hyperparameters of every model candidate.  For example, {"max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
                 Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
 
@@ -293,6 +318,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
+        self.experiment_path = os.path.join(self.output_dir, experiment_name)
 
         self.tuner = tune.Tuner(
             trainable,
@@ -301,7 +327,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 name=experiment_name,
                 log_to_file=True,
                 local_dir=self.output_dir if self.output_dir else None,
-                callbacks=[tune.logger.CSVLoggerCallback()],
+                callbacks=[tune.logger.CSVLoggerCallback(), tune.logger.JsonLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
@@ -310,3 +336,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         )
 
         return self.training_results
+
+    def visualdl(self, trial_id: Optional[str] = None):
+        """
+        Return visualdl path to represent the results of the taskflow training.
+        """
+        model_result = self._get_model_result(trial_id=trial_id)
+        return os.path.join(model_result.log_dir, self.visualdl_path)

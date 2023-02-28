@@ -80,7 +80,7 @@ python run.py --raw_train_filename="data/sparc_data_removefrom/train.pkl" \
 * embedding_filename: GLOVE 词向量文件路径。
 * data_directory: 预处理得到的文件夹路径。
 * logdir: 输出日志文件夹路径。
-* train，evaluate: 是否执行trian，evaluate。
+* train，evaluate: 是否执行train，evaluate。
 
 
 ### 训练阶段的输出日志

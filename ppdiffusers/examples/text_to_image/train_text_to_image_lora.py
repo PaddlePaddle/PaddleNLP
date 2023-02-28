@@ -270,6 +270,12 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
+        "--lora_rank",
+        type=int,
+        default=4,
+        help="The rank of lora linear.",
+    )
+    parser.add_argument(
         "--random_flip",
         action="store_true",
         help="whether to randomly flip images horizontally",
@@ -483,7 +489,7 @@ def main():
             hidden_size = unet.config.block_out_channels[block_id]
 
         lora_attn_procs[name] = LoRACrossAttnProcessor(
-            hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
+            hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=args.lora_rank
         )
 
     unet.set_attn_processor(lora_attn_procs)
