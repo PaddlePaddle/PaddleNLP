@@ -1483,13 +1483,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        # we already handled the cache_dir logic through resolve_cache_dir
-        default_root = cache_dir
-        # default_root = (
-        #     os.path.join(cache_dir, pretrained_model_name_or_path)
-        #     if cache_dir is not None
-        #     else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-        # )
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -1505,19 +1498,19 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     library_version=__version__,
                 )
             else:
-                path = os.path.join(default_root, file_path.split("/")[-1])
+                path = os.path.join(cache_dir, file_path.split("/")[-1])
                 if os.path.exists(path):
                     logger.info("Already cached %s" % path)
                     resolved_vocab_files[file_id] = path
 
                 else:
-                    logger.info("Downloading %s and saved to %s" % (file_path, default_root))
+                    logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
                         if not url_file_exists(file_path):
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue
-                        resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, default_root)
+                        resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, cache_dir)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
                             resolved_vocab_files[file_id] = None
@@ -1640,7 +1633,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            tokenizer.save_pretrained(default_root)
+            tokenizer.save_pretrained(cache_dir)
 
         return tokenizer
 

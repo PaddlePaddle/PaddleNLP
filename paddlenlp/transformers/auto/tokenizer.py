@@ -333,13 +333,11 @@ class AutoTokenizer:
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            # we already handled the cache_dir logic through resolve_cache_dir
-            default_root = cache_dir
             community_config_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

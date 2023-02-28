@@ -330,8 +330,6 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            # we already handled the cache_dir logic through resolve_cache_dir
-            default_root = cache_dir
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
@@ -340,10 +338,10 @@ class _BaseAutoModelClass:
             )
             try:
                 if url_file_exists(standard_community_url):
-                    resolved_vocab_file = get_path_from_url(standard_community_url, default_root)
+                    resolved_vocab_file = get_path_from_url(standard_community_url, cache_dir)
                 elif url_file_exists(legacy_community_url):
                     logger.info("Standard config do not exist, loading from legacy config")
-                    resolved_vocab_file = get_path_from_url(legacy_community_url, default_root)
+                    resolved_vocab_file = get_path_from_url(legacy_community_url, cache_dir)
                 else:
                     raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
             except RuntimeError as err:

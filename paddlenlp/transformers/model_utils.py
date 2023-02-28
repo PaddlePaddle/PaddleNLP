@@ -523,8 +523,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
 
-        # we already handled the cache_dir logic through resolve_cache_dir
-        default_root = cache_dir
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -541,14 +539,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     library_version=__version__,
                 )
             else:
-                path = os.path.join(default_root, file_path.split("/")[-1])
+                path = os.path.join(cache_dir, file_path.split("/")[-1])
                 if os.path.exists(path):
                     logger.info("Already cached %s" % path)
                     resolved_resource_files[file_id] = path
                 else:
-                    logger.info("Downloading %s and saved to %s" % (file_path, default_root))
+                    logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
-                        resolved_resource_files[file_id] = get_path_from_url_with_filelock(file_path, default_root)
+                        resolved_resource_files[file_id] = get_path_from_url_with_filelock(file_path, cache_dir)
                     except RuntimeError as err:
                         logger.error(err)
                         raise RuntimeError(
@@ -628,14 +626,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             model = cls(*derived_args, **derived_kwargs)
 
         # save the model config file into cache dir
-        model_config_file_path = os.path.join(default_root, cls.model_config_file)
+        model_config_file_path = os.path.join(cache_dir, cls.model_config_file)
         # check if there is model config file in cache directory
         if (
             pretrained_model_name_or_path in cls.pretrained_init_configuration
             and init_kwargs is not None
             and not os.path.exists(model_config_file_path)
         ):
-            model.save_model_config(default_root)
+            model.save_model_config(cache_dir)
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
