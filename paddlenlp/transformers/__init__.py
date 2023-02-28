@@ -169,6 +169,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
@@ -192,10 +193,12 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
-from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
+from .blip_2.modeling import *
+from .blip_2.configuration import *
+from .blip_2.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

@@ -446,8 +446,13 @@ class GenerationMixin(object):
                     argument.startswith("decoder_") or argument.startswith("cross_attn") or argument == "use_cache"
                 )
             }
-
-            model_kwargs["encoder_output"] = encoder(input_ids, **encoder_kwargs)
+            input_name = encoder.main_input_name
+            if input_name == "input_ids" and "inputs_embeds" in encoder_kwargs:
+                inputs, input_name = model_kwargs["inputs_embeds"], "inputs_embeds"
+                encoder_kwargs.pop(input_name)
+                model_kwargs["encoder_output"] = encoder(inputs_embeds=inputs, **encoder_kwargs)
+            else:
+                model_kwargs["encoder_output"] = encoder(input_ids=input_ids, **encoder_kwargs)
 
         return model_kwargs
 
@@ -807,6 +812,7 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
+
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
@@ -832,7 +838,6 @@ class GenerationMixin(object):
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
             else None,
         )
-
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
 
@@ -942,6 +947,7 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            logits = outputs.logits
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
             # pre-process distribution

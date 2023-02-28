@@ -21,7 +21,9 @@ import os
 import re
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple, Type
+from contextlib import contextmanager
+from functools import partial
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 import numpy as np
 import paddle
@@ -75,6 +77,147 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
+    """
+    Prune a linear layer to keep only entries in index.
+    Used to remove heads.
+    Args:
+        layer (`torch.nn.Linear`): The layer to prune.
+        index (`torch.LongTensor`): The indices to keep in the layer.
+        dim (`int`, *optional*, defaults to 0): The dimension on which to keep the indices.
+    Returns:
+        `torch.nn.Linear`: The pruned layer as a new layer with `requires_grad=True`.
+    """
+    index = index.to(layer.weight)
+    W = layer.weight.index_select(dim, index).clone().detach()
+    if layer.bias is not None:
+        if dim == 1:
+            b = layer.bias.clone().detach()
+        else:
+            b = layer.bias[index].clone().detach()
+    new_size = list(layer.weight.shape)
+    new_size[dim] = len(index)
+    new_layer = nn.Linear(new_size[1], new_size[0], bias_attr=layer.bias is not None)
+    new_layer.weight.stop_gradient = True
+    new_layer.weight.copy_(W)
+    new_layer.weight.stop_gradient = False
+    if layer.bias is not None:
+        new_layer.bias.stop_gradient = True
+        new_layer.bias.copy_(b)
+        new_layer.bias.stop_gradient = False
+    return new_layer
+
+
+def find_pruneable_heads_and_indices(
+    heads: List[int], n_heads: int, head_size: int, already_pruned_heads: Set[int]
+) -> Tuple[Set[int], paddle.LongTensor]:
+    """
+    Finds the heads and their indices taking `already_pruned_heads` into account.
+    Args:
+        heads (`List[int]`): List of the indices of heads to prune.
+        n_heads (`int`): The number of heads in the model.
+        head_size (`int`): The size of each head.
+        already_pruned_heads (`Set[int]`): A set of already pruned heads.
+    Returns:
+        `Tuple[Set[int], torch.LongTensor]`: A tuple with the remaining heads and their corresponding indices.
+    """
+    mask = paddle.ones([n_heads, head_size])
+    heads = set(heads) - already_pruned_heads  # Convert to set and remove already pruned heads
+    for head in heads:
+        # Compute how many pruned heads are before the head and move the index accordingly
+        head = head - sum(1 if h < head else 0 for h in already_pruned_heads)
+        mask[head] = 0
+    mask = mask.reshape([-1]).eq(1)
+    index: paddle.Tensor = paddle.arange(len(mask))[mask].cast("int64")
+    return heads, index
+
+
+def apply_chunking_to_forward(
+    forward_fn: Callable[..., paddle.Tensor], chunk_size: int, chunk_dim: int, *input_tensors
+) -> paddle.Tensor:
+    """
+    This function chunks the `input_tensors` into smaller input tensor parts of size `chunk_size` over the dimension
+    `chunk_dim`. It then applies a layer `forward_fn` to each chunk independently to save memory.
+    If the `forward_fn` is independent across the `chunk_dim` this function will yield the same result as directly
+    applying `forward_fn` to `input_tensors`.
+    Args:
+        forward_fn (`Callable[..., paddle.Tensor]`):
+            The forward function of the model.
+        chunk_size (`int`):
+            The chunk size of a chunked tensor: `num_chunks = len(input_tensors[0]) / chunk_size`.
+        chunk_dim (`int`):
+            The dimension over which the `input_tensors` should be chunked.
+        input_tensors (`Tuple[paddle.Tensor]`):
+            The input tensors of `forward_fn` which will be chunked
+    Returns:
+        `paddle.Tensor`: A tensor with the same shape as the `forward_fn` would have given if applied`.
+    Examples:
+    ```python
+    # rename the usual forward() fn to forward_chunk()
+    def forward_chunk(self, hidden_states):
+        hidden_states = self.decoder(hidden_states)
+        return hidden_states
+    # implement a chunked forward function
+    def forward(self, hidden_states):
+        return apply_chunking_to_forward(self.forward_chunk, self.chunk_size_lm_head, self.seq_len_dim, hidden_states)
+    ```"""
+
+    assert len(input_tensors) > 0, f"{input_tensors} has to be a tuple/list of tensors"
+
+    # inspect.signature exist since python 3.5 and is a python method -> no problem with backward compatibility
+    num_args_in_forward_chunk_fn = len(inspect.signature(forward_fn).parameters)
+    if num_args_in_forward_chunk_fn != len(input_tensors):
+        raise ValueError(
+            f"forward_chunk_fn expects {num_args_in_forward_chunk_fn} arguments, but only {len(input_tensors)} input "
+            "tensors are given"
+        )
+
+    if chunk_size > 0:
+        tensor_shape = input_tensors[0].shape[chunk_dim]
+        for input_tensor in input_tensors:
+            if input_tensor.shape[chunk_dim] != tensor_shape:
+                raise ValueError(
+                    f"All input tenors have to be of the same shape: {tensor_shape}, "
+                    f"found shape {input_tensor.shape[chunk_dim]}"
+                )
+
+        if input_tensors[0].shape[chunk_dim] % chunk_size != 0:
+            raise ValueError(
+                f"The dimension to be chunked {input_tensors[0].shape[chunk_dim]} has to be a multiple of the chunk "
+                f"size {chunk_size}"
+            )
+
+        num_chunks = input_tensors[0].shape[chunk_dim] // chunk_size
+
+        # chunk input tensor into tuples
+        input_tensors_chunks = tuple(input_tensor.chunk(num_chunks, axis=chunk_dim) for input_tensor in input_tensors)
+        # apply forward fn to every tuple
+        output_chunks = tuple(forward_fn(*input_tensors_chunk) for input_tensors_chunk in zip(*input_tensors_chunks))
+        # concatenate output at same dimension
+        return paddle.concat(output_chunks, axis=chunk_dim)
+
+    return forward_fn(*input_tensors)
+
+
+_init_weights = True
+
+
+@contextmanager
+def no_init_weights(_enable=True):
+    """
+    Context manager to globally disable weight initialization to speed up loading large models.
+    TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
+    """
+    global _init_weights
+    old_init_weights = _init_weights
+    if _enable:
+        _init_weights = False
+    try:
+        yield
+    finally:
+        _init_weights = old_init_weights
 
 
 def unwrap_model(model, *args, **kwargs):
@@ -322,6 +465,39 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
+    def post_init(self):
+        """
+        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
+        modules properly initialized (such as weight initialization).
+        """
+        self.init_weights()
+        self._backward_compatibility_gradient_checkpointing()
+
+    def _backward_compatibility_gradient_checkpointing(self):
+        if self.supports_gradient_checkpointing and getattr(self.config, "gradient_checkpointing", False):
+            self.gradient_checkpointing_enable()
+            # Remove the attribute now that is has been consumed, so it's no saved in the config.
+            delattr(self.config, "gradient_checkpointing")
+
+    def gradient_checkpointing_enable(self):
+        """
+        Activates gradient checkpointing for the current model.
+        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
+        activations".
+        """
+        if not self.supports_gradient_checkpointing:
+            raise ValueError(f"{self.__class__.__name__} does not support gradient checkpointing.")
+        self.apply(partial(self._set_gradient_checkpointing, value=True))
+
+    def gradient_checkpointing_disable(self):
+        """
+        Deactivates gradient checkpointing for the current model.
+        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
+        activations".
+        """
+        if self.supports_gradient_checkpointing:
+            self.apply(partial(self._set_gradient_checkpointing, value=False))
+
     def __getattr__(self, name):
         """
         called when the attribute name is missed in the model
@@ -419,6 +595,127 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
             f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
         )
+
+    def init_weights(self):
+        """
+        If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
+        initialization logic in `_init_weights`.
+        """
+        # Prune heads if needed
+        if self.config.pruned_heads:
+            self.prune_heads(self.config.pruned_heads)
+
+        if _init_weights:
+            # Initialize weights
+            self.apply(self._initialize_weights)
+
+            # Tie weights should be skipped when not initializing all weights
+            # since from_pretrained(...) calls tie weights anyways
+            self.tie_weights()
+
+    def _initialize_weights(self, module):
+        """
+        Initialize the weights if they are not already initialized.
+        """
+        if getattr(module, "_is_hf_initialized", False):
+            return
+        self._init_weights(module)
+        module._is_hf_initialized = True
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        If the `torchscript` flag is set in the configuration, can't handle parameter sharing so we are cloning the
+        weights instead.
+        """
+        if getattr(self.config, "tie_word_embeddings", True):
+            output_embeddings = self.get_output_embeddings()
+            if output_embeddings is not None:
+                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
+
+        if getattr(self.config, "is_encoder_decoder", False) and getattr(self.config, "tie_encoder_decoder", False):
+            if hasattr(self, self.base_model_prefix):
+                self = getattr(self, self.base_model_prefix)
+            self._tie_encoder_decoder_weights(self.encoder, self.decoder, self.base_model_prefix)
+
+        # for module in self.sublayers():
+        #     if hasattr(module, "_tie_weights"):
+        #         module._tie_weights()
+
+    @staticmethod
+    def _tie_encoder_decoder_weights(encoder: nn.Layer, decoder: nn.Layer, base_model_prefix: str):
+        uninitialized_encoder_weights: List[str] = []
+        if decoder.__class__ != encoder.__class__:
+            logger.info(
+                f"{decoder.__class__} and {encoder.__class__} are not equal. In this case make sure that all encoder"
+                " weights are correctly initialized."
+            )
+
+        def tie_encoder_to_decoder_recursively(
+            decoder_pointer: nn.Layer,
+            encoder_pointer: nn.Layer,
+            module_name: str,
+            uninitialized_encoder_weights: List[str],
+            depth=0,
+        ):
+            assert isinstance(decoder_pointer, nn.Layer) and isinstance(
+                encoder_pointer, nn.Layer
+            ), f"{decoder_pointer} and {encoder_pointer} have to be of type nn.Layer"
+            if hasattr(decoder_pointer, "weight"):
+                assert hasattr(encoder_pointer, "weight")
+                encoder_pointer.weight = decoder_pointer.weight
+                if hasattr(decoder_pointer, "bias"):
+                    assert hasattr(encoder_pointer, "bias")
+                    encoder_pointer.bias = decoder_pointer.bias
+                return
+
+            encoder_modules = encoder_pointer._modules
+            decoder_modules = decoder_pointer._modules
+            if len(decoder_modules) > 0:
+                assert (
+                    len(encoder_modules) > 0
+                ), f"Encoder module {encoder_pointer} does not match decoder module {decoder_pointer}"
+
+                all_encoder_weights = {module_name + "/" + sub_name for sub_name in encoder_modules.keys()}
+                encoder_layer_pos = 0
+                for name, module in decoder_modules.items():
+                    if name.isdigit():
+                        encoder_name = str(int(name) + encoder_layer_pos)
+                        decoder_name = name
+                        if not isinstance(decoder_modules[decoder_name], type(encoder_modules[encoder_name])) and len(
+                            encoder_modules
+                        ) != len(decoder_modules):
+                            # this can happen if the name corresponds to the position in a list module list of layers
+                            # in this case the decoder has added a cross-attention that the encoder does not have
+                            # thus skip this step and subtract one layer pos from encoder
+                            encoder_layer_pos -= 1
+                            continue
+                    elif name not in encoder_modules:
+                        continue
+                    elif depth > 500:
+                        raise ValueError(
+                            "Max depth of recursive function `tie_encoder_to_decoder` reached. It seems that there is"
+                            " a circular dependency between two or more `nn.Layers` of your model."
+                        )
+                    else:
+                        decoder_name = encoder_name = name
+                    tie_encoder_to_decoder_recursively(
+                        decoder_modules[decoder_name],
+                        encoder_modules[encoder_name],
+                        module_name + "/" + name,
+                        uninitialized_encoder_weights,
+                        depth=depth + 1,
+                    )
+                    all_encoder_weights.remove(module_name + "/" + encoder_name)
+
+                uninitialized_encoder_weights += list(all_encoder_weights)
+
+        # tie weights recursively
+        tie_encoder_to_decoder_recursively(decoder, encoder, base_model_prefix, uninitialized_encoder_weights)
+        if len(uninitialized_encoder_weights) > 0:
+            logger.warning(
+                f"The following encoder weights were not tied to the decoder {uninitialized_encoder_weights}"
+            )
 
     @classmethod
     def constructed_from_pretrained_config(cls, init_func=None) -> bool:

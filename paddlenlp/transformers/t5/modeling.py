@@ -896,7 +896,6 @@ class T5Stack(T5PretrainedModel):
         return_dict=False,
         **model_kwargs
     ):
-
         if input_ids is not None and inputs_embeds is not None:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(
@@ -1552,7 +1551,6 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 logits = output[1]
 
         """
-
         input_type = type(decoder_input_ids) if decoder_input_ids is not None else type(decoder_inputs_embeds)
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
