@@ -285,7 +285,7 @@ class ReformerModelTester:
             input_ids_roll, attention_mask=attn_mask_roll, return_dict=self.parent.return_dict
         )[0][:, roll : half_seq_len + roll]
 
-        self.parent.assertTrue(paddle.allclose(output_padded, output_padded_rolled, atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_padded, output_padded_rolled, atol=1e-4))
 
     def create_and_check_reformer_layer_dropout_seed(
         self, config: ReformerConfig, input_ids, input_mask, choice_labels, is_decoder=False
@@ -316,7 +316,7 @@ class ReformerModelTester:
             paddle.allclose(
                 prev_attn_output + attn_outputs.hidden_states,
                 next_attn_output,
-                atol=1e-3,
+                atol=1e-4,
             )
         )
 
@@ -326,7 +326,7 @@ class ReformerModelTester:
             paddle.allclose(
                 next_hidden_states,
                 hidden_states + feed_forward_hidden_states,
-                atol=1e-3,
+                atol=1e-4,
             )
         )
 
@@ -367,13 +367,13 @@ class ReformerModelTester:
         grad_slice_word_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
         grad_slice_position_factor_1_chunk = model.reformer.embeddings.position_embeddings.weights[0][1, 0, -5:]
         grad_slice_position_factor_2_chunk = model.reformer.embeddings.position_embeddings.weights[1][0, 1, :5]
-        self.parent.assertTrue(paddle.allclose(loss_chunk, loss_no_chunk, atol=1e-3))
-        self.parent.assertTrue(paddle.allclose(grad_slice_word_no_chunk, grad_slice_word_chunk, atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(loss_chunk, loss_no_chunk, atol=1e-4))
+        self.parent.assertTrue(paddle.allclose(grad_slice_word_no_chunk, grad_slice_word_chunk, atol=1e-4))
         self.parent.assertTrue(
-            paddle.allclose(grad_slice_position_factor_1_chunk, grad_slice_position_factor_1_no_chunk, atol=1e-3)
+            paddle.allclose(grad_slice_position_factor_1_chunk, grad_slice_position_factor_1_no_chunk, atol=1e-4)
         )
         self.parent.assertTrue(
-            paddle.allclose(grad_slice_position_factor_2_chunk, grad_slice_position_factor_2_no_chunk, atol=1e-3)
+            paddle.allclose(grad_slice_position_factor_2_chunk, grad_slice_position_factor_2_no_chunk, atol=1e-4)
         )
 
     def create_and_check_reformer_model_generate(self, config: ReformerConfig, input_ids, input_mask, choice_labels):

@@ -16,11 +16,10 @@
 
 import inspect
 import sys
-from collections import namedtuple
 from dataclasses import dataclass
 from functools import reduce
 from operator import mul
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import paddle
@@ -59,20 +58,6 @@ REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "reformer-crime-and-punishment",
     "reformer-enwik8",
 ]
-
-# Define named tuples for nn.Layers here
-LSHSelfAttentionOutput = namedtuple("LSHSelfAttentionOutput", ["hidden_states", "attention_probs", "buckets"])
-LocalSelfAttentionOutput = namedtuple("LocalSelfAttentionOutput", ["hidden_states", "attention_probs"])
-AttentionOutput = namedtuple("AttentionOutput", ["hidden_states", "attention_probs", "buckets"])
-ReformerOutput = namedtuple("ReformerOutput", ["hidden_states", "attn_output", "attention_probs", "buckets"])
-ReformerBackwardOutput = namedtuple(
-    "ReformerBackwardOutput",
-    ["attn_output", "hidden_states", "grad_attn_output", "grad_hidden_states"],
-)
-ReformerEncoderOutput = namedtuple(
-    "ReformerEncoderOutput",
-    ["hidden_states", "all_hidden_states", "all_attentions", "cache"],
-)
 
 
 def _logsumexp(x, axis=-1, keepdim=False):
@@ -1905,11 +1890,14 @@ class ReformerOnlyLMHead(nn.Layer):
 class ReformerClassificationHead(nn.Layer):
     """Head for sentence-level classification tasks."""
 
-    def __init__(self, hidden_size, classifier_dropout, num_classes):
+    def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(2 * hidden_size, hidden_size)
+        self.dense = nn.Linear(2 * config.hidden_size, config.hidden_size)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
         self.dropout = nn.Dropout(classifier_dropout)
-        self.out_proj = nn.Linear(hidden_size, num_classes)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_classes)
 
     def forward(self, hidden_states):
         hidden_states = hidden_states[:, 0]  # take <s> token (equiv. to [CLS])
@@ -1922,34 +1910,53 @@ class ReformerClassificationHead(nn.Layer):
 
 
 @dataclass
-class ReformerForPreTrainingOutput(ModelOutput):
-    """
-    Output type of [`ReformerForPreTraining`].
-    Args:
-        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
-            Total loss as the sum of the masked language modeling loss and the next sequence prediction
-            (classification) loss.
-        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
-            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
-        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
-            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
-            before SoftMax).
-        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
-            shape `(batch_size, sequence_length, hidden_size)`.
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
-            sequence_length)`.
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-            heads.
-    """
+class LSHSelfAttentionOutput(ModelOutput):
 
-    loss: Optional[paddle.Tensor] = None
-    prediction_logits: paddle.Tensor = None
-    seq_relationship_logits: paddle.Tensor = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
-    attentions: Optional[Tuple[paddle.Tensor]] = None
+    attention_probs: Optional[Tuple[paddle.Tensor]] = None
+    buckets: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class LocalSelfAttentionOutput(ModelOutput):
+
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attention_probs: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class AttentionOutput(ModelOutput):
+
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attention_probs: Optional[Tuple[paddle.Tensor]] = None
+    buckets: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ReformerOutput(ModelOutput):
+
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attn_output: Optional[Tuple[paddle.Tensor]] = None
+    attention_probs: Optional[Tuple[paddle.Tensor]] = None
+    buckets: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ReformerBackwardOutput(ModelOutput):
+
+    attn_output: Optional[Tuple[paddle.Tensor]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    grad_attn_output: Optional[Tuple[paddle.Tensor]] = None
+    grad_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ReformerEncoderOutput(ModelOutput):
+
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    all_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    all_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cache: Optional[Tuple[paddle.Tensor]] = None
 
 
 class ReformerPretrainedModel(PretrainedModel):
@@ -1982,7 +1989,7 @@ class ReformerPretrainedModel(PretrainedModel):
         tie_word_embeddings = (
             self.tie_word_embeddings
             if hasattr(self, "tie_word_embeddings")
-            else self.reformer.config.get("tie_word_embeddings", False)
+            else self.config.get("tie_word_embeddings", False)
         )
         if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings") and tie_word_embeddings:
             output_embeddings = self.get_output_embeddings()
@@ -2022,9 +2029,7 @@ class ReformerPretrainedModel(PretrainedModel):
                 weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.axial_norm_std
-                        if hasattr(self, "axial_norm_std")
-                        else self.reformer.config["axial_norm_std"],
+                        std=self.axial_norm_std if hasattr(self, "axial_norm_std") else self.config.axial_norm_std,
                         shape=weight.shape,
                     )
                 )
@@ -2035,7 +2040,7 @@ class ReformerPretrainedModel(PretrainedModel):
                     mean=0.0,
                     std=self.initializer_range
                     if hasattr(self, "initializer_range")
-                    else self.reformer.config["initializer_range"],
+                    else self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -2045,9 +2050,7 @@ class ReformerPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.axial_norm_std
-                    if hasattr(self, "axial_norm_std")
-                    else self.reformer.config["axial_norm_std"],
+                    std=self.axial_norm_std if hasattr(self, "axial_norm_std") else self.config.axial_norm_std,
                     shape=layer.weight.shape,
                 )
             )
@@ -2176,12 +2179,12 @@ class ReformerModel(ReformerPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        num_hashes=None,
-        cache=None,
-        use_cache=False,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        num_hashes: Optional[int] = None,
+        cache: Optional[List[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = False,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -2416,22 +2419,22 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
     def __init__(self, config: ReformerConfig):
         super().__init__(config)
         self.reformer = ReformerModel(config)
-        local_num_chunks_after = self.reformer.config["local_num_chunks_after"]
-        lsh_num_chunks_after = self.reformer.config["lsh_num_chunks_after"]
-        assert self.reformer.config[
+        local_num_chunks_after = self.config.local_num_chunks_after
+        lsh_num_chunks_after = self.config.lsh_num_chunks_after
+        assert self.config[
             "is_decoder"
         ], "If you want to use `ReformerModelWithLMHead` make sure that `is_decoder=True`."
         assert (
-            "local" not in self.reformer.config["attn_layers"] or local_num_chunks_after == 0
+            "local" not in self.config.attn_layers or local_num_chunks_after == 0
         ), f"If causal mask is enabled, make sure that `local_num_chunks_after` is set to 0 and not {local_num_chunks_after}."
         assert (
-            "lsh" not in self.reformer.config["attn_layers"] or lsh_num_chunks_after == 0
+            "lsh" not in self.config.attn_layers or lsh_num_chunks_after == 0
         ), f"If causal mask is enabled, make sure that `lsh_num_chunks_after` is set to 1 and not {lsh_num_chunks_after}."
 
         """self.lm_head = ReformerOnlyLMHead(
-            chunk_size_lm_head=self.reformer.config["chunk_size_lm_head"],
-            hidden_size=self.reformer.config["hidden_size"],
-            vocab_size=self.reformer.config["vocab_size"],
+            chunk_size_lm_head=self.config.chunk_size_lm_head,
+            hidden_size=self.config.hidden_size,
+            vocab_size=self.config.vocab_size,
         )"""
         self.lm_head = ReformerOnlyLMHead(config)
 
@@ -2445,15 +2448,15 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        num_hashes=None,
-        cache=None,
-        use_cache=False,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
+        input_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        num_hashes: Optional[int] = None,
+        cache: Optional[List[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = False,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[Tensor] = None,
+        output_attentions: Optional[Tensor] = None,
     ):
         r"""
 
@@ -2547,7 +2550,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
 
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(
-                shift_logits.reshape(shape=[-1, self.reformer.config["vocab_size"]]),
+                shift_logits.reshape(shape=[-1, self.config.vocab_size]),
                 shift_labels.flatten(),
             )
 
@@ -2582,7 +2585,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
     def __init__(self, config: ReformerConfig):
         super().__init__(config)
         self.reformer = ReformerModel(config)
-        assert not self.reformer.config[
+        assert not self.config[
             "is_decoder"
         ], "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
         self.lm_head = ReformerOnlyLMHead(config)
@@ -2596,11 +2599,11 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        num_hashes=None,
-        labels=None,
+        input_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        num_hashes: Optional[int] = None,
+        labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -2671,6 +2674,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 logits = output[1]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         reformer_outputs = self.reformer(
             input_ids,
@@ -2690,7 +2694,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                logits.reshape(shape=[-1, self.reformer.config["vocab_size"]]),
+                logits.reshape(shape=[-1, self.config.vocab_size]),
                 labels.flatten(),
             )
 
@@ -2726,24 +2730,19 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         super().__init__(config)
         self.reformer = ReformerModel(config)
         self.num_classes = config.num_classes
-        dropout = None
-        classifier_dropout = dropout if dropout is not None else self.reformer.config["hidden_dropout_prob"]
-        self.classifier = ReformerClassificationHead(
-            hidden_size=self.reformer.config["hidden_size"],
-            classifier_dropout=classifier_dropout,
-            num_classes=config.num_classes,
-        )
-        if self.reformer.config["is_decoder"] is True:
+        self.config = config
+        self.classifier = ReformerClassificationHead(config)
+        if self.config.is_decoder is True:
             logger.warning("You might want to disable causal masking for sequence classification")
 
         self.init_weights()
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        num_hashes=None,
+        input_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        num_hashes: Optional[int] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -2812,6 +2811,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 logits = output[1]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.reformer(
             input_ids,
@@ -2865,21 +2865,19 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
 
     def __init__(self, config: ReformerConfig):
         super().__init__(config)
-        dropout = (None,)
         self.reformer = ReformerModel(config)
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.reformer.config["hidden_dropout_prob"])
         # 2 * hidden_size because we use reversible residual layers
-        self.qa_outputs = nn.Linear(2 * self.reformer.config["hidden_size"], 2)
-        if self.reformer.config["is_decoder"] is True:
+        self.qa_outputs = nn.Linear(2 * self.config.hidden_size, 2)
+        if self.config.is_decoder is True:
             logger.warning("You might want to disable causal masking for question answering task.")
         self.init_weights()
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        num_hashes=None,
+        input_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        num_hashes: Optional[int] = None,
         start_positions: Optional[Tensor] = None,
         end_positions: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
@@ -2964,6 +2962,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 end_logits = outputs[1]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         reformer_outputs = self.reformer(
             input_ids,
