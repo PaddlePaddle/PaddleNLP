@@ -92,6 +92,6 @@ class BERT_Test(TestCase):
 
         glue_config = load_test_config(self.config_path, "glue")
         with argv_context_guard(glue_config):
-            from run_glue import do_train
+            from run_glue_trainer import do_train
 
             do_train()

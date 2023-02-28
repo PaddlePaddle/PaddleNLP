@@ -14,14 +14,14 @@
 
 import argparse
 import os
-from functools import partial
+from functools import partial  # noqa:F401
 
 import paddle
-from paddle import inference
 from datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddle import inference  # noqa:F401
+from run_glue_trainer import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
 
-from run_glue import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
+from paddlenlp.data import Dict, Pad, Stack, Tuple  # noqa:F401
 
 
 def parse_args():
