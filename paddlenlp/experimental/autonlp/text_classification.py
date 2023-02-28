@@ -16,7 +16,7 @@ import functools
 import json
 import os
 import shutil
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import paddle
@@ -371,32 +371,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         else:
             raise NotImplementedError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
         return trainer
-
-    def _construct_trainable(self) -> Callable:
-        """
-        Returns the Trainable functions that contains the main preprocessing and training logic
-        """
-
-        def trainable(model_config):
-            # import is required for proper pickling
-            from paddlenlp.utils.log import logger
-
-            # construct trainer
-            model_config = model_config["candidates"]
-            trainer = self._construct_trainer(model_config)
-            # train
-            trainer.train()
-            # evaluate
-            eval_metrics = trainer.evaluate()
-            # save dygraph model
-            trainer.save_model(self.save_path)
-
-            if os.path.exists(self.training_path):
-                logger.info("Removing training checkpoints to conserve disk space")
-                shutil.rmtree(self.training_path)
-            return eval_metrics
-
-        return trainable
 
     def evaluate(self, eval_dataset: Optional[Dataset] = None, trial_id: Optional[str] = None):
         """
