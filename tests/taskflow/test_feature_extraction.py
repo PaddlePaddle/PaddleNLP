@@ -32,8 +32,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         cls.max_resolution = 40
         cls.min_resolution = 30
         cls.num_channels = 3
-        cls.max_seq_len = 30
-        cls.model = "__internal_testing__/tiny-random-ernievil2"
+        cls.max_length = 30
 
     @classmethod
     def tearDownClass(cls):
@@ -41,22 +40,20 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
 
     def test_model_np(self):
         feature_extractor = Taskflow(
-            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         outputs = feature_extractor("This is a test")
         self.assertEqual(outputs["features"].shape, (1, 32))
 
     def test_return_tensors(self):
         feature_extractor = Taskflow(
-            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             return_tensors="pd",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         outputs = feature_extractor(
             "This is a test",
@@ -97,25 +94,23 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         input_text = (["这是一只猫", "这是一只狗"],)
         # dygraph text test
         dygraph_taskflow = MultimodalFeatureExtractionTask(
-            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             is_static_model=False,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
         self.assertEqual(shape[0], 2)
         # static text test
         static_taskflow = MultimodalFeatureExtractionTask(
-            model="PaddlePaddle/ernie_vil-2.0-base-zh",
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             is_static_model=True,
             return_tensors="np",
             device_id=0,
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         static_results = static_taskflow(input_text)
         self.assertEqual(static_results["features"].shape[0], 2)
@@ -142,11 +137,11 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
 
         # dygraph test
         dygraph_taskflow = Taskflow(
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             is_static_model=False,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
@@ -154,11 +149,11 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         self.assertEqual(shape[0], 2)
         # static test
         static_taskflow = Taskflow(
+            model="__internal_testing__/tiny-random-ernievil2",
             task="feature_extraction",
-            task_path=self.model,
             is_static_model=True,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         static_results = static_taskflow(input_text)
         self.assertEqual(static_results["features"].shape[0], 2)
