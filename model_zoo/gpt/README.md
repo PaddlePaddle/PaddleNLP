@@ -167,7 +167,7 @@ python run_eval.py --model_name gpt2-en \
 `eval_path` 数据集地址。
 `init_checkpoint_path` 模型参数地址。
 `batch_size` batch size大小。
-`device` 运行设备，cpu，gpu，xpu可选。
+`device` 运行设备，cpu，gpu，xpu, npu可选。
 `overlapping_eval` wikitext数据集参数。
 `cloze_eval` lambada数据参数，作为完型填空任务。
 
@@ -294,7 +294,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 基于`gpt2-medium-en`在SST-2任务上Fine-tuning后，在验证集上有如下结果：
@@ -332,7 +332,7 @@ python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
 - `logging_steps`: 表示日志打印间隔。
 - `save_steps`: 表示模型保存及评估间隔。
 - `output_dir`: 表示模型保存路径。
-- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 
 基于`gpt-cpm-small-cn-distill`在MSRA的NER任务上Fine-tuning后，在验证集上有如下结果：
 

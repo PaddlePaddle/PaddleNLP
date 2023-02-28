@@ -21,6 +21,7 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import AutoConfig
+from paddlenlp.utils.env import CONFIG_NAME
 
 
 class AutoConfigTest(unittest.TestCase):
@@ -74,3 +75,11 @@ class AutoConfigTest(unittest.TestCase):
             # but it can load it as the PretrainedConfig class
             auto_config = AutoConfig.from_pretrained(tempdir)
             self.assertEqual(auto_config.hidden_size, number)
+
+    def test_from_pretrained_cache_dir(self):
+        model_id = "__internal_testing__/tiny-random-bert"
+        with tempfile.TemporaryDirectory() as tempdir:
+            AutoConfig.from_pretrained(model_id, cache_dir=tempdir)
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_id, CONFIG_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_id, model_id)))

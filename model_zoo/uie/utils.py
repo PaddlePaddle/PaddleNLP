@@ -16,6 +16,7 @@ import json
 import math
 import random
 import re
+from typing import List, Optional
 
 import numpy as np
 import paddle
@@ -578,7 +579,20 @@ def convert_ext_examples(
     return all_entity_examples, all_relation_examples, entity_cls_examples
 
 
-def convert_example(example, tokenizer, max_seq_len, multilingual=False):
+def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length: List[int]) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    cur_length = len(examples[0]["input_ids"])
+    max_length = default_max_length
+    for max_length_option in sorted(dynamic_max_length):
+        if cur_length <= max_length_option:
+            max_length = max_length_option
+            break
+    return max_length
+
+
+def convert_example(
+    example, tokenizer, max_seq_len, multilingual=False, dynamic_max_length: Optional[List[int]] = None
+):
     """
     example: {
         title
@@ -587,17 +601,49 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
         result_list
     }
     """
-    encoded_inputs = tokenizer(
-        text=[example["prompt"]],
-        text_pair=[example["content"]],
-        truncation=True,
-        max_seq_len=max_seq_len,
-        pad_to_max_seq_len=True,
-        return_attention_mask=True,
-        return_position_ids=True,
-        return_dict=False,
-        return_offsets_mapping=True,
-    )
+    if dynamic_max_length is not None:
+        temp_encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_seq_len,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        max_length = get_dynamic_max_length(
+            examples=temp_encoded_inputs, default_max_length=max_seq_len, dynamic_max_length=dynamic_max_length
+        )
+        # always pad to max_length
+        encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_length,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        start_ids = [0.0 for x in range(max_length)]
+        end_ids = [0.0 for x in range(max_length)]
+    else:
+        encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_seq_len,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        start_ids = [0.0 for x in range(max_seq_len)]
+        end_ids = [0.0 for x in range(max_seq_len)]
+
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -609,8 +655,6 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
             continue
         offset_mapping[index][0] += bias
         offset_mapping[index][1] += bias
-    start_ids = [0.0 for x in range(max_seq_len)]
-    end_ids = [0.0 for x in range(max_seq_len)]
     for item in example["result_list"]:
         start = map_offset(item["start"] + bias, offset_mapping)
         end = map_offset(item["end"] - 1 + bias, offset_mapping)

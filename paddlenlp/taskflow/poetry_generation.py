@@ -13,20 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
-
-import numpy as np
-from .utils import download_file
 from .text_generation import TextGenerationTask
-from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            poetry = Taskflow("poetry_generation")
            poetry("林密不见人")

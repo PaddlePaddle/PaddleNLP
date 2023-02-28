@@ -14,14 +14,12 @@
 
 import argparse
 import os
-from functools import partial  # noqa:F401
 
 import paddle
 from datasets import load_dataset
-from paddle import inference  # noqa:F401
 from run_glue_trainer import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
 
-from paddlenlp.data import Dict, Pad, Stack, Tuple  # noqa:F401
+from paddlenlp.data import Dict, Pad
 
 
 def parse_args():
@@ -52,7 +50,7 @@ def parse_args():
     parser.add_argument(
         "--device",
         default="gpu",
-        choices=["gpu", "cpu", "xpu"],
+        choices=["gpu", "cpu", "xpu", "npu"],
         help="Device selected for inference.",
     )
     parser.add_argument(

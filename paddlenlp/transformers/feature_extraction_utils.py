@@ -24,9 +24,9 @@ import numpy as np
 import paddle
 
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
-from ..utils.env import MODEL_HOME
 from ..utils.log import logger
 from .tokenizer_utils_base import TensorType
+from .utils import resolve_cache_dir
 
 FEATURE_EXTRACTOR_NAME = "preprocessor_config.json"
 
@@ -241,6 +241,11 @@ class FeatureExtractionMixin(object):
         Returns:
             `Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the feature extractor object.
         """
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
+            cache_dir=kwargs.pop("cache_dir", None),
+        )
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
@@ -257,9 +262,8 @@ class FeatureExtractionMixin(object):
                 feature_extractor_file = "/".join(
                     [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
                 )
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, default_root)
+                resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, cache_dir)
             except Exception:
                 # For any other exception, we throw a generic error.
                 raise EnvironmentError(

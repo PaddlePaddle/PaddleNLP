@@ -154,6 +154,9 @@ class Task(metaclass=abc.ABCMeta):
     def _check_predictor_type(self):
         if paddle.get_device() == "cpu" and self._infer_precision == "fp16":
             logger.warning("The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu.")
+        elif paddle.get_device().split(":", 1)[0] == "npu":
+            if self._infer_precision == "fp16":
+                logger.info("Inference on npu with fp16 precison")
         else:
             if self._infer_precision == "fp16":
                 self._predictor_type = "onnxruntime"
@@ -324,6 +327,29 @@ class Task(metaclass=abc.ABCMeta):
 
         self._static_model_file = self.inference_model_path + ".pdmodel"
         self._static_params_file = self.inference_model_path + ".pdiparams"
+
+        if paddle.get_device().split(":", 1)[0] == "npu" and self._infer_precision == "fp16":
+            # transform fp32 model tp fp16 model
+            self._static_fp16_model_file = self.inference_model_path + "-fp16.pdmodel"
+            self._static_fp16_params_file = self.inference_model_path + "-fp16.pdiparams"
+            if not os.path.exists(self._static_fp16_model_file) and not os.path.exists(self._static_fp16_params_file):
+                logger.info("Converting to the inference model from fp32 to fp16.")
+                paddle.inference.convert_to_mixed_precision(
+                    os.path.join(self._static_model_file),
+                    os.path.join(self._static_params_file),
+                    os.path.join(self._static_fp16_model_file),
+                    os.path.join(self._static_fp16_params_file),
+                    backend=paddle.inference.PlaceType.CUSTOM,
+                    mixed_precision=paddle.inference.PrecisionType.Half,
+                    # Here, npu sigmoid will lead to OOM and cpu sigmoid don't support fp16.
+                    # So, we add sigmoid to black list temporarily.
+                    black_list={"sigmoid"},
+                )
+                logger.info(
+                    "The inference model in fp16 precison save in the path:{}".format(self._static_fp16_model_file)
+                )
+            self._static_model_file = self._static_fp16_model_file
+            self._static_params_file = self._static_fp16_params_file
         if self._predictor_type == "paddle-inference":
             self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
