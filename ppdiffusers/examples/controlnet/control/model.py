@@ -24,6 +24,7 @@ from paddlenlp.transformers import AutoTokenizer, CLIPTextModel
 from paddlenlp.utils.log import logger
 from ppdiffusers import (
     AutoencoderKL,
+    ControlNetModel,
     DDIMScheduler,
     DDPMScheduler,
     UNet2DConditionModel,
@@ -84,10 +85,7 @@ class ControlNet(nn.Layer):
         freeze_params(self.unet.parameters())
         logger.info("Freeze unet parameters!")
 
-        # assert model_args.controlnet_config_file is not None, "cant find controlnet_config_file!"
-
-        self.controlnet = UNet2DConditionModel.from_pretrained(unet_name_or_path, controlnet_hint_channels=3)
-        # self.controlnet = UNet2DConditionModel.from_config(**read_json(model_args.controlnet_config_file))
+        self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path, controlnet_conditioning_channels=3)
 
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
@@ -126,7 +124,7 @@ class ControlNet(nn.Layer):
         if self.use_ema:
             self.model_ema(self.control_model)
 
-    def forward(self, input_ids=None, pixel_values=None, controlnet_hint=None, **kwargs):
+    def forward(self, input_ids=None, pixel_values=None, controlnet_cond=None, **kwargs):
         self.train()
         with paddle.amp.auto_cast(enable=False):
             with paddle.no_grad():
@@ -141,20 +139,28 @@ class ControlNet(nn.Layer):
                 noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
                 encoder_hidden_states = self.text_encoder(input_ids)[0]
         # control
-        control = self.controlnet(
+        down_block_res_samples, mid_block_res_sample = self.controlnet(
             noisy_latents,
             timestep=timesteps,
             encoder_hidden_states=encoder_hidden_states,
-            controlnet_hint=controlnet_hint,
+            controlnet_cond=controlnet_cond,
+            return_dict=False,
         )
-        control = [c * scale for c, scale in zip(control, self.control_scales)]
+        down_block_res_samples = [
+            down_block_res_sample * controlnet_conditioning_scale
+            for down_block_res_sample, controlnet_conditioning_scale in zip(
+                down_block_res_samples, self.control_scales[:-1]
+            )
+        ]
+        mid_block_res_sample *= self.control_scales[-1]
 
         # predict the noise residual
         noise_pred = self.unet(
             noisy_latents,
             timestep=timesteps,
             encoder_hidden_states=encoder_hidden_states,
-            control=control,
+            down_block_additional_residuals=down_block_res_samples,
+            mid_block_additional_residual=mid_block_res_sample,
         ).sample
         loss = F.mse_loss(noise_pred, noise, reduction="mean")
         return loss
@@ -171,12 +177,12 @@ class ControlNet(nn.Layer):
         return image
 
     @paddle.no_grad()
-    def decode_control_image(self, controlnet_hint=None, **kwargs):
-        return 255 * (controlnet_hint.transpose([0, 2, 3, 1]) * 2.0 - 1.0).cast("float32").numpy().round()
+    def decode_control_image(self, controlnet_cond=None, **kwargs):
+        return 255 * (controlnet_cond.transpose([0, 2, 3, 1]) * 2.0 - 1.0).cast("float32").numpy().round()
 
     @paddle.no_grad()
     def log_image(
-        self, input_ids=None, controlnet_hint=None, height=512, width=512, eta=0.0, guidance_scale=7.5, **kwargs
+        self, input_ids=None, controlnet_cond=None, height=512, width=512, eta=0.0, guidance_scale=7.5, **kwargs
     ):
         self.eval()
         with self.ema_scope():
@@ -209,8 +215,8 @@ class ControlNet(nn.Layer):
             if accepts_eta:
                 extra_step_kwargs["eta"] = eta
 
-            controlnet_hint_input = (
-                paddle.concat([controlnet_hint] * 2) if do_classifier_free_guidance else controlnet_hint
+            controlnet_cond_input = (
+                paddle.concat([controlnet_cond] * 2) if do_classifier_free_guidance else controlnet_cond
             )
 
             for t in self.eval_scheduler.timesteps:
@@ -221,17 +227,27 @@ class ControlNet(nn.Layer):
                 latent_model_input = self.eval_scheduler.scale_model_input(latent_model_input, t)
 
                 # ControlNet predict the noise residual
-                control = self.controlnet(
-                    latent_model_input, t, encoder_hidden_states=text_embeddings, controlnet_hint=controlnet_hint_input
+                down_block_res_samples, mid_block_res_sample = self.controlnet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=text_embeddings,
+                    controlnet_cond=controlnet_cond_input,
+                    return_dict=False,
                 )
-                control = [c * scale for c, scale in zip(control, self.control_scales)]
-
+                down_block_res_samples = [
+                    down_block_res_sample * controlnet_conditioning_scale
+                    for down_block_res_sample, controlnet_conditioning_scale in zip(
+                        down_block_res_samples, self.control_scales[:-1]
+                    )
+                ]
+                mid_block_res_sample *= self.control_scales[-1]
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,
                     t,
                     encoder_hidden_states=text_embeddings,
-                    control=control,
+                    down_block_additional_residuals=down_block_res_samples,
+                    mid_block_additional_residual=mid_block_res_sample,
                 ).sample
 
                 # perform guidance
@@ -258,4 +274,4 @@ class ControlNet(nn.Layer):
                 layer.gradient_checkpointing = value
                 print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
-        self.apply(fn)
+        self.controlnet.apply(fn)

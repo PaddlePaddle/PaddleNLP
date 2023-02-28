@@ -45,9 +45,6 @@ class ModelArguments:
     image_logging_steps: Optional[int] = field(default=1000, metadata={"help": "Log image every X steps."})
     sd_locked: Optional[bool] = field(default=True, metadata={"help": "lock unet output_blocks and out."})
 
-    controlnet_config_file: Optional[str] = field(
-        default="./controlnet.json", metadata={"help": "controlnet_config_file"}
-    )
     # TODO, not support this
     only_mid_control: Optional[bool] = field(default=False, metadata={"help": "only_mid_control."})
 
@@ -58,22 +55,10 @@ class DataArguments:
     Arguments pertaining to what data we are going to input our model for training.
     """
 
-    file_list: str = field(
-        default="./data/filelist/train.filelist.list", metadata={"help": "The name of the file_list."}
-    )
     resolution: int = field(
         default=512,
         metadata={
             "help": "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
         },
-    )
-    num_records: int = field(default=10000000, metadata={"help": "num_records"})
-    buffer_size: int = field(
-        default=100,
-        metadata={"help": "Buffer size"},
-    )
-    shuffle_every_n_samples: int = field(
-        default=5,
-        metadata={"help": "shuffle_every_n_samples."},
     )
     file_path: str = field(default="./fill50k", metadata={"help": "The path to of the fill50k."})

@@ -408,7 +408,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
 
         return image
 
-    def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, device, generator, latents=None):
+    def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(

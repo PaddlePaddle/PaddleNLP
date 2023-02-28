@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import contextlib
+import os
 import sys
 
 import paddle.amp.auto_cast as autocast
@@ -24,6 +25,7 @@ from paddlenlp.trainer.integrations import (
     rewrite_logs,
 )
 from paddlenlp.utils.log import logger
+from ppdiffusers.modeling_utils import unwrap_model
 
 
 class VisualDLWithImageCallback(VisualDLCallback):
@@ -63,10 +65,10 @@ class VisualDLWithImageCallback(VisualDLCallback):
         ):
             with self.autocast_smart_context_manager(args):
                 image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"])
-                image_logs["control"] = model.decode_control_image(controlnet_hint=inputs["controlnet_hint"])
+                image_logs["control"] = model.decode_control_image(controlnet_cond=inputs["controlnet_cond"])
                 image_logs["ddim-samples-7.5"] = model.log_image(
                     input_ids=inputs["input_ids"],
-                    controlnet_hint=inputs["controlnet_hint"],
+                    controlnet_cond=inputs["controlnet_cond"],
                     guidance_scale=7.5,
                     height=args.resolution,
                     width=args.resolution,
@@ -104,3 +106,8 @@ class ControlNetTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         loss = model(**inputs)
         return loss
+
+    def _save(self, output_dir=None, state_dict=None):
+        super()._save(output_dir=output_dir, state_dict=state_dict)
+        output_dir = output_dir if output_dir is not None else self.args.output_dir
+        unwrap_model(self.model).controlnet.save_pretrained(os.path.join(output_dir, "controlnet"))
