@@ -122,20 +122,30 @@ class TextSimilarityTask(Task):
                 "dcff14cd671e1064be2c5d63734098bb",
             ],
         },
+        "__internal_testing__/tiny-random-bert": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/model_state.pdparams",
+                "a7a54deee08235fc6ae454f5def2d663",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/config.json",
+                "bfaa763f77da7cc796de4e0ad4b389e9",
+            ],
+        },
     }
 
-    def __init__(self, task, model, batch_size=1, max_seq_len=384, **kwargs):
+    def __init__(self, task, model, batch_size=1, max_length=384, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
-        self._check_task_files()
-        self._get_inference_model()
+        if not self.from_hf_hub:
+            self._check_task_files()
         if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
         self._construct_tokenizer(model)
         self._batch_size = batch_size
-        self._max_seq_len = max_seq_len
+        self._max_length = max_length
         self._usage = usage
         self.model_name = model
 
@@ -185,16 +195,16 @@ class TextSimilarityTask(Task):
         for data in inputs:
             text1, text2 = data[0], data[1]
             if "rocketqa" in self.model_name:
-                encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_seq_len=self._max_seq_len)
+                encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_length=self._max_length)
                 ids = encoded_inputs["input_ids"]
                 segment_ids = encoded_inputs["token_type_ids"]
                 examples.append((ids, segment_ids))
             else:
-                text1_encoded_inputs = self._tokenizer(text=text1, max_seq_len=self._max_seq_len)
+                text1_encoded_inputs = self._tokenizer(text=text1, max_length=self._max_length)
                 text1_input_ids = text1_encoded_inputs["input_ids"]
                 text1_token_type_ids = text1_encoded_inputs["token_type_ids"]
 
-                text2_encoded_inputs = self._tokenizer(text=text2, max_seq_len=self._max_seq_len)
+                text2_encoded_inputs = self._tokenizer(text=text2, max_length=self._max_length)
                 text2_input_ids = text2_encoded_inputs["input_ids"]
                 text2_token_type_ids = text2_encoded_inputs["token_type_ids"]
 
