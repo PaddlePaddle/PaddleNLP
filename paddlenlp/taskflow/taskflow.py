@@ -72,6 +72,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",
@@ -197,6 +201,10 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": "sentiment_analysis-uie-senta-nano",
             },
+            "__internal_testing__/tiny-random-skep": {
+                "task_class": SkepTask,
+                "task_flag": "sentiment_analysis-tiny-random-skep",
+            },
         },
         "default": {"model": "bilstm"},
     },
@@ -244,6 +252,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-ernie-search-large-cross-encoder-marco-en",
             },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
+            },
         },
         "default": {"model": "simbert-base-chinese"},
     },
@@ -264,8 +276,23 @@ TASKS = {
                 "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
                 "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
             },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese-V1",
+                "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+            },
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+            },
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+            },
         },
-        "default": {"model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"},
+        "default": {"model": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"},
     },
     "word_segmentation": {
         "modes": {
@@ -665,6 +692,11 @@ TASKS = {
                 "task_class": MultimodalFeatureExtractionTask,
                 "task_flag": "feature_extraction-openai/clip-rn50x4",
                 "task_priority_path": "openai/clip-rn50x4",
+            },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
             },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},

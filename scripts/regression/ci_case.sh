@@ -182,13 +182,13 @@ print_info $? skep_train_aspect
 time ( python -m paddle.distributed.launch train_opinion.py  --batch_size 4 --epochs 1 --device gpu --save_dir ./opinion_checkpoints >${log_path}/skep_train_opinion) >>${log_path}/skep_train_opinion 2>&1
 print_info $? skep_train_opinion
 # predict_sentence
-time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --params_path checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
+time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --ckpt_dir checkpoints/model_100 >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
 print_info $? skep_predict_sentence
 ## predict_aspect
-time (python predict_aspect.py --device 'gpu' --params_path ./aspect_checkpoint/model_100/model_state.pdparams  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
+time (python predict_aspect.py --device 'gpu' --ckpt_dir ./aspect_checkpoints/model_100  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
 print_info $? skep_predict_aspect
 # # predict_opinion
-time (python predict_opinion.py --device 'gpu' --params_path ./opinion_checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
+time (python predict_opinion.py --device 'gpu' --ckpt_dir ./opinion_checkpoints/model_100 >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
 print_info $? skep_predict_opinion
 }
 # 6 bigbird

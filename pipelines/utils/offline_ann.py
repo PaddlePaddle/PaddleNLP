@@ -42,6 +42,7 @@ parser.add_argument("--share_parameters", action="store_true", help="Use to cont
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select devices, defaults to gpu.")
+parser.add_argument('--search_fields', default=['content', 'name'], help="multi recall BM25Retriever set search_fields")
 args = parser.parse_args()
 # yapf: enable
 
@@ -66,6 +67,7 @@ def offline_ann(index_name, doc_dir):
             password="",
             embedding_dim=args.embedding_dim,
             index=index_name,
+            search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
         )
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(

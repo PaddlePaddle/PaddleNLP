@@ -114,8 +114,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+        choices=["cpu", "gpu", "xpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
     parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")

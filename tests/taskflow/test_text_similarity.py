@@ -34,8 +34,7 @@ class TestTextSimilarityTask(unittest.TestCase):
         # static simbert test
         similarity = Taskflow(
             task="text_similarity",
-            model="simbert-base-chinese",
-            task_path="__internal_testing__/tiny-random-bert",
+            model="__internal_testing__/tiny-random-bert",
         )
         results = similarity([["世界上什么东西最小", "世界上什么东西最小？"]])
         self.assertTrue(len(results) == 1)
