@@ -14,7 +14,9 @@ limitations under the License. */
 #pragma once
 
 #include "fastertransformer/utils/common.h"
+#ifdef WITH_FT5
 #include "src/fastertransformer5/utils/cuda_utils.h"
+#endif
 
 
 namespace fastertransformer {
@@ -40,6 +42,7 @@ public:
 
 }  // namespace fastertransformer
 
+#ifdef WITH_FT5
 namespace fastertransformer5 {
 
 template <paddle::DataType D>
@@ -70,3 +73,4 @@ public:
 };
 
 }  // namespace fastertransformer5
+#endif

@@ -24,6 +24,9 @@ const int64_t numel(const std::vector<int64_t>& tensor_shape) {
     return n;
 }
 
+
+#ifdef WITH_FT5
+
 namespace ft = fastertransformer5;
 
 std::vector<size_t> convert_shape(paddle::Tensor tensor) {
@@ -102,3 +105,4 @@ CublasWrapperMutex* CublasWrapperMutex::GetInstance() {
 CublasWrapperMutex::~CublasWrapperMutex() {
   delete mutex_;
 }
+#endif

@@ -17,7 +17,9 @@ limitations under the License. */
 #include <stdint.h>
 #include <vector>
 
+#ifdef WITH_FT5
 #include "src/fastertransformer5/utils/Tensor.h"
+#endif
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
@@ -34,6 +36,7 @@ limitations under the License. */
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape);
 
+#ifdef WITH_FT5
 template<typename T, typename D>
 inline T* get_ptr(paddle::Tensor& t) {
     return reinterpret_cast<T*>(t.data<D>());
@@ -90,3 +93,4 @@ class CublasWrapperMutex {
 
   std::mutex* mutex_;
 };
+#endif

@@ -24,10 +24,13 @@
 
 #include "fusion_gpt_op.h"
 #include "pd_traits.h"
+
+#ifdef WITH_FT5
 #include "src/fastertransformer5/utils/nvtx_utils.h"
 
 #include "src/fastertransformer5/models/multi_gpu_gpt/ParallelGpt.h"
 #include "src/fastertransformer5/utils/cuda_bf16_wrapper.h"
+#endif
 
 #include "utils.h"
 #include "cublas_handle.h"
@@ -86,6 +89,7 @@ std::vector<paddle::Tensor> gpt_kernel(
         const int& tensor_para_size = 1,
         const int& layer_para_size = 1,
         const int& layer_para_batch_size = 1) {
+#ifdef WITH_FT5
     static char* enable_ft5_env_char = std::getenv("ENABLE_FT5");
     bool is_enable_ft5 = (enable_ft5_env_char != nullptr && (std::string(enable_ft5_env_char) == "ON" || std::string(enable_ft5_env_char) == "1")) ? true : false;
 
@@ -285,6 +289,8 @@ std::vector<paddle::Tensor> gpt_kernel(
 
         delete cublas_algo_map;
     } else {
+#endif
+
         namespace ft = fastertransformer;
 
         auto input_dims = input.shape();
@@ -445,7 +451,9 @@ std::vector<paddle::Tensor> gpt_kernel(
         delete gpt_decoding;
         delete[] params;
 
+#ifdef WITH_FT5
     }
+#endif
 
     return {output_ids};
 }
