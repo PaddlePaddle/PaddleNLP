@@ -245,7 +245,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
             untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
 
             if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
-                text_input_ids, untruncated_ids
+                paddle.to_tensor(text_input_ids), paddle.to_tensor(untruncated_ids)
             ):
                 removed_text = self.tokenizer.batch_decode(
                     untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
