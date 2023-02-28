@@ -188,8 +188,6 @@ class FunnelConfig(PretrainedConfig):
         self.truncate_seq = truncate_seq
         self.pool_q_only = pool_q_only
 
-        self.items()  # strange way to initialize the dict
-
     @property
     def hidden_size(self):
         return self.d_model
