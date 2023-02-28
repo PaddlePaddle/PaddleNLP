@@ -156,6 +156,18 @@ senta("怀着十分激动的心情放映，可是看着看着发现，在放映�
 '''
 ```
 
+如果想使用自己训练好的模型加载进Taskflow进行预测，可以使用参数`task_path`进行指定模型路径，需要注意的是，该路径下需要存放模型文件以及相应的Tokenizer文件（训练过程中，已保存这两者相关文件）。
+
+```python
+from paddlenlp import Taskflow
+
+senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch", task_path="./checkpoints/model_100")
+senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
+'''
+[{'text': '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般', 'label': 'negative', 'score': 0.9686369299888611}]
+'''
+```
+
 #### 模型部署
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数。在进行模型转换时，需要通过参数`ckpt_dir`指定训练好的模型存放目录，通过`output_path`指定静态图模型参数保存路径，详情请参考export_model.py。模型转换命令如下：
@@ -254,4 +266,6 @@ python predict_opinion.py \
     --device "gpu"
 ```
 
-**备注**：评价对象级情感分类和观点抽取两类任务的模型部署方式可参考语句级情感分类，这里不再赘述。
+**备注**：
+1. 评价对象级情感分类和观点抽取两类任务的模型部署方式可参考语句级情感分类，这里不再赘述。
+2. 评级级情感分类以及观点抽取，暂不支持skep模型的Taskflow离线模型加载。如需使用此类功能，请参考：[unified_sentiment_analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction)。

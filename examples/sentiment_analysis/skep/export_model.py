@@ -43,7 +43,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: "negative", 1: "positive"}
-    model = SkepForSequenceClassification.from_pretrained(args.ckpt_dir, num_classes=len(label_map))
+    model = SkepForSequenceClassification.from_pretrained(args.ckpt_dir, num_labels=len(label_map))
     print("Loaded model from %s" % args.ckpt_dir)
 
     model.eval()
