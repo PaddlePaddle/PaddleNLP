@@ -17,7 +17,7 @@
 import logging
 from collections import OrderedDict
 from collections.abc import Iterable
-from dataclasses import dataclass, fields
+from dataclasses import fields
 
 import numpy as np
 import paddle
@@ -27,6 +27,7 @@ from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
 from .. import PretrainedModel as PreTrainedModel
 from .. import register_base_model
 from ..activations import ACT2FN
+from ..model_outputs import BaseModelOutput
 from .configuration import (
     FUNNEL_PRETRAINED_INIT_CONFIGURATION,
     FUNNEL_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1599,32 +1600,3 @@ class ModelOutput(OrderedDict):
         Convert self to a tuple containing all the attributes/keys that are not ``None``.
         """
         return tuple(self[k] for k in self.keys())
-
-
-@dataclass
-class BaseModelOutput(ModelOutput):
-    """
-    Base class for model's outputs, with potential hidden states and attentions.
-
-    Args:
-        last_hidden_state (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`):
-            Sequence of hidden-states at the output of the last layer of the model.
-        hidden_states (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_hidden_states=True`` is passed or when ``config.output_hidden_states=True``):
-            Tuple of :obj:`paddle.Tensor` (one for the output of the embeddings + one for the output of each layer)
-            of shape :obj:`(batch_size, sequence_length, hidden_size)`.
-
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_attentions=True`` is passed or when ``config.output_attentions=True``):
-            Tuple of :obj:`paddle.Tensor` (one for each layer) of shape :obj:`(batch_size, num_heads,
-            sequence_length, sequence_length)`.
-
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-            heads.
-    """
-
-    last_hidden_state = None
-    hidden_states = None
-    attentions = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
