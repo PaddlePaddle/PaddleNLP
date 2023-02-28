@@ -211,6 +211,7 @@ class ModelTesterMixin:
                 )
             out_len = len(outputs)
             print("out_len:", out_len)
+            print(outputs)
             if self.is_encoder_decoder:
                 correct_outlen = 5
 
