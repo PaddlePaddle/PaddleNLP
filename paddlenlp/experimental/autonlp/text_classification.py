@@ -246,7 +246,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "trainer_type": "PromptTrainer",
                 "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
                 "early_stopping_patience": 5,
-                "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
                 "num_train_epochs": 100,

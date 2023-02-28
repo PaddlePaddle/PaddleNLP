@@ -98,7 +98,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     @abstractmethod
     def _default_training_argument(self) -> TrainingArguments:
         """
-        Default CompressionArguments for the Trainer
+        Default TrainingArguments for the Trainer
         """
         return TrainingArguments(
             output_dir=self.training_path,
