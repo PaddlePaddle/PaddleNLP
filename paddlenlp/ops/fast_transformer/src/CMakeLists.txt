@@ -314,8 +314,17 @@ else(ON_INFER)
   endif()
 
   add_library(decoding_op SHARED ${decoding_op_files})
-  add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost extern_fastertransformer5)
+  add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
+
+  if (WITH_FT5)
+    add_dependencies(decoding_op extern_fastertransformer5)
+  endif()
+
   set_property(TARGET decoding_op PROPERTY POSITION_INDEPENDENT_CODE  ON)
   set_property(TARGET decoding_op PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)
-  target_link_libraries(decoding_op PUBLIC -lcublas -lcudart ${lib_link} ${ft_lib_link} ${ft5_lib_link})
+  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
+
+  if (WITH_FT5)
+    target_link_libraries(decoding_op PUBLIC ${ft5_lib_link})
+  endif()
 endif()
