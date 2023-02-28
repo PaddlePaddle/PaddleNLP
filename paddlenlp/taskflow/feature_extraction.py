@@ -182,9 +182,7 @@ class MultimodalFeatureExtractionTask(Task):
         },
     }
 
-    def __init__(
-        self, task, model, batch_size=1, is_static_model=True, max_seq_len=128, return_tensors="pd", **kwargs
-    ):
+    def __init__(self, task, model, batch_size=1, is_static_model=True, max_length=128, return_tensors="pd", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
         # we do not use batch
@@ -193,7 +191,7 @@ class MultimodalFeatureExtractionTask(Task):
         self.return_tensors = return_tensors
         if not self._custom_model:
             self._check_task_files()
-        self._max_seq_len = max_seq_len
+        self._max_length = max_length
         self._construct_tokenizer()
         self.is_static_model = is_static_model
         self._config_map = {}
@@ -239,7 +237,7 @@ class MultimodalFeatureExtractionTask(Task):
                     images=batch_images,
                     return_tensors="np",
                     padding="max_length",
-                    max_seq_len=self._max_seq_len,
+                    max_length=self._max_length,
                     truncation=True,
                 )
             else:
@@ -249,7 +247,7 @@ class MultimodalFeatureExtractionTask(Task):
                     images=batch_images,
                     return_tensors="pd",
                     padding="max_length",
-                    max_seq_len=self._max_seq_len,
+                    max_length=self._max_length,
                     truncation=True,
                 )
             return tokenized_inputs

@@ -32,7 +32,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
         cls.max_resolution = 40
         cls.min_resolution = 30
         cls.num_channels = 3
-        cls.max_seq_len = 30
+        cls.max_length = 30
         cls.model = "__internal_testing__/tiny-random-ernievil2"
 
     @classmethod
@@ -45,7 +45,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         outputs = feature_extractor("This is a test")
         self.assertEqual(outputs["features"].shape, (1, 32))
@@ -56,7 +56,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task="feature_extraction",
             task_path=self.model,
             return_tensors="pd",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         outputs = feature_extractor(
             "This is a test",
@@ -102,7 +102,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task_path=self.model,
             is_static_model=False,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
@@ -115,7 +115,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             is_static_model=True,
             return_tensors="np",
             device_id=0,
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         static_results = static_taskflow(input_text)
         self.assertEqual(static_results["features"].shape[0], 2)
@@ -146,7 +146,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task_path=self.model,
             is_static_model=False,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         dygraph_results = dygraph_taskflow(input_text)
         shape = dygraph_results["features"].shape
@@ -158,7 +158,7 @@ class TestMultimodalFeatureExtractionTask(unittest.TestCase):
             task_path=self.model,
             is_static_model=True,
             return_tensors="np",
-            max_seq_len=self.max_seq_len,
+            max_length=self.max_length,
         )
         static_results = static_taskflow(input_text)
         self.assertEqual(static_results["features"].shape[0], 2)
