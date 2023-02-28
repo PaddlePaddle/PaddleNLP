@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import shutil
 import unittest
 
 from paddlenlp.taskflow import Taskflow
@@ -20,10 +22,14 @@ from paddlenlp.taskflow import Taskflow
 class TestSentimentAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # TODO rmtree will remove in the future
+        if os.path.exists("__internal_testing__/tiny-random-skep"):
+            shutil.rmtree("__internal_testing__/tiny-random-skep")
+
         cls.senta = Taskflow(
             task="sentiment_analysis",
             model="skep_ernie_1.0_large_ch",
-            # task_path="__internal_testing__/tiny-random-skep",
+            task_path="__internal_testing__/tiny-random-skep",
         )
 
     def test_single(self):
