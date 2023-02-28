@@ -12,16 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""PyTorch BLOOM model."""
+"""Paddle BLOOM model."""
 from __future__ import annotations
 
 import math
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import paddle
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.fluid.framework import in_dygraph_mode
+import paddle.nn.functional as F
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -46,6 +48,15 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
+def finfo(dtype):
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
+    
+
 def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_split_chunks: bool = False):
     """Split a tensor along its last dimension -> query/key/value layer
     Args:
@@ -61,7 +72,81 @@ def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_
 
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
-    return paddle.where(mask, y, x)
+    return paddle.where(paddle.cast(mask, "bool"), y, x)
+
+
+def _make_causal_mask(input_ids_shape, past_key_values_length: int) -> Tensor:
+    """
+    Make causal mask used for self-attention.
+    """
+    batch_size, target_length = input_ids_shape
+    mask = paddle.zeros((target_length, target_length + past_key_values_length), dtype=paddle.float32)
+    # ONNX doesn't support `Tensor.triu` properly, thus we use this workaround
+    seq_ids = paddle.arange(target_length)
+    mask[:, past_key_values_length:] = paddle.cast(seq_ids[:, None] < seq_ids[None, :], mask.dtype)
+
+    if past_key_values_length > 0:
+        mask[:, :past_key_values_length] = False
+
+    expanded_mask = mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+    return expanded_mask
+
+
+def _expand_mask(mask: Tensor, tgt_length: int) -> Tensor:
+    """
+    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
+    """
+    batch_size, src_length = mask.shape
+    tgt_length = tgt_length if tgt_length is not None else src_length
+
+    expanded_mask = ~(paddle.cast(mask[:, None, None, :], "bool"))
+    expanded_mask = paddle.cast(expanded_mask, dtype=paddle.float32)
+    
+    return expanded_mask.expand([batch_size, 1, tgt_length, src_length])
+
+
+def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
+    """
+    Link to paper: https://arxiv.org/abs/2108.12409 Alibi tensor is not causal as the original paper mentions, it
+    relies on a translation invariance of softmax for quick implementation: with l being a tensor, and a fixed value
+    `softmax(l+a) = softmax(l)`. Based on
+    https://github.com/ofirpress/attention_with_linear_biases/blob/a35aaca144e0eb6b789dfcb46784c4b8e31b7983/fairseq/models/transformer.py#L742
+    TODO @thomasw21 this doesn't work as nicely due to the masking strategy, and so masking varies slightly.
+
+    Args:
+    Returns tensor shaped (batch_size * num_heads, 1, max_seq_len)
+        attention_mask (`Tensor`):
+            Token-wise attention mask, this should be of shape (batch_size, max_seq_len).
+        num_heads (`int`, *required*):
+            number of heads
+        dtype (`torch.dtype`, *optional*, default=`torch.bfloat16`):
+            dtype of the output tensor
+    """
+    batch_size, seq_length = attention_mask.shape
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = paddle.to_tensor(
+        2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32
+    )
+    powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
+    slopes = paddle.pow(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = paddle.tensor(
+            2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3))),  dtype=paddle.float32
+        )
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = paddle.arange(1, 1 + 2 * num_remaining_heads, 2, dtype=paddle.int32)
+        slopes = paddle.concat([slopes, paddle.pow(extra_base, extra_powers)], axis=0)
+
+    # Note: alibi will added to the attention bias that will be applied to the query, key product of attention
+    # => therefore alibi will have to be of shape (batch_size, num_heads, query_length, key_length)
+    # => here we set (batch_size=1, num_heads=num_heads, query_length=1, key_length=max_length)
+    # => the query_length dimension will then be broadcasted correctly
+    # This is more or less identical to T5's relative position bias:
+    # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
+    arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
+    alibi = slopes[..., None] * arange_tensor
+    return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
 
 
 def attention_mask_func(attention_scores: Tensor, attention_mask: Tensor, causal_mask: Tensor):
@@ -84,46 +169,23 @@ def attention_mask_func(attention_scores: Tensor, attention_mask: Tensor, causal
     )
 
 
-def build_alibi_tensor(max_seq_len: int, n_head: int, dtype=paddle.bfloat16):
+def dropout_add(x: Tensor, residual: Tensor, prob: float, training: bool) -> Tensor:
     """
-    Link to paper: https://arxiv.org/abs/2108.12409 Alibi tensor is not causal as the original paper mentions, it
-    relies on a translation invariance of softmax for quick implementation: with l being a tensor, and a fixed value
-    `softmax(l+a) = softmax(l)`. Based on
-    https://github.com/ofirpress/attention_with_linear_biases/blob/a35aaca144e0eb6b789dfcb46784c4b8e31b7983/fairseq/models/transformer.py#L742
+    Dropout add function
 
     Args:
-    Returns tensor shaped (n_head, 1, max_seq_len)
-     hdiwipa   max_seq_len: (`int`, *required*):
-            max sequence length
-        n_head: (`int`, *required*):
-            number of heads
-        dtype: (`paddle.dtype`, *optional*, default=`paddle.bfloat16`):
-            dtype of the output tensor
+        x (`torch.tensor`, *required*):
+            input tensor
+        residual (`torch.tensor`, *required*):
+            esidual tensor
+        prob (`float`, *required*):
+            dropout probability
+        training (`bool`, *required*):
+            training mode
     """
-
-    def get_slopes(n):
-        def get_slopes_power_of_2(n):
-            start = 2 ** (-(2 ** -(math.log2(n) - 3)))
-            ratio = start
-            return [start * ratio**i for i in range(n)]
-
-        if math.log2(n).is_integer():
-            return get_slopes_power_of_2(n)
-        else:
-            closest_power_of_2 = 2 ** math.floor(math.log2(n))
-            return (
-                get_slopes_power_of_2(closest_power_of_2)
-                + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
-            )
-
-    slopes = paddle.to_tensor(get_slopes(n_head), dtype=dtype).unsqueeze(1).unsqueeze(1)
-    arange_tensor = paddle.arange(max_seq_len).unsqueeze(0).unsqueeze(0)
-    alibi = slopes * arange_tensor.expand([n_head, -1, -1])
-
-    alibi = paddle.cast(alibi, dtype=dtype)
-
-    return alibi
-
+    out = F.dropout(x, p=prob, training=training)
+    out = residual + out
+    return out
 
 def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
     """
@@ -227,6 +289,7 @@ def baddbmm(input, batch1, batch2, beta=1.0, alpha=1.0):
 #         return tmp
 
 
+
 class GeLUFunction(PyLayer):
     @staticmethod
     def forward(ctx, input):
@@ -236,8 +299,7 @@ class GeLUFunction(PyLayer):
     @staticmethod
     def backward(ctx, grad_output):
         input = ctx.saved_tensors
-        tmp = bloom_gelu_back(grad_output, input)
-        return tmp
+        return bloom_gelu_back(grad_output, input)
 
 
 class BloomGelu(nn.Layer):
@@ -261,57 +323,6 @@ class BloomGelu(nn.Layer):
             return bloom_gelu_forward(x)
 
 
-class BloomScaledSoftmax(nn.Layer):
-    """
-    fused operation: scaling + mask + softmax
-
-    Args:
-        input_in_fp16 (`bool`, *required*):
-            flag to indicate if input in fp16 data format.
-        input_in_bf16 (`bool`, *required*):
-            flag to indicate if input in bf16 data format.
-        scaled_masked_softmax_fusion (`bool`, *required*):
-            flag to indicate user want to use softmax fusion
-        mask_func (`function`, *required*):
-            mask function to be applied.
-        softmax_in_fp32 (`bool`, *required*):
-            if true, softmax in performed at fp32 precision.
-        scale (`float`, *required*):
-            scaling factor used in input tensor scaling.
-    """
-
-    def __init__(self, scaled_masked_softmax_fusion, mask_func, softmax_in_fp32, scale):
-        super().__init__()
-        self.scaled_masked_softmax_fusion = scaled_masked_softmax_fusion
-        self.mask_func = mask_func
-        self.softmax_in_fp32 = softmax_in_fp32
-        self.scale = scale
-
-        if not (self.scale is None or softmax_in_fp32):
-            raise ValueError("softmax should be in fp32 when scaled")
-
-    def forward(self, input, mask, max_positions):
-        input_dtype = input.dtype
-        input_in_16bit = input_dtype in [paddle.float16, paddle.bfloat16]
-        softmax_dtype = paddle.float32 if self.softmax_in_fp32 else input_dtype
-
-        if self.scale is not None:
-            input = input * self.scale
-
-        if mask is None:
-            mask = paddle.ones([input.shape[0], max_positions])
-
-        seq_ids = paddle.arange(max_positions)
-        causal_mask = (seq_ids[None, :] <= seq_ids[:, None]).reshape([1, 1, max_positions, max_positions])
-        mask_output, padded_causal_mask = self.mask_func(input, mask, causal_mask)
-        probs = nn.functional.softmax(mask_output, axis=-1, dtype=softmax_dtype) * (~padded_causal_mask)
-
-        if input_in_16bit and self.softmax_in_fp32:
-            probs = paddle.cast(probs, dtype=input_dtype)
-
-        return probs
-
-
 class BloomAttention(nn.Layer):
     def __init__(self, config, layer_number=None):
         super().__init__()
@@ -323,8 +334,6 @@ class BloomAttention(nn.Layer):
         self.num_heads = config.n_head
         self.head_dim = self.hidden_size // self.num_heads
         self.split_size = self.hidden_size
-        self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
-        self.masked_softmax_fusion = config.masked_softmax_fusion
         self.hidden_dropout = config.hidden_dropout
 
         if self.head_dim * self.num_heads != self.hidden_size:
@@ -334,140 +343,137 @@ class BloomAttention(nn.Layer):
             )
 
         # Layer-wise attention scaling
-        self.layer_number = max(1, layer_number)
-        self.norm_factor = math.sqrt(self.head_dim) * self.layer_number
-
-        # Scaled Softmax
-        self.scale_mask_softmax = BloomScaledSoftmax(
-            self.masked_softmax_fusion,
-            attention_mask_func,
-            self.attention_softmax_in_fp32,
-            self.layer_number,
-        )
+        self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
+        self.beta = 1.0
 
         self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias_attr=True)
         self.dense = nn.Linear(self.hidden_size, self.hidden_size)
         self.attention_dropout = nn.Dropout(config.attention_dropout)
 
+    def _split_heads(self, fused_qkv: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        """
+        Split the last dimension into (num_heads, head_dim) without making any copies, results share same memory
+        storage as `fused_qkv`
+
+        Args:
+            fused_qkv (`torch.tensor`, *required*): [batch_size, seq_length, num_heads * 3 * head_dim]
+
+        Returns:
+            query: [batch_size, seq_length, num_heads, head_dim] key: [batch_size, seq_length, num_heads, head_dim]
+            value: [batch_size, seq_length, num_heads, head_dim]
+        """
+        batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
+        fused_qkv = fused_qkv.reshape([batch_size, seq_length, self.num_heads, 3, self.head_dim])
+        return fused_qkv[..., 0, :], fused_qkv[..., 1, :], fused_qkv[..., 2, :]
+
+    def _merge_heads(self, x: Tensor) -> Tensor:
+        """
+        Merge heads together over the last dimenstion
+
+        Args:
+            x: (`torch.tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]
+
+        Returns:
+            torch.tensor: [batch_size, seq_length, num_heads * head_dim]
+        """
+        # What we want to achieve is:
+        # batch_size * num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads * head_dim
+        batch_size_and_num_heads, seq_length, _ = x.shape
+        batch_size = batch_size_and_num_heads // self.num_heads
+
+        # First view to decompose the batch size
+        # batch_size * num_heads, seq_length, head_dim -> batch_size, num_heads, seq_length, head_dim
+        x = x.reshape([batch_size, self.num_heads, seq_length, self.head_dim])
+
+        # batch_size, num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads, head_dim
+        x = x.transpose([0, 2, 1, 3])
+
+        # batch_size, seq_length, num_heads, head_dim -> batch_size, seq_length, num_heads * head_dim
+        return x.reshape([batch_size, seq_length, self.num_heads * self.head_dim])
+
+
     def forward(
         self,
-        hidden_states,
-        residual,
-        layer_past=None,
-        attention_mask=None,
-        alibi=None,
-        head_mask=None,
-        use_cache=False,
-        output_attentions=False,
+        hidden_states: Tensor,
+        residual: Tensor,
+        alibi: Tensor,
+        attention_mask: Tensor,
+        layer_past: Optional[Tuple[Tensor, Tensor]] = None,
+        head_mask: Optional[Tensor] = None,
+        use_cache: bool = False,
+        output_attentions: bool = False,
     ):
-        # hidden_states: [batch_size, seq_length, hidden_size]
-        # repeat alibi tensor with the batch size
-        alibi = alibi.repeat_interleave(hidden_states.shape[0], axis=1)
+        fused_qkv = self.query_key_value(hidden_states)  # [batch_size, seq_length, 3 x hidden_size]
 
-        # apply preprocessing if the input is padded
-        if attention_mask is not None and 0 in attention_mask:
-            alibi = pre_process_alibi_for_pad(alibi, attention_mask, self.num_heads)
+        # 3 x [batch_size, seq_length, num_heads, head_dim]
+        (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
 
-        mixed_x_layer = self.query_key_value(hidden_states)
+        batch_size, q_length, _, _ = query_layer.shape
 
-        # [batch_size, seq_length, 3 x hidden_size] --> [batch_size, seq_length, num_heads, 3 x head_dim]
-        new_tensor_shape = mixed_x_layer.shape[:-1] + [self.num_heads, 3 * self.head_dim]
-        mixed_x_layer = mixed_x_layer.reshape(new_tensor_shape)
-
-        # [batch_size, seq_length, num_heads, 3 x head_dim] --> 3  [batch_size, seq_length, num_heads, head_dim]
-        (query_layer, key_layer, value_layer) = split_tensor_along_last_dim(mixed_x_layer, 3)
-
+        query_layer = query_layer.transpose([0, 2, 1, 3]).reshape([batch_size * self.num_heads, q_length, self.head_dim])
+        key_layer = key_layer.transpose([0, 2, 3, 1]).reshape([batch_size * self.num_heads, self.head_dim, q_length])
+        value_layer = value_layer.transpose([0, 2, 1, 3]).reshape([batch_size * self.num_heads, q_length, self.head_dim])
         if layer_past is not None:
             past_key, past_value = layer_past
-            key_layer = paddle.cat((past_key.type_as(key_layer), key_layer), axis=1)
-            value_layer = paddle.cat((past_value.type_as(value_layer), value_layer), axis=1)
+            # concatenate along seq_length dimension:
+            #  - key: [batch_size * self.num_heads, head_dim, kv_length]
+            #  - value: [batch_size * self.num_heads, kv_length, head_dim]
+            key_layer = paddle.concat((past_key, key_layer), axis=2)
+            value_layer = paddle.concat((past_value, value_layer), axis=1)
+
+        _, _, kv_length = key_layer.shape
 
         if use_cache is True:
             present = (key_layer, value_layer)
         else:
             present = None
 
-        # [batch_size, head_dim, q_length, k_length]
-        output_size = (query_layer.shape[0], query_layer.shape[2], query_layer.shape[1], key_layer.shape[1])
+        # [batch_size * num_heads, q_length, kv_length]
+        # we use `Tensor.baddbmm` instead of `torch.baddbmm` as the latter isn't supported by TorchScript v1.11
+        matmul_result = baddbmm(alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor)
 
-        # [batch_size, q_length, num_heads, head_dim] -> [q_length, batch_size * num_heads, head_dim]
-        query_layer = query_layer.transpose([1, 0, 2, 3]).reshape(
-            [output_size[2], output_size[0] * output_size[1], -1]
-        )
+        # change view to [batch_size, num_heads, q_length, kv_length]
+        attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
-        # [batch_size, k_length, num_heads, head_dim] -> [k_length, batch_size * num_heads, head_dim]
-        key_layer = key_layer.transpose([1, 0, 2, 3]).reshape([output_size[3], output_size[0] * output_size[1], -1])
+        # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
+        input_dtype = attention_scores.dtype
+        # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
+        if input_dtype == paddle.float16:
+            attention_scores = paddle.cast(attention_scores, paddle.float32)
+        attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
 
-        # slice alibi tensor until the query length
-        sliced_alibi = alibi[: output_size[0] * output_size[1], :, : output_size[3]]
+        attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
 
-        # Raw attention scores. [batch_size * num_heads, q_length, k_length]
-        beta = 1.0 / self.layer_number
-
-        matmul_result = baddbmm(
-            sliced_alibi,
-            query_layer.transpose([1, 0, 2]),
-            key_layer.transpose([1, 0, 2]).transpose([0, 2, 1]),
-            beta=beta,
-            alpha=(1.0 / self.norm_factor),
-        )
-
-        # change view to [batch_size, num_heads, q_length, k_length]
-        attention_scores = matmul_result.reshape([*output_size])
-
-        # attention scores and attention mask [b, np, sq, sk]
-        max_positions = max(attention_scores.shape[-1], attention_scores.shape[-2])
-        attention_probs = self.scale_mask_softmax(attention_scores, attention_mask, max_positions)
+        # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
 
         if head_mask is not None:
             attention_probs = attention_probs * head_mask
 
-        # context layer shape: [batch_size, num_heads, q_length, head_dim]
-        output_size = (value_layer.shape[0], value_layer.shape[2], query_layer.shape[0], value_layer.shape[3])
-
-        # change view [k_length, batch_size x num_heads, head_dim]
-        value_layer = value_layer.transpose([1, 0, 2, 3]).reshape(
-            [value_layer.shape[1], output_size[0] * output_size[1], -1]
-        )
-
-        # change view [batch_size x num_heads, q_length, k_length]
-        attention_probs_reshaped = attention_probs.reshape([output_size[0] * output_size[1], output_size[2], -1])
+        # change view [batch_size x num_heads, q_length, kv_length]
+        attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
 
         # matmul: [batch_size * num_heads, q_length, head_dim]
-        context_layer = paddle.bmm(attention_probs_reshaped, value_layer.transpose([1, 0, 2]))
+        context_layer = paddle.bmm(attention_probs_reshaped, value_layer)
 
         # change view [batch_size, num_heads, q_length, head_dim]
-        context_layer = context_layer.reshape([*output_size])
-
-        # [batchs_size, num_heads, q_length, head_dim] --> [q_length, batch_size, num_heads, head_dim]
-        # context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
-        context_layer = context_layer.transpose([2, 0, 1, 3])
-
-        # [q_length, batch_size, num_heads, head_dim] --> [q_length, batch_size, hidden_size]
-        new_context_layer_shape = context_layer.shape[:-2] + [self.hidden_size]
-
-        context_layer = context_layer.reshape([*new_context_layer_shape])
-
-        # Output. [q_length, batch_size, hidden_size]
+        context_layer = self._merge_heads(context_layer)
 
         # aggregate results across tp ranks. See here: https://github.com/pytorch/pytorch/issues/76232
         if self.pretraining_tp > 1 and self.slow_but_exact:
-            slices = context_layer.shape[-1] / self.pretraining_tp
+            slices = self.hidden_size / self.pretraining_tp
             output_tensor = paddle.zeros_like(context_layer)
             for i in range(self.pretraining_tp):
-                output_tensor = output_tensor + nn.functional.linear(
+                output_tensor = output_tensor + F.linear(
                     context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
                     self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
                 )
         else:
             output_tensor = self.dense(context_layer)
 
-        output = output_tensor.transpose([1, 0, 2])
+        output_tensor = dropout_add(output_tensor, residual, self.hidden_dropout, self.training)
 
-        output = dropout_add(output, residual, self.hidden_dropout, self.training)
-
-        outputs = (output, present)
+        outputs = (output_tensor, present)
         if output_attentions:
             outputs += (attention_probs,)
 
@@ -605,6 +611,45 @@ class BloomPreTrainedModel(PretrainedModel):
         if isinstance(module, BloomModel):
             module.gradient_checkpointing = value
 
+    @staticmethod
+    def _convert_to_bloom_cache(
+        past_key_value: Tuple[Tuple[Tensor, Tensor]]
+    ) -> Tuple[Tuple[Tensor, Tensor]]:
+        """
+        Converts the cache to the format expected by Bloom, i.e. to tuple(tuple([batch_size * num_heads, ...]))
+        """
+        batch_size, num_heads, head_dim, seq_length = past_key_value[0][0].shape
+        batch_size_times_num_heads = batch_size * num_heads
+        # key:  [batch_size, num_heads, head_dim, seq_length] -> [batch_size * num_heads, head_dim, seq_length]
+        # value: [batch_size, num_heads, seq_length, head_dim] -> [batch_size * num_heads, seq_length, head_dim]
+        return tuple(
+            (
+                layer_past[0].reshape([batch_size_times_num_heads, head_dim, seq_length]),
+                layer_past[1].reshape([batch_size_times_num_heads, seq_length, head_dim]),
+            )
+            for layer_past in past_key_value
+        )
+
+    @staticmethod
+    def _convert_to_standard_cache(
+        past_key_value: Tuple[Tuple[Tensor, Tensor]], batch_size: int
+    ) -> Tuple[Tuple[Tensor, Tensor]]:
+        """
+        Standardizes the format of the cache so as to match most implementations, i.e. to tuple(tuple([batch_size,
+        num_heads, ...]))
+        """
+        batch_size_times_num_heads, head_dim, seq_length = past_key_value[0][0].shape
+        num_heads = batch_size_times_num_heads // batch_size
+        # key: [batch_size * num_heads, head_dim, seq_length] -> [batch_size, num_heads, head_dim, seq_length]
+        # value: [batch_size * num_heads, seq_length, head_dim] -> [batch_size, num_heads, seq_length, head_dim]
+        return tuple(
+            (
+                layer_past[0].reshape([batch_size, num_heads, head_dim, seq_length]),
+                layer_past[1].reshape([batch_size, num_heads, seq_length, head_dim]),
+            )
+            for layer_past in past_key_value
+        )
+
     def _convert_head_mask_to_5d(self, head_mask, num_hidden_layers):
         """-> [num_hidden_layers x batch x num_heads x seq_length x seq_length]"""
         if head_mask.dim() == 1:
@@ -622,7 +667,6 @@ class BloomPreTrainedModel(PretrainedModel):
     ) -> Tensor:
         """
         Prepare the head mask if needed.
-
         Args:
             head_mask (`torch.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
                 The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
@@ -630,7 +674,6 @@ class BloomPreTrainedModel(PretrainedModel):
                 The number of hidden layers in the model.
             is_attention_chunked: (`bool`, *optional*, defaults to `False`):
                 Whether or not the attentions scores are computed by chunks or not.
-
         Returns:
             `torch.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
             `[None]` for each layer.
@@ -643,6 +686,7 @@ class BloomPreTrainedModel(PretrainedModel):
             head_mask = [None] * num_hidden_layers
 
         return head_mask
+
 
     @classmethod
     def _get_name_mappings(cls, config: BloomConfig) -> list[StateDictNameMapping]:
@@ -706,7 +750,31 @@ class BloomModel(
     def get_input_embeddings(self):
         return self.word_embeddings
 
-    def set_input_embeddings(self, new_embeddings):
+    def get_input_embeddings(self):
+        return self.word_embeddings
+
+    def _prepare_attn_mask(
+        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int
+    ) -> Tensor:
+        # create causal mask
+        # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
+        combined_attention_mask = None
+        _, src_length = input_shape
+
+        if src_length > 1:
+            combined_attention_mask = _make_causal_mask(
+                input_shape, past_key_values_length=past_key_values_length
+            )
+
+        # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
+        expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
+        combined_attention_mask = (
+            expanded_attn_mask if combined_attention_mask is None else paddle.logical_or(expanded_attn_mask, combined_attention_mask)
+        )
+
+        return combined_attention_mask
+
+    def set_input_embeddings(self, new_embeddings: Tensor):
         self.word_embeddings = new_embeddings
 
     def forward(
@@ -732,10 +800,9 @@ class BloomModel(
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = input_ids.shape
-            input_ids = input_ids.reshape([-1, input_shape[-1]])
+            batch_size, seq_length = input_ids.shape
         elif inputs_embeds is not None:
-            input_shape = inputs_embeds.shape[:-1]
+            batch_size, seq_length, _ = inputs_embeds.shape
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
@@ -744,8 +811,8 @@ class BloomModel(
 
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x n_head x N x N
-        # head_mask has shape n_layer x batch x n_head x N x N
+        # attention_probs has shape batch_size x num_heads x N x N
+        # head_mask has shape n_layer x batch x num_heads x N x N
         head_mask = self.get_head_mask(head_mask, self.config.n_layer)
 
         if inputs_embeds is None:
@@ -753,25 +820,32 @@ class BloomModel(
 
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
 
-        output_shape = input_shape + [hidden_states.shape[-1]]
-
         presents = () if use_cache else None
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
 
         # Compute alibi tensor: check build_alibi_tensor documentation
-        current_sequence_length = hidden_states.shape[1]
+        seq_length_with_past = seq_length
+        past_key_values_length = 0
         if past_key_values[0] is not None:
-            current_sequence_length += past_key_values[0][0].shape[1]
-        alibi = build_alibi_tensor(current_sequence_length, self.n_head, hidden_states.dtype)
+            past_key_values_length = past_key_values[0][0].shape[2]
+            seq_length_with_past = seq_length_with_past + past_key_values_length
+
+        if attention_mask is None:
+            attention_mask = paddle.ones((batch_size, seq_length_with_past))
+
+        alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+        causal_mask = self._prepare_attn_mask(
+            attention_mask,
+            input_shape=(batch_size, seq_length),
+            past_key_values_length=past_key_values_length,
+        )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
-
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
             if self.gradient_checkpointing and self.training:
-
                 if use_cache:
                     logger.warning(
                         "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
@@ -781,22 +855,24 @@ class BloomModel(
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
                         # None for past_key_value
-                        return module(*inputs, use_cache, output_attentions, alibi)
+                        return module(*inputs, use_cache=use_cache, output_attentions=output_attentions)
 
                     return custom_forward
 
-                outputs = paddle.distributed.fleet.utils.recompute(
+                # need change this block
+                outputs = torch.utils.checkpoint.checkpoint(
                     create_custom_forward(block),
                     hidden_states,
-                    None,
-                    attention_mask,
+                    alibi,
+                    causal_mask,
+                    layer_past,
                     head_mask[i],
                 )
             else:
                 outputs = block(
                     hidden_states,
                     layer_past=layer_past,
-                    attention_mask=attention_mask,
+                    attention_mask=causal_mask,
                     head_mask=head_mask[i],
                     use_cache=use_cache,
                     output_attentions=output_attentions,
@@ -815,8 +891,6 @@ class BloomModel(
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
-
-        hidden_states = hidden_states.reshape(output_shape)
 
         if not return_dict:
             return tuple(v for v in [hidden_states, presents, all_hidden_states, all_self_attentions] if v is not None)
@@ -937,7 +1011,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         beam_idx at every generation step.
         """
         return tuple(
-            tuple(past_state.index_select(0, beam_idx.to(past_state.device)) for past_state in layer_past)
+            tuple(past_state.index_select(0, beam_idx) for past_state in layer_past)
             for layer_past in past
         )
 
@@ -1013,7 +1087,7 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
                     "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
                 )
 
-        pooled_logits = logits[paddle.arange(batch_size, device=logits.device), sequence_lengths]
+        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
 
         loss = None
         if labels is not None:
