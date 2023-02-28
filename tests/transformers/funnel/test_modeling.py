@@ -250,7 +250,6 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
     bese_model_class = FunnelModel
     test_head_masking = False
     test_pruning = False
-    is_encoder_decoder = True
     all_model_classes = (
         FunnelModel,
         FunnelForSequenceClassification,
