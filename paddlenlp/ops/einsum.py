@@ -28,7 +28,7 @@ def einsum(equation, *operands):
             Uses uncased letters to specify the dimension of the operands and result. The input
             equation is on the left hand before `->` while the output equation is on the right side.
             Einsum can infer the result shape so that the `->` and the result label letters can be omitted.
-            Operands in the input equation are splited by commas (','), e.g. 'abc,cde' describes two 3D
+            Operands in the input equation are splitted by commas (','), e.g. 'abc,cde' describes two 3D
             operands. The dimensions labeled with same letter should be same or be 1. Ellipsis ('...') can
             be used to specify the broadcast dimensions.
 
@@ -129,14 +129,14 @@ def einsum(equation, *operands):
             is_right_summed_dim = right.shape[i] > 1
             if i in sum_dims_set:
                 if is_left_summed_dim and is_right_summed_dim:
-                    assert left.shape[i] == right.shape[i], "Non-brocast dim should be equal."
+                    assert left.shape[i] == right.shape[i], "Non-broadcast dim should be equal."
                     summed_size *= left.shape[i]
                 elif is_left_summed_dim:
                     left = left.sum(axis=i, keepdim=True)
                 elif is_right_summed_dim:
                     right = right.sum(axis=i, keepdim=True)
             elif is_left_summed_dim and is_right_summed_dim:
-                assert left.shape[i] == right.shape[i], "Non-brocast dim should be equal."
+                assert left.shape[i] == right.shape[i], "Non-broadcast dim should be equal."
                 batch_dims.append(i)
                 batch_size *= left.shape[i]
             elif is_left_summed_dim:
@@ -204,7 +204,7 @@ def einsum(equation, *operands):
         for ch in term:
             if ch == ".":
                 ell_char_count += 1
-                assert ell_char_count <= 3, "The '.' should only exist in one ellispis '...' in term {}".format(term)
+                assert ell_char_count <= 3, "The '.' should only exist in one ellipsis '...' in term {}".format(term)
                 if ell_char_count == 3:
                     if num_ell_idxes == -1:
                         num_ell_idxes = curr_num_ell_idxes
@@ -213,7 +213,7 @@ def einsum(equation, *operands):
                     else:
                         assert (
                             curr_num_ell_idxes == num_ell_idxes
-                        ), "Ellispis in all terms should represent same dimensions ({}).".format(num_ell_idxes)
+                        ), "Ellipsis in all terms should represent same dimensions ({}).".format(num_ell_idxes)
 
                     for j in range(num_ell_idxes):
                         curr_operand_idxes.append(j + first_ell_idx)
@@ -247,11 +247,11 @@ def einsum(equation, *operands):
         for ch in output_eqn:
             if ch == ".":
                 ell_char_count += 1
-                assert ell_char_count <= 3, "The '.' should only exist in one ellispis '...' in term {}".format(
+                assert ell_char_count <= 3, "The '.' should only exist in one ellipsis '...' in term {}".format(
                     output_eqn
                 )
                 if ell_char_count == 3:
-                    assert num_ell_idxes > -1, "Input equation '{}' don't have ellispis.".format(input_eqn)
+                    assert num_ell_idxes > -1, "Input equation '{}' don't have ellipsis.".format(input_eqn)
                     for j in range(num_ell_idxes):
                         idxes_to_output_dims[first_ell_idx + j] = num_output_dims
                         num_output_dims += 1

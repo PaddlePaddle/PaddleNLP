@@ -67,6 +67,7 @@ SUCCESS_STATUS = 0
 
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
+TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 PYTORCH_WEIGHT_FILE_NAME = "pytorch_model.bin"
 PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
 

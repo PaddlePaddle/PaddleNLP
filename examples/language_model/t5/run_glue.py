@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import logging
 import math
 import os
 
 import paddle
+from data import (
+    GLUE_PROCESSED,
+    get_dev_dataloader,
+    get_mnli_dev_dataloader,
+    get_train_dataloader,
+)
 from paddle.amp import GradScaler, auto_cast
 from paddle.optimizer import AdamW
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 from tqdm import tqdm
-
-from data import get_dev_dataloader, get_train_dataloader, get_mnli_dev_dataloader, GLUE_PROCESSED
 from utils import GLUE_METRICS, get_scheduler, get_writer, set_seed
 
-import argparse
+from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 
 
 def parse_args():
@@ -139,6 +143,13 @@ def parse_args():
         help="num_workers.",
     )
     parser.add_argument("--is_test", action="store_true", help="is_test.")
+    parser.add_argument(
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["gpu", "cpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/npu.",
+    )
     args = parser.parse_args()
     args.task_name = args.task_name.lower()
     args.logdir = os.path.join(args.output_dir, "logs")
@@ -197,6 +208,7 @@ def evaluate(model, data_loader, tokenizer, label2id, metric_list, generate_max_
 
 
 def main(args):
+    paddle.set_device(args.device)
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",

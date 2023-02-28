@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-
 from model import SimNet
 from utils import preprocess_prediction_data
 
+from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
+
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./simnet_vocab.txt", help="The path to vocabulary.")
 parser.add_argument('--network', type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?")
