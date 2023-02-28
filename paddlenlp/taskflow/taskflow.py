@@ -71,6 +71,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",

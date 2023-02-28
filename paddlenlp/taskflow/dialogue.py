@@ -74,7 +74,17 @@ class DialogueTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/dialogue/plato-mini/model_config.json",
                 "5e853fda9a9b573815ad112e494a65af",
             ],
-        }
+        },
+        "__internal_testing__/tiny-random-plato": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/model_state.pdparams",
+                "fda5d068908505cf0c3a46125eb4d39e",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/config.json",
+                "3664e658d5273a132f2e7345a8cafa53",
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, max_seq_len=512, **kwargs):
