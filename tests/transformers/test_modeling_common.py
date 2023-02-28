@@ -210,8 +210,6 @@ class ModelTesterMixin:
                     [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
                 )
             out_len = len(outputs)
-            print("out_len:", out_len)
-            print(dict(outputs))
             if self.is_encoder_decoder:
                 correct_outlen = 5
 
@@ -262,7 +260,6 @@ class ModelTesterMixin:
                 added_hidden_states = 2
             else:
                 added_hidden_states = 1
-            print(added_hidden_states)
             self.assertEqual(out_len + added_hidden_states, len(outputs))
 
             self_attentions = outputs.encoder_attentions if self.is_encoder_decoder else outputs.attentions
