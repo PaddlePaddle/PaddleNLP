@@ -601,6 +601,11 @@ TASKS = {
                 "task_flag": "feature_extraction-openai/clip-rn50x4",
                 "task_priority_path": "openai/clip-rn50x4",
             },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
+            },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
