@@ -254,7 +254,7 @@ std::vector<paddle::Tensor> gpt_kernel(
         }
         if (topk > 0) {
             input_tensors.insert(
-                {"runtime_top_k", ft::Tensor(ft::MemoryType::MEMORY_CPU, ft::TYPE_UINT32, {1}, &topk)});
+                {"runtime_top_k", ft::Tensor(ft::MemoryType::MEMORY_CPU, ft::TYPE_INT32, {1}, &topk)});
         }
         if (temperature != 1.0) {
             input_tensors.insert(
