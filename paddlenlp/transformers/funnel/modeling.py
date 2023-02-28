@@ -902,7 +902,7 @@ class FunnelForPreTrainingOutput(OrderedDict):
 
 class FunnelBaseModel(FunnelPreTrainedModel):
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
@@ -972,7 +972,7 @@ class FunnelModel(FunnelPreTrainedModel):
     base_model_prefix = "model"
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
@@ -1139,7 +1139,7 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
 
 class FunnelForMaskedLM(FunnelPreTrainedModel):
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
@@ -1286,7 +1286,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
 
 class FunnelForMultipleChoice(FunnelPreTrainedModel):
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
