@@ -266,7 +266,7 @@ if __name__ == "__main__":
         text_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
             args.text_encoder_model_prefix,
-            False,  # use_trt
+            use_trt,
             text_encoder_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
