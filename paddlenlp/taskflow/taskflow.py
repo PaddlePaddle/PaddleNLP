@@ -239,6 +239,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
             },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
+            },
         },
         "default": {"model": "simbert-base-chinese"},
     },
