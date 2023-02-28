@@ -135,13 +135,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertEqual(len(results_df), num_models)
 
             # test hp override
+            model_result = auto_trainer._get_model_result()
             if hp_overrides is not None:
                 for hp_key, hp_value in hp_overrides.items():
-                    result_hp_key = f"config/candidates/{hp_key}"
-                    self.assertEqual(results_df[result_hp_key][0], hp_value)
+                    self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            model_result = auto_trainer._get_model_result()
             trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
@@ -247,13 +246,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertEqual(len(results_df), num_models)
 
             # test hp override
+            model_result = auto_trainer._get_model_result()
             if hp_overrides is not None:
                 for hp_key, hp_value in hp_overrides.items():
-                    result_hp_key = f"config/candidates/{hp_key}"
-                    self.assertEqual(results_df[result_hp_key][0], hp_value)
+                    self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            model_result = auto_trainer._get_model_result()
             trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
@@ -358,13 +356,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertEqual(len(results_df), num_models)
 
             # test hp override
+            model_result = auto_trainer._get_model_result()
             if hp_overrides is not None:
                 for hp_key, hp_value in hp_overrides.items():
-                    result_hp_key = f"config/candidates/{hp_key}"
-                    self.assertEqual(results_df[result_hp_key][0], hp_value)
+                    self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            model_result = auto_trainer._get_model_result()
             trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
