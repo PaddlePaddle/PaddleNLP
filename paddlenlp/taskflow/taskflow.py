@@ -71,6 +71,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",
@@ -234,6 +238,10 @@ TASKS = {
             "rocketqa-nano-cross-encoder": {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
+            },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
             },
         },
         "default": {"model": "simbert-base-chinese"},
@@ -596,6 +604,11 @@ TASKS = {
                 "task_class": MultimodalFeatureExtractionTask,
                 "task_flag": "feature_extraction-openai/clip-rn50x4",
                 "task_priority_path": "openai/clip-rn50x4",
+            },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
             },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
