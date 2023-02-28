@@ -7,6 +7,7 @@ add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
 # Default is 1 in standard c++ when using gcc8.2
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
+add_definitions(-DBUILD_CUTLASS_MIXED_GEMM=1)
 
 add_definitions(-w)
 
@@ -165,6 +166,8 @@ if(ON_INFER)
   endif(NOT WIN32)
 
   cuda_add_library(decoding_infer_op ${decoding_op_files} SHARED)
+  set_property(TARGET decoding_op PROPERTY POSITION_INDEPENDENT_CODE  ON)
+  set_property(TARGET decoding_op PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)
   add_dependencies(decoding_infer_op extern_${THIRD_PARTY_NAME} boost)
 
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
@@ -295,6 +298,10 @@ else(ON_INFER)
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils
   )
 
+  set(ft5_lib_link
+    -ltransformer-shared
+  )
+
   if(WITH_PARALLEL)
     set(ft_lib_link ${ft_lib_link} -lmpi -lnccl)
   endif()
@@ -307,6 +314,8 @@ else(ON_INFER)
   endif()
 
   add_library(decoding_op SHARED ${decoding_op_files})
-  add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
-  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
+  add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost extern_fastertransformer5)
+  set_property(TARGET decoding_op PROPERTY POSITION_INDEPENDENT_CODE  ON)
+  set_property(TARGET decoding_op PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)
+  target_link_libraries(decoding_op PUBLIC -lcublas -lcudart ${lib_link} ${ft_lib_link} ${ft5_lib_link})
 endif()

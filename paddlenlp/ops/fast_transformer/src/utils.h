@@ -17,5 +17,76 @@ limitations under the License. */
 #include <stdint.h>
 #include <vector>
 
+#include "src/fastertransformer5/utils/Tensor.h"
+
+#ifdef PADDLE_ON_INFERENCE
+#include "paddle/include/experimental/ext_all.h"
+#else
+#include "paddle/extension.h"
+#endif
+
+#include <cstdio>
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
+#include <iostream>
+#include <nvToolsExt.h>
+
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape);
+
+template<typename T, typename D>
+inline T* get_ptr(paddle::Tensor& t) {
+    return reinterpret_cast<T*>(t.data<D>());
+}
+
+template<typename T, typename D>
+inline const T* get_ptr(const paddle::Tensor& t) {
+    return reinterpret_cast<const T*>(t.data<D>());
+}
+
+std::vector<size_t> convert_shape(paddle::Tensor tensor);
+
+template<typename T, typename D>
+fastertransformer5::Tensor convert_tensor(paddle::Tensor tensor);
+
+template<typename T, typename D>
+fastertransformer5::Tensor convert_tensor(paddle::Tensor tensor, fastertransformer5::MemoryType memory_type);
+
+size_t sizeBytes(paddle::Tensor tensor);
+
+struct cudaDeviceProp GetCudaDeviceProp();
+
+class CudaDeviceProp {
+ private:
+  CudaDeviceProp() { prop_ = GetCudaDeviceProp(); }
+
+ public:
+  CudaDeviceProp(CudaDeviceProp& other) = delete;
+
+  void operator=(const CudaDeviceProp&) = delete;
+
+  static CudaDeviceProp* GetInstance();
+
+  ~CudaDeviceProp();
+
+  struct cudaDeviceProp prop_;
+  
+};
+
+std::mutex* GetCublasWrapperMutex();
+
+class CublasWrapperMutex {
+ private:
+  CublasWrapperMutex() { mutex_ = GetCublasWrapperMutex(); }
+
+ public:
+  CublasWrapperMutex(CublasWrapperMutex& other) = delete;
+
+  void operator=(const CublasWrapperMutex&) = delete;
+
+  static CublasWrapperMutex* GetInstance();
+
+  ~CublasWrapperMutex();
+
+  std::mutex* mutex_;
+};

@@ -37,6 +37,8 @@ limitations under the License. */
 #endif
 
 
+namespace ft = fastertransformer;
+
 template <paddle::DataType D>
 std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& input_ids,
@@ -131,11 +133,11 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   const int memory_hidden_dim = head_num_ * size_per_head_;
   const int vocab_size = word_emb.shape()[0];
 
-  typedef PDTraits<D> traits_;
+  typedef ft::PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
 
-  DecodingInitParam<DataType_> decoding_params;
+  ft::DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
   decoding_params.cublaslt_handle =
       CublasHandle::GetInstance()->cublaslt_handle_;
@@ -146,9 +148,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       sequence_length.mutable_data<int>(input_ids.place());
   decoding_params.output_scores = output_scores.mutable_data<float>(input_ids.place());
 
-  typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
+  typedef ft::DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
-  fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
+  ft::Allocator<ft::AllocatorType::PD> allocator_(stream);
 
   decoding_params.d_start_ids = const_cast<int *>(input_ids.data<int>());
   decoding_params.d_attn_mask =
@@ -199,8 +201,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   int seed = -1;
 #endif
 
-  DecoderInitParam<DataType_>* params =
-      new DecoderInitParam<DataType_>[num_layer_];
+  ft::DecoderInitParam<DataType_>* params =
+      new ft::DecoderInitParam<DataType_>[num_layer_];
 
   // Allow python passing partial weights for model parallel.
   int inner_coeff =
@@ -334,17 +336,17 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       decoding_params.decoder_position_ids = decoder_position_ids.data<int>();
   }
 
-  ActivationType activate =
-      (hidden_act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
+  ft::ActivationType activate =
+      (hidden_act == "gelu") ? ft::ActivationType::GELU : ft::ActivationType::RELU;
 
   int finished_candidate_num_ =
       ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
   if ("beam_search" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
+    ft::DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
 
     unified_decoding_beam_search_ =
-        new DecodingBeamsearch<DecodingTraits_::OpType>(
+        new ft::DecodingBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
             beam_width_,
@@ -382,10 +384,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     delete unified_decoding_beam_search_;
   } else if ("beam_search_v2" == decoding_strategy ||
              "beam_search_v3" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
+    ft::DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
 
     unified_decoding_beam_search_ =
-        new DecodingBeamsearch<DecodingTraits_::OpType>(
+        new ft::DecodingBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
             beam_width_,
@@ -420,9 +422,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
-    DecodingSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
+    ft::DecodingSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
 
-    unified_decoding_sampling_ = new DecodingSampling<DecodingTraits_::OpType>(
+    unified_decoding_sampling_ = new ft::DecodingSampling<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         max_seq_len_,

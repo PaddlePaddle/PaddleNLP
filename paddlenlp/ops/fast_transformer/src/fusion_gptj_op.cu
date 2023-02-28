@@ -38,6 +38,9 @@ limitations under the License. */
 #include "parallel_utils.h"
 #endif
 
+
+namespace ft = fastertransformer;
+
 template <paddle::DataType D>
 std::vector<paddle::Tensor> gptj_kernel(
     const paddle::Tensor& input,
@@ -78,11 +81,11 @@ std::vector<paddle::Tensor> gptj_kernel(
   int start_len = input_dims[1];
   const int vocab_size = emb_bias.shape()[0];
 
-  typedef PDTraits<D> traits_;
+  typedef ft::PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
 
-  DecodingInitParam<DataType_> decoding_params;
+  ft::DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
   decoding_params.cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
 
@@ -93,9 +96,9 @@ std::vector<paddle::Tensor> gptj_kernel(
   decoding_params.output_ids = output_ids.mutable_data<int>(word_emb.place());
 #endif
 
-  typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
+  typedef ft::DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
-  fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
+  ft::Allocator<ft::AllocatorType::PD> allocator_(stream);
 
   const int hidden_unit = size_per_head * n_head;
 
@@ -126,7 +129,7 @@ std::vector<paddle::Tensor> gptj_kernel(
   int seed = -1;
 #endif
 
-  DecodingGptJ<DecodingTraits_::OpType>* gptj_decoding;
+  ft::DecodingGptJ<DecodingTraits_::OpType>* gptj_decoding;
 
   decoding_params.request_batch_size = batch_size_;
   decoding_params.max_input_len = start_len;
@@ -139,7 +142,7 @@ std::vector<paddle::Tensor> gptj_kernel(
   decoding_params.d_start_lengths = start_length.data<int>();
 
   gptj_decoding =
-      new DecodingGptJ<DecodingTraits_::OpType>(allocator_,
+      new ft::DecodingGptJ<DecodingTraits_::OpType>(allocator_,
                                                batch_size_,
                                                max_len,
                                                n_head,
@@ -162,8 +165,8 @@ std::vector<paddle::Tensor> gptj_kernel(
   gptj_decoding->set_tensor_parallel_param(tensor_parallel_param);
   gptj_decoding->set_layer_parallel_param(layer_parallel_param);
 
-  DecoderInitParam<DataType_>* params =
-      new DecoderInitParam<DataType_>[num_layer];
+  ft::DecoderInitParam<DataType_>* params =
+      new ft::DecoderInitParam<DataType_>[num_layer];
 
   for (int i = 0; i < self_ln_weight.size(); ++i) {
     // Allow python passing weights of all layers or only passing the

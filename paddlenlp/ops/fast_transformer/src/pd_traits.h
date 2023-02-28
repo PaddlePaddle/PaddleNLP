@@ -14,8 +14,10 @@ limitations under the License. */
 #pragma once
 
 #include "fastertransformer/utils/common.h"
+#include "src/fastertransformer5/utils/cuda_utils.h"
 
-using namespace fastertransformer;
+
+namespace fastertransformer {
 
 template <paddle::DataType D>
 class PDTraits;
@@ -35,3 +37,36 @@ public:
   typedef paddle::float16 data_t;
   static const OperationType OpType = OperationType::FP16;
 };
+
+}  // namespace fastertransformer
+
+namespace fastertransformer5 {
+
+template <paddle::DataType D>
+class PDTraits;
+
+template <>
+class PDTraits<paddle::DataType::FLOAT32> {
+public:
+  typedef float DataType;
+  typedef float data_t;
+  static const OperationType OpType = OperationType::FP32;
+};
+
+template <>
+class PDTraits<paddle::DataType::FLOAT16> {
+public:
+  typedef half DataType;
+  typedef paddle::float16 data_t;
+  static const OperationType OpType = OperationType::FP16;
+};
+
+template <>
+class PDTraits<paddle::DataType::BFLOAT16> {
+public:
+  typedef __nv_bfloat16 DataType;
+  typedef paddle::bfloat16 data_t;
+  static const OperationType OpType = OperationType::BF16;
+};
+
+}  // namespace fastertransformer5

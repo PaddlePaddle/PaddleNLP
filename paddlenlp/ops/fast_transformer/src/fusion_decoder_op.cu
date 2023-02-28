@@ -26,6 +26,8 @@ limitations under the License. */
 #include "pd_traits.h"
 
 
+namespace ft = fastertransformer;
+
 template <paddle::DataType D>
 std::vector<paddle::Tensor> decoder_kernel(
     const paddle::Tensor& from_tensor_input,
@@ -86,17 +88,17 @@ std::vector<paddle::Tensor> decoder_kernel(
   int decoder_max_seq_len =
       (use_batch_major) ? (int)old_self_cache_value.shape()[2] : -1;
 
-  typedef PDTraits<D> traits_;
+  typedef ft::PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
-  typedef DecoderTransformerTraits<traits_::OpType> DecoderTraits_;
-  OpenDecoder<DecoderTraits_::OpType>* decoder_;
-  decoder_ = new OpenDecoder<DecoderTraits_::OpType>(n_head,
+  typedef ft::DecoderTransformerTraits<traits_::OpType> DecoderTraits_;
+  ft::OpenDecoder<DecoderTraits_::OpType>* decoder_;
+  decoder_ = new ft::OpenDecoder<DecoderTraits_::OpType>(n_head,
                                                      size_per_head,
                                                      memory_hidden_dim_,
                                                      is_fuse_qkv_,
                                                      true,
-                                                     ActivationType::RELU);
+                                                     ft::ActivationType::RELU);
 
   DataType_* decoder_output = reinterpret_cast<DataType_*>(
       decoder_output_tensor.mutable_data<data_t_>());
@@ -112,13 +114,13 @@ std::vector<paddle::Tensor> decoder_kernel(
       reinterpret_cast<const DataType_*>(memory_tensor_input.data<data_t_>());
   const int* memory_sequence_length = mem_seq_len_input.data<int>();
 
-  DecoderInitParam<DataType_> params;
+  ft::DecoderInitParam<DataType_> params;
   params.cublas_handle = cublas_handle_;
   params.cublaslt_handle = cublaslt_handle_;
   params.stream = stream;
   params.request_max_mem_seq_len = max_seq_len_;
   params.request_batch_size = batch_size_;
-  fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
+  ft::Allocator<ft::AllocatorType::PD> allocator_(stream);
 
   params.self_layernorm.gamma =
       reinterpret_cast<const DataType_*>(self_ln_weight.data<data_t_>());

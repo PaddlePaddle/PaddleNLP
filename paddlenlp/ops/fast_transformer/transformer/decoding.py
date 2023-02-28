@@ -3072,6 +3072,7 @@ class InferOptDecoding(nn.Layer):
 
 class InferGptDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
@@ -3170,6 +3171,9 @@ class InferGptDecoding(nn.Layer):
             temperature=temperature,
             use_fp16_decoding=self.use_fp16_decoding,
         )
+
+        if "ENABLE_FT5" in os.environ.keys() and (os.environ["ENABLE_FT5"] == "ON" or os.environ["ENABLE_FT5"] == "1"):
+            output_ids = output_ids.t()
 
         output_ids = output_ids[paddle.shape(input_ids)[-1] :, :]
         if forced_eos_token_id is not None:

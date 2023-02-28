@@ -346,7 +346,6 @@ void add_bias_act_kernelLauncher(T* out,
     grid.x = ceil(m * n / 1024.);
   }
 
-
   if (activation_type == ActivationType::RELU)
     add_bias_relu<T><<<grid, block, 0, stream>>>(
         out, bias, m, n / data_type_factor);
