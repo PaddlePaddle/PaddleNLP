@@ -55,6 +55,7 @@ from .bart.tokenizer import *
 from .bart.configuration import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
+from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
