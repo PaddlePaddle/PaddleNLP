@@ -35,7 +35,7 @@ from paddlenlp.prompt import (
     SoftVerbalizer,
 )
 from paddlenlp.taskflow import Taskflow
-from paddlenlp.trainer import CompressionArguments, EarlyStoppingCallback, Trainer
+from paddlenlp.trainer import EarlyStoppingCallback, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import (
     AutoModelForMaskedLM,
@@ -105,8 +105,11 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return ["Chinese", "English"]
 
     @property
-    def _default_training_argument(self) -> CompressionArguments:
-        return CompressionArguments(
+    def _default_training_argument(self) -> TrainingArguments:
+        """
+        Default TrainingArguments for the Trainer
+        """
+        return TrainingArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
             metric_for_best_model="accuracy",
@@ -116,6 +119,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property
@@ -130,6 +134,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             save_strategy="epoch",
             save_total_limit=1,
             report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,
         )
 
     @property

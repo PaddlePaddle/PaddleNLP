@@ -254,7 +254,7 @@ class PromptTrainer(Trainer):
             if self.args.use_rgl:
                 loss += self._compute_rgl_loss(hidden_states, labels)
         else:
-            loss, logits, _ = model(**input_dict)
+            loss, logits = model(**input_dict)
 
         outputs = (loss, logits)
 

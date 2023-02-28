@@ -33,7 +33,6 @@ from huggingface_hub.utils import EntryNotFoundError
 
 from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
-from ..utils.env import MODEL_HOME
 from ..utils.log import logger
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
 from .utils import resolve_cache_dir
@@ -294,14 +293,9 @@ class ImageProcessingMixin(object):
             image_processor_file = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
             )
-            default_root = (
-                os.path.join(cache_dir, pretrained_model_name_or_path)
-                if cache_dir is not None
-                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            )
             try:
                 # Load from local folder or from cache or download from model Hub and cache
-                resolved_image_processor_file = get_path_from_url_with_filelock(image_processor_file, default_root)
+                resolved_image_processor_file = get_path_from_url_with_filelock(image_processor_file, cache_dir)
             except EnvironmentError:
                 # Raise any environment error raise by `cached_file`. It will have a helpful error message adapted to
                 # the original exception.

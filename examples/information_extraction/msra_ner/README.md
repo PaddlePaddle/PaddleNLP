@@ -45,7 +45,7 @@ python -u ./train.py \
 - `logging_steps`: 表示日志打印间隔。
 - `save_steps`: 表示模型保存及评估间隔。
 - `output_dir`: 表示模型保存路径。
-- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 
 #### 多卡训练
 ```shell
