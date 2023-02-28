@@ -1,1 +1,0 @@
-{"task": "text_classification", "mode": "finetune", "is_static_model": true, "problem_type": "multi_class", "multilabel_threshold": 0.5, "max_length": 513, "id2label": {"0": "news_edu", "1": "news_finance", "2": "news_house", "3": "news_travel", "4": "news_tech", "5": "news_sports", "6": "news_game", "7": "news_culture", "8": "news_entertainment", "9": "news_military"}}
