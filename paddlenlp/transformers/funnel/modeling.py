@@ -971,7 +971,7 @@ class FunnelBaseModel(FunnelPreTrainedModel):
 class FunnelModel(FunnelPreTrainedModel):
     base_model_prefix = "model"
 
-    def __init__(self, **config):
+    def __init__(self, config):
         super().__init__()
         if isinstance(config, PreTrainedModel):
             config = config.config
@@ -1358,8 +1358,7 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
 class FunnelForTokenClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
-    def __init__(self, basemodel, num_classes=2):
-        config = basemodel.init_config
+    def __init__(self, config):
         super().__init__()
         if isinstance(config, PreTrainedModel):
             config = config.config
@@ -1370,7 +1369,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
         self.funnel = FunnelModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.num_classes = num_classes
+        self.num_labels = config.num_labels
         self.init_weights()
 
     def forward(
@@ -1430,8 +1429,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
 class FunnelForQuestionAnswering(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
-    def __init__(self, basemodel):
-        config = basemodel.init_config
+    def __init__(self, config):
         super().__init__()
         if isinstance(config, PreTrainedModel):
             config = config.config
@@ -1440,7 +1438,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
         self.config2 = config
         self.num_labels = config.num_labels
 
-        self.funnel = FunnelModel(**config)
+        self.funnel = FunnelModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
         self.init_weights()
