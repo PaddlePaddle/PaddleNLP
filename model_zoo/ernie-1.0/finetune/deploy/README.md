@@ -101,7 +101,7 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
     </tr>
     <tr>
       <td align=center> Paddle TensorRT </td>
-      <td align=center> use_trt_backend() + enable_paddle_to_trt() </td>
+      <td align=center> use_paddle_infer_backend() + paddle_infer_option.enable_trt = True </td>
       <td align=center> ✅ </td>
       <td align=center> ✅ </td>
     </tr>
