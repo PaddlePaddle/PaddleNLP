@@ -69,7 +69,7 @@ class VisualDLWithImageCallback(VisualDLCallback):
                 image_logs["ddim-samples-7.5"] = model.log_image(
                     input_ids=inputs["input_ids"],
                     controlnet_cond=inputs["controlnet_cond"],
-                    guidance_scale=7.5,
+                    guidance_scale=9.0,
                     height=args.resolution,
                     width=args.resolution,
                 )

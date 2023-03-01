@@ -18,7 +18,7 @@ import paddle
 import paddle.nn as nn
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..initializer import reset_initialized_parameter, zeros_
+from ..initializer import zeros_
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 from .cross_attention import AttnProcessor
@@ -70,8 +70,6 @@ class ControlNetConditioningDefaultEmbedding(nn.Layer):
             nn.Silu(),
             zero_module(nn.Conv2D(256, conditioning_embedding_channels, kernel_size=3, padding=1)),
         )
-        reset_initialized_parameter(self.conditioning_embedder)
-        zero_module(self.conditioning_embedder[-1])
 
     def forward(self, conditioning):
         embedding = self.conditioning_embedder(conditioning)

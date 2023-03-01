@@ -2,13 +2,13 @@
 
 [ControlNet](https://arxiv.org/abs/2302.05543) 是一种通过添加额外条件来控制扩散模型的神经网络结构。
 <p align="center">
-    <img src="https://github.com/lllyasviel/ControlNet/blob/main/github_page/he.png">
+    <img src="https://raw.githubusercontent.com/lllyasviel/ControlNet/main/github_page/he.png">
 </p>
 
 
 ## 1.1 安装依赖
 
-在运行这个训练代码前，我们需要安装develop分支的ppdiffusers模型:
+在运行这个训练代码前，我们需要安装 develop 分支的 ppdiffusers 模型:
 
 ```bash
 cd ppdiffusers
@@ -17,7 +17,11 @@ python setup.py install
 
 ## 1.2 Fill50K 训练例子
 
-作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型.
+作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集：
+```sh
+wget https://huggingface.co/lllyasviel/ControlNet/resolve/main/training/fill50k.zip
+unzip -o fill50k.zip
+```
 
 ### 1.2.1 单机单卡训练
 ```bash
@@ -25,26 +29,24 @@ export FLAGS_conv_workspace_size_limit=4096
 python -u train_txt2img_control_trainer.py \
     --do_train \
     --output_dir ./sd15_control \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 1 \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 2 \
     --learning_rate 1e-5 \
     --weight_decay 0.02 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
     --sd_locked True \
-    --only_mid_control False \
     --max_steps 10000000 \
     --logging_steps 50 \
     --image_logging_steps 400 \
     --save_steps 2000 \
     --save_total_limit 2 \
-    --seed 2048 \
+    --seed 23 \
     --dataloader_num_workers 4 \
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
     --file_path ./fill50k \
-    --overwrite_output_dir \
-    --recompute
+    --overwrite_output_dir
 ```
 
 `train_txt2img_control_trainer.py`代码可传入的参数解释如下：
@@ -82,29 +84,43 @@ export FLAGS_conv_workspace_size_limit=4096
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_control_trainer.py \
     --do_train \
     --output_dir ./sd15_control \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 1 \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 2 \
     --learning_rate 1e-5 \
     --weight_decay 0.02 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
     --sd_locked True \
-    --only_mid_control False \
     --max_steps 10000000 \
     --logging_steps 50 \
     --image_logging_steps 400 \
     --save_steps 2000 \
     --save_total_limit 2 \
-    --seed 2048 \
+    --seed 23 \
     --dataloader_num_workers 4 \
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
     --file_path ./fill50k \
-    --overwrite_output_dir \
-    --recompute
+    --overwrite_output_dir
 ```
 
 ## 2 模型推理
+待模型训练完毕，会在`output_dir`保存训练好的模型权重，我们可以使用如下的代码进行推理
+```python
+from ppdiffusers import StableDiffusionControlNetPipeline, ControlNetModel
+from ppdiffusers.utils import load_image
+controlnet = ControlNetModel.from_pretrained("./sd15_control/checkpoint-12000/controlnet")
+pipe = StableDiffusionControlNetPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", controlnet = controlnet, safety_checker=None)
+canny_edged_image = load_image("https://user-images.githubusercontent.com/50394665/221844474-fd539851-7649-470e-bded-4d174271cc7f.png")
+img = pipe(prompt="pale golden rod circle with old lace background", image=canny_edged_image, guidance_scale=9, num_inference_steps=50).images[0]
+img.save("demo.png")
+```
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/50394665/221844474-fd539851-7649-470e-bded-4d174271cc7f.png">
+    <img src="https://user-images.githubusercontent.com/50394665/222058833-7e94bfa5-7cc2-4b9e-9022-37c9d47398de.png">
+</p>
 
-## 2 参考资料
+
+## 3 参考资料
 - https://github.com/lllyasviel/ControlNet/edit/main/docs/train.md
+- https://github.com/huggingface/diffusers

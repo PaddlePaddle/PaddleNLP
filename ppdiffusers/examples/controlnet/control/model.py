@@ -51,7 +51,6 @@ class ControlNet(nn.Layer):
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name_or_path, model_max_length=model_args.model_max_length
         )
-        self.tokenizer.pad_token_id = 0
 
         # init vae
         vae_name_or_path = (
@@ -85,7 +84,7 @@ class ControlNet(nn.Layer):
         freeze_params(self.unet.parameters())
         logger.info("Freeze unet parameters!")
 
-        self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path, controlnet_conditioning_channels=3)
+        self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path)
 
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
