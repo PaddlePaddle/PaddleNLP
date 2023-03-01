@@ -39,13 +39,15 @@ python seq_cls_infer.py --model_dir ../../finetuned_models/export/model --device
 |--batch_size |输入的batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--device_id | 运行设备的id。默认为0。 |
+|--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 
-FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 BERT 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE-M 模型。
+FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 BERT 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 BERT 模型。
 
 符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
 

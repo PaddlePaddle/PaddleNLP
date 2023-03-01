@@ -42,6 +42,8 @@ def parse_arguments():
         choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
         help="The inference runtime backend.",
     )
+    parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
+    parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
     parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
@@ -78,8 +80,9 @@ class Predictor(object):
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
+            option.set_cpu_thread_num(args.cpu_threads)
         else:
-            option.use_gpu()
+            option.use_gpu(args.device_id)
         if args.backend == "paddle":
             option.use_paddle_infer_backend()
         elif args.backend == "onnx_runtime":
@@ -89,25 +92,20 @@ class Predictor(object):
         else:
             option.use_trt_backend()
             if args.backend == "paddle_tensorrt":
-                option.enable_paddle_to_trt()
-                option.enable_paddle_trt_collect_shape()
+                option.use_paddle_backend()
+                option.paddle_infer_option.collect_trt_shape = True
+                option.paddle_infer_option.enable_trt = True
             trt_file = os.path.join(args.model_dir, "model.trt")
-            option.set_trt_input_shape(
-                "input_ids",
-                min_shape=[1, 1],
-                opt_shape=[args.batch_size, args.max_length],
-                max_shape=[args.batch_size, args.max_length],
+            option.trt_option.set_shape(
+                "input_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
             )
-            option.set_trt_input_shape(
-                "token_type_ids",
-                min_shape=[1, 1],
-                opt_shape=[args.batch_size, args.max_length],
-                max_shape=[args.batch_size, args.max_length],
+            option.trt_option.set_shape(
+                "token_type_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
             )
             if args.use_fp16:
-                option.enable_trt_fp16()
+                option.trt_option.enable_fp16 = True
                 trt_file = trt_file + ".fp16"
-            option.set_trt_cache_file(trt_file)
+            option.trt_option.serialize_file = trt_file
         return fd.Runtime(option)
 
     def preprocess(self, text):
