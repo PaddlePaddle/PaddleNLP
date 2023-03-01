@@ -28,6 +28,10 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
+WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"
+PT_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
+SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
+
 
 def fn_args_to_dict(func, *args, **kwargs):
     """

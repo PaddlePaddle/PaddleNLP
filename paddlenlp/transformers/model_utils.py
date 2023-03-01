@@ -65,6 +65,7 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
+    WEIGHTS_INDEX_NAME,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
     fn_args_to_dict,
@@ -75,6 +76,8 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+WEIGHTS_NAME = "model_state.pdparams"
 
 
 def unwrap_model(model, *args, **kwargs):
@@ -216,6 +219,164 @@ class BackboneMixin:
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
         return self(*args, **filtered_kwargs)
+
+
+def dtype_byte_size(dtype):
+    """
+    Returns the size (in bytes) occupied by one parameter of type `dtype`.
+
+    Example:
+
+    ```py
+    >>> dtype_byte_size(torch.float32)
+    4
+    ```
+    """
+    if dtype == torch.bool:
+        return 1 / 8
+    bit_search = re.search(r"[^\d](\d+)$", str(dtype))
+    if bit_search is None:
+        raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
+    bit_size = int(bit_search.groups()[0])
+    return bit_size // 8
+
+
+def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
+    if variant is not None:
+        splits = weights_name.split(".")
+        splits = splits[:-1] + [variant] + splits[-1:]
+        weights_name = ".".join(splits)
+
+    return weights_name
+
+
+def shard_checkpoint(
+    state_dict: Dict[str, torch.Tensor], max_shard_size: Union[int, str] = "10GB", weights_name: str = WEIGHTS_NAME
+):
+    """
+    Splits a model state dictionary in sub-checkpoints so that the final size of each sub-checkpoint does not exceed a
+    given size.
+
+    The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
+    optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
+    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
+    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
+
+    <Tip warning={true}>
+
+    If one of the model's weight is bigger that `max_sahrd_size`, it will end up in its own sub-checkpoint which will
+    have a size greater than `max_shard_size`.
+
+    </Tip>
+
+    Args:
+        state_dict (`Dict[str, torch.Tensor]`): The state dictionary of a model to save.
+        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+            The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
+            (like `"5MB"`).
+        weights_name (`str`, *optional*, defaults to `"pytorch_model.bin"`):
+            The name of the model save file.
+    """
+    max_shard_size = convert_file_size_to_int(max_shard_size)
+
+    sharded_state_dicts = []
+    current_block = {}
+    current_block_size = 0
+    total_size = 0
+
+    for key, weight in state_dict.items():
+        weight_size = weight.numel() * dtype_byte_size(weight.dtype)
+
+        # If this weight is going to tip up over the maximal size, we split.
+        if current_block_size + weight_size > max_shard_size:
+            sharded_state_dicts.append(current_block)
+            current_block = {}
+            current_block_size = 0
+
+        current_block[key] = weight
+        current_block_size += weight_size
+        total_size += weight_size
+
+    # Add the last block
+    sharded_state_dicts.append(current_block)
+
+    # If we only have one shard, we return it
+    if len(sharded_state_dicts) == 1:
+        return {weights_name: sharded_state_dicts[0]}, None
+
+    # Otherwise, let's build the index
+    weight_map = {}
+    shards = {}
+    for idx, shard in enumerate(sharded_state_dicts):
+        shard_file = weights_name.replace(".bin", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.bin")
+        shard_file = shard_file.replace(
+            ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
+        )
+        shards[shard_file] = shard
+        for key in shard.keys():
+            weight_map[key] = shard_file
+
+    # Add the metadata
+    metadata = {"total_size": total_size}
+    index = {"metadata": metadata, "weight_map": weight_map}
+    return shards, index
+
+
+def load_sharded_checkpoint(model, folder, strict=True):
+    """
+    This is the same as
+    [`torch.nn.Module.load_state_dict`](https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=load_state_dict#torch.nn.Module.load_state_dict)
+    but for a sharded checkpoint.
+
+    This load is performed efficiently: each checkpoint shard is loaded one by one in RAM and deleted after being
+    loaded in the model.
+
+    Args:
+        model (`torch.nn.Module`): The model in which to load the checkpoint.
+        folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
+        strict (`bool`, *optional`, defaults to `True`):
+            Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
+
+    Returns:
+        `NamedTuple`: A named tuple with `missing_keys` and `unexpected_keys` fields
+            - `missing_keys` is a list of str containing the missing keys
+            - `unexpected_keys` is a list of str containing the unexpected keys
+    """
+    # Load the index
+    index_file = os.path.join(folder, WEIGHTS_INDEX_NAME)
+    if not os.path.isfile(index_file):
+        raise ValueError(f"Can't find a checkpoint index ({WEIGHTS_INDEX_NAME}) in {folder}.")
+
+    with open(index_file, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    shard_files = list(set(index["weight_map"].values()))
+
+    # If strict=True, error before loading any of the state dicts.
+    loaded_keys = index["weight_map"].keys()
+    model_keys = model.state_dict().keys()
+    missing_keys = [key for key in model_keys if key not in loaded_keys]
+    unexpected_keys = [key for key in loaded_keys if key not in model_keys]
+    if strict and (len(missing_keys) > 0 or len(unexpected_keys) > 0):
+        error_message = f"Error(s) in loading state_dict for {model.__class__.__name__}"
+        if len(missing_keys) > 0:
+            str_missing_keys = ",".join([f'"{k}"' for k in missing_keys])
+            error_message += f"\nMissing key(s): {str_missing_keys}."
+        if len(unexpected_keys) > 0:
+            str_unexpected_keys = ",".join([f'"{k}"' for k in unexpected_keys])
+            error_message += f"\nMissing key(s): {str_unexpected_keys}."
+        raise RuntimeError(error_message)
+
+    for shard_file in shard_files:
+        state_dict = torch.load(os.path.join(folder, shard_file), map_location="cpu")
+        model.load_state_dict(state_dict, strict=False)
+
+        # Make sure memory is fred before we load the next state dict.
+        del state_dict
+        gc.collect()
+
+    # Return the same thing as PyTorch load_state_dict function.
+    return torch.nn.modules.module._IncompatibleKeys(missing_keys, unexpected_keys)
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -774,7 +935,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with io.open(model_config_file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
-    def save_pretrained(self, save_dir: str):
+    def save_pretrained(
+        self,
+        save_dir: Union[str, os.PathLike],
+        is_main_process: bool = True,
+        state_dict: Optional[dict] = None,
+        save_function: Callable = paddle.save,
+        max_shard_size: Union[int, str] = "10GB",
+        safe_serialization: bool = False,
+        variant: Optional[str] = None,
+        **kwargs,
+    ):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -798,7 +969,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
         if self.constructed_from_pretrained_config():
-            return self.save_pretrained_v2(save_dir)
+
+            raise ValueError()
+            return self.save_pretrained_v2(
+                save_dir,
+                is_main_process,
+                state_dict,
+                save_function,
+                max_shard_size,
+                safe_serialization,
+                variant,
+                **kwargs,
+            )
 
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
@@ -1077,17 +1259,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if url_file_exists(community_model_file_path):
                 return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
-            logger.warning(
-                f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-                f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-            )
+        # 6. final error entry, report FileNotFoundError
+        logger.warning(
+            f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
+            f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
+        )
 
-            if ENABLE_TORCH_CHECKPOINT:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
-            else:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+        if ENABLE_TORCH_CHECKPOINT:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+        else:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
 
-            raise FileNotFoundError(msg)
+        raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(
@@ -1370,6 +1553,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
+
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=model_state_dict,
@@ -1422,7 +1606,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model, model_state_dict
 
-    def save_pretrained_v2(self, save_dir: str):
+    def save_pretrained_v2(
+        self,
+        save_dir: Union[str, os.PathLike],
+        is_main_process: bool = True,
+        state_dict: Optional[dict] = None,
+        save_function: Callable = paddle.save,
+        max_shard_size: Union[int, str] = "10GB",
+        safe_serialization: bool = False,
+        variant: Optional[str] = None,
+        **kwargs,
+    ):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -1445,6 +1639,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # reload from save_directory
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
+
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
@@ -1452,18 +1647,104 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
+        # model_to_save = unwrap_model(self)
+        # dtype = get_parameter_dtype(model_to_save)
+        # model_to_save.config.dtype = str(dtype).split(".")[1]
+
+        # # Attach architecture to the config
+        # model_to_save.config.architectures = [model_to_save.__class__.__name__]
+
+        # model_to_save.config.save_pretrained(save_dir)
+
+        save_directory = save_dir
+
+        if safe_serialization and not is_safetensors_available():
+            raise ImportError("`safe_serialization` requires the `safetensors library: `pip install safetensors`.")
+
+        if os.path.isfile(save_directory):
+            logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
+            return
+
+        os.makedirs(save_directory, exist_ok=True)
+        # Save model config
+
+        # Only save the model itself if we are using distributed training
         model_to_save = unwrap_model(self)
+
+        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # we currently don't use this setting automatically, but may start to use with v5
         dtype = get_parameter_dtype(model_to_save)
+        # model_to_save.config.torch_dtype = str(dtype).split(".")[1]
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         # Attach architecture to the config
         model_to_save.config.architectures = [model_to_save.__class__.__name__]
 
-        model_to_save.config.save_pretrained(save_dir)
+        # Save the config
+        if is_main_process:
+            model_to_save.config.save_pretrained(save_directory)
+            if self.can_generate():
+                model_to_save.generation_config.save_pretrained(save_directory)
+
+        # Save the model
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+
+        # Shard the model if it is too big.
+        weights_name = SAFE_WEIGHTS_NAME if safe_serialization else WEIGHTS_NAME
+        weights_name = _add_variant(weights_name, variant)
 
         # Save model
-        if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, self.resource_files_names["model_state"])
-            paddle.save(self.state_dict(), file_name)
+        shards, index = shard_checkpoint(state_dict, max_shard_size=max_shard_size, weights_name=weights_name)
+
+        # Clean the folder from a previous save
+        for filename in os.listdir(save_directory):
+            full_filename = os.path.join(save_directory, filename)
+            # If we have a shard file that is not going to be replaced, we delete it, but only from the main process
+            # in distributed settings to avoid race conditions.
+            weights_no_suffix = weights_name.replace(".pdparams", "").replace(".safetensors", "")
+
+            # make sure that file to be deleted matches format of sharded file, e.g. pytorch_model-00001-of-00005
+            filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
+            reg = re.compile("(.*?)-\d{5}-of-\d{5}")
+
+            if (
+                filename.startswith(weights_no_suffix)
+                and os.path.isfile(full_filename)
+                and filename not in shards.keys()
+                and is_main_process
+                and reg.fullmatch(filename_no_suffix) is not None
+            ):
+                os.remove(full_filename)
+
+        # Save the model
+        for shard_file, shard in shards.items():
+            if safe_serialization:
+                # At some point we will need to deal better with save_function (used for TPU and other distributed
+                # joyfulness), but for now this enough.
+                safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "pd"})
+            else:
+                save_function(shard, os.path.join(save_directory, shard_file))
+
+        if index is None:
+            path_to_weights = os.path.join(save_directory, _add_variant(WEIGHTS_NAME, variant))
+            logger.info(f"Model weights saved in {path_to_weights}")
         else:
-            logger.warning("Save pretrained model only supported dygraph mode for now!")
+            save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else WEIGHTS_INDEX_NAME
+            save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
+            # Save the index as well
+            with open(save_index_file, "w", encoding="utf-8") as f:
+                content = json.dumps(index, indent=2, sort_keys=True) + "\n"
+                f.write(content)
+            logger.info(
+                f"The model is bigger than the maximum size per checkpoint ({max_shard_size}) and is going to be "
+                f"split in {len(shards)} checkpoint shards. You can find where each parameters has been saved in the "
+                f"index located at {save_index_file}."
+            )
+
+        # # Save model
+        # if paddle.in_dynamic_mode():
+        #     file_name = os.path.join(save_dir, self.resource_files_names["model_state"])
+        #     paddle.save(self.state_dict(), file_name)
+        # else:
+        #     logger.warning("Save pretrained model only supported dygraph mode for now!")
