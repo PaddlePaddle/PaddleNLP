@@ -1059,18 +1059,18 @@ class FunnelModel(FunnelPreTrainedModel):
             outputs = (decoder_outputs.last_hidden_state,)
             if output_hidden_states:
                 idx += 1
-                outputs = outputs + (encoder_outputs.hidden_states + decoder_outputs[idx],)
+                outputs = outputs + (encoder_outputs.hidden_states,) + (decoder_outputs[idx],)
             if output_attentions:
                 idx += 1
-                outputs = outputs + (encoder_outputs.attentions + decoder_outputs[idx],)
+                outputs = outputs + (encoder_outputs.attentions,) + (decoder_outputs[idx],)
             return outputs
 
         return BaseModelOutput(
             last_hidden_state=decoder_outputs.last_hidden_state,
-            hidden_states=(encoder_outputs.hidden_states + decoder_outputs.hidden_states)
+            hidden_states=(encoder_outputs.hidden_states,) + (decoder_outputs.hidden_states,)
             if output_hidden_states
             else None,
-            attentions=(encoder_outputs.attentions + decoder_outputs.attentions) if output_attentions else None,
+            attentions=(encoder_outputs.attentions,) + (decoder_outputs.attentions,) if output_attentions else None,
         )
 
 
