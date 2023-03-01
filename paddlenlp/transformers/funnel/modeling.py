@@ -1226,7 +1226,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
         # self.config.attention_dropout=0
         # self.config.activation_dropout=0
 
-        self.funnel = FunnelBaseModel(config)
+        self.funnel = FunnelModel(config)
         self.classifier = FunnelClassificationHead(config, config.num_labels)
         self.init_weights()
 
@@ -1307,7 +1307,7 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
         if isinstance(config, dict):
             config = FunnelConfig(**config)
 
-        self.funnel = FunnelBaseModel(config)
+        self.funnel = FunnelModel(config)
         self.classifier = FunnelClassificationHead(config, 1)
         self.init_weights()
 
