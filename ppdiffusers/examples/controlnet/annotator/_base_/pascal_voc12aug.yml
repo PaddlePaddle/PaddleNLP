@@ -1,0 +1,4 @@
+_base_: './pascal_voc12.yml'
+
+train_dataset:
+  mode: trainaug

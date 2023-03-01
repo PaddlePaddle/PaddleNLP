@@ -1,0 +1,50 @@
+train_dataset:
+  type: AutoNUE
+  dataset_root: data/IDD_Segmentation
+  transforms:
+    - type: Resize
+      target_size: [1920, 1080]
+    - type: ResizeStepScaling
+      min_scale_factor: 0.5
+      max_scale_factor: 2.0
+      scale_step_size: 0.25
+    - type: RandomPaddingCrop
+      crop_size: [1024, 512]
+    - type: RandomHorizontalFlip
+    - type: RandomDistort
+      brightness_range: 0.25
+      brightness_prob: 1
+      contrast_range: 0.25
+      contrast_prob: 1
+      saturation_range: 0.25
+      saturation_prob: 1
+      hue_range: 63
+      hue_prob: 1
+    - type: Normalize
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+  mode: train
+
+
+val_dataset:
+  type: AutoNUE
+  dataset_root: data/IDD_Segmentation
+  transforms:
+    - type: Resize
+      target_size: [1920, 1080]
+    - type: Normalize
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+  mode: val
+
+
+optimizer:
+  type: sgd
+  momentum: 0.9
+  weight_decay: 0.0001
+
+lr_scheduler:
+  type: PolynomialDecay
+  learning_rate: 0.005
+  end_lr: 0
+  power: 2

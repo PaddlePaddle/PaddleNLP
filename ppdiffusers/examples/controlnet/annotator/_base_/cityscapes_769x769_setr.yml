@@ -1,0 +1,22 @@
+_base_: './cityscapes.yml'
+
+train_dataset:
+  transforms:
+    - type: ResizeStepScaling
+      min_scale_factor: 0.25
+      max_scale_factor: 2.0
+      scale_step_size: 0.25
+    - type: RandomPaddingCrop
+      crop_size: [769, 769]
+    - type: RandomHorizontalFlip
+    - type: RandomDistort
+      brightness_range: 0.5
+      contrast_range: 0.5
+      saturation_range: 0.5
+    - type: Normalize
+
+val_dataset:
+  transforms:
+    - type: Padding
+      target_size: [2048, 1024]
+    - type: Normalize
