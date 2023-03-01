@@ -92,7 +92,7 @@ class Predictor(object):
         else:
             option.use_trt_backend()
             if args.backend == "paddle_tensorrt":
-                option.use_paddle_backend()
+                option.use_paddle_infer_backend()
                 option.paddle_infer_option.collect_trt_shape = True
                 option.paddle_infer_option.enable_trt = True
             trt_file = os.path.join(args.model_dir, "model.trt")
