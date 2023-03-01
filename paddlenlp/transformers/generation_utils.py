@@ -448,9 +448,8 @@ class GenerationMixin(object):
             }
             input_name = encoder.main_input_name
             if input_name == "input_ids" and "inputs_embeds" in encoder_kwargs:
-                inputs, input_name = model_kwargs["inputs_embeds"], "inputs_embeds"
-                encoder_kwargs.pop(input_name)
-                model_kwargs["encoder_output"] = encoder(inputs_embeds=inputs, **encoder_kwargs)
+                encoder_kwargs["return_dict"] = True
+                model_kwargs["encoder_output"] = encoder(**encoder_kwargs)
             else:
                 model_kwargs["encoder_output"] = encoder(input_ids=input_ids, **encoder_kwargs)
 
@@ -945,16 +944,16 @@ class GenerationMixin(object):
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
-            logits = outputs.logits
+            outputs = self(**model_inputs, return_dict=True)
+
             # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
+            next_token_logits = outputs.logits[:, -1, :]
+
             # pre-process distribution
-            logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
+            next_token_logits = self.adjust_logits_during_generation(next_token_logits)
+            next_tokens_scores = logits_processors(input_ids, next_token_logits)
             # greedy
-            probs = F.softmax(logits)
+            probs = F.softmax(next_tokens_scores)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
