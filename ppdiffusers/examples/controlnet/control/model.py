@@ -273,4 +273,4 @@ class ControlNet(nn.Layer):
                 layer.gradient_checkpointing = value
                 print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
-        self.controlnet.apply(fn)
+        self.apply(fn)

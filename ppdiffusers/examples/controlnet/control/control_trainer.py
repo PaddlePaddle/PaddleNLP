@@ -66,7 +66,7 @@ class VisualDLWithImageCallback(VisualDLCallback):
             with self.autocast_smart_context_manager(args):
                 image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"])
                 image_logs["control"] = model.decode_control_image(controlnet_cond=inputs["controlnet_cond"])
-                image_logs["ddim-samples-7.5"] = model.log_image(
+                image_logs["ddim-samples-9.0"] = model.log_image(
                     input_ids=inputs["input_ids"],
                     controlnet_cond=inputs["controlnet_cond"],
                     guidance_scale=9.0,
