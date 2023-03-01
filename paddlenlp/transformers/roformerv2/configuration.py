@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["RoFormerV2Config", "ROFORMERV2_PRETRAINED_INIT_CONFIGURATION", "ROFORMERV2_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["RoFormerv2Config", "ROFORMERV2_PRETRAINED_INIT_CONFIGURATION", "ROFORMERV2_PRETRAINED_RESOURCE_FILES_MAP"]
 
 ROFORMERV2_PRETRAINED_INIT_CONFIGURATION = {
     "roformer_v2_chinese_char_small": {
@@ -76,7 +76,7 @@ ROFORMERV2_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class RoFormerV2Config(PretrainedConfig):
+class RoFormerv2Config(PretrainedConfig):
     model_type = "roformerv2"
     pretrained_init_configuration = ROFORMERV2_PRETRAINED_INIT_CONFIGURATION
 
@@ -90,6 +90,7 @@ class RoFormerV2Config(PretrainedConfig):
         hidden_act="relu",
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
+        act_dropout=0,
         max_position_embeddings=512,
         type_vocab_size=2,
         pad_token_id=0,
@@ -99,6 +100,9 @@ class RoFormerV2Config(PretrainedConfig):
         normalize_before=False,
         num_choices=2,
         embedding_weights=None,
+        need_weights=False,
+        kdim=None,
+        vdim=None,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -111,6 +115,7 @@ class RoFormerV2Config(PretrainedConfig):
         self.hidden_act = hidden_act
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.act_dropout = act_dropout
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.pad_token_id = pad_token_id
@@ -120,3 +125,6 @@ class RoFormerV2Config(PretrainedConfig):
         self.normalize_before = normalize_before
         self.num_choices = num_choices
         self.embedding_weights = embedding_weights
+        self.need_weights = need_weights
+        self.kdim = kdim
+        self.vdim = vdim
