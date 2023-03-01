@@ -200,6 +200,10 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": "sentiment_analysis-uie-senta-nano",
             },
+            "__internal_testing__/tiny-random-skep": {
+                "task_class": SkepTask,
+                "task_flag": "sentiment_analysis-tiny-random-skep",
+            },
         },
         "default": {"model": "bilstm"},
     },

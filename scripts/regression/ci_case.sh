@@ -119,9 +119,12 @@ print_info $? glue_${TASK_NAME}_train
 # 4 bert
 bert() {
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-cd ${nlp_dir}/model_zoo/bert/
-wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
-tar -xzvf bert.tar.gz
+# cd ${nlp_dir}/model_zoo/bert/
+# wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
+# tar -xzvf bert.tar.gz
+cd ${nlp_dir}/model_zoo/bert/data/
+wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
+cd ../
 # pretrain
 time (python -m paddle.distributed.launch run_pretrain.py \
     --model_type bert \
@@ -132,7 +135,7 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --input_dir bert/ \
+    --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
     --save_steps 1 \
@@ -140,12 +143,12 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --device gpu \
     --use_amp False >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
-time (python -m paddle.distributed.launch run_glue.py \
-    --model_type bert \
+time (python -m paddle.distributed.launch run_glue_trainer.py \
     --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
+    --per_device_eval_batch_size 32   \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
@@ -153,7 +156,9 @@ time (python -m paddle.distributed.launch run_glue.py \
     --max_steps 1 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
+    --fp16 False\
+    --do_train \
+    --do_eval >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
 print_info $? bert_fintune
 time (python -u ./export_model.py \
     --model_type bert \
@@ -182,13 +187,13 @@ print_info $? skep_train_aspect
 time ( python -m paddle.distributed.launch train_opinion.py  --batch_size 4 --epochs 1 --device gpu --save_dir ./opinion_checkpoints >${log_path}/skep_train_opinion) >>${log_path}/skep_train_opinion 2>&1
 print_info $? skep_train_opinion
 # predict_sentence
-time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --params_path checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
+time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --ckpt_dir checkpoints/model_100 >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
 print_info $? skep_predict_sentence
 ## predict_aspect
-time (python predict_aspect.py --device 'gpu' --params_path ./aspect_checkpoint/model_100/model_state.pdparams  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
+time (python predict_aspect.py --device 'gpu' --ckpt_dir ./aspect_checkpoints/model_100  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
 print_info $? skep_predict_aspect
 # # predict_opinion
-time (python predict_opinion.py --device 'gpu' --params_path ./opinion_checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
+time (python predict_opinion.py --device 'gpu' --ckpt_dir ./opinion_checkpoints/model_100 >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
 print_info $? skep_predict_opinion
 }
 # 6 bigbird
