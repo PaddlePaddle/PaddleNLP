@@ -54,6 +54,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
     save_path = "trained_model"  # filepath for the trained dygraph model
     export_path = "exported_model"  # filepath for the exported static model
+    compress_path = "compressed_model"  # filepath for the compressed static model
     results_filename = "experiment_results.csv"  # filepath for storing experiment results
     experiment_path = None  # filepath for the experiment results
     visualdl_path = "visualdl"  # filepath for the visualdl
@@ -120,9 +121,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self, dataset_list: List[Dataset]):
         """
-        Performs different data checks and inferences on the training and eval datasets
+        Performs different data checks and inferences on the datasets
         """
 
     def _construct_trainable(self) -> Callable:
@@ -175,36 +176,36 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def export(self, export_path, trial_id=None):
+    def export(self, export_path: str, trial_id: Optional[str] = None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
         Args:
             export_path (str, required): the filepath to export to
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
 
         raise NotImplementedError
 
     @abstractmethod
-    def to_taskflow(self, trial_id=None):
+    def to_taskflow(self, trial_id: Optional[str] = None):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, trial_id=None, eval_dataset=None) -> Dict[str, float]:
+    def evaluate(self, eval_dataset: Optional[Dataset] = None, trial_id: Optional[str] = None) -> Dict[str, float]:
         """
-        Evaluate the models from a certain `trial_id` on the given dataset
+        Run evaluation and returns metrics from a certain `trial_id` on the given dataset.
 
         Args:
             trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
             eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
-                If not provided, defaults to the evaluation dataset used at construction
+                If not provided, defaults to the evaluation dataset used at construction.
         """
         raise NotImplementedError
 
