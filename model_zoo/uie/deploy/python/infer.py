@@ -83,10 +83,10 @@ def create_option(args):
             "token_type_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
         )
         option.trt_option.set_shape(
-            "pos_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            "position_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
         )
         option.trt_option.set_shape(
-            "att_mask", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            "attention_mask", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
         )
         trt_file = os.path.join(args.model_dir, "inference.trt")
         if args.use_fp16:
