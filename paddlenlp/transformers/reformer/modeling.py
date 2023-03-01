@@ -541,7 +541,6 @@ class EfficientAttentionMixin:
 class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
     def __init__(self, config: ReformerConfig):
         super().__init__()
-        self.config = config
 
         self.chunk_length = config.lsh_attn_chunk_length
         self.num_hashes = config.num_hashes
@@ -2029,7 +2028,7 @@ class ReformerPretrainedModel(PretrainedModel):
                 weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.axial_norm_std if hasattr(self, "axial_norm_std") else self.config.axial_norm_std,
+                        std=self.config.axial_norm_std,
                         shape=weight.shape,
                     )
                 )
@@ -2038,9 +2037,7 @@ class ReformerPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.config.initializer_range,
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -2050,7 +2047,7 @@ class ReformerPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.axial_norm_std if hasattr(self, "axial_norm_std") else self.config.axial_norm_std,
+                    std=self.config.axial_norm_std,
                     shape=layer.weight.shape,
                 )
             )
@@ -2162,7 +2159,6 @@ class ReformerModel(ReformerPretrainedModel):
 
     def __init__(self, config: ReformerConfig):
         super().__init__(config)
-        self.config = config
         assert (
             self.config.num_hidden_layers > 0
         ), "`config.attn_layers` is empty. Select at least one attn layer form ['lsh', 'local']"
@@ -2730,9 +2726,8 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         super().__init__(config)
         self.reformer = ReformerModel(config)
         self.num_classes = config.num_classes
-        self.config = config
         self.classifier = ReformerClassificationHead(config)
-        if self.config.is_decoder is True:
+        if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for sequence classification")
 
         self.init_weights()
@@ -2868,7 +2863,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
         self.reformer = ReformerModel(config)
         # 2 * hidden_size because we use reversible residual layers
         self.qa_outputs = nn.Linear(2 * self.config.hidden_size, 2)
-        if self.config.is_decoder is True:
+        if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for question answering task.")
         self.init_weights()
 
