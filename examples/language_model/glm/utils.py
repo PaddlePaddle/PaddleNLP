@@ -19,6 +19,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
+from paddle.optimizer import Adam
+from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.trainer import Trainer
 
@@ -28,7 +30,7 @@ class GLMTrainer(Trainer):
         super().__init__(**kwargs)
         self.start_token = self.tokenizer.bos_token_id
         self.end_token = self.tokenizer.eos_token_id
-        self.mask_token = self.tokenizer.mask_token_id
+        self.mask_token = self.tokenizer.smask_token_id
         self.pad_token = self.tokenizer.pad_token_id
         self.do_generation = do_generation
         self.processors = LogitsProcessorList()
@@ -87,6 +89,7 @@ class GLMTrainer(Trainer):
 
         model.eval()
         with paddle.no_grad():
+            inputs = self.tokenizer.build_inputs_for_generation(inputs, max_gen_length=self.args.out_seq_length)
             tokens = inputs["input_ids"]
             attention_mask = inputs["attention_mask"]
             position_ids = inputs["position_ids"]
@@ -98,7 +101,7 @@ class GLMTrainer(Trainer):
                 length_penalty=self.args.length_penalty,
                 do_early_stopping=False,
             )
-            beam_scores = paddle.zeros([batch_size, self.args.num_beams], dtype="float")
+            beam_scores = paddle.zeros([batch_size, self.args.num_beams], dtype="float32")
             beam_scores[:, 1:] = -1e9
             beam_scores = beam_scores.reshape(
                 [
@@ -109,7 +112,11 @@ class GLMTrainer(Trainer):
             counter = 0
             while counter < self.args.tgt_length:
                 if counter == 0:
-                    next_token_logits, mems = model(tokens, position_ids, attention_mask, use_cache=True)
+                    next_token_logits, mems = model(
+                        input_ids=tokens,
+                        position_ids=position_ids,
+                        attention_mask=attention_mask,
+                    )
                     seq_length = next_token_logits.shape[1]
                     next_token_logits = next_token_logits[:, -1]
                     next_token_logits = next_token_logits.unsqueeze(1).tile([1, self.args.num_beams, 1])
@@ -131,7 +138,13 @@ class GLMTrainer(Trainer):
                         position_ids[:, 1] = counter + 1
                     last_token = tokens[:, -1:]
                     cur_attention_mask = paddle.zeros([batch_size * self.args.num_beams], dtype=tokens.dtype)
-                    next_token_logits, mems = model(last_token, position_ids, cur_attention_mask, mems, use_cache=True)
+                    next_token_logits, mems = model(
+                        input_ids=last_token,
+                        position_ids=position_ids,
+                        attention_mask=cur_attention_mask,
+                        cache=mems,
+                        use_cache=True,
+                    )
                     next_token_logits = next_token_logits[:, -1]
                 next_token_logits = top_k_logits(next_token_logits, top_k=self.args.top_k, top_p=self.args.top_p)
                 next_token_scores = nn.functional.log_softmax(next_token_logits, axis=-1)
@@ -165,13 +178,12 @@ class GLMTrainer(Trainer):
                 beam_next_tokens = beam_outputs["next_beam_tokens"]
                 beam_idx = beam_outputs["next_beam_indices"]
                 beam_next_tokens = beam_next_tokens.unsqueeze(-1)
-                print(tokens)
-                print(beam_idx)
-                print(beam_next_tokens)
                 if tokens.shape[1] == 0:
                     tokens = beam_next_tokens
                 else:
-                    tokens = paddle.concat([tokens[beam_idx, :], beam_next_tokens], axis=-1)
+                    tokens = paddle.concat(
+                        [paddle.stack([tokens[i, :] for i in beam_idx.tolist()], axis=0), beam_next_tokens], axis=-1
+                    )
                 mems = [mem[beam_idx] for mem in mems] if mems else []
                 if beam_scorer.is_done:
                     break
@@ -191,12 +203,62 @@ class GLMTrainer(Trainer):
                 all_preds.append(text)
 
             all_labels = []
-            for label, mask in zip(input["labels"].numpy(), attention_mask.numpy()):
-                label = self.tokenizer.decode(label[mask.astype("bool")], skip_special_tokens=True).strip()
-                label = float(label.replace(" ", ""))
+            for label, mask in zip(inputs["labels"].numpy(), attention_mask.numpy()):
+                label = self.tokenizer.decode(label[mask.astype("bool")][0], skip_special_tokens=True).split()
                 all_labels.append(label)
 
         return (None, all_preds, all_labels)
+
+    def create_scheduler(self, num_training_steps: int):
+        num_warmup_steps = (
+            self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
+        )
+
+        def lr_lambda(current_step: int):
+            if current_step < num_warmup_steps:
+                return float(current_step) / float(max(1, num_warmup_steps))
+            else:
+                decay_step_ratio = (current_step - num_warmup_steps) / (num_training_steps - num_warmup_steps)
+                return 1.0 - (1.0 - self.args.lr_decay_ratio) * decay_step_ratio
+
+        if self.lr_scheduler is None:
+            self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
+        return self.lr_scheduler
+
+    def create_optimizer(self, lr_scheduler=None):
+        if self.optimizer is None:
+            if self.optimizer_grouped_parameters is not None:
+                params = self.optimizer_grouped_parameters
+                apply_decay_param_fun = None
+            else:
+                params = self.model.parameters()
+                decay_parameters = [
+                    p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
+                ]
+
+                def apply_decay_param_fun(x):
+                    return x in decay_parameters
+
+            optimizer_cls = Adam
+            optimizer_kwargs = {}
+            adam_kwargs = {
+                "beta1": self.args.adam_beta1,
+                "beta2": self.args.adam_beta2,
+                "epsilon": self.args.adam_epsilon,
+            }
+            optimizer_kwargs.update(adam_kwargs)
+
+            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
+                optimizer_kwargs["multi_precision"] = True
+
+            self.optimizer = optimizer_cls(
+                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                parameters=params,
+                weight_decay=self.args.weight_decay,
+                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
+                **optimizer_kwargs,
+            )
+        return self.optimizer
 
 
 def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
@@ -504,7 +566,7 @@ class BeamSearchScorer(BeamScorer):
 
         # prepare for adding eos
         sent_max_len = sent_lengths.max().item()
-        decoded: Tensor = paddle.zeros([batch_size * self.num_beam_hyps_to_keep], sent_max_len, dtype=input_ids.dtype)
+        decoded: Tensor = paddle.zeros([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         scores = paddle.zeros([batch_size * self.num_beam_hyps_to_keep], dtype=final_beam_scores.dtype)
         # shorter batches are padded if needed
         if sent_lengths.min().item() != sent_lengths.max().item():

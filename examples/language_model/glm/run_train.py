@@ -50,6 +50,7 @@ class ModelArgument:
         default="glm-2b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
+    lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
 
 
 # yafp: enable
@@ -68,11 +69,9 @@ def main():
     paddle.set_device(training_args.device)
 
     # Load the pretrained language model.
-    # TODO: FP16, DDP
     model = AutoModelForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path, output_predict=True, parallel_output=True
     )
-    # TODO: prepare_tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
@@ -82,7 +81,6 @@ def main():
     dev_ds = dev_ds.map(trans_func)
     test_ds = test_ds.map(trans_func)
 
-    # TODO: Set seed for sampler based on specific epoch and seed.
     criterion = nn.loss.CrossEntropyLoss(reduction="none")
 
     def compute_metrics(eval_preds):

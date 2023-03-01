@@ -159,8 +159,6 @@ class GPT2MLP(nn.Layer):
     into h hidden dimension. At the end, dropout is also applied.
     """
 
-    # TODO: Where does init_method used?
-
     def __init__(self, config: GLMConfig):
         super(GPT2MLP, self).__init__()
         self.dense_h_to_4h = nn.Linear(config.hidden_size, config.hidden_size * 4)
@@ -170,7 +168,7 @@ class GPT2MLP(nn.Layer):
     def forward(self, hidden_states):
         # [batch_size, sequence_length, 4h / number of partitions]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
-        intermediate_parallel = F.gelu(intermediate_parallel)
+        intermediate_parallel = F.gelu(intermediate_parallel, approximate=True)
 
         # [batch_size, sequence_length, h]
         output = self.dense_4h_to_h(intermediate_parallel)
@@ -281,6 +279,7 @@ class GLMStack(nn.Layer):
         position_embeddings = self.position_embeddings(position_ids)
 
         hidden_states = hidden_states + position_embeddings
+
         if self.block_position_encoding:
             block_position_embeddings = self.block_position_embeddings(block_position_ids)
             hidden_states = hidden_states + block_position_embeddings
@@ -295,6 +294,7 @@ class GLMStack(nn.Layer):
                 hidden_states = self.recompute_training(layer, hidden_states, attention_mask, cache=mem_i)
             else:
                 hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
+
             memory_layers.append(hidden_states.detach())
 
         output = self.final_layernorm(hidden_states)
@@ -373,14 +373,14 @@ class GLMModel(GLMPretrainedModel):
     def __init__(self, config: GLMConfig):
         super(GLMModel, self).__init__(config)
         self.config = config
-        self.output_predict = config.output_predict  # TODO check it in PaddleNLP
+        self.output_predict = config.output_predict
         self.word_embeddings = nn.Embedding(
             config.vocab_size,
             config.hidden_size,
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
         )
         self.transformer = GLMStack(config)
-        self.apply(self.init_weights)  # TODO Whether it is the same as transformers
+        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -416,7 +416,7 @@ class GLMModel(GLMPretrainedModel):
         if not return_dict:
             return (logits, hidden_layers)
 
-        return ModelOutput(logits=logits, cache=hidden_layers)  # TODO Should the ModelOutput be different?
+        return ModelOutput(logits=logits, cache=hidden_layers)
 
 
 class GLMForMultipleChoice(GLMPretrainedModel):
@@ -463,7 +463,7 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             logits=log_probs,
             hidden_states=lm_logits,
             cache=model_output.cache,
-        )  # TODO Difference between MultipleChoiceModelOutput and it?
+        )
 
 
 class GLMForConditionalGeneration(GLMPretrainedModel):
@@ -533,7 +533,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
 
         loss = None
         if labels is not None:
-            print(type(lm_logits), type(labels))
             loss = F.cross_entropy(
                 lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
             )

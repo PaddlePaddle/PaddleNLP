@@ -38,20 +38,20 @@ class GLMTokenizerMixin:
     """
 
     @property
-    def bos_token(self) -> Optional[str]:
+    def sop_token(self) -> Optional[str]:
         return "<|startofpiece|>"
 
     @property
-    def bos_token_id(self) -> Optional[int]:
-        return self.convert_tokens_to_ids(self.bos_token)
+    def sop_token_id(self) -> Optional[int]:
+        return self.convert_tokens_to_ids(self.sop_token)
 
     @property
-    def eos_token(self) -> Optional[str]:
+    def eop_token(self) -> Optional[str]:
         return "<|endofpiece|>"
 
     @property
-    def eos_token_id(self) -> Optional[int]:
-        return self.convert_tokens_to_ids(self.eos_token)
+    def eop_token_id(self) -> Optional[int]:
+        return self.convert_tokens_to_ids(self.eop_token)
 
     @property
     def gmask_token_id(self) -> int:
@@ -89,7 +89,7 @@ class GLMTokenizerMixin:
             choice_indices.append(paddle.arange(len(token), len(token) + len(choice), dtype="int64"))
             attention_mask.append(paddle.tril(paddle.ones([len(choice), len(choice)], dtype="int64")))
 
-            token = paddle.concat([token, paddle.to_tensor([self.bos_token_id], dtype="int64"), choice[:-1]])
+            token = paddle.concat([token, paddle.to_tensor([self.sop_token_id], dtype="int64"), choice[:-1]])
             position_id = paddle.concat([position_id, paddle.to_tensor([mask_position] * len(choice), dtype="int64")])
             block_position_id = paddle.concat([block_position_id, paddle.arange(1, len(choice) + 1, dtype="int64")])
 
@@ -163,10 +163,10 @@ class GLMTokenizerMixin:
             if not is_batched:
                 targets = [targets]
             assert len(targets) == len(input_ids)
-            targets = [(target + [self.eos_token_id])[:max_gen_length] for target in targets]
+            targets = [(target + [self.eop_token_id])[:max_gen_length] for target in targets]
             if not padding:
                 max_gen_length = max(map(len, targets))
-            targets = [[self.bos_token_id] + target for target in targets]
+            targets = [[self.sop_token_id] + target for target in targets]
             labels = [target[1:] for target in targets]
             targets = [target + [self.pad_token_id] * (max_gen_length + 1 - len(target)) for target in targets]
             labels = [label + [-100] * (max_gen_length - len(label)) for label in labels]
@@ -206,7 +206,7 @@ class GLMTokenizerMixin:
 
         if targets is None:
             input_ids = paddle.concat(
-                [input_ids, paddle.full([batch_size, 1], self.bos_token_id, dtype=input_ids.dtype)], axis=-1
+                [input_ids, paddle.full([batch_size, 1], self.sop_token_id, dtype=input_ids.dtype)], axis=-1
             )
         else:
             loss_mask = paddle.concat([paddle.zeros_like(input_ids), loss_mask], axis=1)
@@ -355,6 +355,27 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         "glm-2b": 1024
         # "glm-10b": 1024,
     }
+
+    def build_inputs_with_special_tokens(
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens. A BERT sequence has the following format:
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+        Args:
+            token_ids_0 (:obj:`List[int]`):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                Optional second list of IDs for sequence pairs.
+        Returns:
+            :obj:`List[int]`: List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
+        """
+        assert token_ids_1 is None
+        cls = [self.cls_token_id]
+        eos = [self.eos_token_id]
+        return cls + token_ids_0 + eos
 
 
 class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):

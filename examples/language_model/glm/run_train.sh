@@ -13,7 +13,7 @@
 # limitations under the License.
 
 device=$1
-model="./local"
+model="./local-2b"
 
 CUDA_VISIBLE_DEVICES=$device python run_train.py \
 --model_name_or_path $model \
@@ -26,7 +26,7 @@ CUDA_VISIBLE_DEVICES=$device python run_train.py \
 --label_smoothing 0.1 \
 --save_steps 10000 \
 --logging_steps 1 \
---eval_steps 1 \
+--eval_steps 4 \
 --output_dir ./checkpoints/glm-$model-cnn_dm \
 --src_length 608 \
 --tgt_length 160 \
@@ -35,16 +35,16 @@ CUDA_VISIBLE_DEVICES=$device python run_train.py \
 --no_repeat_ngram_size 3 \
 --num_beams 5 \
 --select_topk True \
---fp16 \
---recompute \
 --per_device_eval_batch_size 1 \
 --per_device_train_batch_size 1 \
 --max_grad_norm 1.0 \
 --lr_scheduler_type linear \
---do_train \
+--do_train
 --do_eval 
 
 #--resume_from_checkpoint ../../../paddlenlp/transformers/glm/paddle/glm-515m/ 
 #--per_device_eval_batch_size 4 \
 #--logging_steps 50 \
 #--eval_steps 1000 \
+--fp16 \
+--recompute \
