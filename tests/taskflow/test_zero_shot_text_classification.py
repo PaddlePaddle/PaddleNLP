@@ -16,14 +16,6 @@ import unittest
 
 from paddlenlp.taskflow import Taskflow
 
-# from paddlenlp import Taskflow
-
-# schema = ['这是一条差评', '这是一条好评']
-# text_cls = Taskflow("zero_shot_text_classification", schema=schema)
-# text_cls('房间干净明亮，非常不错')
-# '''
-# [{'predictions': [{'label': '这是一条好评', 'score': 0.9695149765679986}], 'text_a': '房间干净明亮，非常不错'}]
-
 
 class TestZeroShotTextClassificationTask(unittest.TestCase):
     @classmethod
