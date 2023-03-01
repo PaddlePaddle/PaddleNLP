@@ -20,9 +20,9 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 
 ```bash
 # CPU 推理
-python seq_cls_infer.py --model_dir ../../finetune/tmp/chnsenticorp_v2/export/ --device cpu --backend paddle
+python seq_cls_infer.py --model_dir ../tmp/chnsenticorp_v2/export/ --device cpu --backend paddle
 # GPU 推理
-python seq_cls_infer.py --model_dir ../../finetune/tmp/chnsenticorp_v2/export/ --device gpu --backend paddle
+python seq_cls_infer.py --model_dir ../tmp/chnsenticorp_v2/export/ --device gpu --backend paddle
 ```
 
 运行完成后返回的结果如下：
@@ -44,6 +44,8 @@ Batch id: 2, example id: 0, sentence: 还稍微重了点，可能是硬盘大的
 |--batch_size |输入的batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--device_id | 运行设备的id。默认为0。 |
+|--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
