@@ -147,6 +147,7 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
 else:
     from .pipelines import (
+        FastDeployCycleDiffusionPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,
