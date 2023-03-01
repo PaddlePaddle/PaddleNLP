@@ -17,7 +17,7 @@ import os
 
 import paddle
 from datasets import load_dataset
-from run_glue import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
+from run_glue_trainer import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
 
 from paddlenlp.data import Dict, Pad
 
