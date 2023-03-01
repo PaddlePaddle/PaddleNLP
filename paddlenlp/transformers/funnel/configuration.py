@@ -192,13 +192,29 @@ class FunnelConfig(PretrainedConfig):
     def hidden_size(self):
         return self.d_model
 
+    @hidden_size.setter
+    def hidden_size(self, value):
+        raise NotImplementedError("This model does not support the setting of `hidden_size`. Please set `d_model`.")
+
     @property
     def num_attention_heads(self):
         return self.n_head
 
+    @num_attention_heads.setter
+    def num_attention_heads(self, value):
+        raise NotImplementedError(
+            "This model does not support the setting of `num_attention_heads`. Please set `n_heads`."
+        )
+
     @property
     def num_hidden_layers(self):
         return sum(self.block_sizes)
+
+    @num_hidden_layers.setter
+    def num_hidden_layers(self, value):
+        raise NotImplementedError(
+            "This model does not support the setting of `num_hidden_layers`. Please set `block_sizes`."
+        )
 
     @property
     def num_blocks(self):
