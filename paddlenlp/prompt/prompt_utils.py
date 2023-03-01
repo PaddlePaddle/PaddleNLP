@@ -44,7 +44,7 @@ class PromptDataCollatorWithPadding:
     pad the inputs to the longest sequence in the batch.
 
     Args:
-        tokenizer (`paddlennlp.transformers.PretrainedTokenizer`):
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
             The tokenizer used for encoding the data from PromptTokenizer.
     """
 

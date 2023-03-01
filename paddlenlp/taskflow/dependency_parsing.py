@@ -15,17 +15,17 @@
 
 import copy
 import os
-import itertools
 
 import numpy as np
 import paddle
-from ..data import Vocab, Pad
-from .utils import download_file, dygraph_mode_guard
-from .task import Task
+
+from ..data import Pad, Vocab
 from .models import BiAffineParser
+from .task import Task
+from .utils import download_file
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            ddp = Taskflow("dependency_parsing")
            ddp("三亚是一座美丽的城市")
@@ -35,7 +35,7 @@ usage = r"""
            ddp(["三亚是一座美丽的城市", "他送了一本书"])
            '''
            [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
-           '''       
+           '''
 
            ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
            ddp("三亚是一座美丽的城市")
@@ -64,7 +64,7 @@ usage = r"""
            ddp.from_segments([['三亚', '是', '一座', '美丽', '的', '城市'], ['他', '送', '了', '一本', '书']])
            '''
            [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
-           '''   
+           '''
          """
 
 
@@ -163,7 +163,7 @@ class DDParserTask(Task):
         else:
             raise ValueError(
                 "The encoding model should be one of \
-                ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh"
+                ddparser, ddparser-ernie-1.0 and ddparser-ernie-gram-zh"
             )
         self._check_task_files()
         self._construct_vocabs()
@@ -181,7 +181,7 @@ class DDParserTask(Task):
 
         try:
             from LAC import LAC
-        except:
+        except Exception:
             raise ImportError("Please install the dependencies first, pip install LAC --upgrade")
 
         self.use_cuda = use_cuda
@@ -274,10 +274,6 @@ class DDParserTask(Task):
            2) Generate the other model inputs from the raw text and token ids.
         """
 
-        # Get the config from the kwargs
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
-
         outputs = {}
 
         lac_results = []
@@ -368,9 +364,9 @@ class DDParserTask(Task):
             data: a numpy array, use cv2.imshow to show it or cv2.imwrite to save it.
         """
         try:
-            import matplotlib.pyplot as plt
             import matplotlib.font_manager as font_manager
-        except:
+            import matplotlib.pyplot as plt
+        except Exception:
             raise ImportError("Please install the dependencies first, pip install matplotlib --upgrade")
 
         self.plt = plt
@@ -528,9 +524,9 @@ def eisner(scores, mask):
     s_i = np.full_like(scores, float("-inf"))
     # Score for complete span
     s_c = np.full_like(scores, float("-inf"))
-    # Incompelte span position for backtrack
+    # Incomplete span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # Compelte span position for backtrack
+    # Complete span position for backtrack
     p_c = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
     # Set 0 to s_c.diagonal
     s_c = fill_diagonal(s_c, 0)

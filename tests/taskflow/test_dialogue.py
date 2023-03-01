@@ -22,7 +22,7 @@ class TestDialogueTask(unittest.TestCase):
     def setUpClass(cls):
         cls.dialogue = Taskflow(
             task="dialogue",
-            task_path="__internal_testing__/tiny-random-plato",
+            model="__internal_testing__/tiny-random-plato",
         )
         cls.max_turn = 3
 

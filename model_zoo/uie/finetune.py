@@ -15,7 +15,7 @@
 import os
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Optional
+from typing import List, Optional
 
 import paddle
 from utils import convert_example, reader
@@ -55,6 +55,11 @@ class DataArguments:
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
+    )
+
+    dynamic_max_length: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "dynamic max length from batch, it can be array of length, eg: 16 32 64 128"},
     )
 
 
@@ -127,12 +132,16 @@ def main():
         tokenizer=tokenizer,
         max_seq_len=data_args.max_seq_length,
         multilingual=model_args.multilingual,
+        dynamic_max_length=data_args.dynamic_max_length,
     )
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
 
-    data_collator = DataCollatorWithPadding(tokenizer)
+    if training_args.device == "npu":
+        data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
+    else:
+        data_collator = DataCollatorWithPadding(tokenizer)
 
     criterion = paddle.nn.BCELoss()
 
@@ -197,17 +206,23 @@ def main():
     if training_args.do_export:
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        if training_args.device == "npu":
+            # npu will transform int64 to int32 for internal calculation.
+            # To reduce useless transformation, we feed int32 inputs.
+            input_spec_dtype = "int32"
+        else:
+            input_spec_dtype = "int64"
         if model_args.multilingual:
             input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
             ]
         else:
             input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
             ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir, "export")

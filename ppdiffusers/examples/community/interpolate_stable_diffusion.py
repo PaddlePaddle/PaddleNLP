@@ -169,7 +169,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -333,10 +333,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         latents_shape = [batch_size * num_images_per_prompt, self.unet.in_channels, height // 8, width // 8]
         latents_dtype = text_embeddings.dtype
         if latents is None:
-            if seed is not None:
-                paddle.seed(seed)
-
-            latents = paddle.randn(latents_shape, dtype=latents_dtype)
+            latents = paddle.randn(latents_shape, generator=generator, dtype=latents_dtype)
         else:
             if latents.shape != latents_shape:
                 raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
@@ -420,10 +417,9 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
 
     def get_noise(self, seed, dtype=paddle.float32, height=512, width=512):
         """Takes in random seed and returns corresponding noise vector"""
-        if seed is None:
-            paddle.seed(seed)
         return paddle.randn(
             (1, self.unet.in_channels, height // 8, width // 8),
+            generator=paddle.Generator().manual_seed(seed),
             dtype=dtype,
         )
 

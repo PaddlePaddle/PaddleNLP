@@ -215,6 +215,7 @@ python train_text_to_image_lora.py \
   --report_to=visualdl \
   --checkpointing_steps=500 \
   --validation_prompt="Totoro" \
+  --lora_rank=4 \
   --seed=1337 \
   --validation_epochs 10
 ```
