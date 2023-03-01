@@ -57,7 +57,7 @@ class FunnelModelTester:
         num_labels=3,
         num_choices=4,
         scope=None,
-        base=False,
+        base=True,
     ):
         self.parent = parent
         self.batch_size = batch_size
