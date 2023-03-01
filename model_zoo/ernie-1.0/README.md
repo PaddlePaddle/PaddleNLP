@@ -648,9 +648,14 @@ python deploy/seq_cls_infer.py --model_dir tmp/chnsenticorp_v2/export/ --device 
 
 运行后预测结果打印如下：
 ```text
-Data: 东西不错，不过有人不太喜欢镜面的，我个人比较喜欢，总之还算满意。   Label: positive
-Data: 房间不错,只是上网速度慢得无法忍受,打开一个网页要等半小时,连邮件都无法收。另前台工作人员服务态度是很好，只是效率有得改善。          Label: positive
-Data: 挺失望的,还不如买一本张爱玲文集呢,以<色戒>命名,可这篇文章仅仅10多页,且无头无尾的,完全比不上里面的任意一篇其它文章.         Label: negative
+[2023-03-01 08:25:31,352] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.fast_tokenizer.ErnieFastTokenizer'> to load '../tmp/chnsenticorp_v2/export/'.
+WARNING: Logging before InitGoogleLogging() is written to STDERR
+W0301 08:25:37.617117 58742 analysis_config.cc:958] It is detected that mkldnn and memory_optimize_pass are enabled at the same time, but they are not supported yet. Currently, memory_optimize_pass is explicitly disabled
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::CPU.
+Batch id: 0, example id: 0, sentence: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+Batch id: 1, example id: 0, sentence: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片！开始还怀疑是不是赠送的个别现象，可是后来发现每张DVD后面都有！真不知道生产商怎么想的，我想看的是猫和老鼠，不是米老鼠！如果厂家是想赠送的话，那就全套米老鼠和唐老鸭都赠送，只在每张DVD后面添加一集算什么？？简直是画蛇添足！！, label: negative, negative prob: 0.9998, positive prob: 0.0002.
+Batch id: 2, example id: 0, sentence: 还稍微重了点，可能是硬盘大的原故，还要再轻半斤就好了。其他要进一步验证。贴的几种膜气泡较多，用不了多久就要更换了，屏幕膜稍好点，但比没有要强多了。建议配赠几张膜让用用户自己贴。, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+......
 ```
 
 更多关于部署的情况可以参考[ERNIE 1.0 模型 Python 部署示例](finetune/deploy/README.md)。
