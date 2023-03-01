@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 import paddle
 from datasets import load_dataset
@@ -28,6 +29,7 @@ from paddlenlp.transformers import (
     BertTokenizer,
     ErnieForSequenceClassification,
     ErnieTokenizer,
+    export_model,
 )
 
 METRIC_CLASSES = {
@@ -75,6 +77,10 @@ class ModelArguments:
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
+    )
+    export_model_dir: Optional[str] = field(
+        default="./infer_model",
+        metadata={"help": "Path to directory to store the exported inference model."},
     )
 
 
@@ -136,11 +142,9 @@ def do_train():
         label = paddle.to_tensor(p.label_ids)
 
         metric = Accuracy()
-        metric.reset()
         result = metric.compute(preds, label)
         metric.update(result)
         accu = metric.accumulate()
-        metric.reset()
         return {"accuracy": accu}
 
     trainer = Trainer(
@@ -172,6 +176,18 @@ def do_train():
             eval_metrics = trainer.evaluate(dev_ds)
             trainer.log_metrics("eval", eval_metrics)
             trainer.save_metrics("eval", eval_metrics)
+
+    # Export inference model
+    if training_args.do_export and paddle.distributed.get_rank() == 0:
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        model_to_save = trainer.model
+        model_to_save = model_to_save._layers if isinstance(model_to_save, paddle.DataParallel) else model_to_save
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        ]
+        export_model(model=model_to_save, input_spec=input_spec, path=model_args.export_model_dir)
+        trainer.tokenizer.save_pretrained(model_args.export_model_dir)
 
 
 if __name__ == "__main__":

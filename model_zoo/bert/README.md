@@ -219,7 +219,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue_trainer.py \
     --device gpu \
     --fp16 False\
     --do_train \
-    --do_eval
+    --do_eval \
+    --do_export
 ```
 
 其中参数释义如下：
@@ -237,6 +238,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue_trainer.py \
 - `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 - `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
 - `do_eval` 是否进行评估任务。同上。(`bool`, 可选, 默认为 `False`)
+- `do_export` 是否进行模型导出任务。同上。(`bool`, 可选, 默认为 `False`)
+
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
@@ -251,22 +254,25 @@ python -m paddle.distributed.launch --gpus "0" run_glue_trainer.py \
 | MNLI  | Matched acc/MisMatched acc   |  0.84422/0.84825  |
 | RTE   | Accuracy                     |      0.711191     |
 
-
-### 预测
+<details>
+<summary>预测</summary>
 
 在Fine-tuning完成后，我们可以使用如下方式导出希望用来预测的模型：
 
-```shell
-python -u ./export_model.py \
+<pre><code>python -u ./export_model.py \
     --model_type bert \
     --model_path bert-base-uncased \
-    --output_path ./infer_model/model
-```
+    --output_path ./infer_model/model</code></pre>
 
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
 - `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
+</details>
+
+### 预测（Trainer版本）
+
+通过设置Trainer的 `do_export` 参数，在Fine-tuning完成后，Trainer就能自动帮我们导出希望用来预测的模型。导出的模型默认保存在 `./infer_mode` 路径下，如果想设置导出路径，可以配置 `export_model_dir` 参数，可参考run_glue_trainer.py脚本中的 `export_model_dir` 参数查看更多信息。
 
 然后按照如下的方式进行GLUE中的评测任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
 
