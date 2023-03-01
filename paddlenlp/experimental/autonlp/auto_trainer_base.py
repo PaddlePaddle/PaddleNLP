@@ -342,7 +342,17 @@ class AutoTrainerBase(metaclass=ABCMeta):
             if num_cpus:
                 hardware_resources["cpu"] = num_cpus
             trainable = tune.with_resources(trainable, hardware_resources)
-        tune_config = tune.tune_config.TuneConfig(num_samples=num_models, time_budget_s=time_budget_s, search_alg=algo)
+
+        def trial_creator(trial):
+            return "{}".format(trial.trial_id)
+
+        tune_config = tune.TuneConfig(
+            num_samples=num_models,
+            time_budget_s=time_budget_s,
+            search_alg=algo,
+            trial_name_creator=trial_creator,
+            trial_dirname_creator=trial_creator,
+        )
 
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
