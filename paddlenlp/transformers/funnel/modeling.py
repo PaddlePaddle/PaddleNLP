@@ -27,7 +27,12 @@ from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
 from .. import PretrainedModel as PreTrainedModel
 from .. import register_base_model
 from ..activations import ACT2FN
-from ..model_outputs import BaseModelOutput
+from ..model_outputs import (
+    BaseModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+)
 from .configuration import (
     FUNNEL_PRETRAINED_INIT_CONFIGURATION,
     FUNNEL_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1282,7 +1287,12 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
             output = (logits,) + outputs[1:]
             return ((loss,) + output) if loss is not None else output
 
-        return logits
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class FunnelForMultipleChoice(FunnelPreTrainedModel):
@@ -1422,7 +1432,12 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
             output = (logits,) + outputs[1:]
             return ((loss,) + output) if loss is not None else output
 
-        return logits
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class FunnelForQuestionAnswering(FunnelPreTrainedModel):
@@ -1505,7 +1520,13 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
             output = (start_logits, end_logits) + outputs[1:]
             return ((total_loss,) + output) if total_loss is not None else output
 
-        return start_logits, end_logits
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 def is_tensor(x):
