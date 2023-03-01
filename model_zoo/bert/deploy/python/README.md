@@ -28,7 +28,13 @@ python seq_cls_infer.py --model_dir ../../finetuned_models/export/model --device
 运行完成后返回的结果如下：
 
 ```bash
-
+[2023-03-01 07:26:34,961] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
+Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: negative, negative prob: 0.5990, positive prob: 0.4010.
+Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: negative, negative prob: 0.5341, positive prob: 0.4659.
+Batch id: 2, example id: 0, sentence1: at achieving the modest , crowd-pleasing goals it sets for itself, label: negative, negative prob: 0.5965, positive prob: 0.4035.
+Batch id: 3, example id: 0, sentence1: so pat it makes your teeth hurt, label: negative, negative prob: 0.5906, positive prob: 0.4094.
+Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: negative, negative prob: 0.5385, positive prob: 0.4615.
 ```
 
 ## 参数说明
