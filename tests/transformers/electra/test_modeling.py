@@ -19,6 +19,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    ElectraConfig,
     ElectraForMaskedLM,
     ElectraForMultipleChoice,
     ElectraForPretraining,
@@ -28,9 +29,8 @@ from paddlenlp.transformers import (
     ElectraModel,
     ElectraPretrainedModel,
 )
-
-from ...testing_utils import slow
-from ..test_modeling_common import (
+from tests.testing_utils import slow
+from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -105,21 +105,21 @@ class ElectraModelTester:
         )
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "embedding_size": self.embedding_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "pad_token_id": self.pad_token_id,
-        }
+        return ElectraConfig(
+            vocab_size=self.vocab_size,
+            embedding_size=self.embedding_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=self.pad_token_id,
+        )
 
     def create_and_check_electra_model(
         self,
@@ -132,7 +132,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraModel(**config)
+        model = ElectraModel(config)
         model.eval()
         result = model(
             input_ids,
@@ -160,7 +160,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraModel(**config)
+        model = ElectraModel(config)
         model.eval()
 
         input_ids = ids_tensor((self.batch_size, self.seq_length), self.vocab_size)
@@ -205,7 +205,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForMaskedLM(ElectraModel(**config))
+        model = ElectraForMaskedLM(config)
         model.eval()
         result = model(
             input_ids,
@@ -236,7 +236,8 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForTokenClassification(ElectraModel(**config), num_classes=self.num_classes)
+        config.num_classes = self.num_classes
+        model = ElectraForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -268,7 +269,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForPretraining(ElectraModel(**config))
+        model = ElectraForPretraining(config)
         model.eval()
         result = model(
             input_ids,
@@ -289,7 +290,8 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForSequenceClassification(ElectraModel(**config), num_classes=self.type_sequence_label_size)
+        config.num_classes = self.type_sequence_label_size
+        model = ElectraForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -320,7 +322,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForQuestionAnswering(ElectraModel(**config))
+        model = ElectraForQuestionAnswering(config)
         model.eval()
         result = model(
             input_ids,
@@ -349,7 +351,8 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForMultipleChoice(ElectraModel(**config), num_choices=self.num_choices)
+        config.num_choices = self.num_choices
+        model = ElectraForMultipleChoice(config)
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
         multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
