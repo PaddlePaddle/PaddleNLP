@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 import time
 
@@ -21,6 +20,7 @@ import numpy as np
 import paddle
 from fastdeploy import ModelFormat
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     FastDeployRuntimeModel,
@@ -69,7 +69,7 @@ def parse_arguments():
     parser.add_argument(
         "--image_path", default="fd_astronaut_rides_horse.png", help="The model directory of diffusion_model."
     )
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
@@ -104,22 +104,24 @@ def create_paddle_inference_runtime(
     device_id=0,
     disable_paddle_trt_ops=[],
     disable_paddle_pass=[],
+    paddle_stream=None,
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
-    option.paddle_infer_option.enable_log_info = True
     if device_id == -1:
         option.use_cpu()
     else:
         option.use_gpu(device_id)
+    if paddle_stream is not None:
+        option.set_external_raw_stream(paddle_stream)
+    for pass_name in disable_paddle_pass:
+        option.paddle_infer_option.delete_pass(pass_name)
     if use_trt:
         option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
-        # option.use_trt_backend()
-        # option.enable_trt()
         option.paddle_infer_option.enable_trt = True
         if use_fp16:
             option.trt_option.enable_fp16 = True
-        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache")
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache/")
         option.set_trt_cache_file(cache_file)
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
@@ -214,6 +216,7 @@ if __name__ == "__main__":
         paddle.set_device("cpu")
     else:
         paddle.set_device(f"gpu:{device_id}")
+        paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -225,14 +228,14 @@ if __name__ == "__main__":
         "input_ids": {
             "min_shape": [1, 77],
             "max_shape": [2, 77],
-            "opt_shape": [2, 77],
+            "opt_shape": [1, 77],
         }
     }
     vae_dynamic_shape = {
         "latent_sample": {
             "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "max_shape": [1, 4, 64, 64],
+            "opt_shape": [1, 4, 64, 64],
         }
     }
 
@@ -269,23 +272,6 @@ if __name__ == "__main__":
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
         use_trt = True if args.backend == "paddle_tensorrt" else False
-        text_encoder_runtime = create_paddle_inference_runtime(
-            args.model_dir,
-            args.text_encoder_model_prefix,
-            use_trt,
-            text_encoder_shape,
-            use_fp16=args.use_fp16,
-            device_id=device_id,
-            disable_paddle_trt_ops=["arg_max", "range"],
-        )
-        vae_decoder_runtime = create_paddle_inference_runtime(
-            args.model_dir,
-            args.vae_decoder_model_prefix,
-            use_trt,
-            vae_dynamic_shape,
-            use_fp16=args.use_fp16,
-            device_id=device_id,
-        )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -294,9 +280,29 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id,
-            disable_paddle_trt_ops=["sin", "cos"],
+            paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
+
+        text_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.text_encoder_model_prefix,
+            use_trt,
+            text_encoder_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+            disable_paddle_trt_ops=["arg_max", "range", "lookup_table_v2"],
+            paddle_stream=paddle_stream,
+        )
+        vae_decoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.vae_decoder_model_prefix,
+            use_trt,
+            vae_dynamic_shape,
+            use_fp16=args.use_fp16,
+            device_id=device_id,
+            paddle_stream=paddle_stream,
+        )
     elif args.backend == "tensorrt":
         text_encoder_runtime = create_ort_runtime(args.model_dir, args.text_encoder_model_prefix, args.model_format)
         vae_decoder_runtime = create_trt_runtime(
@@ -342,10 +348,11 @@ if __name__ == "__main__":
 
     prompt = "a photo of an astronaut riding a horse on mars"
     # Warm up
+    pipe.scheduler.set_timesteps(10)
     pipe(prompt, num_inference_steps=10)
-
     time_costs = []
     print(f"Run the stable diffusion pipeline {args.benchmark_steps} times to test the performance.")
+    pipe.scheduler.set_timesteps(args.inference_steps)
     for step in range(args.benchmark_steps):
         start = time.time()
         images = pipe(prompt, num_inference_steps=args.inference_steps).images

@@ -423,11 +423,11 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
             assert toks[idx] == ")"
             idx += 1
         if idx < len_ and toks[idx] == "a":
-            assert last_table is not None, "last_table should be a table name strin, not None"
+            assert last_table is not None, "last_table should be a table name string, not None"
             tables_with_alias["a"] = last_table
             idx += 2
         elif idx < len_ and toks[idx] == "b":
-            assert last_table is not None, "last_table should be a table name strin, not None"
+            assert last_table is not None, "last_table should be a table name string, not None"
             tables_with_alias["b"] = last_table
             idx += 1
         if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in (")", ";")):
@@ -675,7 +675,7 @@ class Evaluator(object):
         # return 1
 
     def eval_exact_match(self, pred, gold):
-        """wrapper of evaluate examct match, to process
+        """wrapper of evaluate exact match, to process
         `SQL1 intersect/union SQL2` vs `SQL2 intersect/union SQL1`
         """
         score = self._eval_exact_match(pred, gold)

@@ -156,6 +156,14 @@ class StandardConfigMappingTest(unittest.TestCase):
         fake_field = loaded_config.fake_field
         self.assertEqual(fake_field, hidden_size)
 
+    def test_from_pretrained_cache_dir(self):
+        model_id = "__internal_testing__/tiny-random-bert"
+        with tempfile.TemporaryDirectory() as tempdir:
+            BertConfig.from_pretrained(model_id, cache_dir=tempdir)
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_id, CONFIG_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_id, model_id)))
+
     def test_load_from_hf(self):
         """test load config from hf"""
         config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)

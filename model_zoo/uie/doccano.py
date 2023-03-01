@@ -20,8 +20,9 @@ import time
 from decimal import Decimal
 
 import numpy as np
-from utils import convert_cls_examples, convert_ext_examples, set_seed, str2bool
+from utils import convert_cls_examples, convert_ext_examples, set_seed
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.log import logger
 
 
@@ -167,7 +168,7 @@ if __name__ == "__main__":
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.")
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")
     parser.add_argument("--prompt_prefix", default="情感倾向", type=str, help="Used only for the classification task, the prompt prefix for classification")
-    parser.add_argument("--is_shuffle", default="True", type=str2bool, help="Whether to shuffle the labeled dataset, defaults to True.")
+    parser.add_argument("--is_shuffle", default="True", type=strtobool, help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
     parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")

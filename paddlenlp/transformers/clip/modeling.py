@@ -24,7 +24,6 @@ from paddle import nn
 
 from ...utils.initializer import normal_, ones_, zeros_
 from ...utils.log import logger
-from ..configuration_utils import PretrainedConfig
 from ..guided_diffusion_utils import (
     DiscoDiffusionMixin,
     create_gaussian_diffusion,
@@ -41,7 +40,6 @@ from ..stable_diffusion_utils import (
     StableDiffusionMixin,
     UNet2DConditionModel,
 )
-from ..utils import resolve_cache_dir
 from .configuration import CLIPConfig, CLIPTextConfig, CLIPVisionConfig
 
 CLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -490,100 +488,6 @@ class CLIPPretrainedModel(PretrainedModel):
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             zeros_(layer.bias)
 
-    @classmethod
-    def from_pretrained_v2(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
-        load_state_as_np = kwargs.pop("load_state_as_np", False)
-        config = kwargs.pop("config", None)
-        force_download = kwargs.pop("force_download", False)
-        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
-        dtype = kwargs.pop("dtype", None)
-        cache_dir = kwargs.pop("cache_dir", None)
-        subfolder = kwargs.pop("subfolder", None)
-
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        model_kwargs = kwargs
-        # 1. get the PretrainedConfig to init model
-        if not isinstance(config, PretrainedConfig):
-            config_path = config if config is not None else pretrained_model_name_or_path
-            config, model_kwargs = cls.config_class.from_pretrained(
-                config_path,
-                cache_dir=cache_dir,
-                return_unused_kwargs=True,
-                force_download=force_download,
-                from_hf_hub=from_hf_hub,
-                subfolder=subfolder,
-                **kwargs,
-            )
-        # Attention! we donot save this config.json
-        # config.save_pretrained(cache_dir)
-
-        # 2. init the model
-        init_args = config["init_args"] or ()
-        model = cls(config, *init_args, **model_kwargs)
-
-        # 3. resolve model_weight file
-        model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub, subfolder=subfolder
-        )
-
-        # 4. loading the state dict
-        model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
-
-        loaded_state_dict_keys = list(model_state_dict.keys())
-        # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
-        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
-            model=model,
-            state_dict=model_state_dict,
-            loaded_keys=loaded_state_dict_keys,
-            ignore_mismatched_sizes=ignore_mismatched_sizes,
-            dtype=dtype,
-        )
-
-        if len(unexpected_keys) > 0:
-            logger.warning(
-                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
-                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
-                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
-                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
-                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
-                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
-                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
-            )
-        else:
-            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
-
-        if len(missing_keys) > 0:
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
-                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
-            )
-        elif len(mismatched_keys) == 0:
-            logger.info(
-                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
-                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
-                " training."
-            )
-        if len(mismatched_keys) > 0:
-            mismatched_warning = "\n".join(
-                [
-                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
-                    for key, shape1, shape2 in mismatched_keys
-                ]
-            )
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
-                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
-                " to use it for predictions and inference."
-            )
-        if paddle.in_dynamic_mode():
-            return model
-
-        return model, model_state_dict
-
 
 class CLIPTextTransformer(nn.Layer):
     def __init__(self, config: CLIPTextConfig):
@@ -898,6 +802,23 @@ class CLIPVisionTransformer(nn.Layer):
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )
+
+    def forward_pre(self, x):
+        x = self.conv1(x)  # shape = [*, width, grid, grid]
+        x = x.reshape([x.shape[0], x.shape[1], -1])  # shape = [*, width, grid ** 2]
+        x = x.transpose((0, 2, 1))  # shape = [*, grid ** 2, width]
+        # t = self.class_embedding.weight + paddle.zeros([x.shape[0], 1, x.shape[-1]], dtype=x.dtype)
+        t = self.class_embedding.unsqueeze([0, 1]).expand([x.shape[0], -1, -1]) + paddle.zeros(
+            [x.shape[0], 1, x.shape[-1]], dtype=x.dtype
+        )
+        x = paddle.concat([t, x], axis=1)  # shape = [*, grid ** 2 + 1, width]
+        x = x + self.positional_embedding.weight
+        x = self.ln_pre(x)
+        return x
+
+    def forward_post(self, x):
+        x = self.ln_post(x)
+        return x
 
 
 class CLIPVisionModel(CLIPPretrainedModel):
@@ -1563,7 +1484,12 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin, StableDif
     config_class = CLIPConfig
 
     def __init__(self, config: CLIPConfig):
+
         super().__init__(config)
+        logger.warning(
+            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
+            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
+        )
         self.clip = CLIPModel(config)
         self.diffusion_type = diffusion_type = config.diffusion_type if hasattr(config, "diffusion_type") else "disco"
         self.scheduler_type = scheduler_type = config.scheduler_type if hasattr(config, "scheduler_type") else "pndm"

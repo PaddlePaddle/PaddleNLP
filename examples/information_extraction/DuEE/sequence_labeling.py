@@ -284,7 +284,7 @@ def do_predict():
             ),  # token_type_ids
         Stack(dtype='int64')  # sequence lens
     ): fn(samples)
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batch_encoded_inputs = [
         encoded_inputs_list[i:i + args.batch_size]
         for i in range(0, len(encoded_inputs_list), args.batch_size)

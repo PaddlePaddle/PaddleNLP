@@ -189,7 +189,7 @@ def get_latest_ann_data(ann_data_dir):
 
     def valid_checkpoint(step):
         ann_data_file = os.path.join(ann_data_dir, step, "new_ann_data")
-        # succed_flag_file is an empty file that indicates ann data has been generated
+        # succeed_flag_file is an empty file that indicates ann data has been generated
         succeed_flag_file = os.path.join(ann_data_dir, step, "succeed_flag_file")
         return os.path.exists(succeed_flag_file) and os.path.exists(ann_data_file)
 

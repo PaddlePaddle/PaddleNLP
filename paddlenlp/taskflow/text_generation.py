@@ -13,23 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
-
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..transformers import GPTForGreedyGeneration
-from ..transformers import GPTChineseTokenizer, GPTTokenizer
-from ..datasets import load_dataset
-from ..data import Stack, Pad, Tuple
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+
+from ..data import Pad, Stack, Tuple
+from ..transformers import GPTChineseTokenizer, GPTForGreedyGeneration, GPTTokenizer
 from .task import Task
+from .utils import download_file, static_mode_guard
 
 usage = r"""
          """
@@ -99,9 +88,7 @@ class TextGenerationTask(Task):
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
         generation_task = self.kwargs["generation_task"] if "generation_task" in self.kwargs else "question_answering"
-        max_seq_len = 32
 
         def select_few_shot_input(model_name, generation_task):
             pre_input = ""
@@ -115,8 +102,6 @@ class TextGenerationTask(Task):
             return pre_input
 
         pre_input = select_few_shot_input(self.model, generation_task)
-
-        infer_data = []
 
         examples = []
         filter_inputs = []

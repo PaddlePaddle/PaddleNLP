@@ -1,0 +1,4 @@
+paddlenlp>=2.5.1
+Pillow
+ppdiffusers>=0.11.0
+paddlepaddle-gpu
