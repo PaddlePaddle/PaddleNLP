@@ -61,6 +61,8 @@ def evaluate(model, metric, data_loader, multilingual=False):
 
 
 def do_eval():
+    paddle.set_device(args.device)
+
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     if args.multilingual:
         model = UIEM.from_pretrained(args.model_path)
@@ -130,7 +132,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU/NPU for training.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["gpu", "cpu", "npu"], help="Device selected for evaluate.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--debug", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
     parser.add_argument("--multilingual", action='store_true', help="Whether is the multilingual model.")

@@ -185,7 +185,7 @@ Ascend NPU 启动：
 
 ```shell
 python train.py --vocab_path='./vocab.json' \
-    --device=ascend \
+    --device=npu \
     --network=bow \
     --lr=5e-4 \
     --batch_size=32 \
@@ -196,7 +196,7 @@ python train.py --vocab_path='./vocab.json' \
 以上参数表示：
 
 * `vocab_path`: 用于保存根据语料库构建的词汇表的文件路径。
-* `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、mlu或者Ascend NPU（ascend）。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm，ascend只支持模型网络设置为bow。
+* `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、mlu或者npu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm，npu只支持模型网络设置为bow。
 * `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
@@ -282,7 +282,7 @@ Ascend NPU启动：
 
 ```shell
 python predict.py --vocab_path='./vocab.json' \
-    --device=ascend \
+    --device=npu \
     --network=bow \
     --params_path=checkpoints/final.pdparams
 ```

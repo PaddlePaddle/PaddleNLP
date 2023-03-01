@@ -29,8 +29,19 @@
 
 ```text
 .
-├── README.md                   # 文档
-├── run_classifier.py           # 自然语言推断任务
+|-- README.md                        # 文档
+|-- deploy                           # 部署目录
+|   |-- predictor                    # onnx离线部署
+|   |   |-- README.md
+|   |   |-- ernie_m_predictor.py
+|   |   |-- inference.py
+|   |   |-- requirements_cpu.txt
+|   |   `-- requirements_gpu.txt
+|   `-- simple_serving               # 基于PaddleNLP SimpleServing 服务化部署
+|       |-- README.md
+|       |-- client_seq_cls.py
+|       `-- server_seq_cls.py
+`-- run_classifier.py                # 分类任务微调脚本
 ```
 
 ## 开始运行

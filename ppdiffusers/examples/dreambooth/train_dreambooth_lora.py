@@ -284,7 +284,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--lora_rank",
         type=int,
-        default=128,
+        default=4,
         help="The rank of lora linear.",
     )
     parser.add_argument(
