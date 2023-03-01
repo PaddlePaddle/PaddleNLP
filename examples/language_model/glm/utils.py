@@ -19,7 +19,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
-from paddle.optimizer import Adam
 from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.trainer import Trainer
@@ -211,7 +210,7 @@ class GLMTrainer(Trainer):
 
     def create_scheduler(self, num_training_steps: int):
         num_warmup_steps = (
-            self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
+            self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio * num_training_steps
         )
 
         def lr_lambda(current_step: int):
@@ -224,41 +223,6 @@ class GLMTrainer(Trainer):
         if self.lr_scheduler is None:
             self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
         return self.lr_scheduler
-
-    def create_optimizer(self, lr_scheduler=None):
-        if self.optimizer is None:
-            if self.optimizer_grouped_parameters is not None:
-                params = self.optimizer_grouped_parameters
-                apply_decay_param_fun = None
-            else:
-                params = self.model.parameters()
-                decay_parameters = [
-                    p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
-                ]
-
-                def apply_decay_param_fun(x):
-                    return x in decay_parameters
-
-            optimizer_cls = Adam
-            optimizer_kwargs = {}
-            adam_kwargs = {
-                "beta1": self.args.adam_beta1,
-                "beta2": self.args.adam_beta2,
-                "epsilon": self.args.adam_epsilon,
-            }
-            optimizer_kwargs.update(adam_kwargs)
-
-            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
-                optimizer_kwargs["multi_precision"] = True
-
-            self.optimizer = optimizer_cls(
-                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                parameters=params,
-                weight_decay=self.args.weight_decay,
-                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
-                **optimizer_kwargs,
-            )
-        return self.optimizer
 
 
 def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
