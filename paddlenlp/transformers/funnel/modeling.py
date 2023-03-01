@@ -1290,7 +1290,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
         if not return_dict:
             output = (logits,) + outputs[1:]
             return ((loss,) + output) if loss is not None else output
-
+        print(len(outputs.attentions))
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
