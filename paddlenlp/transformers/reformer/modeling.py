@@ -1910,7 +1910,6 @@ class ReformerClassificationHead(nn.Layer):
 
 @dataclass
 class LSHSelfAttentionOutput(ModelOutput):
-
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attention_probs: Optional[Tuple[paddle.Tensor]] = None
     buckets: Optional[Tuple[paddle.Tensor]] = None
@@ -1918,14 +1917,12 @@ class LSHSelfAttentionOutput(ModelOutput):
 
 @dataclass
 class LocalSelfAttentionOutput(ModelOutput):
-
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attention_probs: Optional[Tuple[paddle.Tensor]] = None
 
 
 @dataclass
 class AttentionOutput(ModelOutput):
-
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attention_probs: Optional[Tuple[paddle.Tensor]] = None
     buckets: Optional[Tuple[paddle.Tensor]] = None
@@ -1933,7 +1930,6 @@ class AttentionOutput(ModelOutput):
 
 @dataclass
 class ReformerOutput(ModelOutput):
-
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attn_output: Optional[Tuple[paddle.Tensor]] = None
     attention_probs: Optional[Tuple[paddle.Tensor]] = None
@@ -1942,7 +1938,6 @@ class ReformerOutput(ModelOutput):
 
 @dataclass
 class ReformerBackwardOutput(ModelOutput):
-
     attn_output: Optional[Tuple[paddle.Tensor]] = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     grad_attn_output: Optional[Tuple[paddle.Tensor]] = None
@@ -1951,7 +1946,6 @@ class ReformerBackwardOutput(ModelOutput):
 
 @dataclass
 class ReformerEncoderOutput(ModelOutput):
-
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     all_hidden_states: Optional[Tuple[paddle.Tensor]] = None
     all_attentions: Optional[Tuple[paddle.Tensor]] = None
