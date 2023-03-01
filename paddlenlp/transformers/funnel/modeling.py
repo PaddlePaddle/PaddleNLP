@@ -1036,7 +1036,7 @@ class FunnelModel(FunnelPreTrainedModel):
                 token_type_ids=token_type_ids,
                 output_attentions=output_attentions,
                 output_hidden_states=True,
-                return_dict=return_dict,
+                return_dict=True,
             )
 
         decoder_outputs = self.decoder(
@@ -1046,7 +1046,7 @@ class FunnelModel(FunnelPreTrainedModel):
             token_type_ids=token_type_ids,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=True,
         )
 
         if not return_dict:
@@ -1206,7 +1206,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
@@ -1358,7 +1358,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
@@ -1429,7 +1429,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
     base_model_class = FunnelModel
 
     def __init__(self, config):
-        super().__init__()
+        super().__init__(config)
         if isinstance(config, PreTrainedModel):
             config = config.config
         if isinstance(config, dict):
