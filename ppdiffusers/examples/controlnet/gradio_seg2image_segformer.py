@@ -14,7 +14,6 @@ from ppdiffusers import StableDiffusionControlNetPipeline
 
 apply_uniformer = SegformerDetector()
 
-# pipe = StableDiffusionControlNetPipeline.from_pretrained("/root/project/paddlenlp/ctrlnet/jun/ppdiffusers/model_convert/control_sd15_seg-ppdiffusers", safety_checker=None)
 pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_seg", safety_checker=None)
 
 

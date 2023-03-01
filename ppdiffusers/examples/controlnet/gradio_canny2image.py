@@ -1,6 +1,4 @@
 import paddle
-
-# paddle.set_device("gpu:7")
 import gradio as gr
 import paddle
 import random

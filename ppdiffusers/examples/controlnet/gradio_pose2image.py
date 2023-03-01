@@ -13,17 +13,9 @@ import cv2
 
 from ppdiffusers import StableDiffusionControlNetPipeline
 
-# from cldm.model import create_model, load_state_dict
-# from cldm.ddim_hacked import DDIMSampler
-
-
 apply_openpose = OpenposePaddleDetector()
-# from annotator.canny import CannyDetector
-# apply_openpose = CannyDetector()
-# apply_canny = CannyDetector()
 
 
-# pipe = StableDiffusionControlNetPipeline.from_pretrained("/root/project/paddlenlp/ctrlnet/jun/ppdiffusers/model_convert/control_sd15_openpose-ppdiffusers", safety_checker=None)
 pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_openpose", safety_checker=None)
 
 
@@ -31,18 +23,10 @@ def process(input_image, hand, prompt, a_prompt, n_prompt, num_samples, image_re
     with paddle.no_grad():
         input_image = HWC3(input_image)
         detected_map, _ = apply_openpose(resize_image(input_image, detect_resolution), hand)
-        # detected_map = apply_openpose(resize_image(input_image, detect_resolution), 100, 200)
         detected_map = HWC3(detected_map)
         img = resize_image(input_image, image_resolution)
         H, W, C = img.shape
-
         detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_NEAREST)
-
-        # img = resize_image(HWC3(input_image), image_resolution)
-        # H, W, C = img.shape
-        # detected_map = apply_canny(img, 100, 200)
-        # detected_map = HWC3(detected_map)
-
 
         control = paddle.to_tensor(detected_map.copy(), dtype=paddle.float32) / 255.0
         control = control.unsqueeze(0).transpose([0, 3, 1, 2])

@@ -29,6 +29,4 @@ class OpenposePaddleDetector:
                     all_hand_peaks.append(peaks)
                 canvas = self.hand_estimation.draw_hand(canvas, all_hand_peaks)
 
-                # all_hand_peaks = self.hand_estimation.predict(oriImg, save_path='saved_images', visualization=False)['all_hand_peaks']
-                # canvas = self.hand_estimation.draw_hand(canvas, all_hand_peaks)
             return canvas, dict(candidate=result['candidate'].tolist(), subset=result['subset'].tolist())
