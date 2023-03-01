@@ -195,6 +195,7 @@ class ModelTesterMixin:
             with paddle.no_grad():
                 outputs = model(**self._prepare_for_class(inputs_dict, model_class))
             attentions = outputs.encoder_attentions if self.is_encoder_decoder else outputs.attentions
+            print(len(attentions), self.model_tester.num_hidden_layers)
             self.assertEqual(len(attentions), self.model_tester.num_hidden_layers)
 
             # TODO(guosheng): check that output_attentions also work using config
