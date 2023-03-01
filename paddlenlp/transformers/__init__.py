@@ -55,6 +55,7 @@ from .bart.tokenizer import *
 from .bart.configuration import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
+from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
@@ -110,8 +111,10 @@ from .mbart.tokenizer import *
 from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
@@ -131,6 +134,7 @@ from .rembert.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
+from .skep.configuration import *
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
@@ -191,6 +195,9 @@ from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 from .auto.configuration import *
+from .nystromformer.configuration import *
+from .nystromformer.modeling import *
+from .nystromformer.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

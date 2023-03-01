@@ -10,9 +10,7 @@
 <img src="https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
 </p>
 
-百度研究团队在三个典型情感分析任务，句子级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，以通用预训练模型ERNIE作为初始化，具体效果如下表：
-
-
+百度研究团队在三个典型情感分析任务，语句级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，下表展示了在模型分别在数据集SST-2、ChnSentiCorp、SE-ABSA16_PHNS、COTE_DP上的实验结果，同时标明了各项数据集对应的任务类型、语言类别、下载地址等信息。
 
 <table>
     <tr>
@@ -24,7 +22,7 @@
         <td><strong><center>数据集地址</strong></td>
     </tr>
     <tr>
-        <td rowspan="2"><center>句子级情感<br /><center>分类</td>
+        <td rowspan="2"><center>语句级情感分类<br /><center>分类</td>
         <td><center>SST-2</td>
         <td><center>英文</td>
         <td><center>ACC</td>
@@ -39,7 +37,7 @@
         <td><center><a href="https://dataset-bj.cdn.bcebos.com/qianyan/ChnSentiCorp.zip" >下载地址</a></td>
     </tr>
     <tr>
-        <td rowspan="1"><center>评价对象级的<br /><center>情感分类</td>
+        <td rowspan="1"><center>评价对象级<br /><center>情感分类</td>
         <td><center>SE-ABSA16_PHNS</td>
         <td><center>中文</td>
         <td><center>ACC</td>
@@ -78,26 +76,33 @@ skep/
 └── train_sentence.py  # 句子级情感分类任务训练脚本
 ```
 
+下面以语句级情感分类、评价对象级情感分类，观点抽取等任务类型为例，分别说明相应的训练和测试方式。
 
-以句子级情感分类任务为例，详细说明SKEP模型在下游任务中该如何使用，其他任务（对象级的情感分类任务、观点抽取任务）使用方式以此类推。
-
-
-### 数据下载
-
-句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
-通过以下方式即可实现加载。
+### 语句级情感分类
+#### 数据下载
+本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集作为语句级情感分类数据集。这两项数据集已经内置于PaddleNLP。可以通过以下方式进行加载。
 
 ```python
+from paddlenlp.datasets import load_dataset
+
 train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
 ```
 
-### 模型训练
+#### 模型训练
 
-我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
+可以通过如下命令开启语句级情感分析任务训练，需要特别说明的是，如果想要基于数据集ChnSentiCorp训练中文情感分析模型，请指定model_name为：`skep_ernie_1.0_large_ch`； 基于数据集GLUE-SST2训练英文情感分析模型请指定model_name为：`skep_ernie_2.0_large_en`。下面以中文情感分析为例进行说明。
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
+python -m paddle.distributed.launch --gpus "0" train_sentence.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --device "gpu" \
+    --save_dir "./checkpoints" \
+    --epochs 3 \
+    --max_seq_len 128 \
+    --batch_size 16 \
+    --learning_rate 5e-5
 ```
 
 可支持配置的参数：
@@ -106,8 +111,8 @@ python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "s
     skep_ernie_1.0_large_ch：是SKEP模型在预训练ernie_1.0_large_ch基础之上在海量中文数据上继续预训练得到的中文预训练模型;
     skep_ernie_2.0_large_en：是SKEP模型在预训练ernie_2.0_large_en基础之上在海量英文数据上继续预训练得到的中文预训练模型。
 * `save_dir`：可选，保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
-* `max_seq_length`：可选，ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
-* `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `max_seq_len`：可选，ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
+* `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为16。
 * `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。
 * `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.00。
 * `epochs`: 训练轮次，默认为3。
@@ -115,64 +120,22 @@ python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "s
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
-
-```python
-model = paddlenlp.transformers.SkepForSequenceClassification.from_pretrained(
-    "skep_ernie_1.0_large_ch")
-tokenizer = paddlenlp.transformers.SkepTokenizer.from_pretrained(
-    "skep_ernie_1.0_large_ch")
-```
-更多预训练模型，参考[transformers](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
-
-
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
-如：
-```text
-checkpoints/
-├── model_100
-│   ├── model_config.json
-│   ├── model_state.pdparams
-│   ├── tokenizer_config.json
-│   └── vocab.txt
-└── ...
-```
 
-**NOTE:**
-* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
-* 如需使用ernie-tiny模型，则需要提前先安装sentencepiece依赖，如`pip install sentencepiece`
-* 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
-  运行方式：
+#### 模型预测
+使用如下命令进行模型预测：
 
-```shell
-python export_model.py --model_name="skep_ernie_1.0_large_ch" --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
-```
-其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
-
-导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
-
-```shell
-python deploy/python/predict.py --model_name="skep_ernie_1.0_large_ch" --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
-```
-
-### 模型预测
-
-启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict_sentence.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
+python predict_sentence.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --ckpt_dir "checkpoints/model_100" \
+    --batch_size 16 \
+    --max_seq_len 128 \
+    --device "gpu"
 ```
 
-将待预测数据如以下示例：
-
-```text
-这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般
-怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片
-作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。
-```
-
-可以直接调用`predict`函数即可输出预测结果。
-
-如
+下面展示了模型的预测示例结果：
 
 ```text
 Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般      Label: negative
@@ -180,30 +143,129 @@ Data: 怀着十分激动的心情放映，可是看着看着发现，在放映�
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Label: positive
 ```
 
-### Taskflow一键预测
-可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键情感分析，具体使用方法如下:
+#### 基于Taskflow一键预测
+当前PaddleNLP已将训练好的SKEP中文语句级情感分析模型集成至Taskflow中，可以使用Taskflow对输入的文本进行一键式情感分析，使用方法如下:
 
 ```python
-
 from paddlenlp import Taskflow
 
-senta = Taskflow("sentiment_analysis")
+senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
 senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
 '''
-[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
-'''
-senta(["怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
-       "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
-'''
-[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'},
- {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive'}
-]
-'''
-
-# 使用skep_ernie_1.0_large_ch模型进行情感分析
-senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
-senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
-'''
-[{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
+[{'text': '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般', 'label': 'negative', 'score': 0.9894790053367615}]
 '''
 ```
+
+如果想使用自己训练好的模型加载进Taskflow进行预测，可以使用参数`task_path`进行指定模型路径，需要注意的是，该路径下需要存放模型文件以及相应的Tokenizer文件（训练过程中，已保存这两者相关文件）。
+
+```python
+from paddlenlp import Taskflow
+
+senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch", task_path="./checkpoints/model_100")
+senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
+'''
+[{'text': '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般', 'label': 'negative', 'score': 0.9686369299888611}]
+'''
+```
+
+#### 模型部署
+
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数。在进行模型转换时，需要通过参数`ckpt_dir`指定训练好的模型存放目录，通过`output_path`指定静态图模型参数保存路径，详情请参考export_model.py。模型转换命令如下：
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python export_model.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --ckpt_dir="./checkpoints/model_100" \
+    --output_path="./static/static_graph_params"
+```
+
+可以将导出的静态图模型进行部署，deploy/python/predict.py展示了python部署预测示例。运行方式如下：
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python deploy/python/predict.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --model_file="./static/static_graph_params.pdmodel" \
+    --params_file="./static/static_graph_params.pdiparams"
+```
+
+### 评价对象级情感分类
+本节将以数据集SE-ABSA16_PHNS为例展示评价对象级的情感分类模型训练和测试。该数据集已内置于PaddleNLP中，可以通过语句级情感分类类似方式进行加载。这里不再赘述。下面展示了SE-ABSA16_PHNS数据集中的一条数据。
+
+```text
+label    text_a    text_b
+1    phone#design_features    今天有幸拿到了港版白色iPhone 5真机，试玩了一下，说说感受吧：1. 真机尺寸宽度与4/4s保持一致没有变化，长度多了大概一厘米，也就是之前所说的多了一排的图标。2. 真机重量比上一代轻了很多，个人感觉跟i9100的重量差不多。（用惯上一代的朋友可能需要一段时间适应了）3. 由于目前还没有版的SIM卡，无法插卡使用，有购买的朋友要注意了，并非简单的剪卡就可以用，而是需要去运营商更换新一代的SIM卡。4. 屏幕显示效果确实比上一代有进步，不论是从清晰度还是不同角度的视角，iPhone 5绝对要更上一层，我想这也许是相对上一代最有意义的升级了。5. 新的数据接口更小，比上一代更好用更方便，使用的过程会有这样的体会。6. 从简单的几个操作来讲速度比4s要快，这个不用测试软件也能感受出来，比如程序的调用以及照片的拍摄和浏览。不过，目前水货市场上坑爹的价格，最好大家可以再观望一下，不要急着出手。
+```
+
+#### 模型训练
+
+可以通过如下命令开启评价对象级级情感分类任务训练。
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train_aspect.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --save_dir "./checkpoints" \
+    --epochs 50 \
+    --max_seq_len 128 \
+    --batch_size 16 \
+    --learning_rate 5e-5 \
+    --device "gpu"
+```
+
+#### 模型预测
+使用如下命令进行模型预测：
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python predict_aspect.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --ckpt_dir "./checkpoints/model_100" \
+    --batch_size 16 \
+    --max_seq_len 128 \
+    --device "gpu"
+```
+
+### 观点抽取
+本节将以数据集COTE_DP为例展示评价对象级的情感分类模型训练和测试。该数据集已内置于PaddleNLP中，可以通过语句级情感分类类似方式进行加载。这里不再赘述。下面展示了COTE_DP数据中的前3条数据。
+
+```text
+label    text_a
+重庆老灶火锅    重庆老灶火锅还是很赞的，有机会可以尝试一下！
+炉鱼来了    一入店内，就看到招牌特别大的炉鱼来了，餐桌上还摆了五颜六色的小蜡烛，挺有调调的。
+外婆家    只能说是聚餐圣地外婆家一个需要提前来取号的地方。
+```
+
+#### 模型训练
+
+可以通过如下命令开启评价对象级级情感分类任务训练。
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train_opinion.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --save_dir "./checkpoints" \
+    --epochs 10 \
+    --max_seq_len 128 \
+    --batch_size 16 \
+    --learning_rate 5e-5 \
+    --device "gpu"
+```
+
+#### 模型预测
+使用如下命令进行模型预测：
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python predict_opinion.py \
+    --model_name "skep_ernie_1.0_large_ch" \
+    --ckpt_dir "./checkpoints/model_100" \
+    --batch_size 16 \
+    --max_seq_len 128 \
+    --device "gpu"
+```
+
+**备注**：
+1. 评价对象级情感分类和观点抽取两类任务的模型部署方式可参考语句级情感分类，这里不再赘述。
+2. 评级级情感分类以及观点抽取，暂不支持skep模型的Taskflow离线模型加载。如需使用此类功能，请参考：[unified_sentiment_analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction)。

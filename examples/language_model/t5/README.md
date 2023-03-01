@@ -31,7 +31,8 @@ python run_glue.py \
     --save_steps 100 \
     --seed 42 \
     --scheduler_type linear \
-    --output_dir outputs/rte/
+    --output_dir outputs/rte/ \
+    --device gpu
 ```
 
 其中参数释义如下：
@@ -49,6 +50,7 @@ python run_glue.py \
 - `seed` 表示随机种子。
 - `scheduler_type` scheduler类型，可选linear和cosine，默认linear。
 - `output_dir` 表示模型保存路径。
+- `device` 表示训练使用的设备，可选cpu、gpu或npu。
 
 使用trainer进行Fine-tuning:
 

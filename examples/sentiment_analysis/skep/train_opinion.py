@@ -12,34 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
-# yapf: disable
+from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import SkepCrfForTokenClassification, SkepTokenizer
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument(
+    "--model_name",
+    choices=["skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"],
+    default="skep_ernie_1.0_large_ch",
+    help="Select which model to train, defaults to skep_ernie_1.0_large_ch.",
+)
+parser.add_argument(
+    "--save_dir",
+    default="./checkpoints",
+    type=str,
+    help="The output directory where the model checkpoints will be written.",
+)
+parser.add_argument(
+    "--max_seq_len",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
+)
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-7, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -52,35 +69,21 @@ def set_seed(seed):
 def convert_example_to_feature(example, tokenizer, max_seq_len=512, no_entity_label="O", is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed
-    to be used in a sequence-pair classification task.
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
-    ::
-
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+    by concatenating and adding special tokens.
 
     Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
+        example(obj:`dict`): Dict of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
-        no_entity_label(obj:`str`, defaults to "O"): The label represents that the token isn't an entity.
+        no_entity_label(obj:`int`): The label to pad label sequence by default.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`list[int]`, optional): The input label if not test data.
+        token_type_ids(obj: `list[int]`): The list of token_type_ids.
+        label(obj:`List[int]`, optional): The input label if not is_test.
     """
     tokens = example["tokens"]
     labels = example["labels"]
@@ -104,16 +107,14 @@ def convert_example_to_feature(example, tokenizer, max_seq_len=512, no_entity_la
     # 3. construct the input data
     new_labels.append(no_entity_label)
     new_tokens.append(tokenizer.sep_token)
-    input_ids = np.array([tokenizer.convert_tokens_to_ids(token) for token in new_tokens], dtype="int64")
-    token_type_ids = np.zeros([len(input_ids)], dtype="int64")
-    seq_len = np.array(len(input_ids), dtype="int64")
+    input_ids = [tokenizer.convert_tokens_to_ids(token) for token in new_tokens]
+    token_type_ids = [0] * len(input_ids)
+    seq_len = len(input_ids)
 
     if is_test:
-        return input_ids, token_type_ids, seq_len
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids, "seq_lens": seq_len}
     else:
-        labels = labels[: (max_seq_len - 2)]
-        encoded_label = np.array(new_labels, dtype="int64")
-        return input_ids, token_type_ids, seq_len, encoded_label
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids, "seq_lens": seq_len, "labels": new_labels}
 
 
 def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
@@ -130,38 +131,35 @@ def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, tra
 
 
 if __name__ == "__main__":
+    set_seed(args.seed)
+
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
     train_ds = load_dataset("cote", "dp", splits=["train"])
+    label_list = train_ds.label_list
     # The COTE_DP dataset labels with "BIO" schema.
-    label_map = {label: idx for idx, label in enumerate(train_ds.label_list)}
+    label_map = {label: idx for idx, label in enumerate(label_list)}
     # `no_entity_label` represents that the token isn't an entity.
     no_entity_label_idx = label_map.get("O", 2)
 
-    set_seed(args.seed)
-    skep = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
-    model = SkepCrfForTokenClassification(skep, num_classes=len(train_ds.label_list))
-    tokenizer = SkepTokenizer.from_pretrained("skep_ernie_1.0_large_ch")
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
+    model = SkepCrfForTokenClassification.from_pretrained(args.model_name, num_labels=len(label_list))
 
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_length,
+        max_seq_len=args.max_seq_len,
         no_entity_label=no_entity_label_idx,
         is_test=False,
     )
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
-        Stack(dtype="int64"),  # sequence lens
-        Pad(axis=0, pad_val=no_entity_label_idx),  # labels
-    ): [data for data in fn(samples)]
+
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=no_entity_label_idx)
 
     train_data_loader = create_dataloader(
-        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=data_collator, trans_fn=trans_func
     )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -179,13 +177,19 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
-    metric = ChunkEvaluator(label_list=train_ds.label_list, suffix=True)
 
     global_step = 0
     tic_train = time.time()
+    model.train()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, seq_lens, labels = batch
+            # print(batch)
+            input_ids, token_type_ids, seq_lens, labels = (
+                batch["input_ids"],
+                batch["token_type_ids"],
+                batch["seq_lens"],
+                batch["labels"],
+            )
             loss = model(input_ids, token_type_ids, seq_lens=seq_lens, labels=labels)
             avg_loss = paddle.mean(loss)
             global_step += 1
@@ -202,6 +206,6 @@ if __name__ == "__main__":
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                file_name = os.path.join(save_dir, "model_state.pdparam")
                 # Need better way to get inner model of DataParallel
-                paddle.save(model._layers.state_dict(), file_name)
+                model._layers.save_pretrained(save_dir)
+                print("Model saved to: {}.".format(save_dir))

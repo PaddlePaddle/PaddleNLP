@@ -267,7 +267,7 @@ class SQLPreproc(object):
         self.format_sql_value(sql_json, value_dict)
 
         parsed = self.grammar.parse(sql_json, section)
-        self.ast_wrapper.verify_ast(parsed)  # will raise AssertionError, if varify failed
+        self.ast_wrapper.verify_ast(parsed)  # will raise AssertionError, if verify failed
 
         root = parsed
         if section == "train":

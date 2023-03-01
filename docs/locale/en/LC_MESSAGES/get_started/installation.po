@@ -83,7 +83,7 @@ msgid ""
 msgstr ""
 
 #: ../get_started/installation.rst:53
-msgid "2、Linux/Mac安装安装Anaconda"
+msgid "2、Linux/Mac安装Anaconda"
 msgstr ""
 
 #: ../get_started/installation.rst:57

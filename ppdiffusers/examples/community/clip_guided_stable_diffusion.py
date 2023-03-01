@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Callable, List, Optional, Union
 
 import paddle
@@ -28,6 +29,7 @@ from paddlenlp.transformers import (
 )
 from ppdiffusers import (
     AutoencoderKL,
+    DDIMScheduler,
     DiffusionPipeline,
     LMSDiscreteScheduler,
     PNDMScheduler,
@@ -84,7 +86,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         clip_model: CLIPModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: Union[PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler],
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
@@ -99,7 +101,12 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         )
 
         self.normalize = transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
-        self.make_cutouts = MakeCutouts(feature_extractor.size)
+        self.cut_out_size = (
+            feature_extractor.size
+            if isinstance(feature_extractor.size, int)
+            else feature_extractor.size["shortest_edge"]
+        )
+        self.make_cutouts = MakeCutouts(self.cut_out_size)
 
         set_stop_gradient(self.text_encoder, True)
         set_stop_gradient(self.clip_model, True)
@@ -152,7 +159,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         # predict the noise residual
         noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
 
-        if isinstance(self.scheduler, PNDMScheduler):
+        if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
             alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
             beta_prod_t = 1 - alpha_prod_t
             # compute predicted original sample from predicted noise also called
@@ -174,7 +181,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         if use_cutouts:
             image = self.make_cutouts(image, num_cutouts)
         else:
-            resize_transform = transforms.Resize(self.feature_extractor.size)
+            resize_transform = transforms.Resize(self.cut_out_size)
             image = paddle.stack([resize_transform(img) for img in image], axis=0)
         image = self.normalize(image).astype(latents.dtype)
 
@@ -207,11 +214,12 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         guidance_scale: Optional[float] = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
+        eta: float = 0.0,
         clip_guidance_scale: Optional[float] = 100,
         clip_prompt: Optional[Union[str, List[str]]] = None,
         num_cutouts: Optional[int] = 4,
         use_cutouts: Optional[bool] = True,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -277,9 +285,9 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
             text_embeddings_clip = self.clip_model.get_text_features(clip_text_input_ids)
             text_embeddings_clip = text_embeddings_clip / text_embeddings_clip.norm(p=2, axis=-1, keepdim=True)
             # duplicate text embeddings clip for each generation per prompt
-            bs_embed, seq_len, _ = text_embeddings.shape
-            text_embeddings_clip = text_embeddings_clip.tile([1, num_images_per_prompt, 1])
-            text_embeddings_clip = text_embeddings_clip.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+            bs_embed, _ = text_embeddings_clip.shape
+            text_embeddings_clip = text_embeddings_clip.tile([1, num_images_per_prompt])
+            text_embeddings_clip = text_embeddings_clip.reshape([bs_embed * num_images_per_prompt, -1])
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -334,8 +342,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         # However this currently doesn't work in `mps`.
         latents_shape = [batch_size * num_images_per_prompt, self.unet.in_channels, height // 8, width // 8]
         if latents is None:
-            paddle.seed(seed)
-            latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
+            latents = paddle.randn(latents_shape, generator=generator, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
                 raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
@@ -349,6 +356,20 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
+
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        extra_step_kwargs = {}
+        if accepts_eta:
+            extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        if accepts_generator:
+            extra_step_kwargs["generator"] = generator
 
         for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the latents if we are doing classifier free guidance
@@ -381,7 +402,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
                 )
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:

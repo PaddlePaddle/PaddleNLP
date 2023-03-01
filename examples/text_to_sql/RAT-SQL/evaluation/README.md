@@ -4,7 +4,7 @@
 # 评估
 输入文件格式：
 1. 文件以.sql结尾
-2. 文件每行的格式："qid\tsql_query\tdb_id",其中predcit文件db_id是可选字段，gold文件db_id是必选字段
+2. 文件每行的格式："qid\tsql_query\tdb_id",其中predict文件db_id是可选字段，gold文件db_id是必选字段
 3. 评估指标：exact matching score
 
 # 使用
