@@ -338,52 +338,83 @@ print_info $? fast_generation_gpt
 # 9 ernie-1.0
 ernie-1.0 (){
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-    #data process
-    cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-    sed -i "s/python3/python/g" Makefile
-    sed -i "s/python-config/python3.7m-config/g" Makefile
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    cd ${nlp_dir}/model_zoo/ernie-1.0/
-    mkdir data && cd data
-    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
-    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
-    cd ../
-    # pretrain
-    python -u  -m paddle.distributed.launch \
-        --log_dir "./log" \
-        run_pretrain_static.py \
-        --model_type "ernie" \
-        --model_name_or_path "ernie-1.0-base-zh " \
-        --input_dir "./data/" \
-        --output_dir "./output/" \
-        --max_seq_len 512 \
-        --micro_batch_size 16 \
-        --global_batch_size 32 \
-        --sharding_degree 1 \
-        --dp_degree 2 \
-        --use_sharding false \
-        --use_amp true \
-        --use_recompute false \
-        --max_lr 0.0001 \
-        --min_lr 0.00001 \
-        --max_steps 40 \
-        --save_steps 20 \
-        --checkpoint_steps 5000 \
-        --decay_steps 3960000 \
-        --weight_decay 0.01 \
-        --warmup_rate 0.0025 \
-        --grad_clip 1.0 \
-        --logging_freq 20\
-        --num_workers 2 \
-        --eval_freq 1000 \
-        --device "gpu" >${log_path}/ernie_pretrain >>${log_path}/ernie_pretrain 2>&1
-    print_info $? ernie_pretrain
-else 
-    python -m pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
-    print_info $? ernie-1.0
-fi
+#data process
+cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
+sed -i "s/python3/python/g" Makefile
+sed -i "s/python-config/python3.7m-config/g" Makefile
+export CUDA_VISIBLE_DEVICES=${cudaid2}
+cd ${nlp_dir}/model_zoo/ernie-1.0/
+mkdir data && cd data
+wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
+wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
+cd ../
+mkdir data_ernie_3.0 && cd data_ernie_3.0
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
+cd ../
+# pretrain_trainer
+python -u -m paddle.distributed.launch \
+    --gpus "0,1" \
+    --log_dir "output/trainer_log" \
+    run_pretrain_trainer.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-3.0-base-zh" \
+    --tokenizer_name_or_path "ernie-3.0-base-zh" \
+    --input_dir "./data_ernie_3.0" \
+    --output_dir "output/trainer_log" \
+    --split 949,50,1 \
+    --max_seq_length 512 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 32 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 2 \
+    --save_steps 2\
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1\
+    --dataloader_num_workers 4 \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --device "gpu" >${log_path}/ernie_1.0_pretrain_trainer >>${log_path}/ernie_1.0_pretrain_trainer 2>&1
+    print_info $? ernie_1.0_pretrain_trainer
+# pretrain_static
+python -u -m paddle.distributed.launch --gpus '0,1' \
+    --log_dir "./log" \
+    run_pretrain_static.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
+    --input_dir "./data/" \
+    --output_dir "./output/" \
+    --max_seq_len 512 \
+    --micro_batch_size 16 \
+    --global_batch_size 32 \
+    --sharding_degree 1 \
+    --dp_degree 2 \
+    --use_sharding false \
+    --use_amp true \
+    --use_recompute false \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 4 \
+    --save_steps 2 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3960000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.0025 \
+    --grad_clip 1.0 \
+    --logging_freq 2\
+    --num_workers 2 \
+    --eval_freq 1000 \
+    --device "gpu" >${log_path}/ernie_1.0_pretrain_static >>${log_path}/ernie_1.0_pretrain_static 2>&1
+    print_info $? ernie_1.0_pretrain_static
+
 }
 # 10 xlnet
 xlnet(){
