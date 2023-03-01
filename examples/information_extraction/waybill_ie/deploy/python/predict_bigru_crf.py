@@ -158,7 +158,7 @@ class Predictor(object):
         config = paddle.inference.Config(model_file, param_file)
         if device == "gpu":
             # set GPU configs accordingly
-            # such as intialize the gpu memory, enable tensorrt
+            # such as initialize the gpu memory, enable tensorrt
             config.enable_use_gpu(100, 0)
             precision_map = {
                 "fp16": inference.PrecisionType.Half,

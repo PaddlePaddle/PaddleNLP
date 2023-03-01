@@ -17,6 +17,7 @@ import base64
 import json
 import os
 import re
+from typing import List
 
 import numpy as np
 import paddle
@@ -101,6 +102,17 @@ usage = r"""
          """
 
 MODEL_MAP = {"UIE": UIE, "UIEM": UIEM, "UIEX": UIEX}
+
+
+def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length: List[int]) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    cur_length = len(examples[0]["input_ids"])
+    max_length = default_max_length
+    for max_length_option in sorted(dynamic_max_length):
+        if cur_length <= max_length_option:
+            max_length = max_length_option
+            break
+    return max_length
 
 
 class UIETask(Task):
@@ -382,6 +394,7 @@ class UIETask(Task):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
+        self._dynamic_max_length = kwargs.get("dynamic_max_length", None)
         self._batch_size = kwargs.get("batch_size", 16)
         self._split_sentence = kwargs.get("split_sentence", False)
         self._position_prob = kwargs.get("position_prob", 0.5)
@@ -459,6 +472,10 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
+        if paddle.get_device().split(":", 1)[0] == "npu":
+            input_spec_dtype = "int32"
+        else:
+            input_spec_dtype = "int64"
         if self._init_class in ["UIEX"]:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
@@ -475,10 +492,10 @@ class UIETask(Task):
             ]
         else:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
             ]
 
     def _construct_model(self, model):
@@ -598,16 +615,44 @@ class UIETask(Task):
 
         def text_reader(inputs):
             for example in inputs:
-                encoded_inputs = self._tokenizer(
-                    text=[example["prompt"]],
-                    text_pair=[example["text"]],
-                    truncation=True,
-                    max_seq_len=self._max_seq_len,
-                    pad_to_max_seq_len=True,
-                    return_attention_mask=True,
-                    return_position_ids=True,
-                    return_offsets_mapping=True,
-                )
+                if self._dynamic_max_length is not None:
+                    temp_encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_dict=False,
+                        return_offsets_mapping=True,
+                    )
+                    max_length = get_dynamic_max_length(
+                        examples=temp_encoded_inputs,
+                        default_max_length=self._max_seq_len,
+                        dynamic_max_length=self._dynamic_max_length,
+                    )
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=max_length,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                    )
+                    logger.info("Inference with dynamic max length in {}".format(max_length))
+                else:
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                    )
                 if self._init_class in ["UIEM"]:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
