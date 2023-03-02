@@ -44,7 +44,9 @@ class ModelArguments:
     )
     image_logging_steps: Optional[int] = field(default=1000, metadata={"help": "Log image every X steps."})
     sd_locked: Optional[bool] = field(default=True, metadata={"help": "lock unet output_blocks and out."})
-
+    use_paddle_conv_init: Optional[bool] = field(
+        default=False, metadata={"help": "Whether or not use paddle conv2d init."}
+    )
     # TODO, not support this
     only_mid_control: Optional[bool] = field(default=False, metadata={"help": "only_mid_control."})
 

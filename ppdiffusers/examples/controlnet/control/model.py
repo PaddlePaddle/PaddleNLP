@@ -29,6 +29,7 @@ from ppdiffusers import (
     DDPMScheduler,
     UNet2DConditionModel,
 )
+from ppdiffusers.initializer import reset_initialized_parameter
 from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.models.ema import LitEma
 
@@ -85,6 +86,10 @@ class ControlNet(nn.Layer):
         logger.info("Freeze unet parameters!")
 
         self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path)
+
+        if not model_args.use_paddle_conv_init:
+            # use torch conv2d init
+            reset_initialized_parameter(self.controlnet.controlnet_cond_embedding.conditioning_embedder[:-1])
 
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
@@ -265,10 +270,6 @@ class ControlNet(nn.Layer):
 
     def set_recompute(self, value=False):
         def fn(layer):
-            if hasattr(layer, "enable_recompute"):
-                layer.enable_recompute = value
-                print("Set", layer.__class__, "recompute", layer.enable_recompute)
-            # unet
             if hasattr(layer, "gradient_checkpointing"):
                 layer.gradient_checkpointing = value
                 print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)

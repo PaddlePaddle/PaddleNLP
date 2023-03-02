@@ -8,7 +8,7 @@
 
 ## 1.1 安装依赖
 
-在运行这个训练代码前，我们需要安装 develop 分支的 ppdiffusers 模型:
+在运行这个训练代码前，我们需要安装 develop 分支的 ppdiffusers 模型。
 
 ```bash
 cd ppdiffusers
@@ -17,11 +17,12 @@ python setup.py install
 
 ## 1.2 Fill50K 训练例子
 
-作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集：
+作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集。
 ```sh
 wget https://huggingface.co/lllyasviel/ControlNet/resolve/main/training/fill50k.zip
 unzip -o fill50k.zip
 ```
+注意：下面的代码需要在32G V100上才可以正常运行。
 
 ### 1.2.1 单机单卡训练
 ```bash
@@ -29,8 +30,8 @@ export FLAGS_conv_workspace_size_limit=4096
 python -u train_txt2img_control_trainer.py \
     --do_train \
     --output_dir ./sd15_control \
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 2 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 1 \
     --learning_rate 1e-5 \
     --weight_decay 0.02 \
     --lr_scheduler_type "constant" \
@@ -45,7 +46,9 @@ python -u train_txt2img_control_trainer.py \
     --dataloader_num_workers 4 \
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
+    --use_paddle_conv_init True \
     --file_path ./fill50k \
+    --recompute True \
     --overwrite_output_dir
 ```
 
@@ -57,7 +60,7 @@ python -u train_txt2img_control_trainer.py \
 > * `--per_device_train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
 > * `--learning_rate`: 学习率。
-> * `--weight_decay`: AdamW优化器的`weight_decay`。
+> * `--weight_decay`: `AdamW`优化器的`weight_decay`。
 > * `--max_steps`: 最大的训练步数。
 > * `--save_steps`: 每间隔多少步`（global step步数）`，保存模型。
 > * `--save_total_limit`: 最多保存多少个模型。
@@ -74,9 +77,17 @@ python -u train_txt2img_control_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`，我们可以使用英文的分词器`bert-base-uncased`，也可以使用中文的分词器`ernie-1.0`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
-> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
+> * `--use_paddle_conv_init`: 是否使用`paddle`的卷积初始化策略，当我们开启该策略后可以很快发现在`fill50k`数据集上，模型很快就收敛了，默认值为 `False`。
+> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大`batch_size`。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
+
+**Tips**:
+> 结合 `paddle` 文档和 `torch` 文档可知，`paddle` 卷积层初始化是 `Xavier Normal`，`torch` 卷积层初始化是 `Uniform`，初始化方法边界值是`(-sqrt(groups/(in_channels*prod(*kernal_size))), sqrt(groups/(in_channels*prod(*kernal_size))))`。
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/50394665/222323097-1ff4472c-b4d0-48a0-92c7-44fbb18997f5.png" width="700">
+    <img src="https://user-images.githubusercontent.com/50394665/222323163-11ecf153-1f79-4384-b455-d5429748d184.png" width="700">
+</p>
 
 ### 1.3.2 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash
@@ -84,8 +95,8 @@ export FLAGS_conv_workspace_size_limit=4096
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_control_trainer.py \
     --do_train \
     --output_dir ./sd15_control \
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 2 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 1 \
     --learning_rate 1e-5 \
     --weight_decay 0.02 \
     --lr_scheduler_type "constant" \
@@ -101,6 +112,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_co
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
     --file_path ./fill50k \
+    --use_paddle_conv_init True \
+    --recompute True \
     --overwrite_output_dir
 ```
 
