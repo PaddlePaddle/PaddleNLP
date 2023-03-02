@@ -935,7 +935,7 @@ class FunnelBaseModel(FunnelPreTrainedModel):
         inputs_embeds=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1007,7 +1007,7 @@ class FunnelModel(FunnelPreTrainedModel):
         inputs_embeds=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -1065,10 +1065,6 @@ class FunnelModel(FunnelPreTrainedModel):
                 outputs = outputs + (encoder_outputs.attentions + decoder_outputs[idx],)
             return outputs
 
-        print(len(encoder_outputs.attentions))
-        print(len(decoder_outputs.attentions))
-        attentions = encoder_outputs.attentions + decoder_outputs.attentions
-        print(len(attentions))
         return BaseModelOutput(
             last_hidden_state=decoder_outputs.last_hidden_state,
             hidden_states=(encoder_outputs.hidden_states + decoder_outputs.hidden_states)
@@ -1095,7 +1091,7 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         labels (``paddle.Tensor`` of shape ``(batch_size, sequence_length)``, `optional`):
@@ -1175,7 +1171,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
@@ -1239,7 +1235,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -1320,7 +1316,7 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -1394,7 +1390,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
@@ -1471,7 +1467,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
         end_positions=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
+        return_dict=True,
     ):
         r"""
         start_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
