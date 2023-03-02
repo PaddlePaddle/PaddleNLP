@@ -508,6 +508,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
             positional_attn = paddle.einsum("bind,jd->bnij", q_r_attention_1, psi) + paddle.einsum(
                 "bind,jd->bnij", q_r_attention_2, omega
             )
+            print(positional_attn.shape)
         else:
             shift = 2 if q_head.shape[1] != context_len else 1
             # Notations from the paper, appending A.2.1, final formula (https://arxiv.org/abs/2006.03236)
@@ -522,8 +523,10 @@ class FunnelRelMultiheadAttention(nn.Layer):
             r_head = paddle.einsum("td,dnh->tnh", r, w_r)
             # Shape batch_size x n_head x seq_len x max_rel_len
             positional_attn = paddle.einsum("binh,tnh->bnit", q_head + v, r_head)
+            print(positional_attn.shape)
             # Shape batch_size x n_head x seq_len x context_len
             positional_attn = _relative_shift_gather(positional_attn, context_len, shift)
+            print(positional_attn.shape)
 
         if cls_mask is not None:
             print(positional_attn.shape)
