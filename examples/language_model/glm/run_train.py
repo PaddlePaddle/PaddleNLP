@@ -18,9 +18,11 @@ from functools import partial
 
 import paddle
 import paddle.nn as nn
-from data import cnn_dm_convert_example, load_local_dataset
+from data import cnn_dm_convert_example
 from utils import GLMTrainer
 
+from paddlenlp.data import DefaultDataCollator
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
@@ -39,8 +41,15 @@ class DataArgument:
     no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
     select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(default=0.0)
-    top_k: int = field(default=0)
+    top_p: float = field(
+        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
+    )
+    top_k: int = field(
+        default=0,
+        metadata={
+            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
+        },
+    )
     no_block_position: bool = field(default=False)
 
 
@@ -75,25 +84,30 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds, dev_ds, test_ds = load_local_dataset(data_path=data_args.data_path, splits=["train", "dev", "test"])
+    train_ds, dev_ds, test_ds = load_dataset("cnn_dailymail", splits=["train", "dev", "test"])
     trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     dev_ds = dev_ds.map(trans_func)
     test_ds = test_ds.map(trans_func)
 
     criterion = nn.loss.CrossEntropyLoss(reduction="none")
+    collate_fn = DefaultDataCollator()
 
     def compute_metrics(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
-        rouge1_score = rouge1.score(eval_preds.predictions, eval_preds.label_ids)
-        rouge2_score = rouge2.score(eval_preds.predictions, eval_preds.label_ids)
-        rougel_score = rougel.score(eval_preds.predictions, eval_preds.label_ids)
+        predictions = [x[x > -100] for x in eval_preds.predictions]
+        references = [x[x > -100] for x in eval_preds.label_ids]
+
+        rouge1_score = rouge1.score(predictions, references)
+        rouge2_score = rouge2.score(predictions, references)
+        for pred, ref in zip(predictions, references):
+            rougel.add_inst(pred, [ref])
         return {
             "rouge1": rouge1_score,
             "rouge2": rouge2_score,
-            "rougel": rougel_score,
+            "rougel": rougel.score(),
         }
 
     trainer = GLMTrainer(
@@ -105,6 +119,7 @@ def main():
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         do_generation=True,
+        data_collator=collate_fn,
     )
 
     if training_args.do_train:
@@ -115,9 +130,8 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate()
-        # trainer.save_metrics("eval", eval_result.metrics)
-        print(eval_result)
+        eval_result = trainer.evaluate(test_ds)
+        trainer.log_metrics("test", eval_result)
 
     if training_args.do_export:
         export_path = os.path.join(training_args.output_dir, "export")

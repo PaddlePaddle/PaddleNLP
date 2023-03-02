@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from paddlenlp.datasets import load_dataset
+import paddle
 
 
-def cnnmail_reader(data_file):
+def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
     def punctuation_standardization(string: str):
         punctuation_dict = {"\u201c": '"', "\u201d": '"', "\u2019": "'", "\u2018": "'", "\u2013": "-"}
         for key, value in punctuation_dict.items():
@@ -41,89 +39,41 @@ def cnnmail_reader(data_file):
         string = string.replace(" 'll", "'ll")
         return string
 
-    source_texts, target_texts = [], []
-    with open(f"{data_file}.source", encoding="utf-8") as file:
-        for line in file:
-            line = line.strip()
-            line = punctuation_standardization(line)
-            line = detokenize(line)
-            source_texts.append(line)
-    with open(f"{data_file}.target", encoding="utf-8") as file:
-        for line in file:
-            line = line.strip()
-            line = punctuation_standardization(line)
-            line = detokenize(line)
-            target_texts.append(line)
-    assert len(source_texts) == len(target_texts)
-    example_list = []
-    for idx, (source_text, target_text) in enumerate(zip(source_texts, target_texts)):
-        if (idx + 1) % 20000 == 0:
-            print(f"Processed {idx + 1} examples")
-        example = {"text_a": source_text, "text_b": target_text}
-        example_list.append(example)
-    return example_list
+    def preprocess(string):
+        string = string.strip()
+        string = punctuation_standardization(string)
+        string = detokenize(string)
+        return string
 
-
-def load_local_dataset(data_path, splits):
-    dataset = []
-    for split in splits:
-        data_file = os.path.join(data_path, split)
-        dataset.append(load_dataset(cnnmail_reader, data_file=data_file, lazy=False))
-    return dataset
-
-
-def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
+    example["article"] = preprocess(example["article"])
+    example["highlights"] = preprocess(example["highlights"])
     prompt = [tokenizer.convert_tokens_to_ids(x) for x in ("[CLS]", "[sMASK]", "ĠContent", ":")]
-    source_tokens = tokenizer.encode(" " + example["text_a"], add_special_tokens=False)["input_ids"]
-    if len(source_tokens) > data_args.src_length - len(prompt):
-        source_tokens = source_tokens[: data_args.src_length - len(prompt)]
-    source_tokens = prompt + source_tokens
-    if len(source_tokens) < data_args.src_length:
-        source_tokens = source_tokens + [tokenizer.pad_token_id] * (data_args.src_length - len(source_tokens))
-    sep = len(source_tokens)
-    position_ids = list(range(len(source_tokens)))
-    block_position_ids = [0] * len(source_tokens)
-    mask_position = source_tokens.index(tokenizer.smask_token_id)
-    if not is_test:
-        target_tokens = tokenizer.encode(" " + example["text_b"], add_special_tokens=False)["input_ids"]
-        target_tokens = target_tokens + [tokenizer.eop_token_id]
-        if len(target_tokens) > data_args.tgt_length:
-            target_tokens = target_tokens[: data_args.tgt_length]
-        loss_mask = [1] * len(target_tokens)
-        if len(target_tokens) < data_args.tgt_length:
-            loss_mask = loss_mask + [0] * (data_args.tgt_length - len(target_tokens))
-            target_tokens = target_tokens + [tokenizer.pad_token_id] * (data_args.tgt_length - len(target_tokens))
-        tokens = source_tokens + [tokenizer.sop_token_id] + target_tokens[:-1]
-        loss_mask = [0] * len(source_tokens) + loss_mask
-        target_ids = [0] * len(source_tokens) + target_tokens
-        position_ids = position_ids + [mask_position] * len(target_tokens)
-        block_position_ids = block_position_ids + list(range(1, len(target_tokens) + 1))
-        position_ids = [position_ids, block_position_ids]
-        example = {
-            "input_ids": tokens,
-            "labels": target_ids,
-            "attention_mask": sep,
-            "loss_mask": loss_mask,
-            "position_ids": position_ids,
-        }
-    else:
-        target_tokens = tokenizer.encode(" " + example["text_b"], add_special_tokens=False)["input_ids"]
-        target_tokens = target_tokens + [tokenizer.eop_token_id]
-        if len(target_tokens) > data_args.tgt_length:
-            target_tokens = target_tokens[: data_args.tgt_length]
-        if len(target_tokens) < data_args.tgt_length:
-            target_tokens = target_tokens + [tokenizer.pad_token_id] * (data_args.tgt_length - len(target_tokens))
-        labels = [0] * len(source_tokens) + target_tokens
-
-        tokens = source_tokens + [tokenizer.sop_token_id]
-        position_ids = position_ids + [mask_position]
-        block_position_ids = block_position_ids + [1]
-        position_ids = [position_ids, block_position_ids]
-
-        example = {
-            "input_ids": tokens,
-            "attention_mask": sep,
-            "position_ids": position_ids,
-            "labels": labels,
-        }
-    return example
+    inputs = tokenizer(
+        " " + example["article"], add_special_tokens=False, max_length=data_args.src_length - len(prompt)
+    )
+    pad_length = data_args.src_length - len(inputs["input_ids"]) - len(prompt)
+    inputs["input_ids"] = paddle.to_tensor([prompt + inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
+    inputs["attention_mask"] = paddle.to_tensor([[1] * len(prompt) + inputs["attention_mask"] + [0] * pad_length])
+    sep = inputs["input_ids"].shape[1]
+    inputs = tokenizer.build_inputs_for_generation(
+        inputs,
+        max_gen_length=data_args.tgt_length,
+        targets=" " + example["highlights"] if not is_test else None,
+        padding=True,
+    )
+    for input_name in inputs.keys():
+        inputs[input_name] = inputs[input_name].squeeze(0)
+    inputs["attention_mask"] = sep
+    if is_test:
+        inputs["position_ids"] = inputs["position_ids"][:, : inputs["input_ids"].shape[-1]]
+        labels = tokenizer.encode(" " + example["highlights"], add_special_tokens=False)["input_ids"]
+        loss_mask = [0] * sep + [1] * len(labels) + [0] * (data_args.tgt_length - len(labels))
+        labels = (
+            [0] * sep
+            + labels
+            + [tokenizer.eop_token_id]
+            + [tokenizer.pad_token_id] * (data_args.tgt_length - len(labels) - 1)
+        )
+        inputs["label_ids"] = labels
+        inputs["loss_mask"] = loss_mask
+    return inputs

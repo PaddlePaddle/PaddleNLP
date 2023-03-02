@@ -25,11 +25,7 @@ from scipy.linalg import block_diag
 from ...utils.log import logger
 from .. import BertTokenizer, GPTTokenizer, RobertaTokenizer
 from ..tokenizer_utils import PretrainedTokenizer
-
-# TODO whether it has the same function as auto.get_tokenizer_config
 from ..tokenizer_utils_base import BatchEncoding
-
-# from transformers import GPT2Tokenizer
 
 
 class GLMTokenizerMixin:
@@ -128,13 +124,15 @@ class GLMTokenizerMixin:
             attention_mask_batch.append(attention_mask)
             choices_batch.append(sample["choice_ids"])
             choice_target_ids_batch.append(sample["choice_indices"])
-        return {
-            "input_ids": paddle.stack(token_batch),
-            "position_ids": paddle.stack(position_id_batch),
-            "attention_mask": paddle.stack(attention_mask_batch).unsqueeze(1),
-            "choice_ids": choices_batch,
-            "choice_indices": choice_target_ids_batch,
-        }
+        return BatchEncoding(
+            {
+                "input_ids": paddle.stack(token_batch),
+                "position_ids": paddle.stack(position_id_batch),
+                "attention_mask": paddle.stack(attention_mask_batch).unsqueeze(1),
+                "choice_ids": choices_batch,
+                "choice_indices": choice_target_ids_batch,
+            }
+        )
 
     def build_inputs_for_multiple_choice(self, model_input: BatchEncoding, choices, max_length=None):
         samples = [{key: value[i] for key, value in model_input.items()} for i in range(len(model_input["input_ids"]))]
@@ -169,11 +167,11 @@ class GLMTokenizerMixin:
             targets = [[self.sop_token_id] + target for target in targets]
             labels = [target[1:] for target in targets]
             targets = [target + [self.pad_token_id] * (max_gen_length + 1 - len(target)) for target in targets]
-            labels = [label + [-100] * (max_gen_length - len(label)) for label in labels]
+            labels = [label + [self.pad_token_id] * (max_gen_length - len(label)) for label in labels]
             targets = paddle.to_tensor(targets, dtype=input_ids.dtype)
-            loss_mask = (targets != self.pad_token_id).astype("int64")
+            loss_mask = paddle.logical_and(targets != self.pad_token_id, targets != self.eop_token_id).astype("int64")
             labels = paddle.to_tensor(labels, dtype=input_ids.dtype)
-            labels = paddle.concat([paddle.full([batch_size, seq_length], -100), labels], axis=1)
+            labels = paddle.concat([paddle.zeros([batch_size, seq_length], dtype=labels.dtype), labels], axis=1)
 
         for i in range(batch_size):
             mask_positions = []
@@ -211,6 +209,7 @@ class GLMTokenizerMixin:
         else:
             loss_mask = paddle.concat([paddle.zeros_like(input_ids), loss_mask], axis=1)
             input_ids = paddle.concat([input_ids, targets[:, :-1]], axis=1)
+            loss_mask = loss_mask[:, : len(input_ids[0])]
 
         batch = {"input_ids": input_ids, "position_ids": position_ids}
         if labels is None:
@@ -218,7 +217,7 @@ class GLMTokenizerMixin:
         else:
             batch["attention_mask"] = attention_mask
             batch["loss_mask"] = loss_mask
-            batch["labels"] = labels
+            batch["label_ids"] = labels
         return BatchEncoding(batch)
 
 

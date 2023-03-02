@@ -27,8 +27,8 @@ from paddlenlp.trainer import Trainer
 class GLMTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
         super().__init__(**kwargs)
-        self.start_token = self.tokenizer.bos_token_id
-        self.end_token = self.tokenizer.eos_token_id
+        self.start_token = self.tokenizer.sop_token_id
+        self.end_token = self.tokenizer.eop_token_id
         self.mask_token = self.tokenizer.smask_token_id
         self.pad_token = self.tokenizer.pad_token_id
         self.do_generation = do_generation
@@ -59,6 +59,7 @@ class GLMTrainer(Trainer):
             loss_mask = inputs.pop("loss_mask").reshape([-1])
         else:
             loss_mask = None
+        inputs.pop("target_attention_mask", None)
 
         logits, _ = model(**inputs)
 
@@ -88,7 +89,6 @@ class GLMTrainer(Trainer):
 
         model.eval()
         with paddle.no_grad():
-            inputs = self.tokenizer.build_inputs_for_generation(inputs, max_gen_length=self.args.out_seq_length)
             tokens = inputs["input_ids"]
             attention_mask = inputs["attention_mask"]
             position_ids = inputs["position_ids"]
@@ -198,15 +198,20 @@ class GLMTrainer(Trainer):
             all_preds = []
             for i, text in enumerate(tokens.tolist()):
                 text = [token for token in text if token not in [self.end_token, self.pad_token]]
-                text = self.tokenizer.convert_ids_to_tokens(text)
                 all_preds.append(text)
+            max_pred_length = max([len(x) for x in all_preds])
+            for index, preds in enumerate(all_preds):
+                all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
 
             all_labels = []
             for label, mask in zip(inputs["labels"].numpy(), attention_mask.numpy()):
-                label = self.tokenizer.decode(label[mask.astype("bool")][0], skip_special_tokens=True).split()
+                label = [x for x in label[mask.astype("bool")][0] if x not in [self.end_token, self.pad_token, 0]]
                 all_labels.append(label)
+            max_label_length = max([len(x) for x in all_labels])
+            for index, labels in enumerate(all_labels):
+                all_labels[index] = labels + [-100] * (max_label_length - len(labels))
 
-        return (None, all_preds, all_labels)
+        return (None, paddle.to_tensor(all_preds), paddle.to_tensor(all_labels))
 
     def create_scheduler(self, num_training_steps: int):
         num_warmup_steps = (
