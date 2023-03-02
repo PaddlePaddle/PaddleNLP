@@ -526,6 +526,8 @@ class FunnelRelMultiheadAttention(nn.Layer):
             positional_attn = _relative_shift_gather(positional_attn, context_len, shift)
 
         if cls_mask is not None:
+            print(positional_attn.shape)
+            print(cls_mask.shape)
             positional_attn *= cls_mask
         return positional_attn
 
