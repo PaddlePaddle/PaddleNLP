@@ -672,10 +672,14 @@ class FunnelEncoder(nn.Layer):
         return_dict=True,
     ):
         print(inputs_embeds.shape, inputs_embeds.dtype)
-        if attention_mask:
+        if attention_mask is not None:
             print(attention_mask.shape, attention_mask.dtype)
-        if token_type_ids:
+        else:
+            print("attention mask: None")
+        if token_type_ids is not None:
             print(token_type_ids.shape, token_type_ids.dtype)
+        else:
+            print("token_type_ids: None")
         print(output_attentions)
         print(output_hidden_states)
         print(return_dict)
