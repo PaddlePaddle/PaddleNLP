@@ -52,6 +52,7 @@ def parse_arguments():
     )
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
+    parser.add_argument("--num_omask_tokens", type=int, default=64, help="The max length of sequence.")
     parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
@@ -159,6 +160,22 @@ class Predictor(object):
             option.trt_option.set_shape(
                 "token_type_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
             )
+            option.trt_option.set_shape(
+                "position_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "attention_mask",
+                [1, 1, 1, 1],
+                [args.batch_size, 1, args.max_length, args.max_length],
+                [args.batch_size, 1, args.max_length, args.max_length],
+            )
+            option.trt_option.set_shape(
+                "omask_positions",
+                [1, 1],
+                [args.batch_size, args.num_omask_tokens],
+                [args.batch_size, args.num_omask_tokens],
+            )
+            option.trt_option.set_shape("cls_positions", [1], [args.batch_size], [args.batch_size])
             if args.use_fp16:
                 option.trt_option.enable_fp16 = True
                 trt_file = trt_file + ".fp16"
