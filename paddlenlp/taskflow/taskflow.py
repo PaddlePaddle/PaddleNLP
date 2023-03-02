@@ -539,6 +539,10 @@ TASKS = {
                 "task_class": ZeroShotTextClassificationTask,
                 "task_flag": "zero_shot_text_classification-utc-pico",
             },
+            "__internal_testing__/tiny-random-utc": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-tiny-random-utc",
+            },
         },
         "default": {"model": "utc-base"},
     },
