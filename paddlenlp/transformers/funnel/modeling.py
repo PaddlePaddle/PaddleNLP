@@ -1421,7 +1421,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
                 active_loss = attention_mask.reshape((-1,)) == 1
                 active_logits = logits.reshape((-1, self.num_labels))
                 active_labels = paddle.where(
-                    active_loss, labels.reshape((-1,)), paddle.tensor(loss_fct.ignore_index).astype(labels.dtype)
+                    active_loss, labels.reshape((-1,)), paddle.to_tensor(loss_fct.ignore_index).astype(labels.dtype)
                 )
                 loss = loss_fct(active_logits, active_labels)
             else:
