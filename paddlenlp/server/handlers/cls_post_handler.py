@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+
 from .base_handler import BasePostHandler
-from ...transformers import AutoTokenizer
-from ...data import Tuple, Pad
-from ...utils.log import logger
 
 
 class MultiClassificationPostHandler(BasePostHandler):
