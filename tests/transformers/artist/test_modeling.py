@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -110,22 +110,20 @@ class ArtistModelTester:
 
     def get_config(self):
         return ArtistConfig(
-            **{
-                "vocab_size": self.vocab_size,
-                "hidden_size": self.hidden_size,
-                "num_hidden_layers": self.num_hidden_layers,
-                "num_attention_heads": self.num_attention_heads,
-                "intermediate_size": self.intermediate_size,
-                "hidden_act": self.hidden_act,
-                "hidden_dropout_prob": self.hidden_dropout_prob,
-                "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-                "max_position_embeddings": self.max_position_embeddings,
-                "type_vocab_size": self.type_vocab_size,
-                "initializer_range": self.initializer_range,
-                "bos_token_id": self.bos_token_id,
-                "eos_token_id": self.eos_token_id,
-                "pad_token_id": self.pad_token_id,
-            }
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            pad_token_id=self.pad_token_id,
         )
 
     def prepare_config_and_inputs_for_decoder(self):
@@ -176,24 +174,15 @@ class ArtistModelTester:
         model.eval()
 
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
-        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
-        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
+        self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
 
     def create_and_check_conditional_generation(self, config, input_ids, input_mask, *args):
         model = ArtistForConditionalGeneration(config)
         model.eval()
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
-        self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
-
-    def create_and_check_image_generation(self, config, input_ids, input_mask, *args):
-        model = ArtistForImageGeneration(config)
-        model.eval()
-        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
-        self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
+        self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
 
@@ -223,7 +212,3 @@ class ArtistModelTest(ModelTesterMixin, unittest.TestCase):
     def test_conditional_generation(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_conditional_generation(*config_and_inputs)
-
-    def test_image_generation(self):
-        config_and_input = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_image_generation(*config_and_input)

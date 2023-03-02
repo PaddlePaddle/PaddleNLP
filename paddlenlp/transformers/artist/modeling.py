@@ -21,8 +21,8 @@ from ...utils.log import logger
 from ..dallebart.modeling import VQGanDetokenizer
 from ..gpt.modeling import GPTLMHead, GPTLMHeadModel, GPTModel
 from .configuration import (
-    Artist_PRETRAINED_INIT_CONFIGURATION,
-    Artist_PRETRAINED_RESOURCE_FILES_MAP,
+    ARTIST_PRETRAINED_INIT_CONFIGURATION,
+    ARTIST_PRETRAINED_RESOURCE_FILES_MAP,
     ArtistConfig,
 )
 
@@ -37,8 +37,8 @@ F.gelu_python = F.gelu
 
 
 class ArtistModel(GPTModel):
-    pretrained_init_configuration = Artist_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = Artist_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
 
 class ArtistForConditionalGeneration(GPTLMHeadModel):
@@ -51,12 +51,12 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     """
 
-    pretrained_init_configuration = Artist_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = Artist_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
     def __init__(self, config: ArtistConfig):
         super().__init__(config)
-        self.lm_head = GPTLMHead(config["hidden_size"], config["vocab_size"])
+        self.lm_head = GPTLMHead(config.hidden_size, config.vocab_size)
         self.apply(self.init_weights)
 
     @staticmethod
@@ -76,8 +76,8 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             The vocabulary size of image.
             Defaults to `16384`.
     """
-    pretrained_init_configuration = Artist_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = Artist_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
     def __init__(self, config: ArtistConfig, image_vocab_size=16384):
         super().__init__(config)

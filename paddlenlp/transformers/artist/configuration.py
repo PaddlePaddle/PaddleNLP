@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from paddlenlp.transformers import GPTConfig
 
-__all__ = ["Artist_PRETRAINED_INIT_CONFIGURATION", "Artist_PRETRAINED_RESOURCE_FILES_MAP", "ArtistConfig"]
+__all__ = ["ARTIST_PRETRAINED_INIT_CONFIGURATION", "ARTIST_PRETRAINED_RESOURCE_FILES_MAP", "ArtistConfig"]
 
-Artist_PRETRAINED_INIT_CONFIGURATION = {
+ARTIST_PRETRAINED_INIT_CONFIGURATION = {
     "pai-painter-base-zh": {
         "vocab_size": 37512,
         "hidden_size": 768,
@@ -105,7 +105,7 @@ Artist_PRETRAINED_INIT_CONFIGURATION = {
         "eol_token_id": 16486,  # 102 + 16384
     },
 }
-Artist_PRETRAINED_RESOURCE_FILES_MAP = {
+ARTIST_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "pai-painter-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
         "pai-painter-painting-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
