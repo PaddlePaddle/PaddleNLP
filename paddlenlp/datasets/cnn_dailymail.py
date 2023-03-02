@@ -28,10 +28,9 @@ except Exception:
 
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
-from paddlenlp.utils.env import DATA_HOME
-from paddlenlp.utils.log import logger
-
-from . import DatasetBuilder
+from ..utils.env import DATA_HOME
+from ..utils.log import logger
+from .dataset import DatasetBuilder
 
 
 class CnnDailymail(DatasetBuilder):

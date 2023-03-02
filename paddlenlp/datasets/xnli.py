@@ -28,10 +28,9 @@ except Exception:
 
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
-from paddlenlp.utils.env import DATA_HOME
-from paddlenlp.utils.log import logger
-
-from . import DatasetBuilder
+from ..utils.env import DATA_HOME
+from ..utils.log import logger
+from .dataset import DatasetBuilder
 
 __all__ = ["XNLI"]
 ALL_LANGUAGES = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
