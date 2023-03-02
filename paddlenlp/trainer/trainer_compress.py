@@ -150,7 +150,19 @@ def _dynabert(self, model):
         args.width_mult_list = [0.75]
     # Each batch is a dict.
     train_dataloader = self.get_train_dataloader()
-    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
+
+    eval_sampler = paddle.io.BatchSampler(
+        self.eval_dataset,
+        batch_size=self.args.per_device_eval_batch_size,
+        shuffle=False,
+        drop_last=False,
+    )
+    eval_dataloader = paddle.io.DataLoader(
+        self.eval_dataset,
+        batch_sampler=eval_sampler,
+        collate_fn=self.data_collator,
+        num_workers=self.args.dataloader_num_workers,
+    )
     if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(self.eval_examples)
         ofa_model, teacher_model = _dynabert_init(self, model, eval_dataloader_with_label)
@@ -728,7 +740,19 @@ def _quant_aware_training_dynamic(self, input_dir):
     output_param_path = os.path.join(input_dir, "best_quant.pdparams")
 
     train_dataloader = self.get_train_dataloader()
-    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
+
+    eval_sampler = paddle.io.BatchSampler(
+        self.eval_dataset,
+        batch_size=self.args.per_device_eval_batch_size,
+        shuffle=False,
+        drop_last=False,
+    )
+    eval_dataloader = paddle.io.DataLoader(
+        self.eval_dataset,
+        batch_sampler=eval_sampler,
+        collate_fn=self.data_collator,
+        num_workers=self.args.dataloader_num_workers,
+    )
 
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
@@ -750,6 +774,9 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter = QAT(config=quant_config)
     self.model = _replace_auto_model_qat_forward(self.model)
     quanter.quantize(self.model)
+
+    if paddle.distributed.get_world_size() > 1:
+        self.model = paddle.DataParallel(self.model)
 
     global_step = 0
     tic_train = time.time()
@@ -784,21 +811,20 @@ def _quant_aware_training_dynamic(self, input_dir):
             self.lr_scheduler.step()
             self.optimizer.clear_grad()
             if global_step % self.args.logging_steps == 0:
-                if paddle.distributed.get_rank() == 0:
-                    logger.info(
-                        "global step %d, epoch: %d, batch: %d, lr: %.3e, loss: %f, speed: %.2f step/s"
-                        % (
-                            global_step,
-                            epoch,
-                            step,
-                            self.optimizer.get_lr(),
-                            loss,
-                            args.logging_steps / (time.time() - tic_train),
-                        )
+                logger.info(
+                    "global step %d, epoch: %d, batch: %d, lr: %.3e, loss: %f, speed: %.2f step/s"
+                    % (
+                        global_step,
+                        epoch,
+                        step,
+                        self.optimizer.get_lr(),
+                        loss,
+                        args.logging_steps / (time.time() - tic_train),
                     )
+                )
                 tic_train = time.time()
 
-            if global_step % args.save_steps == 0:
+            if global_step % args.save_steps == 0 and paddle.distributed.get_rank() == 0:
                 tic_eval = time.time()
                 acc = evaluate(self, self.model, eval_dataloader)
                 if acc > best_acc:
@@ -810,20 +836,28 @@ def _quant_aware_training_dynamic(self, input_dir):
                         )
                         paddle.save(model_to_save.state_dict(), output_param_path)
                 logger.info("eval done total: %s s" % (time.time() - tic_eval))
-    logger.info("Best result: %.4f" % best_acc)
-    self.model.set_state_dict(paddle.load(output_param_path))
 
-    input_spec = generate_input_spec(self.model, self.train_dataset, self.args.input_dtype)
+    if paddle.distributed.get_rank() == 0:
+        logger.info("Best result: %.4f" % best_acc)
+        self.model.set_state_dict(paddle.load(output_param_path))
 
-    quanter.save_quantized_model(
-        self.model, os.path.join(input_dir, args.output_filename_prefix), input_spec=input_spec
-    )
+        input_spec = generate_input_spec(self.model, self.train_dataset, self.args.input_dtype)
 
-    self.model = _recover_auto_model_forward(self.model)
-    logger.info(
-        "Quant aware training ends and quantized models are saved to %s."
-        % os.path.join(input_dir, args.output_filename_prefix)
-    )
+        quanter.save_quantized_model(
+            self.model._layers if isinstance(self.model, paddle.DataParallel) else self.model,
+            os.path.join(input_dir, args.output_filename_prefix),
+            input_spec=input_spec,
+        )
+
+        if isinstance(self.model, paddle.DataParallel):
+            self.model._layers = _recover_auto_model_forward(self.model._layers)
+        else:
+            self.model = _recover_auto_model_forward(self.model)
+
+        logger.info(
+            "Quant aware training ends and quantized models are saved to %s."
+            % os.path.join(input_dir, args.output_filename_prefix)
+        )
 
 
 def _quant_embeddings(self, input_prefix):
