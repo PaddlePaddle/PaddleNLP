@@ -94,7 +94,6 @@ class Predictor(object):
             raise ValueError(f"Invalid schema: {schema}.")
 
     def _check_input_text(self, inputs):
-        inputs = inputs[0]
         if isinstance(inputs, str) or isinstance(inputs, dict):
             inputs = [inputs]
 
