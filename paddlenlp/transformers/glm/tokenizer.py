@@ -355,27 +355,6 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         # "glm-10b": 1024,
     }
 
-    def build_inputs_with_special_tokens(
-        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
-        """
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. A BERT sequence has the following format:
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-        Args:
-            token_ids_0 (:obj:`List[int]`):
-                List of IDs to which the special tokens will be added.
-            token_ids_1 (:obj:`List[int]`, `optional`):
-                Optional second list of IDs for sequence pairs.
-        Returns:
-            :obj:`List[int]`: List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
-        """
-        assert token_ids_1 is None
-        cls = [self.cls_token_id]
-        eos = [self.eos_token_id]
-        return cls + token_ids_0 + eos
-
 
 class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
     model_input_names = ["input_ids", "position_ids", "attention_mask"]
@@ -394,18 +373,6 @@ class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
         "glm-515m": 512,
         # "glm-large": 512,
     }
-
-    # @property
-    # def gmask_token_id(self) -> int:
-    #     raise NotImplementedError("The model doesn't support gMASK")
-
-    # @property
-    # def smask_token_id(self) -> int:
-    #     raise NotImplementedError("The model doesn't support sMASK")
-
-    # @property
-    # def mask_token_ids(self):
-    #     return [self.mask_token_id]
 
 
 class GLMTokenizer:

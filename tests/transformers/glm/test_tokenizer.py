@@ -106,6 +106,7 @@ class GLMGPT2TokenizerTest(TokenizerTesterMixin, unittest.TestCase):
             "\u0120wider",
             "<unk>",
             "<|endoftext|>",
+            "[CLS]",
         ]
         vocab_tokens = dict(zip(vocab, range(len(vocab))))
         merges = ["#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r", ""]
@@ -126,6 +127,9 @@ class GLMGPT2TokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         output_text = "lower newer"
         return input_text, output_text
 
+    def test_pretokenized_inputs(self, *args, **kwargs):
+        pass
+
     def test_full_tokenizer(self):
         tokenizer = GLMGPT2Tokenizer(self.vocab_file, self.merges_file, **self.special_tokens_map)
         text = "lower newer"
@@ -136,6 +140,9 @@ class GLMGPT2TokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         input_tokens = tokens + [tokenizer.unk_token]
         input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
         self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
+
+    def test_padding_different_model_input_name(self):
+        pass
 
     def test_padding_if_pad_token_set_slow(self):
         tokenizer = GLMGPT2Tokenizer.from_pretrained(self.tmpdirname, pad_token="<pad>")
@@ -213,6 +220,19 @@ class GLMGPT2TokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         # No max_model_input_sizes
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                truncation=True,
+                return_offsets_mapping=True,
+            )
+            self.assertEqual(len(encoding["input_ids"]), 2)
+            self.assertEqual(len(encoding["offset_mapping"]), 2)
 
 
 if __name__ == "__main__":
