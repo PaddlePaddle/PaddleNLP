@@ -514,10 +514,13 @@ class FunnelRelMultiheadAttention(nn.Layer):
             # Notations from the paper, appending A.2.1, final formula (https://arxiv.org/abs/2006.03236)
             # Grab the proper positional encoding, shape max_rel_len x d_model
             r = position_embeds[self.block_index][shift - 1]
+            print("r.shape:", r.shape)
             # Shape n_head x d_head
             v = self.r_r_bias * self.scale
+            print("v.shape", v.shape)
             # Shape d_model x n_head x d_head
             w_r = self.r_kernel
+            print("w_r.shape", w_r.shape)
 
             # Shape max_rel_len x n_head x d_model
             r_head = paddle.einsum("td,dnh->tnh", r, w_r)
