@@ -161,7 +161,7 @@ def do_train(args):
         model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
     # Get bigbird config for generate random attention mask
     config = getattr(model, BigBirdForPretraining.base_model_prefix).config
-    criterion = BigBirdPretrainingCriterion(config["vocab_size"], args.use_nsp)
+    criterion = BigBirdPretrainingCriterion(config, args.use_nsp)
     if worker_num > 1:
         model = paddle.DataParallel(model)
 
