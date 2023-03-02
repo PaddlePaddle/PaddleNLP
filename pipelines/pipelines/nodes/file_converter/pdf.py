@@ -13,14 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Dict, Any
-
-import os
 import logging
+import os
 import tempfile
-import subprocess
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import pdfplumber
+
+try:
+    from pdf2image import convert_from_path
+except (ImportError, ModuleNotFoundError) as ie:
+    from pipelines.utils.import_utils import _optional_component_not_installed
+
+    _optional_component_not_installed(__name__, "ocr", ie)
 
 from pipelines.nodes.file_converter import BaseConverter, ImageToTextConverter
 
