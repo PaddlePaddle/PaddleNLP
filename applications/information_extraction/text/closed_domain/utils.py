@@ -18,8 +18,9 @@ import random
 
 import numpy as np
 import paddle
-from paddlenlp.utils.ie_utils import ClosedDomainIEProcessor
+
 from paddlenlp.data.data_collator import DataCollatorForClosedDomainIE
+from paddlenlp.utils.ie_utils import ClosedDomainIEProcessor
 
 
 def set_seed(seed):

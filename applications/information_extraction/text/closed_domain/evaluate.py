@@ -18,7 +18,13 @@ import argparse
 import paddle
 from metric import get_eval
 from tqdm import tqdm
-from utils import create_dataloader, get_label_maps, ClosedDomainIEProcessor, reader, get_eval_golds
+from utils import (
+    ClosedDomainIEProcessor,
+    create_dataloader,
+    get_eval_golds,
+    get_label_maps,
+    reader,
+)
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, ErnieForClosedDomainIE

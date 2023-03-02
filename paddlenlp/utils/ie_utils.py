@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import base64
+import re
 from io import BytesIO
-from PIL import Image
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
+from PIL import Image
 
 from ..metrics import SpanEvaluator
 from .image_utils import NormalizeImage, Permute, ResizeImage

@@ -19,16 +19,14 @@ import time
 
 import paddle
 from evaluate import evaluate
-from utils import (
-    create_dataloader,
-    get_label_maps,
-    reader,
-    set_seed,
-    get_eval_golds,
-)
+from utils import create_dataloader, get_eval_golds, get_label_maps, reader, set_seed
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, LinearDecayWithWarmup, ErnieLayoutForClosedDomainIE
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    ErnieLayoutForClosedDomainIE,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 
