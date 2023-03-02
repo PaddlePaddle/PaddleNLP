@@ -12,23 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
-import ast
-import math
 import argparse
+import os
 import random
+import time
 
 import numpy as np
 import paddle
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.utils.log import logger
-import distutils.util
-
 from data import create_data_loader
 from model import BiGruCrf
 
-# yapf: disable
+from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.utils.log import logger
+
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
@@ -36,15 +33,22 @@ parser.add_argument("--model_save_dir", type=str, default=None, help="The model 
 parser.add_argument("--epochs", type=int, default=10, help="Corpus iteration num.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
-parser.add_argument("--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network.")
+parser.add_argument(
+    "--device",
+    default="gpu",
+    type=str,
+    choices=["cpu", "gpu"],
+    help="The device to select to train the model, is must be cpu/gpu.",
+)
+parser.add_argument(
+    "--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network."
+)
 parser.add_argument("--crf_lr", type=float, default=0.2, help="The learning rate ratio that affects CRF layers.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 parser.add_argument("--logging_steps", type=int, default=10, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
-# yapf: enable
+parser.add_argument("--do_eval", type=strtobool, default=True, help="To evaluate the model if True.")
 
 
 def set_seed(seed):

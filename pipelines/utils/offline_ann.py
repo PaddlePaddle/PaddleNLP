@@ -40,6 +40,7 @@ parser.add_argument("--params_path", default="checkpoints/model_40/model_state.p
 parser.add_argument("--delete_index", action="store_true", help="Whether to delete existing index while updating index")
 parser.add_argument("--share_parameters", action="store_true", help="Use to control the query and title models sharing the same parameters",)
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--search_fields', default=['content', 'name'], help="multi recall BM25Retriever set search_fields")
 args = parser.parse_args()
 # yapf: enable
 
@@ -64,6 +65,7 @@ def offline_ann(index_name, doc_dir):
             password="",
             embedding_dim=args.embedding_dim,
             index=index_name,
+            search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
         )
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(

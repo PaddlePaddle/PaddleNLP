@@ -13,10 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import tempfile
 import unittest
 
 import paddlenlp
 from paddlenlp.transformers import AutoTokenizer, is_fast_tokenizer_available
+from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 
 
 class AutoTokenizerTest(unittest.TestCase):
@@ -41,3 +44,24 @@ class AutoTokenizerTest(unittest.TestCase):
             self.assertIsInstance(tokenizer, paddlenlp.transformers.BertFastTokenizer)
         else:
             self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizer)
+
+    def test_hf_tokenizer(self):
+        t1 = AutoTokenizer.from_pretrained(
+            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=True
+        )
+        t2 = AutoTokenizer.from_pretrained(
+            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
+        )
+        if is_fast_tokenizer_available():
+            self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
+        else:
+            self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
+        self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)
+
+    def test_from_pretrained_cache_dir(self):
+        model_name = "__internal_testing__/tiny-random-bert"
+        with tempfile.TemporaryDirectory() as tempdir:
+            AutoTokenizer.from_pretrained(model_name, cache_dir=tempdir)
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, TOKENIZER_CONFIG_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))

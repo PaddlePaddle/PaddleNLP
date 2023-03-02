@@ -61,7 +61,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             }
         else:
             self.tokenizer = ErnieTokenizer.from_pretrained(model_config.pretrain_model)
-            # low frequency token will be used as specail token
+            # low frequency token will be used as special token
             # Other candidate: overchicstoretvhome
             self.special_token_dict = {
                 "table": "blogabstract",
@@ -183,7 +183,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             if match_cells is not None and len(match_cells) > 0:
                 if column.dtype in ("text", "time"):
                     if not self.config.predict_value:
-                        match_cells = match_cells[:1]  # the first cell used to complement senmantics
+                        match_cells = match_cells[:1]  # the first cell used to complement semantics
                     for mcell in match_cells:
                         value_list.append(mcell)
                         toks = [self.special_token_dict["value"]] + self.tokenizer.tokenize(mcell)

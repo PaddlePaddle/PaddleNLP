@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
+
 import numpy as np
+import paddle
 from scipy.special import softmax
 
-import paddle
-from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.transformers import BertTokenizer
 
 
@@ -36,8 +36,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+        choices=["cpu", "gpu", "xpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
     parser.add_argument(
         "--max_seq_length",
@@ -102,7 +102,7 @@ class Predictor(object):
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         outputs = []

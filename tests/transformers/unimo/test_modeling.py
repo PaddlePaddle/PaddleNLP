@@ -541,8 +541,6 @@ class UNIMOModelLanguageGenerationTest(unittest.TestCase):
         )
         output_str = postprocess_response(output_ids[0].numpy(), tokenizer)
 
-        print(output_str)
-
         EXPECTED_OUTPUT_STR = "百 度 飞 桨 ： 深 度 学 习 助 力 企 业 转 型 升 级"
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 

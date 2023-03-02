@@ -1,12 +1,34 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 
-from .modules.seq2seq import Seq2SeqBenchmark
+from .modules.bert_for_question_answering import BertForQuestionAnsweringBenchmark
 from .modules.bigru_crf import BiGruCrfBenchmark
-from .modules.xlnet import XLNetBenchmark
-from .modules.rnnlm import RNNLMBenchmark
+from .modules.ernie3_for_sequence_classification import (
+    Ernie3ForSequenceClassificationBenchmark,
+)
 from .modules.ernie_tiny import ErnieTinyBenchmark
-from .modules.optimizer import *
-from .modules.lr_scheduler import *
+from .modules.gpt_for_sequence_classification import (
+    GPTForSequenceClassificationBenchmark,
+)
+from .modules.lr_scheduler import *  # noqa: F403
+from .modules.optimizer import *  # noqa: F403
+from .modules.rnnlm import RNNLMBenchmark
+from .modules.seq2seq import Seq2SeqBenchmark
+from .modules.t5_for_conditional_generation import T5ForConditionalGenerationBenchmark
+from .modules.xlnet import XLNetBenchmark
 
 __all__ = [
     "MODEL_REGISTRY",
@@ -22,18 +44,31 @@ MODEL_REGISTRY = {
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
     "ernie_tiny": ErnieTinyBenchmark,
+    "ernie3_for_sequence_classification": Ernie3ForSequenceClassificationBenchmark,
+    "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
+    "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
+    "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
 }
 
 OPTIMIZER_REGISTRY = {
-    "adam": AdamBenchmark,
-    "adamw": AdamWBenchmark,
-    "sgd": SGDBenchmark,
+    "adam": AdamBenchmark,  # noqa: F405
+    "adamw": AdamWBenchmark,  # noqa: F405
+    "sgd": SGDBenchmark,  # noqa: F405
 }
 
 LR_SCHEDULER_REGISTRY = {
-    "lambda_decay": LambdaDecayBenchmark,
-    "linear_decay_with_warmup": LinearDecayWithWarmupBenchmark,
+    "lambda_decay": LambdaDecayBenchmark,  # noqa: F405
+    "linear_decay_with_warmup": LinearDecayWithWarmupBenchmark,  # noqa: F405
 }
+
+
+def str2bool(v):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def get_training_parser():
@@ -88,13 +123,17 @@ def get_parser():
     parser.add_argument("--logging_steps", type=int, default=10, help="Print logs after N steps. ")
     parser.add_argument("--seed", type=int, default=None, help="Random generator seed. ")
 
-    parser.add_argument("--use_amp", action="store_true", help="Enable AMP. ")
+    parser.add_argument("--use_amp", type=str2bool, nargs="?", const=False, help="Enable AMP. ")
     parser.add_argument("--scale_loss", type=float, default=128, help="Loss scale. ")
-    parser.add_argument("--amp_level", type=str, default="O1", help="AMP LEVEL. O1 or O2. ")
+    parser.add_argument("--amp_level", type=str, default="O2", help="AMP LEVEL. O1 or O2. ")
     parser.add_argument("--custom_black_list", type=str, nargs="+", default=None, help="Custom black list for AMP. ")
+
+    parser.add_argument("--to_static", action="store_true", help="Enable to static. ")
 
     parser.add_argument("--max_steps", type=int, default=None, help="Maximum steps. ")
     parser.add_argument("--epoch", type=int, default=10, help="Number of epochs. ")
+
+    parser.add_argument("--generated_inputs", action="store_true", help="Use generated inputs. ")
 
     # For benchmark.
     parser.add_argument(

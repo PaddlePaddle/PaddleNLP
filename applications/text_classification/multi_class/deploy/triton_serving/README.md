@@ -60,18 +60,9 @@ python3 -m pip install fast-tokenizer-python
 
 ## 模型获取和转换
 
-使用Triton做服务化部署时，选择ONNX Runtime后端运行需要先将模型转换成ONNX格式。
-
-
-首先将保存的动态图参数导出成静态图参数，具体代码见[静态图导出脚本](../../export_model.py)，静态图参数保存在`output_path`指定路径中，裁剪API裁剪会自动保存静态图模型。运行方式：
-
+使用Triton做服务化部署时，选择ONNX Runtime后端运行需要先将模型转换成ONNX格式。使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成model.onnx模型文件。
 ```shell
-python ../../export_model.py --params_path=../../checkpoint/model_state.pdparams --output_path=./infer_model
-```
-
-使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成model.onnx模型文件。
-```shell
-paddle2onnx --model_dir infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
+paddle2onnx --model_dir ../../checkpoint/export --model_filename model.pdmodel --params_filename model.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
 ```
 创建空白目录/seqcls/1和seqcls_model/1，并将将转换好的ONNX模型移动到模型仓库目录
 ```shell

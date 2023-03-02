@@ -69,9 +69,9 @@ echo "python="${python}
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
-    python -m pip install --ignore-installed --upgrade pip
-    python -m pip install -r scripts/regression/requirements_ci.txt
-    python -m pip install ${paddle};
+    python -m pip install --user -r scripts/regression/requirements_ci.txt
+    python -m pip uninstall paddlepaddle -y
+    python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
     python -c 'from visualdl import LogWriter'
 }
@@ -98,26 +98,25 @@ upload (){
         build_dev_path=/workspace/PaddleNLP_dev
         nlp_build ${build_dev_path}
         nlp_version=$(python -c "from paddlenlp import __version__; print(__version__)")
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-latest-py3-none-any.whl
+        # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/ 
+        # for ci pr test
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-ci-py3-none-any.whl
         echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
         build_pr_path=${nlp_dir}
         nlp_build ${build_pr_path}
-        cd $build_pr_path/dist
-        cp $build_pr_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-${GIT_PR_ID}-py3-none-any.whl
     elif [ $1 == "pipelines" ];then
         echo -e "\033[35m ---- build latest pipelines  \033[0m"
-        python -m pip install --force-reinstall paddlenlp
         build_dev_path=/workspace/PaddleNLP_dev/$1
         nlp_build ${build_dev_path}
         pipe_version=$(python -c "from pipelines import __version__; print(__version__)")
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/pipelines-latest-py3-none-any.whl
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/
     elif [ $1 == "ppdiffusers" ];then
         echo -e "\033[35m ---- build latest ppdiffusers  \033[0m"
-        python -m pip install --force-reinstall paddlenlp
         build_dev_path=/workspace/PaddleNLP_dev/$1
         nlp_build ${build_dev_path}
         pipe_version=$(python -c "from ppdiffusers import __version__; print(__version__)")
-        cp $build_dev_path/dist/pa****.whl ${PPNLP_HOME}/upload/ppdiffusers-latest-py3-none-any.whl
+        cp $build_dev_path/dist/pa****.whl ${PPNLP_HOME}/upload/
     fi
 }
 ####################################
@@ -149,6 +148,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
+            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
+            fi
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
         elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
@@ -156,7 +158,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+            P0case_list[${#P0case_list[*]}]=${dir2}
+        elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
             P0case_list[${#P0case_list[*]}]=${dir3}
         elif [[ ${dir3##*.} == "py" ]] && [[ !(${all_example_dict[*]} =~ ${dir2}) ]];then #新增规范模型
             P0case_list[${#P0case_list[*]}]=${dir2}
@@ -176,6 +180,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         if [[ ${dir2} =~ "transformers" ]] ;then
             if [[ ${dir3##*.} == "py" ]];then
                 continue
+            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
             else
                 APIcase_list[${#APIcase_list[*]}]=${dir3}
             fi
@@ -220,7 +226,8 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
-        python -m pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+        wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
+        python -m pip install --user paddlenlp-ci-py3-none-any.whl
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl

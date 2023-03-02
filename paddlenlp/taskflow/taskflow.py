@@ -23,8 +23,9 @@ from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
+from .feature_extraction import MultimodalFeatureExtractionTask
 from .fill_mask import FillMaskTask
-from .information_extraction import ClosedDomainIETask, UIETask, GPTask
+from .information_extraction import ClosedDomainIETask, GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
 from .lexical_analysis import LacTask
 from .named_entity_recognition import NERLACTask, NERWordTagTask
@@ -70,6 +71,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",
@@ -195,6 +200,10 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": "sentiment_analysis-uie-senta-nano",
             },
+            "__internal_testing__/tiny-random-skep": {
+                "task_class": SkepTask,
+                "task_flag": "sentiment_analysis-tiny-random-skep",
+            },
         },
         "default": {"model": "bilstm"},
     },
@@ -234,6 +243,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
             },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
+            },
         },
         "default": {"model": "simbert-base-chinese"},
     },
@@ -254,8 +267,23 @@ TASKS = {
                 "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
                 "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
             },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese-V1",
+                "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+            },
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+            },
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+            },
         },
-        "default": {"model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"},
+        "default": {"model": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"},
     },
     "word_segmentation": {
         "modes": {
@@ -381,17 +409,17 @@ TASKS = {
         },
     },
     "text_classification": {
-        "models": {
-            "multi_class": {
+        "modes": {
+            "finetune": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification-multi_class",
+                "task_flag": "text_classification-finetune",
             },
-            "multi_label": {
+            "prompt": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification-multi_label",
+                "task_flag": "text_classification-prompt",
             },
         },
-        "default": {"model": "multi_class"},
+        "default": {"mode": "finetune"},
     },
     "text_to_image": {
         "models": {
@@ -491,8 +519,115 @@ TASKS = {
                 "task_class": ZeroShotTextClassificationTask,
                 "task_flag": "zero_shot_text_classification-utc-large",
             },
+            "utc-xbase": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-xbase",
+            },
+            "utc-base": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-base",
+            },
+            "utc-medium": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-medium",
+            },
+            "utc-micro": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-micro",
+            },
+            "utc-mini": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-mini",
+            },
+            "utc-nano": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-nano",
+            },
+            "utc-pico": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-pico",
+            },
+            "__internal_testing__/tiny-random-utc": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-tiny-random-utc",
+            },
         },
-        "default": {"model": "utc-large"},
+        "default": {"model": "utc-base"},
+    },
+    "feature_extraction": {
+        "models": {
+            "PaddlePaddle/ernie_vil-2.0-base-zh": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-PaddlePaddle/ernie_vil-2.0-base-zh",
+                "task_priority_path": "PaddlePaddle/ernie_vil-2.0-base-zh",
+            },
+            "OFA-Sys/chinese-clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-base-patch16",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-base-patch16",
+            },
+            "OFA-Sys/chinese-clip-vit-huge-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-huge-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-huge-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14-336px": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14-336px",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14-336px",
+            },
+            "openai/clip-vit-base-patch32": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch32",
+                "task_priority_path": "openai/clip-vit-base-patch32",
+            },
+            "openai/clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch16",
+                "task_priority_path": "openai/clip-vit-base-patch16",
+            },
+            "openai/clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-large-patch14",
+                "task_priority_path": "openai/clip-vit-large-patch14",
+            },
+            "laion/CLIP-ViT-H-14-laion2B-s32B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+            },
+            "laion/CLIP-ViT-B-32-laion2B-s34B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+            },
+            "openai/clip-rn50": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50",
+                "task_priority_path": "openai/clip-rn50",
+            },
+            "openai/clip-rn101": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn101",
+                "task_priority_path": "openai/clip-rn101",
+            },
+            "openai/clip-rn50x4": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50x4",
+                "task_priority_path": "openai/clip-rn50x4",
+            },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
+            },
+        },
+        "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
 }
 
@@ -515,6 +650,13 @@ support_schema_list = [
     "uie-senta-micro",
     "uie-senta-nano",
     "utc-large",
+    "utc-xbase",
+    "utc-base",
+    "utc-medium",
+    "utc-micro",
+    "utc-mini",
+    "utc-nano",
+    "utc-pico",
 ]
 
 support_argument_list = [
@@ -570,7 +712,7 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        if self.task in ["word_segmentation", "ner"]:
+        if self.task in ["word_segmentation", "ner", "text_classification"]:
             tag = "modes"
             ind_tag = "mode"
             self.model = mode

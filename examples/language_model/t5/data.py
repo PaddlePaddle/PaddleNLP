@@ -12,15 +12,159 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import os
 from functools import partial
+
 from paddle.io import BatchSampler, DataLoader
+from utils import load_pickle, save_pickle
+
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
 
-from utils import load_pickle, save_pickle
-import collections
-
+CLUE_PROCESSED = collections.OrderedDict(
+    [
+        ("afqmc", (["afqmc sentence1: ", "afqmc sentence2: "], ["不同", "类似"])),
+        (
+            "tnews",
+            (
+                ["tnews sentence: "],
+                ["故事", "文化", "娱乐", "体育", "财经", "房产", "汽车", "教育", "科技", "军事", "旅游", "国际", "股票", "农业", "电竞"],
+            ),
+        ),
+        (
+            "iflytek",
+            (
+                ["iflytek sentence: "],
+                [
+                    "打车",
+                    "地图导航",
+                    "免费WIFI",
+                    "租车",
+                    "同城服务",
+                    "快递物流",
+                    "婚庆",
+                    "家政",
+                    "公共交通",
+                    "政务",
+                    "社区服务",
+                    "薅羊毛",
+                    "魔幻",
+                    "仙侠",
+                    "卡牌",
+                    "飞行空战",
+                    "射击游戏",
+                    "休闲益智",
+                    "动作类",
+                    "体育竞技",
+                    "棋牌中心",
+                    "经营养成",
+                    "策略",
+                    "MOBA",
+                    "辅助工具",
+                    "约会社交",
+                    "即时通讯",
+                    "工作社交",
+                    "论坛圈子",
+                    "婚恋社交",
+                    "情侣社交",
+                    "社交工具",
+                    "生活社交",
+                    "微博博客",
+                    "新闻",
+                    "漫画",
+                    "小说",
+                    "技术",
+                    "教辅",
+                    "问答交流",
+                    "搞笑",
+                    "杂志",
+                    "百科",
+                    "影视娱乐",
+                    "求职",
+                    "兼职",
+                    "视频",
+                    "短视频",
+                    "音乐",
+                    "直播",
+                    "电台",
+                    "K歌",
+                    "成人",
+                    "中小学",
+                    "职考",
+                    "公务员",
+                    "英语",
+                    "视频教育",
+                    "高等教育",
+                    "成人教育",
+                    "艺术",
+                    "语言(非英语)",
+                    "旅游资讯",
+                    "综合预定",
+                    "民航",
+                    "铁路",
+                    "酒店",
+                    "行程管理",
+                    "民宿短租",
+                    "出国",
+                    "工具",
+                    "亲子儿童",
+                    "母婴",
+                    "驾校",
+                    "违章",
+                    "汽车咨询",
+                    "汽车交易",
+                    "日常养车",
+                    "行车辅助",
+                    "租房",
+                    "买房",
+                    "装修家居",
+                    "电子产品",
+                    "问诊挂号",
+                    "养生保健",
+                    "医疗服务",
+                    "减肥瘦身",
+                    "美妆美业",
+                    "菜谱",
+                    "餐饮店",
+                    "体育咨讯",
+                    "运动健身",
+                    "支付",
+                    "保险",
+                    "股票",
+                    "借贷",
+                    "理财",
+                    "彩票",
+                    "记账",
+                    "银行",
+                    "美颜",
+                    "影像剪辑",
+                    "摄影修图",
+                    "相机",
+                    "绘画",
+                    "二手",
+                    "电商",
+                    "团购",
+                    "外卖",
+                    "电影票务",
+                    "社区超市",
+                    "购物咨询",
+                    "笔记",
+                    "办公",
+                    "日程管理",
+                    "女性",
+                    "经营",
+                    "收款",
+                    "其他",
+                ],
+            ),
+        ),
+        ("cmnli", (["cmnli sentence1: ", "cmnli sentence2: "], ["矛盾", "中立", "蕴涵"])),
+        ("ocnli", (["ocnli sentence1: ", "ocnli sentence2: "], ["蕴涵", "矛盾", "中立"])),
+        ("cluewsc2020", (["cluewsc2020 sentence: "], ["同义", "歧义"])),
+        ("csl", ((["csl sentence1: ", "csl sentence2: "], ["伪造", "真实"]))),
+    ]
+)
 GLUE_PROCESSED = collections.OrderedDict(
     [
         ("cola", (["cola sentence: "], ["not_acceptable", "acceptable"])),
@@ -132,12 +276,22 @@ def get_train_dataloader(tokenizer, args):
 
     batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=True)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-        Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    ): fn(samples)
+    # batchify_fn = lambda samples, fn=Tuple(
+    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+    #     Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+    # ): fn(samples)
+    def batchify_fn(
+        samples,
+        fn=Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        ),
+    ):
+        return fn(samples)
 
     data_loader = DataLoader(
         dataset=ds,
@@ -166,12 +320,16 @@ def get_dev_dataloader(tokenizer, args):
 
     batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-        Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    ): fn(samples)
+    def batchify_fn(
+        samples,
+        fn=Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        ),
+    ):
+        return fn(samples)
 
     data_loader = DataLoader(
         dataset=ds,
@@ -203,12 +361,16 @@ def get_mnli_dev_dataloader(tokenizer, args, matched=True):
 
     batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-        Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    ): fn(samples)
+    def batchify_fn(
+        samples,
+        fn=Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        ),
+    ):
+        return fn(samples)
 
     data_loader = DataLoader(
         dataset=ds,

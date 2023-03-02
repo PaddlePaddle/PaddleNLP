@@ -37,6 +37,7 @@ from .import_utils import (
     is_paddlenlp_available,
     is_scipy_available,
     is_unidecode_available,
+    is_wandb_available,
     requires_backends,
 )
 from .logging import get_logger
@@ -72,7 +73,9 @@ DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPDIFFUSERS_CACHE = default_cache_path
 PPDIFFUSERS_DYNAMIC_MODULE_NAME = "ppdiffusers_modules"
 PPNLP_MODULES_CACHE = os.getenv("PPNLP_MODULES_CACHE", _get_sub_home("modules"))
+HF_CACHE = os.environ.get("HUGGINGFACE_HUB_CACHE", PPDIFFUSERS_CACHE)
 TEST_DOWNLOAD_SERVER = "https://paddlenlp.bj.bcebos.com/models/community/ppdiffusers/tests"
+HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
     "DDIMScheduler",

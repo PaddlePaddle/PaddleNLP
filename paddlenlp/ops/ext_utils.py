@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import hashlib
 import os
 import subprocess
@@ -20,6 +21,7 @@ import textwrap
 from distutils.dep_util import newer_group
 from pathlib import Path
 
+from filelock import FileLock
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 from paddle.utils.cpp_extension.cpp_extension import CUDA_HOME
 from paddle.utils.cpp_extension.cpp_extension import (
@@ -33,7 +35,6 @@ from paddle.utils.cpp_extension.extension_utils import (
 from setuptools import Extension
 
 from paddlenlp.utils.env import PPNLP_HOME
-from paddlenlp.utils.file_lock import decorate as file_lock
 from paddlenlp.utils.log import logger
 
 if CUDA_HOME and not os.path.exists(CUDA_HOME):
@@ -42,6 +43,18 @@ if CUDA_HOME and not os.path.exists(CUDA_HOME):
     CUDA_HOME = None
 
 LOADED_EXT = {}
+
+
+def file_lock(lock_file_path):
+    def _wrapper(func):
+        @functools.wraps(func)
+        def _impl(*args, **kwargs):
+            with FileLock(lock_file_path):
+                func(*args, **kwargs)
+
+        return _impl
+
+    return _wrapper
 
 
 def _get_files(path):

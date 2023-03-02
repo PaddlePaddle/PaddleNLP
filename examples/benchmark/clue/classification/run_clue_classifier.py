@@ -13,25 +13,27 @@
 # limitations under the License.
 
 import argparse
+import json
+import math
 import os
-import sys
 import random
 import time
-import math
-import json
-import distutils.util
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
+from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
-from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
@@ -120,7 +122,7 @@ def parse_args():
     parser.add_argument(
         "--save_best_model",
         default=True,
-        type=distutils.util.strtobool,
+        type=strtobool,
         help="Whether to save best model.",
     )
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
@@ -163,7 +165,6 @@ def convert_example(example, tokenizer, label_list, is_test=False, max_seq_lengt
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
         # Get the label
         label = np.array(example["label"], dtype="int64")
     # Convert raw text to feature
@@ -228,16 +229,13 @@ def do_eval(args):
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
 
-    num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
+    num_classes = 1 if dev_ds.label_list is None else len(dev_ds.label_list)
 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     metric = metric_class()
-    best_acc = 0.0
-    global_step = 0
-    tic_train = time.time()
     model.eval()
     metric.reset()
     for batch in dev_data_loader:
@@ -287,7 +285,7 @@ def do_train(args):
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
 
     if args.dropout != 0.1:
@@ -410,7 +408,7 @@ def do_predict(args):
             return_list=True,
         )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
 

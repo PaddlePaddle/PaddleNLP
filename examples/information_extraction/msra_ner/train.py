@@ -14,22 +14,23 @@
 
 import argparse
 import os
-import random
 import time
-import math
-from functools import partial
 
-import numpy as np
 import paddle
+from datasets import load_dataset
 from paddle.io import DataLoader
 
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
-from datasets import load_dataset
-from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
-from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.transformers import (
+    BertForTokenClassification,
+    BertTokenizer,
+    ErnieCtmForTokenClassification,
+    ErnieCtmTokenizer,
+    ErnieForTokenClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -42,8 +43,8 @@ parser = argparse.ArgumentParser()
 
 # yapf: disable
 parser.add_argument("--model_type", default="bert", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()), )
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join( sum([ list(classes[-1].pretrained_init_configuration.keys())  for classes in MODEL_CLASSES.values() ], [])), )
-parser.add_argument("--dataset", default="msra_ner", type=str, choices=["msra_ner", "peoples_daily_ner"] ,help="The named entity recognition datasets.")
+parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
+parser.add_argument("--dataset", default="msra_ner", type=str, choices=["msra_ner", "peoples_daily_ner"] , help="The named entity recognition datasets.")
 parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
@@ -57,7 +58,7 @@ parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup o
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu", "npu"] , help="The device to select to train the model, is must be cpu/gpu/xpu/npu.")
 # yapf: enable
 
 
@@ -179,7 +180,6 @@ def do_train(args):
     metric = ChunkEvaluator(label_list=label_list)
 
     global_step = 0
-    last_step = args.num_train_epochs * len(train_data_loader)
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):

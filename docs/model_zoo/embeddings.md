@@ -23,7 +23,7 @@
 
 ## 介绍
 
-PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用`paddlenlp.embeddings.TokenEmbedding`时，指定预训练模型的名称，即可加载相对应的预训练模型。以下将介绍`TokenEmbeddign`详细用法，并列出PaddleNLP所支持的预训练Embedding模型。
+PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用`paddlenlp.embeddings.TokenEmbedding`时，指定预训练模型的名称，即可加载相对应的预训练模型。以下将介绍`TokenEmbedding`详细用法，并列出PaddleNLP所支持的预训练Embedding模型。
 
 ## 用法
 

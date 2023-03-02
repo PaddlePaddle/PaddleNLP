@@ -17,6 +17,7 @@ import base64
 import json
 import os
 import re
+from typing import List
 
 import numpy as np
 import paddle
@@ -29,14 +30,14 @@ from ..transformers import (
     UIE,
     UIEM,
     UIEX,
-    ErnieForClosedDomainIE,
-    ErnieLayoutForClosedDomainIE,
     AutoModel,
     AutoTokenizer,
+    ErnieForClosedDomainIE,
+    ErnieLayoutForClosedDomainIE,
 )
 from ..utils.doc_parser import DocParser
 from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
-from ..utils.ie_utils import map_offset, pad_image_data, ClosedDomainIEProcessor
+from ..utils.ie_utils import ClosedDomainIEProcessor, map_offset, pad_image_data
 from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
@@ -303,6 +304,17 @@ class IETaskBase(Task):
                 result = _add_bbox(result, char_boxes)
             new_results.append(result)
         return new_results
+
+
+def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length: List[int]) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    cur_length = len(examples[0]["input_ids"])
+    max_length = default_max_length
+    for max_length_option in sorted(dynamic_max_length):
+        if cur_length <= max_length_option:
+            max_length = max_length_option
+            break
+    return max_length
 
 
 class UIETask(IETaskBase):
@@ -583,6 +595,9 @@ class UIETask(IETaskBase):
     def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
+        self._max_seq_len = kwargs.get("max_seq_len", 512)
+        self._dynamic_max_length = kwargs.get("dynamic_max_length", None)
+        self._batch_size = kwargs.get("batch_size", 16)
         self._split_sentence = kwargs.get("split_sentence", False)
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._use_fast = kwargs.get("use_fast", False)
@@ -638,6 +653,10 @@ class UIETask(IETaskBase):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
+        if paddle.get_device().split(":", 1)[0] == "npu":
+            input_spec_dtype = "int32"
+        else:
+            input_spec_dtype = "int64"
         if self._init_class in ["UIEX"]:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
@@ -654,10 +673,10 @@ class UIETask(IETaskBase):
             ]
         else:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
             ]
 
     def _construct_model(self, model):
@@ -727,16 +746,44 @@ class UIETask(IETaskBase):
 
         def text_reader(inputs):
             for example in inputs:
-                encoded_inputs = self._tokenizer(
-                    text=[example["prompt"]],
-                    text_pair=[example["text"]],
-                    truncation=True,
-                    max_seq_len=self._max_seq_len,
-                    pad_to_max_seq_len=True,
-                    return_attention_mask=True,
-                    return_position_ids=True,
-                    return_offsets_mapping=True,
-                )
+                if self._dynamic_max_length is not None:
+                    temp_encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_dict=False,
+                        return_offsets_mapping=True,
+                    )
+                    max_length = get_dynamic_max_length(
+                        examples=temp_encoded_inputs,
+                        default_max_length=self._max_seq_len,
+                        dynamic_max_length=self._dynamic_max_length,
+                    )
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=max_length,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                    )
+                    logger.info("Inference with dynamic max length in {}".format(max_length))
+                else:
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                    )
                 if self._init_class in ["UIEM"]:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
@@ -782,16 +829,18 @@ class UIETask(IETaskBase):
                     q_sep_index = content_encoded_inputs["input_ids"].index(2, 1)
 
                     bias = 0
-                    for index in range(len(sub_offset_mapping)):
-                        if index == 0:
+                    for i in range(len(sub_offset_mapping)):
+                        if i == 0:
                             continue
-                        mapping = sub_offset_mapping[index]
+                        mapping = sub_offset_mapping[i]
                         if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-                            bias = sub_offset_mapping[index - 1][-1] + 1
+                            bias = sub_offset_mapping[i - 1][-1] + 1
                         if mapping[0] == 0 and mapping[1] == 0:
                             continue
-                        sub_offset_mapping[index][0] += bias
-                        sub_offset_mapping[index][1] += bias
+                        if mapping == sub_offset_mapping[i - 1]:
+                            continue
+                        sub_offset_mapping[i][0] += bias
+                        sub_offset_mapping[i][1] += bias
 
                     offset_mapping = sub_offset_mapping[:-1]
                     last_offset = offset_mapping[-1][-1]
@@ -801,12 +850,11 @@ class UIETask(IETaskBase):
                     )
                     inputs_ids += content_encoded_inputs["input_ids"][1:-1]
                     sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
-
                     for i, sub_list in enumerate(sub_offset_mapping[1:-1]):
                         if i == 0:
                             org_offset = sub_list[1]
                         else:
-                            if sub_list[0] != org_offset:
+                            if sub_list[0] != org_offset and sub_offset_mapping[1:-1][i - 1] != sub_list:
                                 last_offset += 1
                             org_offset = sub_list[1]
                         offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
@@ -1008,7 +1056,6 @@ class UIETask(IETaskBase):
 
             start_ids_list = get_bool_ids_greater_than(start_prob, limit=self._position_prob, return_prob=True)
             end_ids_list = get_bool_ids_greater_than(end_prob, limit=self._position_prob, return_prob=True)
-
             for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list, offset_maps.tolist()):
                 span_set = get_span(start_ids, end_ids, with_prob=True)
                 sentence_id, prob = get_id_and_prob(span_set, offset_map)

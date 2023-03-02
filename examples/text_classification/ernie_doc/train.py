@@ -50,7 +50,7 @@ parser.add_argument("--seed", type=int, default=1, help="Random seed for initial
 parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float,
-                    help="Linear warmup proption over the training process.")
+                    help="Linear warmup proportion over the training process.")
 parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
                     help="The training dataset")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")

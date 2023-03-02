@@ -9,7 +9,7 @@
 <p align="center">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202-dfd.svg"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
-    <a href=""><img src="https://img.shields.io/badge/python-3.6.2+-aff.svg"></a>
+    <a href=""><img src="https://img.shields.io/badge/python-3.7+-aff.svg"></a>
     <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-pink.svg"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/graphs/contributors"><img src="https://img.shields.io/github/contributors/PaddlePaddle/PaddleNLP?color=9ea"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/commits"><img src="https://img.shields.io/github/commit-activity/m/PaddlePaddle/PaddleNLP?color=3af"></a>
@@ -31,6 +31,10 @@
 
 ## News 📢
 
+* 🔥 **2023.2.28-2023.3.01  UIE 产业落地经验分享 2 日直播课，欢迎填写 [问卷](https://wx566b3770e2bd0b56.mp.weixinhost.com/addon/app-commonapply/index?form_id=635909496275456&channel_id=1500817731950358528) 报名线上直播课。**
+  * 金融行业中复杂单据的实体、关系抽取，更小的标注量，更优的效果；
+  * 零售行业中针对产品评论进行客户意见洞察，促进消费品牌经营转型。
+  
 * **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
   * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)
   * 💎 产业应用：信息抽取、文本分类、情感分析、智能问答 四大应用全新升级，发布文档信息抽取 [UIE-X](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列预训练小模型，在低资源和域外数据效果更强，开源 模型裁剪、模型量化、FastDeploy 推理加速、边缘端部署 端到端部署方案，降低预训练模型部署难度
@@ -277,7 +281,7 @@ outputs, _ = model.generate(
 ### 环境依赖
 
 - python >= 3.7
-- paddlepaddle >= 2.2
+- paddlepaddle >= 2.3
 
 ### pip安装
 
@@ -288,7 +292,7 @@ pip install --upgrade paddlenlp
 或者可通过以下命令安装最新 develop 分支代码：
 
 ```shell
-pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。

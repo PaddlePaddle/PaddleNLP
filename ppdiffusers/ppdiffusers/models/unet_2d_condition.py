@@ -17,8 +17,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
+from ..loaders import UNet2DConditionLoadersMixin
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 from .cross_attention import AttnProcessor
@@ -37,6 +39,11 @@ from .unet_2d_blocks import (
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
+class Mish(nn.Layer):
+    def forward(self, hidden_states):
+        return hidden_states * paddle.tanh(F.softplus(hidden_states))
+
+
 @dataclass
 class UNet2DConditionOutput(BaseOutput):
     """
@@ -48,7 +55,7 @@ class UNet2DConditionOutput(BaseOutput):
     sample: paddle.Tensor
 
 
-class UNet2DConditionModel(ModelMixin, ConfigMixin):
+class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
     r"""
     UNet2DConditionModel is a conditional 2D UNet model that takes in a noisy sample, conditional state, and a timestep
     and returns sample shaped output.
@@ -122,6 +129,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
+        resnet_pre_temb_non_linearity=False,
     ):
         super().__init__()
 
@@ -157,6 +165,14 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         if isinstance(attention_head_dim, int):
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
 
+        # pre_temb_act_fun opt
+        self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
+        if act_fn == "swish":
+            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+        elif act_fn == "mish":
+            self.down_resnet_temb_nonlinearity = Mish()
+        elif act_fn == "silu":
+            self.down_resnet_temb_nonlinearity = nn.Silu()
         # down
         output_channel = block_out_channels[0]
         for i, down_block_type in enumerate(down_block_types):
@@ -182,6 +198,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 only_cross_attention=only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
             self.down_blocks.append(down_block)
 
@@ -200,6 +217,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 upcast_attention=upcast_attention,
+                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
         elif mid_block_type == "UNetMidBlock2DSimpleCrossAttn":
             self.mid_block = UNetMidBlock2DSimpleCrossAttn(
@@ -212,6 +230,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 attn_num_head_channels=attention_head_dim[-1],
                 resnet_groups=norm_num_groups,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
         else:
             raise ValueError(f"unknown mid_block_type : {mid_block_type}")
@@ -257,6 +276,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 only_cross_attention=reversed_only_cross_attention[i],
                 upcast_attention=upcast_attention,
                 resnet_time_scale_shift=resnet_time_scale_shift,
+                resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
             )
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
@@ -268,17 +288,58 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         self.conv_act = nn.Silu()
         self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, 3, padding=1)
 
-    def set_attn_processor(self, processor: AttnProcessor):
+    @property
+    def attn_processors(self) -> Dict[str, AttnProcessor]:
+        r"""
+        Returns:
+            `dict` of attention processors: A dictionary containing all attention processors used in the model with
+            indexed by its weight name.
+        """
         # set recursively
-        def fn_recursive_attn_processor(module: nn.Layer):
+        processors = {}
+
+        def fn_recursive_add_processors(name: str, module: nn.Layer, processors: Dict[str, AttnProcessor]):
             if hasattr(module, "set_processor"):
-                module.set_processor(processor)
+                processors[f"{name}.processor"] = module.processor
 
-            for child in module.children():
-                fn_recursive_attn_processor(child)
+            for sub_name, child in module.named_children():
+                fn_recursive_add_processors(f"{name}.{sub_name}", child, processors)
 
-        for module in self.children():
-            fn_recursive_attn_processor(module)
+            return processors
+
+        for name, module in self.named_children():
+            fn_recursive_add_processors(name, module, processors)
+
+        return processors
+
+    def set_attn_processor(self, processor: Union[AttnProcessor, Dict[str, AttnProcessor]]):
+        r"""
+        Parameters:
+            `processor (`dict` of `AttnProcessor` or `AttnProcessor`):
+                The instantiated processor class or a dictionary of processor classes that will be set as the processor
+                of **all** `CrossAttention` layers.
+            In case `processor` is a dict, the key needs to define the path to the corresponding cross attention processor. This is strongly recommended when setting trainablae attention processors.:
+        """
+        count = len(self.attn_processors.keys())
+
+        if isinstance(processor, dict) and len(processor) != count:
+            raise ValueError(
+                f"A dict of processors was passed, but the number of processors {len(processor)} does not match the"
+                f" number of attention layers: {count}. Please make sure to pass {count} processor classes."
+            )
+
+        def fn_recursive_attn_processor(name: str, module: nn.Layer, processor):
+            if hasattr(module, "set_processor"):
+                if not isinstance(processor, dict):
+                    module.set_processor(processor)
+                else:
+                    module.set_processor(processor.pop(f"{name}.processor"))
+
+            for sub_name, child in module.named_children():
+                fn_recursive_attn_processor(f"{name}.{sub_name}", child, processor)
+
+        for name, module in self.named_children():
+            fn_recursive_attn_processor(name, module, processor)
 
     def set_attention_slice(self, slice_size):
         r"""
@@ -383,7 +444,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         if any(s % default_overall_up_factor != 0 for s in sample.shape[-2:]):
             logger.info("Forward upsample size to force interpolation output size.")
             forward_upsample_size = True
-
         # prepare attention_mask
         if attention_mask is not None:
             attention_mask = (1 - attention_mask.cast(sample.dtype)) * -10000.0
@@ -431,24 +491,28 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 3. down
         down_block_res_samples = (sample,)
+        if self.resnet_pre_temb_non_linearity:
+            down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
+        else:
+            down_nonlinear_temb = emb
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
         sample = self.mid_block(
             sample,
-            emb,
+            down_nonlinear_temb,
             encoder_hidden_states=encoder_hidden_states,
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
@@ -468,7 +532,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=emb,
+                    temb=down_nonlinear_temb,
                     res_hidden_states_tuple=res_samples,
                     encoder_hidden_states=encoder_hidden_states,
                     cross_attention_kwargs=cross_attention_kwargs,
@@ -477,7 +541,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 )
             else:
                 sample = upsample_block(
-                    hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
+                    hidden_states=sample,
+                    temb=down_nonlinear_temb,
+                    res_hidden_states_tuple=res_samples,
+                    upsample_size=upsample_size,
                 )
         # 6. post-process
         sample = self.conv_norm_out(sample)

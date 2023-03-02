@@ -517,8 +517,12 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         out_channels (int,  *optional*, defaults to 3): Number of channels in the output.
         down_block_types (`Tuple[str]`, *optional*, defaults to :
             obj:`("DownEncoderBlock2D",)`): Tuple of downsample block types.
+        down_block_out_channels (`Tuple[int]`, *optional*, defaults to :
+            None: Tuple of down block output channels.
         up_block_types (`Tuple[str]`, *optional*, defaults to :
             obj:`("UpDecoderBlock2D",)`): Tuple of upsample block types.
+        up_block_out_channels (`Tuple[int]`, *optional*, defaults to :
+            None: Tuple of up block output channels.
         block_out_channels (`Tuple[int]`, *optional*, defaults to :
             obj:`(64,)`): Tuple of block output channels.
         act_fn (`str`, *optional*, defaults to `"silu"`): The activation function to use.
@@ -532,7 +536,9 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         in_channels: int = 3,
         out_channels: int = 3,
         down_block_types: Tuple[str] = ("DownEncoderBlock2D",),
+        down_block_out_channels: Tuple[int] = None,
         up_block_types: Tuple[str] = ("UpDecoderBlock2D",),
+        up_block_out_channels: Tuple[int] = None,
         block_out_channels: Tuple[int] = (64,),
         layers_per_block: int = 1,
         act_fn: str = "silu",
@@ -547,7 +553,10 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
             in_channels=in_channels,
             out_channels=latent_channels,
             down_block_types=down_block_types,
-            block_out_channels=block_out_channels,
+            block_out_channels=down_block_out_channels
+            if down_block_out_channels
+            is not None  # if down_block_out_channels not givien, we will use block_out_channels
+            else block_out_channels,
             layers_per_block=layers_per_block,
             act_fn=act_fn,
             norm_num_groups=norm_num_groups,
@@ -559,7 +568,9 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
             in_channels=latent_channels,
             out_channels=out_channels,
             up_block_types=up_block_types,
-            block_out_channels=block_out_channels,
+            block_out_channels=up_block_out_channels  # if up_block_out_channels not givien, we will use block_out_channels
+            if up_block_out_channels is not None
+            else block_out_channels,
             layers_per_block=layers_per_block,
             norm_num_groups=norm_num_groups,
             act_fn=act_fn,

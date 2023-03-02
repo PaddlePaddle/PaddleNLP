@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.io import DataLoader, Dataset
 
 from ..data import DataCollator
 from ..datasets import MapDataset
@@ -144,13 +145,18 @@ class PromptTrainer(Trainer):
     def load_state_dict_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
         if resume_from_checkpoint is not None:
             self.template = AutoTemplate.load_from(
-                resume_from_checkpoint, self.tokenizer, self.args.max_seq_length, self._get_model()
+                resume_from_checkpoint, self.tokenizer, self.args.max_seq_length, self._get_model().plm
             )
         super(PromptTrainer, self).load_state_dict_from_checkpoint(resume_from_checkpoint)
 
     def get_test_dataloader(self, test_dataset):
         test_dataset = self._map_dataset(test_dataset)
         return super(PromptTrainer, self).get_test_dataloader(test_dataset)
+
+    def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
+        if eval_dataset is not None:
+            eval_dataset = self._map_dataset(eval_dataset)
+        return super(PromptTrainer, self).get_eval_dataloader(eval_dataset)
 
     def create_optimizer(self, lr_scheduler=None):
         """
@@ -248,7 +254,7 @@ class PromptTrainer(Trainer):
             if self.args.use_rgl:
                 loss += self._compute_rgl_loss(hidden_states, labels)
         else:
-            loss, logits, _ = model(**input_dict)
+            loss, logits = model(**input_dict)
 
         outputs = (loss, logits)
 

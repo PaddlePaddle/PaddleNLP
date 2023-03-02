@@ -27,7 +27,7 @@ parser.add_argument("--similar_text_pair", type=str,
 parser.add_argument("--recall_result_file", type=str,
                     default='', help="The full path of recall result file")
 parser.add_argument("--recall_num", type=int, default=10,
-                    help="Most similair number of doc recalled from corpus per query")
+                    help="Most similar number of doc recalled from corpus per query")
 
 
 args = parser.parse_args()

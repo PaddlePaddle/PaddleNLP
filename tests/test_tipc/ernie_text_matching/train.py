@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-
-from data import create_dataloader
 from data import convert_pointwise_example as convert_example
+from data import create_dataloader
 from model import PointwiseMatching
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 
 
 def set_seed(seed):
@@ -154,22 +152,39 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument(
+        "--save_dir",
+        default="./checkpoint",
+        type=str,
+        help="The output directory where the model checkpoints will be written.",
+    )
+    parser.add_argument(
+        "--max_seq_length",
+        default=128,
+        type=int,
+        help="The maximum total input sequence length after tokenization. "
+        "Sequences longer than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--eval_step", default=100, type=int, help="Step interval for evaluation.")
-    parser.add_argument('--save_step', default=10000, type=int, help="Step interval for saving checkpoint.")
-    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+    parser.add_argument("--save_step", default=10000, type=int, help="Step interval for saving checkpoint.")
+    parser.add_argument(
+        "--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process."
+    )
     parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
-    parser.add_argument('--device', choices=['cpu', 'gpu', 'npu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+    parser.add_argument(
+        "--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform."
+    )
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu", "npu", "xpu"],
+        default="gpu",
+        help="Select which device to train model, defaults to gpu.",
+    )
     args = parser.parse_args()
-    # yapf: enable
     do_train(args)
