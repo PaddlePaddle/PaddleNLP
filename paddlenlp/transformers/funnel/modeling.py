@@ -1128,12 +1128,12 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
         if labels is not None:
             loss_fct = nn.BCEWithLogitsLoss()
             if attention_mask is not None:
-                active_loss = attention_mask.reshape(-1, discriminator_sequence_output.shape[1]) == 1
-                active_logits = logits.reshape(-1, discriminator_sequence_output.shape[1])[active_loss]
+                active_loss = attention_mask.reshape((-1, discriminator_sequence_output.shape[1])) == 1
+                active_logits = logits.reshape((-1, discriminator_sequence_output.shape[1]))[active_loss]
                 active_labels = labels[active_loss]
                 loss = loss_fct(active_logits, active_labels.astype("float32"))
             else:
-                loss = loss_fct(logits.reshape(-1, discriminator_sequence_output.shape[1]), labels.astype("float32"))
+                loss = loss_fct(logits.reshape((-1, discriminator_sequence_output.shape[1])), labels.astype("float32"))
 
         if not return_dict:
             output = (logits,) + discriminator_hidden_states[1:]
@@ -1202,7 +1202,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_logits.reshape(-1, self.config.vocab_size), labels.reshape(-1))
+            masked_lm_loss = loss_fct(prediction_logits.reshape((-1, self.config.vocab_size)), labels.reshape((-1)))
 
         if not return_dict:
             output = (prediction_logits,) + outputs[1:]
@@ -1282,7 +1282,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
                     loss = loss_fct(logits, labels)
             elif self.config.problem_type == "single_label_classification":
                 loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.reshape(-1, self.num_labels), labels.reshape(-1))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             elif self.config.problem_type == "multi_label_classification":
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -1332,11 +1332,11 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
 
-        input_ids = input_ids.reshape(-1, input_ids.shape[-1]) if input_ids is not None else None
-        attention_mask = attention_mask.reshape(-1, attention_mask.shape[-1]) if attention_mask is not None else None
-        token_type_ids = token_type_ids.reshape(-1, token_type_ids.shape[-1]) if token_type_ids is not None else None
+        input_ids = input_ids.reshape((-1, input_ids.shape[-1])) if input_ids is not None else None
+        attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1])) if attention_mask is not None else None
+        token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1])) if token_type_ids is not None else None
         inputs_embeds = (
-            inputs_embeds.reshape(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1])
+            inputs_embeds.reshape((-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
             if inputs_embeds is not None
             else None
         )
@@ -1354,7 +1354,7 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
         last_hidden_state = outputs[0]
         pooled_output = last_hidden_state[:, 0]
         logits = self.classifier(pooled_output)
-        reshaped_logits = logits.reshape(-1, num_choices)
+        reshaped_logits = logits.reshape((-1, num_choices))
 
         loss = None
         if labels is not None:
@@ -1423,14 +1423,14 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
             loss_fct = CrossEntropyLoss()
             # Only keep active parts of the loss
             if attention_mask is not None:
-                active_loss = attention_mask.reshape(-1) == 1
-                active_logits = logits.reshape(-1, self.num_labels)
+                active_loss = attention_mask.reshape((-1)) == 1
+                active_logits = logits.reshape((-1, self.num_labels))
                 active_labels = paddle.where(
-                    active_loss, labels.reshape(-1), paddle.tensor(loss_fct.ignore_index).astype(labels.dtype)
+                    active_loss, labels.reshape((-1,)), paddle.tensor(loss_fct.ignore_index).astype(labels.dtype)
                 )
                 loss = loss_fct(active_logits, active_labels)
             else:
-                loss = loss_fct(logits.reshape(-1, self.num_labels), paddle.reshape(labels, -1))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), paddle.reshape(labels, (-1,)))
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -1512,8 +1512,8 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
             ignored_index = start_logits.shape[1]
-            start_positions = start_positions.clamp(0, ignored_index)
-            end_positions = end_positions.clamp(0, ignored_index)
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
 
             loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
             start_loss = loss_fct(start_logits, start_positions)
