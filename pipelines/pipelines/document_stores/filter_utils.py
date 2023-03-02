@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union, List, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from functools import reduce
+from typing import Dict, List, Optional, Tuple, Union
 
-from sqlalchemy.sql import select
 from sqlalchemy import and_, or_
+from sqlalchemy.sql import select
 
 from pipelines.document_stores import utils
 

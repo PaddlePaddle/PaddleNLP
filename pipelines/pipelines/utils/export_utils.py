@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any, List, Optional
-
 import json
-import pprint
 import logging
-import pandas as pd
+import pprint
 from collections import defaultdict
+from typing import Any, Dict, List, Optional
 
-from pipelines.schema import Document, Answer
+import pandas as pd
+
 from pipelines.document_stores.sql import DocumentORM
+from pipelines.schema import Answer, Document
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def print_answers(results: dict, details: str = "all", max_text_len: Optional[in
     # Defines the fields to keep in the Answer for each detail level
     fields_to_keep_by_level = {"minimum": ["answer", "context"], "medium": ["answer", "context", "score"]}
 
-    if not "answers" in results.keys():
+    if "answers" not in results.keys():
         raise ValueError(
             "The results object does not seem to come from a Reader: "
             f"it does not contain the 'answers' key, but only: {results.keys()}.  "
