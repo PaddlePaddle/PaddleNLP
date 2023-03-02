@@ -1,5 +1,4 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +13,7 @@
 # limitations under the License.
 # flake8: noqa
 
-from ..utils import is_paddle_available
-
-if is_paddle_available():
-    from .attention import Transformer2DModel
-    from .controlnet import ControlNetModel
-    from .prior_transformer import PriorTransformer
-    from .unet_1d import UNet1DModel
-    from .unet_2d import UNet2DModel
-    from .unet_2d_condition import UNet2DConditionModel
-    from .vae import AutoencoderKL, VQModel
+from .control_args import DataArguments, ModelArguments
+from .control_trainer import ControlNetTrainer
+from .dumpy_dataset import Fill50kDataset
+from .model import ControlNet
