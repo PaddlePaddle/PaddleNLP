@@ -13,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NewType, Optional, Union
 
 import numpy as np
 import paddle
-import random
-import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ..transformers.tokenizer_utils_base import BatchEncoding, PretrainedTokenizerBase, PaddingStrategy
 
 __all__ = [
@@ -29,6 +27,7 @@ __all__ = [
     "DefaultDataCollator",
     "DataCollatorForTokenClassification",
     "DataCollatorForSeq2Seq",
+    "DataCollatorForClosedDomainIE",
 ]
 
 InputDataClass = NewType("InputDataClass", Any)
@@ -384,3 +383,67 @@ class DataCollatorForSeq2Seq:
             features["decoder_input_ids"] = decoder_input_ids
 
         return features
+
+
+@dataclass
+class DataCollatorForClosedDomainIE:
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    label_maps: Optional[dict] = None
+    multi_modal: bool = False
+    text_feature_names: List[str] = field(default_factory=lambda: ["offset_mapping", "text", "doc_id", "text_offset"])
+    doc_feature_names: List[str] = field(
+        default_factory=lambda: ["bbox", "image", "offset_mapping", "text", "doc_id", "text_offset"]
+    )
+
+    def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
+        labels = [feature["labels"] for feature in features] if "labels" in features[0].keys() else None
+        new_features = [{k: v for k, v in f.items() if k not in ["labels"] + self.doc_feature_names} for f in features]
+
+        batch = self.tokenizer.pad(
+            new_features,
+            padding=self.padding,
+        )
+
+        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
+
+        if self.multi_modal:
+            max_length = batch[1].shape[1]
+            for feature in features:
+                feature["bbox"] = feature["bbox"] + [[0, 0, 0, 0] for _ in range(max_length - len(feature["bbox"]))]
+
+            for ignore_key in self.doc_feature_names:
+                if ignore_key in ["bbox", "image"]:
+                    batch.append(paddle.to_tensor([feature[ignore_key] for feature in features]))
+                else:
+                    batch.append([feature[ignore_key] for feature in features])
+        else:
+            for ignore_key in self.text_feature_names:
+                batch.append([feature[ignore_key] for feature in features])
+
+        if labels is None:
+            return batch
+
+        bs = len(batch[0])
+        # Ensure the dimension is greater or equal to 1
+        max_ent_num = max(max([len(lb["entity_labels"]) for lb in labels]), 1)
+        num_ents = len(self.label_maps["entity_label2id"])
+        batch_entity_labels = paddle.zeros(shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
+        for i, lb in enumerate(labels):
+            for eidx, (l, eh, et) in enumerate(lb["entity_labels"]):
+                batch_entity_labels[i, l, eidx, :] = paddle.to_tensor([eh, et])
+
+        if not self.label_maps["relation_label2id"]:
+            batch.append([batch_entity_labels])
+        else:
+            max_spo_num = max(max([len(lb["relation_labels"]) for lb in labels]), 1)
+            num_rels = len(self.label_maps["relation_label2id"])
+            batch_head_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+            batch_tail_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+
+            for i, lb in enumerate(labels):
+                for spidx, (sh, st, p, oh, ot) in enumerate(lb["relation_labels"]):
+                    batch_head_labels[i, p, spidx, :] = paddle.to_tensor([sh, oh])
+                    batch_tail_labels[i, p, spidx, :] = paddle.to_tensor([st, ot])
+            batch.append([batch_entity_labels, batch_head_labels, batch_tail_labels])
+        return batch

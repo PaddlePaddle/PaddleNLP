@@ -21,8 +21,7 @@
 ```shell
 python data_distill.py \
     --data_path ../data \
-    --save_dir student_data \
-    --task_type relation_extraction \
+    --save_dir ./data \
     --synthetic_ratio 10 \
     --model_path ../checkpoint/model_best
 ```
@@ -31,46 +30,22 @@ python data_distill.py \
 
 可配置参数说明：
 
-- `data_path`: 标注数据（`doccano_ext.json`）及无监督文本（`unlabeled_data.txt`）路径。
+- `data_path`: 标注数据（`doccano_ext.json`）及无监督文本路径。
 - `model_path`: 训练好的UIE定制模型路径。
 - `save_dir`: 学生模型训练数据保存路径。
 - `synthetic_ratio`: 控制合成数据的比例。最大合成数据数量=synthetic_ratio*标注数据数量。
-- `platform`: 标注数据的所使用的标注平台，可选有`doccano`，`label_studio`，默认为`label_studio`。
-- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域抽取，不同任务的后处理逻辑不同，因此需指定任务类型。
 - `seed`: 随机种子，默认为1000。
 
-#### 老师模型评估
 
-UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，非关系抽取或事件抽取的标准评估方式），可通过以下评估脚本进行端到端评估。
-
-```shell
-python evaluate_teacher.py \
-    --task_type relation_extraction \
-    --test_path ./student_data/dev_data.json \
-    --label_maps_path ./student_data/label_maps.json \
-    --model_path ../checkpoint/model_best
-```
-
-可配置参数说明：
-
-- `model_path`: 训练好的UIE定制模型路径。
-- `test_path`: 测试数据集路径。
-- `label_maps_path`: 学生模型标签字典。
-- `batch_size`: 批处理大小，默认为8。
-- `max_seq_len`: 最大文本长度，默认为256。
-- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取的评估，需指定任务类型。
-
-
-#### 学生模型训练
+#### 封闭域模型训练
 
 ```shell
 python train.py \
-    --task_type relation_extraction \
-    --train_path student_data/train_data.json \
-    --dev_path student_data/dev_data.json \
-    --label_maps_path student_data/label_maps.json \
+    --train_path data/train_data.json \
+    --dev_path data/dev_data.json \
+    --label_maps_path data/label_maps.json \
     --num_epochs 50 \
-    --encoder ernie-3.0-mini-zh
+    --model_name_or_path ernie-3.0-base-zh
 ```
 
 可配置参数说明：
@@ -85,22 +60,19 @@ python train.py \
 - `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 - `num_epochs`: 训练轮数，默认为100。
 - `seed`: 随机种子，默认为1000。
-- `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
-- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取，需指定任务类型。
+- `model_name_or_path`: 选择封闭域模型的编码器，默认为`ernie-3.0-base-zh`。
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `eval_steps`: evaluate的间隔steps数，默认200。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 - `init_from_ckpt`: 可选，模型参数路径，热启动模型训练；默认为None。
 
-#### 学生模型评估
+#### 封闭域模型评估
 
 ```shell
 python evaluate.py \
     --model_path ./checkpoint/model_best \
-    --test_path student_data/dev_data.json \
-    --task_type relation_extraction \
-    --label_maps_path student_data/label_maps.json \
-    --encoder ernie-3.0-mini-zh
+    --test_path data/dev_data.json \
+    --label_maps_path data/label_maps.json
 ```
 
 可配置参数说明：
@@ -109,20 +81,19 @@ python evaluate.py \
 - `test_path`: 测试数据集路径。
 - `label_maps_path`: 学生模型标签字典。
 - `batch_size`: 批处理大小，默认为8。
-- `max_seq_len`: 最大文本长度，默认为256。
-- `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
-- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取的评估，需指定任务类型。
+- `max_seq_len`: 最大文本长度，默认为512。
 
-## Taskflow部署学生模型
+
+## Taskflow部署封闭域模型
 
 - 通过Taskflow一键部署封闭域信息抽取模型，`task_path`为学生模型路径。
 
 ```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+from pprint import pprint
+from paddlenlp import Taskflow
 
->>> my_ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
->>> pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
+my_ie = Taskflow("information_extraction", model="global-pointer", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
+pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
 [{'武器名称': [{'end': 14,
             'probability': 0.9976037,
             'relations': {'产国': [{'end': 18,

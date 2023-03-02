@@ -21,7 +21,7 @@
 ```shell
 python data_distill.py \
     --data_path ../data \
-    --save_dir student_data \
+    --save_dir data \
     --synthetic_ratio 10 \
     --model_path ../checkpoint/model_best
 ```
@@ -36,35 +36,16 @@ python data_distill.py \
 - `synthetic_ratio`: 控制合成数据的比例。最大合成数据数量=synthetic_ratio*标注数据数量。
 - `seed`: 随机种子，默认为1000。
 
-#### 老师模型评估
-
-UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，非关系抽取或事件抽取的标准评估方式），可通过以下评估脚本进行端到端评估。
-
-```shell
-python evaluate_teacher.py \
-    --test_path ./student_data/dev_data.json \
-    --label_maps_path ./student_data/label_maps.json \
-    --model_path ../checkpoint/model_best
-```
-
-可配置参数说明：
-
-- `model_path`: 训练好的UIE定制模型路径。
-- `test_path`: 测试数据集路径。
-- `label_maps_path`: 学生模型标签字典。
-- `batch_size`: 批处理大小，默认为8。
-- `max_seq_len`: 最大文本长度，默认为256。
-
 
 #### 学生模型训练
 
 ```shell
 python train.py \
-    --train_path student_data/train_data.json \
-    --dev_path student_data/train_data.json \
-    --label_maps_path student_data/label_maps.json \
+    --train_path data/train_data.json \
+    --dev_path data/dev_data.json \
+    --label_maps_path data/label_maps.json \
     --num_epochs 50 \
-    --encoder ernie-layoutx-base-uncased
+    --model_name_or_path ernie-layoutx-base-uncased
 ```
 
 可配置参数说明：
@@ -74,23 +55,23 @@ python train.py \
 - `batch_size`: 批处理大小，默认为16。
 - `learning_rate`: 学习率，默认为3e-5。
 - `save_dir`: 模型存储路径，默认为`./checkpoint`。
-- `max_seq_len`: 最大文本长度，默认为256。
+- `max_seq_len`: 最大文本长度，默认为512。
 - `weight_decay`: 表示AdamW优化器中使用的 weight_decay 的系数。
 - `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 - `num_epochs`: 训练轮数，默认为100。
 - `seed`: 随机种子，默认为1000。
-- `encoder`: 选择学生模型的模型底座，默认为`ernie-layoutx-base-uncased`。
+- `model_name_or_path`: 选择封闭域模型的编码器，默认为`ernie-layoutx-base-uncased`。
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `eval_steps`: evaluate的间隔steps数，默认200。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 - `init_from_ckpt`: 可选，模型参数路径，热启动模型训练；默认为None。
 
-#### 学生模型评估
+#### 封闭域模型评估
 
 ```shell
 python evaluate.py \
     --model_path ./checkpoint/model_best \
-    --test_path student_data/dev_data.json
+    --test_path data/dev_data.json
 ```
 
 可配置参数说明：
@@ -99,40 +80,34 @@ python evaluate.py \
 - `test_path`: 测试数据集路径。
 - `label_maps_path`: 学生模型标签字典。
 - `batch_size`: 批处理大小，默认为8。
-- `max_seq_len`: 最大文本长度，默认为256。
+- `max_seq_len`: 最大文本长度，默认为512。
 - `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
 
-## Taskflow部署学生模型
+## Taskflow封闭域模型一键预测
 
-- 通过Taskflow一键部署封闭域信息抽取模型，`task_path`为学生模型路径。
+`paddlenlp.Taskflow`装载定制模型，通过`task_path`指定模型权重文件的路径，路径下需要包含训练好的模型权重文件`model_state.pdparams`。
 
 ```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+from pprint import pprint
+from paddlenlp import Taskflow
+from paddlenlp.utils.doc_parser import DocParser
 
->>> my_ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
->>> pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
-[{'武器名称': [{'end': 14,
-            'probability': 0.9976037,
-            'relations': {'产国': [{'end': 18,
-                                  'probability': 0.9988706,
-                                  'relations': {},
-                                  'start': 16,
-                                  'text': '瑞典'}],
-                          '研发单位': [{'end': 25,
-                                    'probability': 0.9978277,
-                                    'relations': {},
-                                    'start': 18,
-                                    'text': 'FFV军械公司'}],
-                          '类型': [{'end': 14,
-                                  'probability': 0.99837446,
-                                  'relations': {},
-                                  'start': 12,
-                                  'text': '炸弹'}]},
-            'start': 0,
-            'text': '威尔哥（Virgo）减速炸弹'}]}]
+my_ie = Taskflow("information_extraction", model="global-pointer", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
 ```
 
+- 对指定的doc_path文档进行信息抽取并进行可视化：
+
+```python
+doc_path = "../data/images/b199.jpg"
+results = my_ie({"doc": doc_path})
+pprint(results)
+
+# 结果可视化
+DocParser.write_image_with_results(
+    doc_path,
+    result=results[0],
+    save_path="./image_show.png")
+```
 
 # References
 

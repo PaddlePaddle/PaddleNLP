@@ -41,14 +41,13 @@ def do_train():
 
     label_maps = get_label_maps(args.label_maps_path)
     golds = get_eval_golds(args.dev_path)
-
     tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased", do_tokenize_postprocess=True)
 
-    num_ents = len(label_maps["entity2id"])
-    num_rels = len(label_maps["relation2id"])
-
     model = ErnieLayoutForClosedDomainIE.from_pretrained(
-        "ernie-layoutx-base-uncased", num_ents=num_ents, num_rels=num_rels
+        "ernie-layoutx-base-uncased",
+        entity_id2label=label_maps["entity_id2label"],
+        relation_id2label=label_maps["relation_id2label"],
+        schema=label_maps["schema"],
     )
 
     train_ds = load_dataset(
@@ -161,17 +160,18 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--train_path", default="./data/dev_data.json", type=str, help="The path of train set.")
+    parser.add_argument("--train_path", default="./data/train_data.json", type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default="./data/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum input sequence length.")
+    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length.")
     parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
+    parser.add_argument("--model_name_or_path", default="ernie-layoutx-base-uncased", type=str, help="Select the pretrained model for GP.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--eval_steps", default=50, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")

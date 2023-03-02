@@ -20,19 +20,26 @@ import os
 import random
 
 from tqdm import tqdm
-from utils import anno2distill, schema2label_maps, set_seed, synthetic2distill
+from utils import set_seed
 
 from paddlenlp import Taskflow
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import DataConverter
 
 
 def do_data_distill():
     set_seed(args.seed)
 
+    data_converter = DataConverter(
+        os.path.join(args.data_path, "label_studio.json"),
+        schema_lang=args.schema_lang,
+        anno_type="text",
+    )
+
     # Generate closed-domain label maps
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
-    label_maps = schema2label_maps(args.task_type, schema=args.schema)
+    label_maps = data_converter.schema2label_maps(args.schema)
     label_maps_path = os.path.join(args.save_dir, "label_maps.json")
 
     # Save closed-domain label maps file
@@ -48,30 +55,22 @@ def do_data_distill():
     dev_ids = sample_index["dev_ids"]
     test_ids = sample_index["test_ids"]
 
-    if args.platform == "label_studio":
-        with open(os.path.join(args.data_path, "label_studio.json"), "r", encoding="utf-8") as fp:
-            json_lines = json.loads(fp.read())
-    elif args.platform == "doccano":
-        json_lines = []
-        with open(os.path.join(args.data_path, "doccano_ext.json"), "r", encoding="utf-8") as fp:
-            for line in fp:
-                json_lines.append(json.loads(line))
-    else:
-        raise ValueError("Unsupported annotation platform!")
+    with open(os.path.join(args.data_path, "label_studio.json"), "r", encoding="utf-8") as fp:
+        json_lines = json.loads(fp.read())
 
     train_lines = [json_lines[i] for i in train_ids]
-    train_lines = anno2distill(train_lines, args.task_type, label_maps, args.platform)
+    train_lines = data_converter.label_studio_to_closed_domain(train_lines, label_maps)
 
     dev_lines = [json_lines[i] for i in dev_ids]
-    dev_lines = anno2distill(dev_lines, args.task_type, label_maps, args.platform)
+    dev_lines = data_converter.label_studio_to_closed_domain(dev_lines, label_maps)
 
     test_lines = [json_lines[i] for i in test_ids]
-    test_lines = anno2distill(test_lines, args.task_type, label_maps, args.platform)
-
-    # Load trained UIE model
-    uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
+    test_lines = data_converter.label_studio_to_closed_domain(test_lines, label_maps)
 
     if args.synthetic_ratio > 0:
+        # Load trained UIE model
+        uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
+
         # Generate synthetic data
         texts = open(os.path.join(args.data_path, "unlabeled_data.txt"), "r", encoding="utf-8").readlines()
 
@@ -86,7 +85,7 @@ def do_data_distill():
         for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
             infer_results.extend(uie(text))
 
-        train_synthetic_lines = synthetic2distill(infer_texts, infer_results, args.task_type)
+        train_synthetic_lines = data_converter.uie_to_closed_domain(infer_texts, infer_results)
 
         # Concat origin and synthetic data
         train_lines.extend(train_synthetic_lines)
@@ -111,11 +110,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--data_path", default="../data", type=str, help="The directory for labeled data with doccano format and the large scale unlabeled data.")
     parser.add_argument("--model_path", type=str, default="../checkpoint/model_best", help="The path of saved model that you want to load.")
-    parser.add_argument("--save_dir", default="./distill_task", type=str, help="The path of data that you wanna save.")
+    parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
     parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
-    parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
-    parser.add_argument("--platform", choices=['doccano', 'label_studio'], type=str, default="label_studio", help="Select the annotation platform.")
+    parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
 
     args = parser.parse_args()
     # yapf: enable

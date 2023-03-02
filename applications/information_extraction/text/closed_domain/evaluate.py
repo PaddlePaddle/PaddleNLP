@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from tqdm import tqdm
 from utils import create_dataloader, get_label_maps, ClosedDomainIEProcessor, reader, get_eval_golds
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, ErnieLayoutForClosedDomainIE
+from paddlenlp.transformers import AutoTokenizer, ErnieForClosedDomainIE
 from paddlenlp.utils.log import logger
 
 
@@ -34,10 +34,10 @@ def evaluate(model, dataloader, label_maps, golds):
     }
     cur_doc_id = -1
     for batch in tqdm(dataloader, desc="Evaluating: ", leave=False):
-        input_ids, attention_masks, bbox, image, offset_mappings, texts, doc_ids, text_offsets, _ = batch
+        input_ids, attention_masks, offset_mappings, texts, doc_ids, text_offsets, _ = batch
 
-        logits = model(input_ids, attention_masks, bbox, image)
-        all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess_doc(
+        logits = model(input_ids, attention_masks)
+        all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess(
             logits,
             all_preds,
             doc_ids,
@@ -59,7 +59,7 @@ def do_eval():
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 
-    model = ErnieLayoutForClosedDomainIE.from_pretrained(args.model_path)
+    model = ErnieForClosedDomainIE.from_pretrained(args.model_path)
 
     test_ds = load_dataset(
         reader,
@@ -88,8 +88,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
 
     args = parser.parse_args()

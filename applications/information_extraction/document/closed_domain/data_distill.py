@@ -20,7 +20,7 @@ import os
 import random
 
 from tqdm import tqdm
-from utils import schema2label_maps, set_seed
+from utils import set_seed
 
 from paddlenlp import Taskflow
 from paddlenlp.utils.log import logger
@@ -30,10 +30,18 @@ from paddlenlp.utils.tools import DataConverter
 def do_data_distill():
     set_seed(args.seed)
 
+    data_converter = DataConverter(
+        os.path.join(args.data_path, "label_studio.json"),
+        layout_analysis=args.layout_analysis,
+        schema_lang=args.schema_lang,
+        ocr_lang=args.ocr_lang,
+        anno_type="image",
+    )
+
     # Generate closed-domain label maps
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
-    label_maps = schema2label_maps(schema=args.schema)
+    label_maps = data_converter.schema2label_maps(args.schema)
     label_maps_path = os.path.join(args.save_dir, "label_maps.json")
 
     # Save closed-domain label maps file
@@ -52,13 +60,6 @@ def do_data_distill():
     with open(os.path.join(args.data_path, "label_studio.json"), "r", encoding="utf-8") as fp:
         json_lines = json.loads(fp.read())
 
-    data_converter = DataConverter(
-        os.path.join(args.data_path, "label_studio.json"),
-        layout_analysis=args.layout_analysis,
-        schema_lang=args.schema_lang,
-        ocr_lang=args.ocr_lang,
-    )
-
     train_lines = [json_lines[i] for i in train_ids]
     train_lines = data_converter.label_studio_to_closed_domain(train_lines, label_maps)
 
@@ -68,10 +69,10 @@ def do_data_distill():
     test_lines = [json_lines[i] for i in test_ids]
     test_lines = data_converter.label_studio_to_closed_domain(test_lines, label_maps)
 
-    # Load trained UIE model
-    uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
+    if args.synthetic_ratio > 0:
+        # Load trained UIE model
+        uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
 
-    if args.synthetic_ratio > 0 and len(train_lines) > 0:
         unlabeled_images_path = os.path.join(args.data_path, "unlabeled_images")
         files_path = [os.path.join(unlabeled_images_path, file) for file in os.listdir(unlabeled_images_path)]
 
@@ -111,7 +112,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--data_path", default="../data", type=str, help="The directory for labeled data with doccano format and the large scale unlabeled data.")
     parser.add_argument("--model_path", type=str, default="../checkpoint/model_best", help="The path of saved model that you want to load.")
-    parser.add_argument("--save_dir", default="./distill_task", type=str, help="The path of data that you wanna save.")
+    parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
     parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--layout_analysis", default=False, type=bool, help="Enable layout analysis to optimize the order of OCR result.")
@@ -122,7 +123,8 @@ if __name__ == "__main__":
     # yapf: enable
 
     # Define your schema here
-    schema = ["开票日期", "名称", "纳税人识别号", "开户行及账号", "金额", "价税合计", "No", "税率", "地址、电话", "税额", "开票人"]
+    # schema = ["开票日期", "名称", "纳税人识别号", "开户行及账号", "金额", "价税合计", "No", "税率", "地址、电话", "税额", "开票人"]
+    schema = {"项目": ["单价", "数量", "金额", "等级"]}
 
     args.schema = schema
 

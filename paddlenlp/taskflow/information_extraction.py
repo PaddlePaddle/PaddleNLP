@@ -22,12 +22,21 @@ import numpy as np
 import paddle
 from huggingface_hub import hf_hub_download
 
+from ..data import DataCollatorForClosedDomainIE
 from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
+from ..transformers import (
+    UIE,
+    UIEM,
+    UIEX,
+    ErnieForClosedDomainIE,
+    ErnieLayoutForClosedDomainIE,
+    AutoModel,
+    AutoTokenizer,
+)
 from ..utils.doc_parser import DocParser
 from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
-from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.ie_utils import map_offset, pad_image_data, ClosedDomainIEProcessor
 from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
@@ -103,7 +112,200 @@ usage = r"""
 MODEL_MAP = {"UIE": UIE, "UIEM": UIEM, "UIEX": UIEX}
 
 
-class UIETask(Task):
+class IETaskBase(Task):
+    """
+    Base class for IE Tasks, unified data format and ocr/layout process.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+    """
+
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+
+        self._max_seq_len = kwargs.get("max_seq_len", 512)
+        self._batch_size = kwargs.get("batch_size", 16)
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
+        self._layout_analysis = kwargs.get("layout_analysis", False)
+        self._ocr_lang = kwargs.get("ocr_lang", "ch")
+        self._expand_to_a4_size = False
+
+        self._parser_map = {
+            "ch": None,  # OCR-CH
+            "en": None,  # OCR-EN
+            "ch-layout": None,  # Layout-CH
+            "en-layout": None,  # Layout-EN
+        }
+
+    def set_schema(self, schema):
+        if isinstance(schema, dict) or isinstance(schema, str):
+            schema = [schema]
+        self._schema_tree = self._build_tree(schema)
+
+    def set_argument(self, argument: dict):
+        for k, v in argument.items():
+            if k == "input":
+                continue
+            setattr(self, f"_{k}", v)
+
+    @classmethod
+    def _build_tree(cls, schema, name="root"):
+        """
+        Build the schema tree.
+        """
+        schema_tree = SchemaTree(name)
+        for s in schema:
+            if isinstance(s, str):
+                schema_tree.add_child(SchemaTree(s))
+            elif isinstance(s, dict):
+                for k, v in s.items():
+                    if isinstance(v, str):
+                        child = [v]
+                    elif isinstance(v, list):
+                        child = v
+                    else:
+                        raise TypeError(
+                            "Invalid schema, value for each key:value pairs should be list or string"
+                            "but {} received".format(type(v))
+                        )
+                    schema_tree.add_child(cls._build_tree(child, name=k))
+            else:
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
+        return schema_tree
+
+    def _parse_inputs(self, inputs):
+        _inputs = []
+        doc_cnt = 0
+        for d in inputs:
+            if isinstance(d, dict):
+                if "doc" in d.keys():
+                    text = ""
+                    bbox = []
+                    img_w, img_h = d["img_w"], d["img_h"]
+                    offset_x, offset_y = d["offset_x"], d["offset_x"]
+                    for segment in d["layout"]:
+                        org_box = segment[0]  # bbox before expand to A4 size
+                        box = [
+                            org_box[0] + offset_x,
+                            org_box[1] + offset_y,
+                            org_box[2] + offset_x,
+                            org_box[3] + offset_y,
+                        ]
+                        box = self._parser_map[self._ocr_lang_choice]._normalize_box(box, [img_w, img_h], [1000, 1000])
+                        text += segment[1]
+                        bbox.extend([box] * len(segment[1]))
+                    _inputs.append(
+                        {"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"], "id": doc_cnt}
+                    )
+                else:
+                    _inputs.append({"text": d["text"], "bbox": None, "image": None, "id": doc_cnt})
+            else:
+                _inputs.append({"text": d, "bbox": None, "image": None, "id": doc_cnt})
+            doc_cnt += 1
+        return _inputs
+
+    def _check_input_text(self, inputs):
+        """
+        Check whether the input meet the requirement.
+        """
+        self._ocr_lang_choice = (self._ocr_lang + "-layout") if self._layout_analysis else self._ocr_lang
+        inputs = inputs[0]
+        if isinstance(inputs, dict) or isinstance(inputs, str):
+            inputs = [inputs]
+        if isinstance(inputs, list):
+            input_list = []
+            for example in inputs:
+                data = {}
+                if isinstance(example, dict):
+                    if "doc" in example.keys():
+                        if not self._parser_map[self._ocr_lang_choice]:
+                            self._parser_map[self._ocr_lang_choice] = DocParser(
+                                ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
+                            )
+                        if "layout" in example.keys():
+                            data = self._parser_map[self._ocr_lang_choice].parse(
+                                {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
+                            )
+                            data["layout"] = example["layout"]
+                        else:
+                            data = self._parser_map[self._ocr_lang_choice].parse(
+                                {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
+                            )
+                    elif "text" in example.keys():
+                        if not isinstance(example["text"], str):
+                            raise TypeError(
+                                "Invalid inputs, the input text should be string. but type of {} found!".format(
+                                    type(example["text"])
+                                )
+                            )
+                        data["text"] = example["text"]
+                    else:
+                        raise ValueError("Invalid inputs, the input should contain a doc or a text.")
+                    input_list.append(data)
+                elif isinstance(example, str):
+                    input_list.append(example)
+                else:
+                    raise TypeError(
+                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!".format(
+                            type(example)
+                        )
+                    )
+        else:
+            raise TypeError("Invalid input format!")
+        return input_list
+
+    def _add_bbox_info(self, results, data):
+        def _add_bbox(result, char_boxes):
+            for vs in result.values():
+                for v in vs:
+                    if "start" in v.keys():
+                        boxes = []
+                        for i in range(v["start"], v["end"]):
+                            cur_box = char_boxes[i][1]
+                            if i == v["start"]:
+                                box = cur_box
+                                continue
+                            _, cur_y1, cur_x2, cur_y2 = cur_box
+                            if cur_y1 == box[1] and cur_y2 == box[3]:
+                                box[2] = cur_x2
+                            else:
+                                boxes.append(box)
+                                box = cur_box
+                        if box:
+                            boxes.append(box)
+                        boxes = [[int(b) for b in box] for box in boxes]
+                        v["bbox"] = boxes
+                    if v.get("relations"):
+                        _add_bbox(v["relations"], char_boxes)
+            return result
+
+        new_results = []
+        for result, one_data in zip(results, data):
+            if "layout" in one_data.keys():
+                layout = one_data["layout"]
+                char_boxes = []
+                for segment in layout:
+                    sbox = segment[0]
+                    text_len = len(segment[1])
+                    if text_len == 0:
+                        continue
+                    if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
+                        char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
+                        for i in range(text_len):
+                            cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
+                            char_boxes.append((segment[1][i], cbox))
+                    else:
+                        cell_bbox = [(segment[1][i], sbox) for i in range(text_len)]
+                        char_boxes.extend(cell_bbox)
+
+                result = _add_bbox(result, char_boxes)
+            new_results.append(result)
+        return new_results
+
+
+class UIETask(IETaskBase):
     """
     Universal Information Extraction Task.
     Args:
@@ -381,15 +583,9 @@ class UIETask(Task):
     def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
-        self._max_seq_len = kwargs.get("max_seq_len", 512)
-        self._batch_size = kwargs.get("batch_size", 16)
         self._split_sentence = kwargs.get("split_sentence", False)
         self._position_prob = kwargs.get("position_prob", 0.5)
-        self._lazy_load = kwargs.get("lazy_load", False)
-        self._num_workers = kwargs.get("num_workers", 0)
         self._use_fast = kwargs.get("use_fast", False)
-        self._layout_analysis = kwargs.get("layout_analysis", False)
-        self._ocr_lang = kwargs.get("ocr_lang", "ch")
         self._schema_lang = kwargs.get("schema_lang", "ch")
         self._expand_to_a4_size = False if self._custom_model else True
 
@@ -425,12 +621,6 @@ class UIETask(Task):
         else:
             self._summary_token_num = 3  # [CLS] prompt [SEP] text [SEP]
 
-        self._parser_map = {
-            "ch": None,  # OCR-CH
-            "en": None,  # OCR-EN
-            "ch-layout": None,  # Layout-CH
-            "en-layout": None,  # Layout-EN
-        }
         if not schema:
             logger.warning(
                 "The schema has not been set yet, please set a schema via set_schema(). "
@@ -441,19 +631,8 @@ class UIETask(Task):
             self.set_schema(schema)
         self._check_predictor_type()
         self._get_inference_model()
-        self._usage = usage
         self._construct_tokenizer()
-
-    def set_argument(self, argument: dict):
-        for k, v in argument.items():
-            if k == "input":
-                continue
-            setattr(self, f"_{k}", v)
-
-    def set_schema(self, schema):
-        if isinstance(schema, dict) or isinstance(schema, str):
-            schema = [schema]
-        self._schema_tree = self._build_tree(schema)
+        self._usage = usage
 
     def _construct_input_spec(self):
         """
@@ -507,56 +686,6 @@ class UIETask(Task):
         outputs = {}
         outputs["text"] = inputs
         return outputs
-
-    def _check_input_text(self, inputs):
-        """
-        Check whether the input meet the requirement.
-        """
-        self._ocr_lang_choice = (self._ocr_lang + "-layout") if self._layout_analysis else self._ocr_lang
-        inputs = inputs[0]
-        if isinstance(inputs, dict) or isinstance(inputs, str):
-            inputs = [inputs]
-        if isinstance(inputs, list):
-            input_list = []
-            for example in inputs:
-                data = {}
-                if isinstance(example, dict):
-                    if "doc" in example.keys():
-                        if not self._parser_map[self._ocr_lang_choice]:
-                            self._parser_map[self._ocr_lang_choice] = DocParser(
-                                ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
-                            )
-                        if "layout" in example.keys():
-                            data = self._parser_map[self._ocr_lang_choice].parse(
-                                {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
-                            )
-                            data["layout"] = example["layout"]
-                        else:
-                            data = self._parser_map[self._ocr_lang_choice].parse(
-                                {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
-                            )
-                    elif "text" in example.keys():
-                        if not isinstance(example["text"], str):
-                            raise TypeError(
-                                "Invalid inputs, the input text should be string. but type of {} found!".format(
-                                    type(example["text"])
-                                )
-                            )
-                        data["text"] = example["text"]
-                    else:
-                        raise ValueError("Invalid inputs, the input should contain a doc or a text.")
-                    input_list.append(data)
-                elif isinstance(example, str):
-                    input_list.append(example)
-                else:
-                    raise TypeError(
-                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!".format(
-                            type(example)
-                        )
-                    )
-        else:
-            raise TypeError("Invalid input format!")
-        return input_list
 
     def _single_stage_predict(self, inputs):
         input_texts = [d["text"] for d in inputs]
@@ -942,33 +1071,6 @@ class UIETask(Task):
         inputs["result"] = results
         return inputs
 
-    def _parse_inputs(self, inputs):
-        _inputs = []
-        for d in inputs:
-            if isinstance(d, dict):
-                if "doc" in d.keys():
-                    text = ""
-                    bbox = []
-                    img_w, img_h = d["img_w"], d["img_h"]
-                    offset_x, offset_y = d["offset_x"], d["offset_x"]
-                    for segment in d["layout"]:
-                        org_box = segment[0]  # bbox before expand to A4 size
-                        box = [
-                            org_box[0] + offset_x,
-                            org_box[1] + offset_y,
-                            org_box[2] + offset_x,
-                            org_box[3] + offset_y,
-                        ]
-                        box = self._parser_map[self._ocr_lang_choice]._normalize_box(box, [img_w, img_h], [1000, 1000])
-                        text += segment[1]
-                        bbox.extend([box] * len(segment[1]))
-                    _inputs.append({"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"]})
-                else:
-                    _inputs.append({"text": d["text"], "bbox": None, "image": None})
-            else:
-                _inputs.append({"text": d, "bbox": None, "image": None})
-        return _inputs
-
     def _multi_stage_predict(self, data):
         """
         Traversal the schema tree and do multi-stage prediction.
@@ -1086,54 +1188,6 @@ class UIETask(Task):
         results = self._add_bbox_info(results, data)
         return results
 
-    def _add_bbox_info(self, results, data):
-        def _add_bbox(result, char_boxes):
-            for vs in result.values():
-                for v in vs:
-                    if "start" in v.keys():
-                        boxes = []
-                        for i in range(v["start"], v["end"]):
-                            cur_box = char_boxes[i][1]
-                            if i == v["start"]:
-                                box = cur_box
-                                continue
-                            _, cur_y1, cur_x2, cur_y2 = cur_box
-                            if cur_y1 == box[1] and cur_y2 == box[3]:
-                                box[2] = cur_x2
-                            else:
-                                boxes.append(box)
-                                box = cur_box
-                        if box:
-                            boxes.append(box)
-                        boxes = [[int(b) for b in box] for box in boxes]
-                        v["bbox"] = boxes
-                    if v.get("relations"):
-                        _add_bbox(v["relations"], char_boxes)
-            return result
-
-        new_results = []
-        for result, one_data in zip(results, data):
-            if "layout" in one_data.keys():
-                layout = one_data["layout"]
-                char_boxes = []
-                for segment in layout:
-                    sbox = segment[0]
-                    text_len = len(segment[1])
-                    if text_len == 0:
-                        continue
-                    if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
-                        char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
-                        for i in range(text_len):
-                            cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
-                            char_boxes.append((segment[1][i], cbox))
-                    else:
-                        cell_bbox = [(segment[1][i], sbox) for i in range(text_len)]
-                        char_boxes.extend(cell_bbox)
-
-                result = _add_bbox(result, char_boxes)
-            new_results.append(result)
-        return new_results
-
     def _convert_ids_to_results(self, examples, sentence_ids, probs):
         """
         Convert ids to raw text in a single stage.
@@ -1161,31 +1215,6 @@ class UIETask(Task):
             results.append(result_list)
         return results
 
-    @classmethod
-    def _build_tree(cls, schema, name="root"):
-        """
-        Build the schema tree.
-        """
-        schema_tree = SchemaTree(name)
-        for s in schema:
-            if isinstance(s, str):
-                schema_tree.add_child(SchemaTree(s))
-            elif isinstance(s, dict):
-                for k, v in s.items():
-                    if isinstance(v, str):
-                        child = [v]
-                    elif isinstance(v, list):
-                        child = v
-                    else:
-                        raise TypeError(
-                            "Invalid schema, value for each key:value pairs should be list or string"
-                            "but {} received".format(type(v))
-                        )
-                    schema_tree.add_child(cls._build_tree(child, name=k))
-            else:
-                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
-        return schema_tree
-
     def _postprocess(self, inputs):
         """
         This function will convert the model output to raw text.
@@ -1193,7 +1222,7 @@ class UIETask(Task):
         return inputs["result"]
 
 
-class GPTask(Task):
+class GPTask(IETaskBase):
     """
     Global Pointer for closed-domain information extraction Task.
     Args:
@@ -1231,12 +1260,7 @@ class GPTask(Task):
         self._task_type = model_config["task_type"]
         self._encoder = model_config["encoder"]
         schema = model_config["label_maps"]["schema"]
-        self._set_schema(schema)
-
-    def _set_schema(self, schema):
-        if isinstance(schema, dict) or isinstance(schema, str):
-            schema = [schema]
-        self._schema_tree = self._build_tree(schema)
+        self.set_schema(schema)
 
     def _construct_input_spec(self):
         """
@@ -1326,31 +1350,6 @@ class GPTask(Task):
             all_preds[1].extend(batch_outputs[1])  # Relation output
         inputs["result"] = all_preds
         return inputs
-
-    @classmethod
-    def _build_tree(cls, schema, name="root"):
-        """
-        Build the schema tree.
-        """
-        schema_tree = SchemaTree(name)
-        for s in schema:
-            if isinstance(s, str):
-                schema_tree.add_child(SchemaTree(s))
-            elif isinstance(s, dict):
-                for k, v in s.items():
-                    if isinstance(v, str):
-                        child = [v]
-                    elif isinstance(v, list):
-                        child = v
-                    else:
-                        raise TypeError(
-                            "Invalid schema, value for each key:value pairs should be list or string"
-                            "but {} received".format(type(v))
-                        )
-                    schema_tree.add_child(cls._build_tree(child, name=k))
-            else:
-                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
-        return schema_tree
 
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
         def _update_offset(result, offset):
@@ -1470,4 +1469,209 @@ class GPTask(Task):
                     child.parent_relations = relations
                     schema_list.append(child)
             results.append(result)
+        return results
+
+
+class ClosedDomainIETask(IETaskBase):
+    """
+    Closed-domain information extraction Task with the Global Pointer head.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+    """
+
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "config": "config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
+    }
+
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._schema_tree = None
+        self._doc_stride = kwargs.get("doc_stride", 256)
+        with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
+            config = json.load(f)
+            self._init_class = config["architectures"].pop()
+            self._entity_id2label = {int(k): v for k, v in config["entity_id2label"].items()}
+            self._relation_id2label = {int(k): v for k, v in config["relation_id2label"].items()}
+        self._multi_modal = True if "Layout" in self._init_class else False
+        self._get_inference_model()
+        self._construct_tokenizer()
+        self.set_schema(config["schema"])
+        self._load_label_maps()
+
+    def _load_label_maps(self):
+        self._label_maps = {
+            "entity_id2label": self._entity_id2label,
+            "relation_id2label": self._relation_id2label,
+        }
+
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        if self._multi_modal:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None, 4], dtype="int64", name="bbox"),
+                paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="image"),
+            ]
+        else:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+            ]
+
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
+        if self._multi_modal:
+            self._model = ErnieLayoutForClosedDomainIE.from_pretrained(self._task_path)
+        else:
+            self._model = ErnieForClosedDomainIE.from_pretrained(self._task_path)
+        self._model.eval()
+
+    def _construct_tokenizer(self):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        # TODO(zhoushunjie): Will set use_fast=True in future.
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+
+    def _preprocess(self, inputs):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+        inputs = self._check_input_text(inputs)
+        inputs = self._parse_inputs(inputs)
+
+        if self._multi_modal:
+            preprocess_func = ClosedDomainIEProcessor.preprocess_doc
+        else:
+            preprocess_func = ClosedDomainIEProcessor.preprocess_text
+
+        def reader(inputs):
+            tokenized_examples = preprocess_func(
+                inputs,
+                tokenizer=self._tokenizer,
+                max_seq_len=self._max_seq_len,
+                doc_stride=self._doc_stride,
+                label_maps=self._label_maps,
+                with_label=False,
+            )
+            for tokenized_example in tokenized_examples:
+                yield tokenized_example
+
+        infer_ds = load_dataset(reader, inputs=inputs, lazy=self._lazy_load)
+
+        data_collator = DataCollatorForClosedDomainIE(
+            self._tokenizer, label_maps=self._label_maps, multi_modal=self._multi_modal
+        )
+
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
+
+        infer_data_loader = paddle.io.DataLoader(
+            dataset=infer_ds,
+            batch_sampler=batch_sampler,
+            collate_fn=data_collator,
+            num_workers=self._num_workers,
+            return_list=True,
+        )
+
+        outputs = {}
+        outputs["data_loader"] = infer_data_loader
+        outputs["data"] = inputs
+        return outputs
+
+    def _run_model(self, inputs):
+        all_preds = {
+            "entity_preds": [],
+            "spo_preds": [],
+        }
+        cur_doc_id = -1
+        for batch in inputs["data_loader"]:
+            if self._multi_modal:
+                input_ids, attention_masks, bbox, image, offset_mappings, texts, doc_ids, text_offsets = batch
+                self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
+                self.input_handles[1].copy_from_cpu(attention_masks.numpy().astype("int64"))
+                self.input_handles[2].copy_from_cpu(bbox.numpy().astype("int64"))
+                self.input_handles[3].copy_from_cpu(image.numpy().astype("int64"))
+            else:
+                input_ids, attention_masks, offset_mappings, texts, doc_ids, text_offsets = batch
+                self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
+                self.input_handles[1].copy_from_cpu(attention_masks.numpy().astype("int64"))
+            self.predictor.run()
+            logits = [paddle.to_tensor(self.output_handle[i].copy_to_cpu()) for i in range(len(self.output_handle))]
+            all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess(
+                logits,
+                all_preds,
+                doc_ids,
+                cur_doc_id,
+                offset_mappings,
+                texts,
+                text_offsets,
+                self._label_maps,
+                with_prob=True,
+            )
+        inputs["result"] = all_preds
+        return inputs
+
+    def _postprocess(self, inputs):
+        all_ent_preds, all_rel_preds = inputs["result"]["entity_preds"], inputs["result"]["spo_preds"]
+        results = []
+        for input_text_idx in range(len(inputs["data"])):
+            result = {}
+            schema_list = self._schema_tree.children[:]
+            while len(schema_list) > 0:
+                node = schema_list.pop(0)
+                if node.parent_relations is None:
+                    relations = [[]]
+                    cnt = -1
+                    for ent in all_ent_preds[input_text_idx]:
+                        if node.name == ent["type"]:
+                            ent_res = {
+                                "text": ent["text"],
+                                "start": ent["start_index"],
+                                "end": ent["start_index"] + len(ent["text"]),
+                                "probability": ent["probability"],
+                            }
+                            result.setdefault(node.name, []).append(ent_res)
+                            cnt += 1
+                            relations[0].append(result[node.name][cnt])
+                else:
+                    relations = [[] for _ in range(len(node.parent_relations))]
+                    for i, rs in enumerate(node.parent_relations):
+                        for r in rs:
+                            cnt = -1
+                            for rel in all_rel_preds[input_text_idx]:
+                                if (
+                                    r["text"] == rel["subject"]
+                                    and r["start"] == rel["subject_start_index"]
+                                    and node.name == rel["predicate"]
+                                ):
+                                    rel_res = {
+                                        "text": rel["object"],
+                                        "start": rel["object_start_index"],
+                                        "end": rel["object_start_index"] + len(rel["object"]),
+                                        "probability": rel["probability"],
+                                    }
+                                    if "relations" not in r.keys():
+                                        r["relations"] = {node.name: [rel_res]}
+                                    else:
+                                        r["relations"].setdefault(node.name, []).append(rel_res)
+                                    cnt += 1
+                                    relations[i].append(r["relations"][node.name][cnt])
+                for child in node.children:
+                    child.parent_relations = relations
+                    schema_list.append(child)
+            results.append(result)
+        results = self._add_bbox_info(results, inputs["data"])
         return results

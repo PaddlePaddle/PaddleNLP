@@ -24,7 +24,7 @@ from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
 from .fill_mask import FillMaskTask
-from .information_extraction import GPTask, UIETask
+from .information_extraction import ClosedDomainIETask, UIETask, GPTask
 from .knowledge_mining import NPTagTask, WordTagTask
 from .lexical_analysis import LacTask
 from .named_entity_recognition import NERLACTask, NERWordTagTask
@@ -316,7 +316,15 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-x-base",
             },
-            "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
+            # This task name will be descrepted in future and replaced by detail model name, e.g. global-pointer
+            "uie-data-distill-gp": {
+                "task_class": GPTask,
+                "task_flag": "information_extraction-uie-data-distill-gp",
+            },
+            "global-pointer": {
+                "task_class": ClosedDomainIETask,
+                "task_flag": "information_extraction-global-pointer",
+            },
         },
         "default": {"model": "uie-base"},
     },

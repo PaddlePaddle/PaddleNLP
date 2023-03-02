@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ def reader(data_path, tokenizer, max_seq_len=512, doc_stride=128, label_maps=Non
             example = json.loads(line)
             examples.append(example)
 
-    tokenized_examples = ClosedDomainIEProcessor.preprocess_doc(
+    tokenized_examples = ClosedDomainIEProcessor.preprocess_text(
         examples,
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,

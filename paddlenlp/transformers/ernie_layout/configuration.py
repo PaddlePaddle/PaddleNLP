@@ -180,8 +180,9 @@ class ErnieLayoutConfig(PretrainedConfig):
         classifier_dropout=None,
         has_visual_segment_embedding=False,
         head_size=64,
-        num_ents=2,
-        num_rels=2,
+        entity_id2label=None,
+        relation_id2label=None,
+        schema=None,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -209,5 +210,6 @@ class ErnieLayoutConfig(PretrainedConfig):
         self.has_visual_segment_embedding = has_visual_segment_embedding
         self.enable_recompute = enable_recompute
         self.head_size = head_size
-        self.num_ents = num_ents
-        self.num_rels = num_rels
+        self.entity_id2label = entity_id2label
+        self.relation_id2label = relation_id2label
+        self.schema = schema

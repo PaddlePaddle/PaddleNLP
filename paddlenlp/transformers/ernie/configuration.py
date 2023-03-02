@@ -1159,6 +1159,10 @@ class ErnieConfig(PretrainedConfig):
         use_cache=False,
         use_task_id=True,
         enable_recompute=False,
+        head_size=64,
+        entity_id2label=None,
+        relation_id2label=None,
+        schema=None,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -1181,3 +1185,7 @@ class ErnieConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_task_id = use_task_id
         self.enable_recompute = enable_recompute
+        self.head_size = head_size
+        self.entity_id2label = entity_id2label
+        self.relation_id2label = relation_id2label
+        self.schema = schema

@@ -18,16 +18,15 @@ import paddle
 import paddle.nn as nn
 
 
-class Criterion(nn.Layer):
-    """Criterion for GPNet"""
+class SparseMultiLabelCrossEntropy(nn.Layer):
+    """Sparse multi-label categorical cross entropy
+    reference to "https://kexue.fm/archives/7359".
+    """
 
     def __init__(self, mask_zero=True):
         self.mask_zero = mask_zero
 
     def _sparse_multilabel_categorical_crossentropy(self, y_true, y_pred, mask_zero=False):
-        """Sparse multi-label categorical cross entropy
-        reference to "https://kexue.fm/archives/7359".
-        """
         zeros = paddle.zeros_like(y_pred[..., :1])
         y_pred = paddle.concat([y_pred, zeros], axis=-1)
         if mask_zero:
