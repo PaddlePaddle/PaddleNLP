@@ -13,16 +13,14 @@
 # see the license for the specific language governing permissions and
 # limitations under the license.
 
-import os
 import time
-import json
-import paddlenlp
-from .predictor import Predictor
-from ..utils.tools import get_env_device
+
 from ..transformers import AutoTokenizer
-from .handlers import BaseModelHandler, BasePostHandler
-from .utils import lock_predictor
 from ..utils.log import logger
+from ..utils.tools import get_env_device
+from .handlers import BaseModelHandler, BasePostHandler
+from .predictor import Predictor
+from .utils import lock_predictor
 
 
 class ModelManager:
@@ -61,7 +59,7 @@ class ModelManager:
             predictor = Predictor(self._model_path, self._precision, "gpu:" + str(self._device_id))
             predictor_list.append(predictor)
         elif isinstance(self._device_id, list):
-            for device in device_id:
+            for device in self._device_id:
                 predictor = Predictor(
                     self._model_path,
                     self._model_class_or_name,

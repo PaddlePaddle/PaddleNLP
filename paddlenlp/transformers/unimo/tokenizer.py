@@ -14,15 +14,11 @@
 # limitations under the License.
 
 import os
-import pickle
-import six
-import shutil
-import paddle
-from paddle.utils import try_import
-from paddlenlp.utils.env import MODEL_HOME
-import numpy as np
-from ...data.vocab import Vocab
 
+import numpy as np
+import paddle
+
+from ...data.vocab import Vocab
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ["UNIMOTokenizer"]
