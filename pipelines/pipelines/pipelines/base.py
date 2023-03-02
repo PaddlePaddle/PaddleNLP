@@ -48,8 +48,9 @@ except Exception:
     # For development
     __version__ = "0.0.0"
 
+
+from pipelines.nodes.base import BaseComponent  # isort: skip
 from pipelines.document_stores.base import BaseDocumentStore
-from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.retriever.base import BaseRetriever
 
 logger = logging.getLogger(__name__)
