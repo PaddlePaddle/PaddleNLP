@@ -27,6 +27,9 @@ from paddle.distributed.fleet.meta_parallel import TensorParallel, get_rng_state
 from paddle.distributed.sharding import group_sharded_parallel
 from visualdl import LogWriter
 
+from paddlenlp.trainer import get_last_checkpoint
+from paddlenlp.trainer.trainer import paddlenlp_load
+from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 from paddlenlp.utils.log import logger
 
@@ -42,12 +45,8 @@ sys.path.insert(0, os.path.join(filepath, "../"))
 import lr  # noqa e402
 from args import parse_args  # noqa e402
 from dataset import create_pretrained_dataset  # noqa e402
-from modeling import (  # noqa e402
-    GPTForPretraining,
-    GPTForPretrainingPipe,
-    GPTModel,
-    GPTPretrainingCriterion,
-)
+from modeling import GPTForPretraining, GPTModel, GPTPretrainingCriterion  # noqa e402
+from run_glue_mp import _rotate_checkpoints, all_gather  # noqa e402
 from run_pretrain import get_train_data_file  # noqa e402
 
 MODEL_CLASSES = {
@@ -92,13 +91,18 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
             break
 
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info("--" * 30)
-    logger.info(
-        "%s step %d, batch: %d, loss: %f, speed: %.2f step/s"
-        % (task_name, global_step, iter_steps, average_loss, iter_steps / (time.time() - local_time))
-    )
-    logger.info("--" * 30)
-    log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+    v = paddle.to_tensor(average_loss).detach()
+    average_loss = all_gather(v)
+
+    if log_writer is not None:
+        logger.info("--" * 30)
+        logger.info(
+            "%s step %d, batch: %d, loss: %f, speed: %.2f step/s"
+            % (task_name, global_step, iter_steps, average_loss, iter_steps / (time.time() - local_time))
+        )
+        logger.info("--" * 30)
+        log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+
     model.train()
 
 
@@ -113,8 +117,8 @@ def do_train(args):
         "sharding_degree": args.sharding_degree,
     }
 
-    accumulate_steps = args.local_batch_size // args.micro_batch_size
-    strategy.pipeline_configs = {"accumulate_steps": accumulate_steps, "micro_batch_size": args.micro_batch_size}
+    args.accumulate_steps = args.local_batch_size // args.micro_batch_size
+    logger.info(f"accumulate_steps: {args.accumulate_steps}")
 
     # set control in tensor parallel
     strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
@@ -123,15 +127,10 @@ def do_train(args):
 
     # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
-    global_rank = hcg.get_global_rank()
+    # global_rank = hcg.get_global_rank()
     mp_rank = hcg.get_model_parallel_rank()
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
-
-    # # sharding stage2/3 not support hybrid parallel now
-    # if args.sharding_stage in [2, 3]:
-    #     assert args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support tensor/pipeline parallel later"
-    #     dp_group = hcg.get_data_parallel_group()
 
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
@@ -146,23 +145,41 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    # Define log writer
-    log_writer_path = os.path.join(
-        args.output_dir,
-        "train_log",
-        "{}_globalbsz_{}_pure_fp16_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16, False, global_rank
-        ).lower(),
-    )
-
-    if os.path.exists(log_writer_path):
-        import shutil
-
-        shutil.rmtree(log_writer_path)
-
-    log_writer = LogWriter(log_writer_path)
-
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    training_args = args
+    training_args.overwrite_output_dir = False
+    training_args.resume_from_checkpoint = True
+    if os.path.isdir(training_args.output_dir) and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
+    global_step = 0
+    if training_args.resume_from_checkpoint and last_checkpoint is not None:
+        global_step = int(str(last_checkpoint).split("-")[-1])
+
+    log_writer = None
+    if dp_rank == 0 and mp_rank == 0 and dp_rank == 0:
+        log_writer_path = os.path.join(args.output_dir, default_logdir())
+        if os.path.exists(log_writer_path):
+            import shutil
+
+            shutil.rmtree(log_writer_path)
+        log_writer = LogWriter(log_writer_path)
+
+    if args.mp_degree > 1:
+        GPTForPretraining.resource_files_names = {"model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)}
 
     model = GPTForPretraining.from_pretrained(
         args.model_name_or_path,
@@ -186,7 +203,11 @@ def do_train(args):
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
         lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=warmup_step,
+            decay_step=args.decay_steps,
+            last_epoch=global_step,
         )
 
     clip = None
@@ -233,9 +254,13 @@ def do_train(args):
             scaler = fleet.distributed_scaler(scaler)
         model = paddle.amp.decorate(models=model, level="O2")
 
+    if training_args.resume_from_checkpoint and last_checkpoint is not None:
+        model.set_state_dict(
+            paddle.load(os.path.join(last_checkpoint, model.resource_files_names["model_state"]), return_numpy=True)
+        )
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
-    if args.sharding_stage in [2, 3]:
+    if args.sharding_stage in [2, 3] and args.sharding_degree > 1:
         scaler = scaler if args.use_pure_fp16 else None
         model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler, args)
 
@@ -252,17 +277,10 @@ def do_train(args):
         else:
             logger.warning("No optimizer checkpoint file found in %s." % opt_path)
 
-    global_step = 0
-    # tic_train = time.time()
-
     files = get_train_data_file(args)
-    files.sort()
-    # num_files = len(files)
-    data_file = files[0]
-
     train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
         args,
-        [data_file],
+        files,
         local_rank=local_rank,
         data_world_size=data_world_size,
         data_world_rank=data_world_rank,
@@ -274,58 +292,86 @@ def do_train(args):
     valid_data_loader = valid_data_loader()
     test_data_loader = test_data_loader()
 
+    global_step = 0
     # time count
     train_reader_cost = 0.0
     train_run_cost = 0.0
     reader_start = time.time()
 
+    if training_args.resume_from_checkpoint and last_checkpoint is not None:
+        optimizer.set_state_dict(
+            paddlenlp_load(
+                os.path.join(
+                    last_checkpoint, "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
+                ),
+                return_numpy=True,
+            )
+        )
+        global_step = int(str(last_checkpoint).split("-")[-1])
+
+    _globalstep_last_logged = global_step
+
+    tr_loss = paddle.to_tensor(0.0)
+    loss_global = paddle.to_tensor(0.0)
+
     for step, batch in enumerate(train_data_loader()):
         train_reader_cost += time.time() - reader_start
         train_start = time.time()
 
-        global_step += 1
+        if _globalstep_last_logged > 0:
+            _globalstep_last_logged -= 1
+            continue
+
         tokens, loss_mask, position_ids, labels = batch
 
         # In ParallelMode of DataParallel, 'no_sync' can be used for improving
         # performance of model by gradient accumulation.
-        loss = 0.0
-        for i in range(accumulate_steps):
-            with paddle.amp.auto_cast(
-                args.use_pure_fp16,
-                custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
-                custom_white_list=["fused_attention", "fused_feedforward"],
-                level="O2",
-            ):
-                preds = model(tokens, position_ids)
-                loss_mbs = criterion(preds, labels, loss_mask)
 
-            loss_mbs = loss_mbs / accumulate_steps
-            if args.use_pure_fp16:
-                scaler.scale(loss_mbs).backward()
-            else:
-                loss_mbs.backward()
-            loss = loss + loss_mbs
+        with paddle.amp.auto_cast(
+            args.use_pure_fp16,
+            custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
+            custom_white_list=["fused_attention", "fused_feedforward"],
+            level="O2",
+        ):
+            preds = model(tokens, position_ids)
+            loss = criterion(preds, labels, loss_mask)
+
+        if args.accumulate_steps > 1:
+            tr_loss_step = loss / args.accumulate_steps
+        else:
+            tr_loss_step = loss
 
         if args.use_pure_fp16:
-            if args.sharding_stage in [2, 3]:
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                scaler.minimize(optimizer, loss)
+            scaler.scale(tr_loss_step).backward()
+        else:
+            tr_loss_step.backward()
+
+        tr_loss_step = tr_loss_step.detach()
+
+        tr_loss += tr_loss_step
+        loss_global += loss.detach()
+
+        # Skip for accumulate_steps in global step
+        if (step + 1) % args.accumulate_steps != 0:
+            continue
+
+        if args.use_pure_fp16:
+            scaler.minimize(optimizer, tr_loss)
         else:
             optimizer.step()
 
-        if lr_scheduler is not None:
-            lr_scheduler.step()
-
         optimizer.clear_grad()
+        tr_loss.subtract_(tr_loss)
+
+        global_step += 1
 
         # Sync for profile time, delete it may be a little faster
-        paddle.device.cuda.synchronize()
+        # paddle.device.cuda.synchronize()
         train_run_cost += time.time() - train_start
 
         if global_step % args.logging_freq == 0:
-            avg_loss = loss.numpy()
+            avg_loss = all_gather(loss_global) / args.logging_freq / args.accumulate_steps
+            loss_global.subtract_(loss_global)
             speed = args.logging_freq / (train_reader_cost + train_run_cost)
             avg_reader_cost = train_reader_cost / args.logging_freq
 
@@ -342,12 +388,16 @@ def do_train(args):
                     optimizer.get_lr(),
                 )
             )
-            log_writer.add_scalar("loss", float(loss), global_step)
-            log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
+            if log_writer is not None:
+                log_writer.add_scalar("loss", float(loss), global_step)
+                log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
 
             # tic_train = time.time()
             train_reader_cost = 0.0
             train_run_cost = 0.0
+
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
         if global_step % args.eval_freq == 0:
             # Since the valid data broardcast to all devices, we do evaluate on all device.
@@ -362,7 +412,10 @@ def do_train(args):
                 if paddle.distributed.get_world_size() > 1 and args.sharding_stage not in [2, 3]
                 else model
             )
-            output_dir = os.path.join(args.output_dir, "step_%d" % global_step)
+            if isinstance(model_to_save, TensorParallel):
+                model_to_save = model_to_save._layers
+
+            output_dir = os.path.join(args.output_dir, "checkpoint-%d" % global_step)
             os.makedirs(output_dir, exist_ok=True)
 
             logger.info("Save model to %s" % output_dir)
@@ -381,6 +434,8 @@ def do_train(args):
                     "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank),
                 ),
             )
+            if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
+                _rotate_checkpoints(args.save_total_limit, output_dir=args.output_dir)
 
         if global_step >= args.max_steps:
             return

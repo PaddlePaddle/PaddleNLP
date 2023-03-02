@@ -182,6 +182,9 @@ def do_train(args):
 
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
+    if args.mp_degree > 1:
+        GPTForPretraining.resource_files_names = {"model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)}
+
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob

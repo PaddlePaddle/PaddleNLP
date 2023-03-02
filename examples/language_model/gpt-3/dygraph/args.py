@@ -206,6 +206,8 @@ def parse_args(MODEL_CLASSES):
     )
     parser.add_argument("--to_static", action="store_true", help="Whether use to_static to train.")
 
+    parser.add_argument("--save_total_limit", type=int, default=3, help="Checkpoint save limit for training.")
+
     # Other config
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization")
     parser.add_argument(

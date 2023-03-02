@@ -505,6 +505,7 @@ class GPTPretrainedModel(PretrainedModel):
     """
 
     model_config_file = "model_config.json"
+
     pretrained_init_configuration = {
         "gpt-cpm-large-cn": {  # 2.6B
             "vocab_size": 30000,
@@ -717,6 +718,13 @@ class GPTModel(GPTPretrainedModel):
         fuse=False,
     ):
         super(GPTModel, self).__init__()
+
+        if num_partitions > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_rank = hcg.get_model_parallel_rank()
+            GPTPretrainedModel.resource_files_names = {
+                "model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
+            }
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
