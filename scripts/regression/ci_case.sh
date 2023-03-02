@@ -354,7 +354,6 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_s
 cd ../
 # pretrain_trainer
 python -u -m paddle.distributed.launch \
-    --gpus "0,1" \
     --log_dir "output/trainer_log" \
     run_pretrain_trainer.py \
     --model_type "ernie" \
@@ -384,7 +383,7 @@ python -u -m paddle.distributed.launch \
     --device "gpu" >${log_path}/ernie_1.0_pretrain_trainer >>${log_path}/ernie_1.0_pretrain_trainer 2>&1
     print_info $? ernie_1.0_pretrain_trainer
 # pretrain_static
-python -u -m paddle.distributed.launch --gpus '0,1' \
+python -u -m paddle.distributed.launch \
     --log_dir "./log" \
     run_pretrain_static.py \
     --model_type "ernie" \
