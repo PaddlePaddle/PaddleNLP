@@ -562,6 +562,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
     def forward(self, query, key, value, attention_inputs, output_attentions=False):
         # query has shape batch_size x seq_len x d_model
         # key and value have shapes batch_size x context_len x d_model
+        print(attention_inputs.shape)
         position_embeds, token_type_mat, attention_mask, cls_mask = attention_inputs
 
         batch_size, seq_len, _ = query.shape
@@ -1037,6 +1038,7 @@ class FunnelModel(FunnelPreTrainedModel):
         # TODO: deal with head_mask
         if inputs_embeds is None:
             inputs_embeds = self.embeddings(input_ids)
+            print(inputs_embeds.shape)
             encoder_outputs = self.encoder(
                 inputs_embeds,
                 attention_mask=attention_mask,
