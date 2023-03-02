@@ -562,7 +562,6 @@ class FunnelRelMultiheadAttention(nn.Layer):
     def forward(self, query, key, value, attention_inputs, output_attentions=False):
         # query has shape batch_size x seq_len x d_model
         # key and value have shapes batch_size x context_len x d_model
-        print(attention_inputs.shape)
         position_embeds, token_type_mat, attention_mask, cls_mask = attention_inputs
 
         batch_size, seq_len, _ = query.shape
@@ -685,6 +684,7 @@ class FunnelEncoder(nn.Layer):
                 pooled_hidden, attention_inputs = self.attention_structure.pre_attention_pooling(
                     hidden, attention_inputs
                 )
+            print(attention_inputs)
             for (layer_index, layer) in enumerate(block):
                 for repeat_index in range(self.config.block_repeats[block_index]):
                     do_pooling = (repeat_index == 0) and (layer_index == 0) and pooling_flag
