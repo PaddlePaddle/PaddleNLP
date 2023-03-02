@@ -18,8 +18,6 @@ from collections import namedtuple
 import paddle
 import paddle.nn.functional as F
 
-from . import model_utils
-
 from .attention import Attention, AttentionResult
 
 
@@ -110,8 +108,6 @@ class TokenPredictor(paddle.nn.Layer):
         _initializer = paddle.nn.initializer.XavierUniform()
 
         state_transform_weights = paddle.ParamAttr(initializer=_initializer)
-
-        vocabulary_weights = paddle.ParamAttr(initializer=_initializer)
 
         vocabulary_biases = paddle.ParamAttr(initializer=bias_initializer)
 
@@ -271,7 +267,6 @@ class SchemaTokenPredictor(TokenPredictor):
     def forward(self, prediction_input, dropout_amount=0.0):
         decoder_state = prediction_input.decoder_state
         input_hidden_states = prediction_input.input_hidden_states
-        snippets = prediction_input.snippets
 
         input_schema = prediction_input.input_schema
         schema_states = prediction_input.schema_states
@@ -445,10 +440,8 @@ def construct_token_predictor(
             params, vocabulary, utterance_attention_key_size, schema_attention_key_size, snippet_size
         )
     elif params.use_snippets and anonymizer and not params.previous_decoder_snippet_encoding:
-        print("using SnippetAnonymizationTokenPredictor")
-        return SnippetAnonymizationTokenPredictor(
-            params, vocabulary, utterance_attention_key_size, snippet_size, anonymizer
-        )
+        print("using AnonymizationTokenPredictor")
+        return AnonymizationTokenPredictor(params, vocabulary, utterance_attention_key_size, snippet_size, anonymizer)
     else:
         print("Unknown token_predictor")
         exit()

@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
-from collections import defaultdict
+import logging
 import re
-
-from paddlenlp.transformers import BertTokenizer
+import sys
+import traceback
+from collections import defaultdict
 
 from text2sql.dataproc.dusql_dataset_v2 import load_tables
 
@@ -91,11 +88,11 @@ def _build(cells):
         dct_index[cell.lower()].add((cell, len(cell_chars)))
         for pos in range(len(cell_chars) - 1):
             bigram = cell_chars[pos : pos + 2]
-            ####tri_gram = cell_chars[pos: pos + 3]
-            ####four_gram = cell_chars[pos: pos + 4]
+            # tri_gram = cell_chars[pos: pos + 3]
+            # four_gram = cell_chars[pos: pos + 4]
             dct_index[bigram].add((cell, len(cell_chars) - 1))
-            ####dct_index[tri_gram].add((cell, len(cell_chars) - 2))
-            ####dct_index[four_gram].add(cell)
+            # dct_index[tri_gram].add((cell, len(cell_chars) - 2))
+            # dct_index[four_gram].add(cell)
     return dct_index
 
 
@@ -158,7 +155,6 @@ def search_values(query, db, extra_values):
         if column.id == 0:
             lst_match_values.append([])
             continue
-        col_id = column.id
 
         candi_cnt = defaultdict(float)
         query_chars = get_char_list(query.lower())
@@ -229,7 +225,7 @@ if __name__ == "__main__":
             )
 
         json.dump(lst_output, args.output, indent=2, ensure_ascii=False)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         # logging.critical(traceback.format_exc())
         exit(-1)
