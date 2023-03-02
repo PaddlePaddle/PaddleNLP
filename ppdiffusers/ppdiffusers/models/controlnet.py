@@ -16,18 +16,18 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..initializer import zeros_
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 from .cross_attention import AttnProcessor
-from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
+from .embeddings import TimestepEmbedding, Timesteps
 from .unet_2d_blocks import (
     CrossAttnDownBlock2D,
     DownBlock2D,
     UNetMidBlock2DCrossAttn,
-    UNetMidBlock2DSimpleCrossAttn,
     get_down_block,
 )
 
@@ -40,7 +40,7 @@ class ControlNetOutput(BaseOutput):
     mid_block_res_sample: paddle.Tensor
 
 
-class ControlNetConditioningDefaultEmbedding(nn.Layer):
+class ControlNetConditioningEmbedding(nn.Layer):
     """
     "Stable Diffusion uses a pre-processing method similar to VQ-GAN [11] to convert the entire dataset of 512 × 512
     images into smaller 64 × 64 “latent images” for stabilized training. This requires ControlNets to convert
@@ -50,29 +50,38 @@ class ControlNetConditioningDefaultEmbedding(nn.Layer):
     feature maps ..."
     """
 
-    def __init__(self, conditioning_channels: int, conditioning_embedding_channels: int):
+    def __init__(
+        self,
+        conditioning_embedding_channels: int,
+        conditioning_channels: int = 3,
+        block_out_channels: Tuple[int] = (16, 32, 96, 256),
+    ):
         super().__init__()
 
-        self.conditioning_embedder = nn.Sequential(
-            nn.Conv2D(conditioning_channels, 16, kernel_size=3, padding=1),
-            nn.Silu(),
-            nn.Conv2D(16, 16, kernel_size=3, padding=1),
-            nn.Silu(),
-            nn.Conv2D(16, 32, kernel_size=3, padding=1, stride=2),
-            nn.Silu(),
-            nn.Conv2D(32, 32, kernel_size=3, padding=1),
-            nn.Silu(),
-            nn.Conv2D(32, 96, kernel_size=3, padding=1, stride=2),
-            nn.Silu(),
-            nn.Conv2D(96, 96, kernel_size=3, padding=1),
-            nn.Silu(),
-            nn.Conv2D(96, 256, kernel_size=3, padding=1, stride=2),
-            nn.Silu(),
-            zero_module(nn.Conv2D(256, conditioning_embedding_channels, kernel_size=3, padding=1)),
+        self.conv_in = nn.Conv2D(conditioning_channels, block_out_channels[0], kernel_size=3, padding=1)
+
+        self.blocks = nn.LayerList([])
+
+        for i in range(len(block_out_channels) - 1):
+            channel_in = block_out_channels[i]
+            channel_out = block_out_channels[i + 1]
+            self.blocks.append(nn.Conv2D(channel_in, channel_in, kernel_size=3, padding=1))
+            self.blocks.append(nn.Conv2D(channel_in, channel_out, kernel_size=3, padding=1, stride=2))
+
+        self.conv_out = zero_module(
+            nn.Conv2D(block_out_channels[-1], conditioning_embedding_channels, kernel_size=3, padding=1)
         )
 
     def forward(self, conditioning):
-        embedding = self.conditioning_embedder(conditioning)
+        embedding = self.conv_in(conditioning)
+        embedding = F.silu(embedding)
+
+        for block in self.blocks:
+            embedding = block(embedding)
+            embedding = F.silu(embedding)
+
+        embedding = self.conv_out(embedding)
+
         return embedding
 
 
@@ -82,9 +91,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
         self,
-        sample_size: Optional[int] = None,
         in_channels: int = 4,
-        center_input_sample: bool = False,
         flip_sin_to_cos: bool = True,
         freq_shift: int = 0,
         down_block_types: Tuple[str] = (
@@ -93,7 +100,6 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             "CrossAttnDownBlock2D",
             "DownBlock2D",
         ),
-        mid_block_type: Optional[str] = "UNetMidBlock2DCrossAttn",
         only_cross_attention: Union[bool, Tuple[bool]] = False,
         block_out_channels: Tuple[int] = (320, 640, 1280, 1280),
         layers_per_block: int = 2,
@@ -104,23 +110,16 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         norm_eps: float = 1e-5,
         cross_attention_dim: int = 1280,
         attention_head_dim: Union[int, Tuple[int]] = 8,
-        dual_cross_attention: bool = False,
         use_linear_projection: bool = False,
         class_embed_type: Optional[str] = None,
         num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
-        time_embedding_type: str = "positional",
-        timestep_post_act: Optional[str] = None,
-        time_cond_proj_dim: Optional[int] = None,
-        conv_in_kernel: int = 3,
         projection_class_embeddings_input_dim: Optional[int] = None,
-        controlnet_conditioning_embedding_type: str = "default",
-        controlnet_conditioning_channels: int = 3,
+        controlnet_conditioning_channel_order: str = "rgb",
+        conditioning_embedding_out_channels: Optional[Tuple[int]] = (16, 32, 96, 256),
     ):
         super().__init__()
-
-        self.sample_size = sample_size
 
         # Check inputs
         if len(block_out_channels) != len(down_block_types):
@@ -139,29 +138,17 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             )
 
         # input
+        conv_in_kernel = 3
         conv_in_padding = (conv_in_kernel - 1) // 2
         self.conv_in = nn.Conv2D(
             in_channels, block_out_channels[0], kernel_size=conv_in_kernel, padding=conv_in_padding
         )
 
         # time
-        if time_embedding_type == "fourier":
-            time_embed_dim = block_out_channels[0] * 2
-            if time_embed_dim % 2 != 0:
-                raise ValueError(f"`time_embed_dim` should be divisible by 2, but is {time_embed_dim}.")
-            self.time_proj = GaussianFourierProjection(
-                time_embed_dim // 2, set_W_to_weight=False, log=False, flip_sin_to_cos=flip_sin_to_cos
-            )
-            timestep_input_dim = time_embed_dim
-        elif time_embedding_type == "positional":
-            time_embed_dim = block_out_channels[0] * 4
+        time_embed_dim = block_out_channels[0] * 4
 
-            self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift)
-            timestep_input_dim = block_out_channels[0]
-        else:
-            raise ValueError(
-                f"{time_embedding_type} does not exist. Please make sure to use one of `fourier` or `positional`."
-            )
+        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift)
+        timestep_input_dim = block_out_channels[0]
 
         self.time_embedding = TimestepEmbedding(
             timestep_input_dim,
@@ -193,15 +180,10 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             self.class_embedding = None
 
         # control net conditioning embedding
-        if controlnet_conditioning_embedding_type == "default":
-            self.controlnet_cond_embedding = ControlNetConditioningDefaultEmbedding(
-                conditioning_channels=controlnet_conditioning_channels,
-                conditioning_embedding_channels=block_out_channels[0],
-            )
-        else:
-            raise ValueError(
-                f"unknown `controlnet_conditioning_embedding_type`: {controlnet_conditioning_embedding_type}. Options are 'default'"
-            )
+        self.controlnet_cond_embedding = ControlNetConditioningEmbedding(
+            conditioning_embedding_channels=block_out_channels[0],
+            block_out_channels=conditioning_embedding_out_channels,
+        )
 
         self.down_blocks = nn.LayerList([])
         self.controlnet_down_blocks = nn.LayerList([])
@@ -237,7 +219,6 @@ class ControlNetModel(ModelMixin, ConfigMixin):
                 cross_attention_dim=cross_attention_dim,
                 attn_num_head_channels=attention_head_dim[i],
                 downsample_padding=downsample_padding,
-                dual_cross_attention=dual_cross_attention,
                 use_linear_projection=use_linear_projection,
                 only_cross_attention=only_cross_attention[i],
                 upcast_attention=upcast_attention,
@@ -262,37 +243,19 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         controlnet_block = zero_module(controlnet_block)
         self.controlnet_mid_block = controlnet_block
 
-        if mid_block_type == "UNetMidBlock2DCrossAttn":
-            self.mid_block = UNetMidBlock2DCrossAttn(
-                in_channels=mid_block_channel,
-                temb_channels=time_embed_dim,
-                resnet_eps=norm_eps,
-                resnet_act_fn=act_fn,
-                output_scale_factor=mid_block_scale_factor,
-                resnet_time_scale_shift=resnet_time_scale_shift,
-                cross_attention_dim=cross_attention_dim,
-                attn_num_head_channels=attention_head_dim[-1],
-                resnet_groups=norm_num_groups,
-                dual_cross_attention=dual_cross_attention,
-                use_linear_projection=use_linear_projection,
-                upcast_attention=upcast_attention,
-            )
-        elif mid_block_type == "UNetMidBlock2DSimpleCrossAttn":
-            self.mid_block = UNetMidBlock2DSimpleCrossAttn(
-                in_channels=mid_block_channel,
-                temb_channels=time_embed_dim,
-                resnet_eps=norm_eps,
-                resnet_act_fn=act_fn,
-                output_scale_factor=mid_block_scale_factor,
-                cross_attention_dim=cross_attention_dim,
-                attn_num_head_channels=attention_head_dim[-1],
-                resnet_groups=norm_num_groups,
-                resnet_time_scale_shift=resnet_time_scale_shift,
-            )
-        elif mid_block_type is None:
-            self.mid_block = None
-        else:
-            raise ValueError(f"unknown mid_block_type : {mid_block_type}")
+        self.mid_block = UNetMidBlock2DCrossAttn(
+            in_channels=mid_block_channel,
+            temb_channels=time_embed_dim,
+            resnet_eps=norm_eps,
+            resnet_act_fn=act_fn,
+            output_scale_factor=mid_block_scale_factor,
+            resnet_time_scale_shift=resnet_time_scale_shift,
+            cross_attention_dim=cross_attention_dim,
+            attn_num_head_channels=attention_head_dim[-1],
+            resnet_groups=norm_num_groups,
+            use_linear_projection=use_linear_projection,
+            upcast_attention=upcast_attention,
+        )
 
     @property
     def attn_processors(self) -> Dict[str, AttnProcessor]:
@@ -421,26 +384,32 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         encoder_hidden_states: paddle.Tensor,
         controlnet_cond: paddle.Tensor,
         class_labels: Optional[paddle.Tensor] = None,
-        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         timestep_cond: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         return_dict: bool = True,
     ) -> Union[ControlNetOutput, Tuple]:
+        # check channel order
+        channel_order = self.config.controlnet_conditioning_channel_order
+
+        if channel_order == "rgb":
+            # in rgb order by default
+            ...
+        elif channel_order == "bgr":
+            controlnet_cond = paddle.flip(controlnet_cond, axis=[1])
+        else:
+            raise ValueError(f"unknown `controlnet_conditioning_channel_order`: {channel_order}")
+
         # prepare attention_mask
         if attention_mask is not None:
             attention_mask = (1 - attention_mask.cast(sample.dtype)) * -10000.0
             attention_mask = attention_mask.unsqueeze(1)
 
-        # 0. center input if necessary
-        if self.config.center_input_sample:
-            sample = 2 * sample - 1.0
-
         # 1. time
         timesteps = timestep
         if not paddle.is_tensor(timesteps):
-            # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
             timesteps = paddle.to_tensor([timesteps], dtype="int64")
-        elif paddle.is_tensor(timesteps) and len(timesteps.shape) == 0:
+        elif len(timesteps.shape) == 0:
             timesteps = timesteps[None]
 
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
@@ -455,8 +424,9 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         # timesteps does not contain any weights and will always return f32 tensors
         # but time_embedding might actually be running in fp16. so we need to cast here.
         # there might be better ways to encapsulate this.
-        t_emb = t_emb.cast(self.dtype)
-        emb = self.time_embedding(t_emb)
+        t_emb = t_emb.cast(dtype=self.dtype)
+
+        emb = self.time_embedding(t_emb, timestep_cond)
 
         if self.class_embedding is not None:
             if class_labels is None:

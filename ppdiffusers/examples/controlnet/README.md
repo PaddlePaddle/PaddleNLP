@@ -81,6 +81,9 @@ python -u train_txt2img_control_trainer.py \
 > * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大`batch_size`。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
+> * `--is_ldmbert`: 是否使用`ldmbert`作为`text_encoder`，默认为`False`，即使用 `clip text_encoder`。
+
+
 
 **Tips**:
 > 结合 `paddle` 文档和 `torch` 文档可知，`paddle` 卷积层初始化是 `Xavier Normal`，`torch` 卷积层初始化是 `Uniform`，初始化方法边界值是`(-sqrt(groups/(in_channels*prod(*kernal_size))), sqrt(groups/(in_channels*prod(*kernal_size))))`。

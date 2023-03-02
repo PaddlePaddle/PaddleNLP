@@ -27,6 +27,7 @@ from ppdiffusers import (
     ControlNetModel,
     DDIMScheduler,
     DDPMScheduler,
+    LDMBertModel,
     UNet2DConditionModel,
 )
 from ppdiffusers.initializer import reset_initialized_parameter
@@ -53,23 +54,33 @@ class ControlNet(nn.Layer):
             tokenizer_name_or_path, model_max_length=model_args.model_max_length
         )
 
+        vae_name = "vqvae" if model_args.is_ldmbert else "vae"
         # init vae
         vae_name_or_path = (
             model_args.vae_name_or_path
             if model_args.pretrained_model_name_or_path is None
-            else os.path.join(model_args.pretrained_model_name_or_path, "vae")
+            else os.path.join(model_args.pretrained_model_name_or_path, vae_name)
         )
+
         self.vae = AutoencoderKL.from_pretrained(vae_name_or_path)
         freeze_params(self.vae.parameters())
         logger.info("Freeze vae parameters!")
 
-        text_encoder_name_or_path = (
-            model_args.text_encoder_name_or_path
-            if model_args.pretrained_model_name_or_path is None
-            else os.path.join(model_args.pretrained_model_name_or_path, "text_encoder")
-        )
-
-        self.text_encoder = CLIPTextModel.from_pretrained(text_encoder_name_or_path)
+        if model_args.is_ldmbert:
+            text_encoder_name_or_path = (
+                model_args.text_encoder_name_or_path
+                if model_args.pretrained_model_name_or_path is None
+                else os.path.join(model_args.pretrained_model_name_or_path, "bert")
+            )
+            # init text_encoder
+            self.text_encoder = LDMBertModel.from_pretrained(text_encoder_name_or_path)
+        else:
+            text_encoder_name_or_path = (
+                model_args.text_encoder_name_or_path
+                if model_args.pretrained_model_name_or_path is None
+                else os.path.join(model_args.pretrained_model_name_or_path, "text_encoder")
+            )
+            self.text_encoder = CLIPTextModel.from_pretrained(text_encoder_name_or_path)
 
         freeze_params(self.text_encoder.parameters())
         logger.info("Freeze text_encoder parameters!")
@@ -89,7 +100,8 @@ class ControlNet(nn.Layer):
 
         if not model_args.use_paddle_conv_init:
             # use torch conv2d init
-            reset_initialized_parameter(self.controlnet.controlnet_cond_embedding.conditioning_embedder[:-1])
+            reset_initialized_parameter(self.controlnet.controlnet_cond_embedding.conv_in)
+            reset_initialized_parameter(self.controlnet.controlnet_cond_embedding.blocks)
 
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
@@ -193,8 +205,8 @@ class ControlNet(nn.Layer):
             if height % 8 != 0 or width % 8 != 0:
                 raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
             # only log 8 image
-            if input_ids.shape[0] > 8:
-                input_ids = input_ids[:8]
+            if input_ids.shape[0] > 4:
+                input_ids = input_ids[:4]
 
             text_embeddings = self.text_encoder(input_ids)[0]
             do_classifier_free_guidance = guidance_scale > 1.0

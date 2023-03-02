@@ -530,6 +530,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
         )
+
+        if mid_block_additional_residual is not None:
+            sample += mid_block_additional_residual
+
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
