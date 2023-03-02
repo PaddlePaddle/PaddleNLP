@@ -388,6 +388,28 @@ class UIETask(Task):
                 "bf25eb5120ad92ef5c7d8596b5dc4046",
             ],
         },
+        "__internal_testing__/tiny-random-uie": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie/model_state.pdparams",
+                "9e89a3bf94081b2d9ed89118419a3061",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie/config.json",
+                "113667d59b84133a99b4f1f1ec5784d7",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie/tokenizer_config.json",
+                "dcb0f3257830c0eb1f2de47f2d86f89a",
+            ],
+        },
     }
 
     def __init__(self, task, model, schema=None, **kwargs):
