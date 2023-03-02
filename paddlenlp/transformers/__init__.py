@@ -176,6 +176,7 @@ from .codegen.tokenizer import *
 from .codegen.configuration import *
 from .artist.modeling import *
 from .artist.tokenizer import *
+from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 from .clip.modeling import *
