@@ -113,7 +113,9 @@ def main():
 
     # Define model & tokenizer
     if os.path.isdir(model_args.model_name_or_path):
-        model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_args.model_name_or_path, label2id=label2id, id2label=id2label
+        )
     elif model_args.model_name_or_path in SUPPORTED_MODELS:
         model = AutoModelForSequenceClassification.from_pretrained(
             model_args.model_name_or_path, num_classes=len(label2id), label2id=label2id, id2label=id2label
@@ -186,7 +188,7 @@ def main():
     if training_args.do_eval:
         if data_args.debug:
             output = trainer.predict(test_ds)
-            log_metrics_debug(output, id2label, dev_ds, data_args.bad_case_path)
+            log_metrics_debug(output, id2label, test_ds, data_args.bad_case_path)
         else:
             eval_metrics = trainer.evaluate()
             trainer.log_metrics("eval", eval_metrics)
