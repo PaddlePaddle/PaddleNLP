@@ -150,7 +150,7 @@ from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
-from .ernie_vil.procesing import *
+from .ernie_vil.processing import *
 from .ernie_vil.image_processing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
@@ -181,12 +181,12 @@ from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
-from .clip.procesing import *
+from .clip.processing import *
 from .clip.image_processing import *
 from .chineseclip.modeling import *
 from .chineseclip.configuration import *
 from .chineseclip.feature_extraction import *
-from .chineseclip.procesing import *
+from .chineseclip.processing import *
 from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *

@@ -45,12 +45,13 @@ from ..t5.configuration import T5Config
 from ..t5.modeling import T5ForConditionalGeneration
 from .configuration import Blip2Config, Blip2QFormerConfig, Blip2VisionConfig
 
-BLIP2_PRETRAINED_MODEL_ARCHIVE_LIST = [
+BLIP_2_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/blip2-flan-t5-xl",
 ]
 
 __all__ = [
     "Blip2QFormerModel",
+    "Blip2Model",
     "Blip2PretrainedModel",
     "Blip2VisionModel",
     "Blip2ForConditionalGeneration",
@@ -994,9 +995,9 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         """
         Invert an attention mask (e.g., switches 0. and 1.).
         Args:
-            encoder_attention_mask (`torch.Tensor`): An attention mask.
+            encoder_attention_mask (`paddle.Tensor`): An attention mask.
         Returns:
-            `torch.Tensor`: The inverted attention mask.
+            `paddle.Tensor`: The inverted attention mask.
         """
         if encoder_attention_mask.ndim == 3:
             encoder_extended_attention_mask = encoder_attention_mask[:, None, :, :]
@@ -1018,14 +1019,14 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         """
         Prepare the head mask if needed.
         Args:
-            head_mask (`torch.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
+            head_mask (`paddle.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
                 The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
             num_hidden_layers (`int`):
                 The number of hidden layers in the model.
             is_attention_chunked: (`bool`, *optional*, defaults to `False`):
                 Whether or not the attentions scores are computed by chunks or not.
         Returns:
-            `torch.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
+            `paddle.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
             `[None]` for each layer.
         """
         if head_mask is not None:
@@ -1165,6 +1166,306 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         )
 
 
+class Blip2Model(Blip2PretrainedModel):
+    config_class = Blip2Config
+    main_input_name = "pixel_values"
+
+    def __init__(self, config: Blip2Config):
+        super().__init__(config)
+        from paddlenlp.transformers import AutoModelForCausalLM
+
+        self.vision_model = Blip2VisionModel(config.vision_config)
+
+        self.query_tokens = Parameter(paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]))
+        self.qformer = Blip2QFormerModel(config.qformer_config)
+
+        self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
+        if config.use_decoder_only_language_model:
+            language_model = AutoModelForCausalLM.from_config(config.text_config)
+        else:
+            # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
+            if isinstance(config.text_config, T5Config):
+                language_model = T5ForConditionalGeneration(config.text_config)
+        self.language_model = language_model
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.embeddings.patch_embedding
+
+    def get_text_features(
+        self,
+        input_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        decoder_input_ids: Optional[paddle.Tensor] = None,
+        decoder_attention_mask: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Returns:
+            text_outputs (`CausalLMOutputWithPast`, or `tuple(paddle.Tensor)` if `return_dict=False`):
+                The language model outputs. If `return_dict=True`, the output is a [`CausalLMOutputWithPast`] that
+                contains the language model logits, the past key values and the hidden states if
+                `output_hidden_states=True`.
+        Examples:
+        ```python
+        >>> import paddle
+        >>> from transformers import AutoTokenizer, Blip2Model
+        >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model.to(device)  # doctest: +IGNORE_RESULT
+        >>> tokenizer = AutoTokenizer.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pt").to(device)
+        >>> text_features = model.get_text_features(**inputs)
+        ```"""
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if self.config.use_decoder_only_language_model:
+            text_outputs = self.language_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+        else:
+            inputs_embeds = self.language_model.get_input_embeddings()(input_ids)
+
+            text_outputs = self.language_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+                decoder_attention_mask=decoder_attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                labels=labels,
+            )
+
+        return text_outputs
+
+    def get_image_features(
+        self,
+        pixel_values: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Returns:
+            vision_outputs (`BaseModelOutputWithPooling` or tuple of `paddle.Tensor`):
+                The vision model outputs. If `return_dict=True`, the output is a [`BaseModelOutputWithPooling`] that
+                contains the image features, the pooled image features and the hidden states if
+                `output_hidden_states=True`.
+        Examples:
+        ```python
+        >>> import paddle
+        >>> from PIL import Image
+        >>> import requests
+        >>> from transformers import AutoProcessor, Blip2Model
+        >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model.to(device)  # doctest: +IGNORE_RESULT
+        >>> processor = AutoProcessor.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        >>> image = Image.open(requests.get(url, stream=True).raw)
+        >>> inputs = processor(images=image, return_tensors="pd")
+        >>> image_outputs = model.get_image_features(**inputs)
+        ```"""
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        vision_outputs = self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        return vision_outputs
+
+    def get_qformer_features(
+        self,
+        pixel_values: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Returns:
+            vision_outputs (`BaseModelOutputWithPooling` or tuple of `paddle.Tensor`):
+                The vision model outputs. If `return_dict=True`, the output is a [`BaseModelOutputWithPooling`] that
+                contains the image features, the pooled image features and the hidden states if
+                `output_hidden_states=True`.
+        Examples:
+        ```python
+        >>> import paddle
+        >>> from PIL import Image
+        >>> import requests
+        >>> from transformers import Blip2Processor, Blip2Model
+        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model.to(device)  # doctest: +IGNORE_RESULT
+        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        >>> image = Image.open(requests.get(url, stream=True).raw)
+        >>> inputs = processor(images=image, return_tensors="pt")
+        >>> qformer_outputs = model.get_qformer_features(**inputs)
+        ```"""
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        vision_outputs = self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        image_embeds = vision_outputs[0]
+
+        # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
+        image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
+
+        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
+        query_outputs = self.qformer(
+            query_embeds=query_tokens,
+            encoder_hidden_states=image_embeds,
+            encoder_attention_mask=image_attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        return query_outputs
+
+    def forward(
+        self,
+        pixel_values: paddle.Tensor,
+        input_ids: paddle.Tensor,
+        attention_mask: Optional[paddle.Tensor] = None,
+        decoder_input_ids: Optional[paddle.Tensor] = None,
+        decoder_attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        labels: Optional[paddle.Tensor] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, Blip2ForConditionalGenerationModelOutput]:
+        r"""
+        Returns:
+        Examples:
+        ```python
+        >>> from PIL import Image
+        >>> import requests
+        >>> from transformers import Blip2Processor, Blip2Model
+        >>> import paddle
+        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
+        >>> model.to(device)  # doctest: +IGNORE_RESULT
+        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        >>> image = Image.open(requests.get(url, stream=True).raw)
+        >>> prompt = "Question: how many cats are there? Answer:"
+        >>> inputs = processor(images=image, text=prompt, return_tensors="pd")
+        >>> outputs = model(**inputs)
+        ```"""
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # step 1: forward the images through the vision encoder,
+        # to get image embeddings of shape (batch_size, seq_len, hidden_size)
+        vision_outputs = self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        image_embeds = vision_outputs[0]
+
+        # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
+        image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
+
+        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
+        query_outputs = self.qformer(
+            query_embeds=query_tokens,
+            encoder_hidden_states=image_embeds,
+            encoder_attention_mask=image_attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        query_output = query_outputs[0]
+
+        # step 3: use the language model, conditioned on the query outputs and the prompt
+        language_model_inputs = self.language_projection(query_output)
+        language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
+        inputs_embeds = self.language_model.get_input_embeddings()(input_ids)
+        inputs_embeds = paddle.concat([language_model_inputs, inputs_embeds], axis=1)
+
+        if attention_mask is None:
+            attention_mask = paddle.ones_like(input_ids)
+
+        attention_mask = paddle.concat([language_model_attention_mask, attention_mask], axis=1)
+
+        if self.config.use_decoder_only_language_model:
+            outputs = self.language_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+            logits = outputs.logits if return_dict else outputs[0]
+            loss = None
+            # we compute the loss here since we need to take into account the sequence length of the query embeds
+            if labels is not None:
+                logits = logits[:, -labels.size(1) :, :]
+                # Shift so that tokens < n predict n
+                shift_logits = logits[..., :-1, :]
+                shift_labels = labels[..., 1:]
+
+                # Flatten the tokens
+                loss_fct = CrossEntropyLoss(reduction="mean")
+
+                loss = loss_fct(
+                    shift_logits.reshape([-1, self.config.text_config.vocab_size]), shift_labels.reshape([-1])
+                )
+        else:
+            outputs = self.language_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+                decoder_attention_mask=decoder_attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                labels=labels,
+            )
+            loss = outputs.loss if return_dict else outputs[0]
+            logits = outputs.logits if return_dict else outputs[1]
+
+        if not return_dict:
+            output = (logits, vision_outputs, query_outputs, outputs)
+            return ((loss,) + output) if loss is not None else output
+
+        return Blip2ForConditionalGenerationModelOutput(
+            loss=loss,
+            logits=logits,
+            vision_outputs=vision_outputs,
+            qformer_outputs=query_outputs,
+            language_model_outputs=outputs,
+        )
+
+
 class Blip2ForConditionalGeneration(Blip2PretrainedModel):
     config_class = Blip2Config
     main_input_name = "pixel_values"
@@ -1184,10 +1485,12 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
             # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
+            else:
+                raise NotImplementedError
         self.language_model = language_model
 
         # Initialize weights and apply final processing
-        self.post_init()
+        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1213,9 +1516,9 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         >>> import requests
         >>> from transformers import Blip2Processor, Blip2ForConditionalGeneration
         >>> import paddle
-        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(
-        ...     "Salesforce/blip2-opt-2.7b", paddle_dtype=paddle.float16
+        ...     "Salesforce/blip2-flan-t5-xl", paddle_dtype=paddle.float16
         ... )
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
@@ -1231,9 +1534,9 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         >>> import requests
         >>> from transformers import Blip2Processor, Blip2ForConditionalGeneration
         >>> import paddle
-        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+        >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(
-        ...     "Salesforce/blip2-opt-2.7b", paddle_dtype=paddle.float16
+        ...     "Salesforce/blip2-flan-t5-xl", paddle_dtype=paddle.float16
         ... )
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
@@ -1259,7 +1562,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
-        query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)
+        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
         query_outputs = self.qformer(
             query_embeds=query_tokens,
             encoder_hidden_states=image_embeds,
@@ -1278,6 +1581,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
+
         attention_mask = paddle.concat([language_model_attention_mask, attention_mask], axis=1)
 
         if self.config.use_decoder_only_language_model:
