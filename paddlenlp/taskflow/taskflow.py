@@ -345,6 +345,11 @@ TASKS = {
                 "task_flag": "information_extraction-uie-x-base",
             },
             "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
+            "__internal_testing__/tiny-random-uie": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie",
+            },
         },
         "default": {"model": "uie-base"},
     },
@@ -649,6 +654,8 @@ support_schema_list = [
     "utc-mini",
     "utc-nano",
     "utc-pico",
+    "utc-tiny",
+    "__internal_testing__/tiny-random-uie",
 ]
 
 support_argument_list = [
