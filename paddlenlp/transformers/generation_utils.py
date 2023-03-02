@@ -25,6 +25,8 @@ from paddle.fluid.layers.utils import map_structure
 
 from paddlenlp.utils.log import logger
 
+from .model_outputs import Seq2SeqLMOutput
+
 __all__ = ["GenerationMixin"]
 
 
@@ -446,8 +448,8 @@ class GenerationMixin(object):
                     argument.startswith("decoder_") or argument.startswith("cross_attn") or argument == "use_cache"
                 )
             }
-            input_name = encoder.main_input_name
-            if input_name == "input_ids" and "inputs_embeds" in encoder_kwargs:
+            # Use inputs_embeds as the priority if inputs_embeds exists
+            if "inputs_embeds" in encoder_kwargs:
                 encoder_kwargs["return_dict"] = True
                 model_kwargs["encoder_output"] = encoder(**encoder_kwargs)
             else:
@@ -944,10 +946,13 @@ class GenerationMixin(object):
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            outputs = self(**model_inputs, return_dict=True)
+            outputs = self(**model_inputs)
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+            # To hundle the logits is a Seq2SeqLMOutput
+            logits = outputs.logits if isinstance(outputs, Seq2SeqLMOutput) else outputs
 
             # [batch_size, vocab_size]
-            next_token_logits = outputs.logits[:, -1, :]
+            next_token_logits = logits[:, -1, :]
 
             # pre-process distribution
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
