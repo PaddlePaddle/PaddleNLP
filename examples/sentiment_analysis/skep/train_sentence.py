@@ -68,13 +68,12 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metric, data_loader):
+def evaluate(model, metric, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
@@ -83,8 +82,7 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch["input_ids"], batch["token_type_ids"], batch["labels"]
-        logits = model(input_ids, token_type_ids)
-        loss = criterion(logits, labels)
+        loss, logits = model(input_ids, token_type_ids, labels=labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -196,7 +194,6 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
-    criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     # start to train model
@@ -206,8 +203,7 @@ if __name__ == "__main__":
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch["input_ids"], batch["token_type_ids"], batch["labels"]
-            logits = model(input_ids, token_type_ids)
-            loss = criterion(logits, labels)
+            loss, logits = model(input_ids, token_type_ids, labels=labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
             metric.update(correct)
@@ -227,7 +223,7 @@ if __name__ == "__main__":
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                evaluate(model, criterion, metric, dev_data_loader)
+                evaluate(model, metric, dev_data_loader)
                 # Need better way to get inner model of DataParallel
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
