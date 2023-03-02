@@ -83,7 +83,7 @@ def repeat_interleave(x, repeats, dim=None):
         size = [1] * len(x.shape)
         size[dim] = repeats
         x = paddle.tile(x, size)
-        return paddle.reshape(x, (-1))
+        return paddle.reshape(x, (-1,))
     else:
         if len(orig_shape) == dim + 1:
             x = x.unsqueeze(-1)
@@ -1198,7 +1198,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_logits.reshape((-1, self.config.vocab_size)), labels.reshape((-1)))
+            masked_lm_loss = loss_fct(prediction_logits.reshape((-1, self.config.vocab_size)), labels.reshape((-1,)))
 
         if not return_dict:
             output = (prediction_logits,) + outputs[1:]
@@ -1418,7 +1418,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
             loss_fct = CrossEntropyLoss()
             # Only keep active parts of the loss
             if attention_mask is not None:
-                active_loss = attention_mask.reshape((-1)) == 1
+                active_loss = attention_mask.reshape((-1,)) == 1
                 active_logits = logits.reshape((-1, self.num_labels))
                 active_labels = paddle.where(
                     active_loss, labels.reshape((-1,)), paddle.tensor(loss_fct.ignore_index).astype(labels.dtype)

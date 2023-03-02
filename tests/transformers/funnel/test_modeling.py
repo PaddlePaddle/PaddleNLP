@@ -163,15 +163,15 @@ class FunnelModelTester:
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
         result = model(input_ids, token_type_ids=token_type_ids)
         result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.d_model))
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
         model.config.truncate_seq = False
         result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.d_model))
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
         model.config.separate_cls = False
         result = model(input_ids)
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.d_model))
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -184,7 +184,7 @@ class FunnelModelTester:
         choice_labels,
         fake_token_labels,
     ):
-
+        config.num_labels = self.num_labels
         model = FunnelForSequenceClassification(config)
         model.eval()
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=sequence_labels)
