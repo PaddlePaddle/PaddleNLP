@@ -38,7 +38,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', 
 #### 设置模型路径
 ```
 # Default task_path
-uie = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema)
+uie = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema)
 ```
 
 #### 多卡服务化预测

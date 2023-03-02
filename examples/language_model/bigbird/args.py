@@ -69,8 +69,8 @@ def parse_args():
         "--device",
         type=str,
         default="gpu",
-        choices=["cpu", "gpu"],
-        help="Select cpu, gpu, xpu devices to train model.",
+        choices=["cpu", "gpu", "npu"],
+        help="Select cpu, gpu, xpu, npu devices to train model.",
     )
 
     parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")

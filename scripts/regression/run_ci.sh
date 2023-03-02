@@ -148,6 +148,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
+            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
+            fi
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
         elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
@@ -177,6 +180,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         if [[ ${dir2} =~ "transformers" ]] ;then
             if [[ ${dir3##*.} == "py" ]];then
                 continue
+            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
             else
                 APIcase_list[${#APIcase_list[*]}]=${dir3}
             fi

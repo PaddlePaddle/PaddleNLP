@@ -16,8 +16,7 @@ import argparse
 import os
 
 import paddle
-
-from run_glue import MODEL_CLASSES
+from run_glue_trainer import MODEL_CLASSES
 
 
 def parse_args():

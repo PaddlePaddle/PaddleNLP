@@ -31,7 +31,7 @@ class Hypothesis4Filtering(Hypothesis):
 
 def beam_search_with_heuristics(model, inputs, beam_size, max_steps, from_cond=True):
     """
-    Find the valid FROM clasue with beam search
+    Find the valid FROM clause with beam search
     """
     orig_inputs = inputs["orig_inputs"][0]
     # inference_state, next_choices = model.inference(inputs, orig_inputs.db)
@@ -93,7 +93,7 @@ def beam_search_with_heuristics(model, inputs, beam_size, max_steps, from_cond=T
         prefixes2fill_from.sort(key=operator.attrgetter("score"), reverse=True)
         # assert len(prefixes) == beam_size
 
-        # emuerating
+        # enumerating
         beam_from = prefixes2fill_from
         max_size = 6
         unfiltered_finished = []

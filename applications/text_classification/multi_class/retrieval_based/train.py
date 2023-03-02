@@ -65,9 +65,9 @@ parser.add_argument("--seed", type=int, default=1000,
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000,
-                    help="Inteval steps to save checkpoint")
+                    help="Interval steps to save checkpoint")
 parser.add_argument('--log_steps', type=int, default=10,
-                    help="Inteval steps to print log")
+                    help="Interval steps to print log")
 parser.add_argument("--train_set_file", type=str,
                     default='./data/train.txt',
                     help="The full path of train_set_file.")
