@@ -22,7 +22,6 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.import_utils import import_module, is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
 
@@ -337,15 +336,8 @@ class AutoTokenizer:
             community_config_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
-
-            default_root = (
-                os.path.join(cache_dir, pretrained_model_name_or_path)
-                if cache_dir is not None
-                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            )
-            # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

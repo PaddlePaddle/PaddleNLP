@@ -19,10 +19,10 @@ import json
 import os
 from collections import OrderedDict
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.log import logger
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from ...utils.import_utils import import_module
+from ...utils.log import logger
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoProcessor",
@@ -125,7 +125,11 @@ class AutoProcessor:
             processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """
-
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
+            cache_dir=kwargs.pop("cache_dir", None),
+        )
         all_processor_names = []
         for names, processor_class in cls._processor_mapping.items():
             for name in names:
@@ -154,10 +158,8 @@ class AutoProcessor:
             community_config_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
             )
-
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
