@@ -15,26 +15,26 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 
 ## 快速开始
 
-以下示例展示如何基于 FastDeploy 库完成 BERT 模型在 GLUE SST-2 数据集上进行自然语言推断任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [BERT 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-m/finetuned_models/export`（用户可按实际情况设置）。
+以下示例展示如何基于 FastDeploy 库完成 BERT 模型在 GLUE SST-2 数据集上进行自然语言推断任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [BERT 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/bert/infer_model`（用户可按实际情况设置）。
 
 
 ```bash
 # CPU 推理
-python seq_cls_infer.py --model_dir ../../finetuned_models/export/ --device cpu --backend paddle
+python seq_cls_infer.py --model_dir ../../infer_model/ --device cpu --backend paddle
 # GPU 推理
-python seq_cls_infer.py --model_dir ../../finetuned_models/export/model --device gpu --backend paddle
+python seq_cls_infer.py --model_dir ../../infer_model/ --device gpu --backend paddle
 ```
 
 运行完成后返回的结果如下：
 
 ```bash
-[2023-03-01 07:26:34,961] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
+[2023-03-02 08:30:03,877] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
 [INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
-Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: negative, negative prob: 0.5990, positive prob: 0.4010.
-Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: negative, negative prob: 0.5341, positive prob: 0.4659.
-Batch id: 2, example id: 0, sentence1: at achieving the modest , crowd-pleasing goals it sets for itself, label: negative, negative prob: 0.5965, positive prob: 0.4035.
-Batch id: 3, example id: 0, sentence1: so pat it makes your teeth hurt, label: negative, negative prob: 0.5906, positive prob: 0.4094.
-Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: negative, negative prob: 0.5385, positive prob: 0.4615.
+Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.0003, positive prob: 0.9997.
+Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: positive, negative prob: 0.0002, positive prob: 0.9998.
+Batch id: 2, example id: 0, sentence1: at achieving the modest , crowd-pleasing goals it sets for itself, label: positive, negative prob: 0.0017, positive prob: 0.9983.
+Batch id: 3, example id: 0, sentence1: so pat it makes your teeth hurt, label: negative, negative prob: 0.9986, positive prob: 0.0014.
+Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: negative, negative prob: 0.9806, positive prob: 0.0194.
 ```
 
 ## 参数说明
