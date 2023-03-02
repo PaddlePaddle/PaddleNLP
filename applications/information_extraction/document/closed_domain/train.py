@@ -39,7 +39,7 @@ def do_train():
 
     label_maps = get_label_maps(args.label_maps_path)
     golds = get_eval_golds(args.dev_path)
-    tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased", do_tokenize_postprocess=True)
+    tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
 
     model = ErnieLayoutForClosedDomainIE.from_pretrained(
         "ernie-layoutx-base-uncased",

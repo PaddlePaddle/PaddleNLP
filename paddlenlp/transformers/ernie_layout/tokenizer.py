@@ -54,8 +54,8 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         },
     }
     pretrained_init_configuration = {
-        "ernie-layoutx-base-uncased": {"do_lower_case": True, "do_tokenize_postprocess": False},
-        "uie-x-base": {"do_lower_case": True, "do_tokenize_postprocess": True},
+        "ernie-layoutx-base-uncased": {"do_lower_case": True},
+        "uie-x-base": {"do_lower_case": True},
     }
     pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 514, "uie-x-base": 514}
     max_model_input_sizes = pretrained_positional_embedding_sizes
@@ -75,7 +75,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self,
         vocab_file,
         sentencepiece_model_file,
-        do_tokenize_postprocess=False,
         sep_token="[SEP]",
         cls_token="[CLS]",
         unk_token="[UNK]",
@@ -95,7 +94,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
         self.vocab_file = vocab_file
-        self.do_tokenize_postprocess = do_tokenize_postprocess
 
         self.tokens_to_ids = {"[CLS]": 0, "[PAD]": 1, "[SEP]": 2, "[UNK]": 3}
 
@@ -208,31 +206,30 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
     def _tokenize(self, text):
         """Tokenize a string."""
         pieces = self.sp_model.EncodeAsPieces(text)
-        if self.do_tokenize_postprocess:
-            new_pieces = []
-            for piece in pieces:
-                if piece == SPIECE_UNDERLINE:
+        new_pieces = []
+        for piece in pieces:
+            if piece == SPIECE_UNDERLINE:
+                continue
+            lst_i = 0
+            for i, c in enumerate(piece):
+                if c == SPIECE_UNDERLINE:
                     continue
-                lst_i = 0
-                for i, c in enumerate(piece):
-                    if c == SPIECE_UNDERLINE:
-                        continue
-                    if self.is_ch_char(c) or self.is_punct(c):
-                        if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
-                            new_pieces.append(piece[lst_i:i])
-                        new_pieces.append(c)
-                        lst_i = i + 1
-                    elif c.isdigit() and i > 0 and not piece[i - 1].isdigit():
-                        if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
-                            new_pieces.append(piece[lst_i:i])
-                        lst_i = i
-                    elif not c.isdigit() and i > 0 and piece[i - 1].isdigit():
-                        if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
-                            new_pieces.append(piece[lst_i:i])
-                        lst_i = i
-                if len(piece) > lst_i:
-                    new_pieces.append(piece[lst_i:])
-            pieces = new_pieces
+                if self.is_ch_char(c) or self.is_punct(c):
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    new_pieces.append(c)
+                    lst_i = i + 1
+                elif c.isdigit() and i > 0 and not piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+                elif not c.isdigit() and i > 0 and piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+            if len(piece) > lst_i:
+                new_pieces.append(piece[lst_i:])
+        pieces = new_pieces
         return pieces
 
     def _convert_token_to_id(self, token):
