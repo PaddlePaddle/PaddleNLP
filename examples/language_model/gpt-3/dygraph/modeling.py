@@ -31,6 +31,8 @@ from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_outputs import SequenceClassifierOutputWithPast
+from paddlenlp.utils.log import logger
 
 __all__ = [
     "GPTModel",
@@ -768,7 +770,7 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.fluid.layers.expand_as(position_ids, input_ids)
+            position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
         # TODO, use registered buffer
@@ -842,19 +844,24 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         super(GPTPretrainingCriterion, self).__init__()
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
         self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+        hcg = fleet.get_hybrid_communicate_group()
+        self.mp_size = hcg.get_model_parallel_world_size()
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-
-        hcg = fleet.get_hybrid_communicate_group()
-        mp_size = hcg.get_model_parallel_world_size()
-        if mp_size > 1:
+        if self.mp_size > 1:
             masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+            # print("masked_lm_loss:", masked_lm_loss.abs().mean().item())
         else:
             masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
-        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-        loss = masked_lm_loss / loss_mask.sum()
+        # print("loss_mask:", loss_mask.sum().item())
+
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = masked_lm_loss.astype("float32")
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
+
         return loss
 
 
@@ -974,6 +981,102 @@ class GPTLMHeadModel(GPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class GPTForSequenceClassification(GPTPretrainedModel):
+    """
+    GPT Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of GPTModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+    """
+
+    def __init__(self, gpt, num_labels):
+        super(GPTForSequenceClassification, self).__init__()
+
+        # self.gpt = GPTModel(config)  # allow gpt to be config
+        self.gpt = gpt
+        self.score = nn.Linear(gpt.config["hidden_size"], num_labels, bias_attr=False)
+        self.apply(self.init_weights)
+        self.num_classes = num_labels
+        # self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        use_cache=False,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
+        # sequence_output shape [bs, seq_len, hidden_size]
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            # inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            # output_attentions=output_attentions,
+            # output_hidden_states=output_hidden_states,
+            # return_dict=return_dict,
+        )
+        if isinstance(sequence_output, input_type):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
+        # logits shape [bs, seq_len, num_class]
+        logits = self.score(hidden_states)
+        # padding index maybe 0
+        eos_token_id = self.gpt.config["eos_token_id"] or 0
+        # sequence_lengths shape [bs,]
+        if input_ids is not None:
+            sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
+        else:
+            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            sequence_lengths = paddle.ones(inputs_shape[:-1], dtype="int64") * (inputs_shape[1] - 1)
+            logger.warning(
+                f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
+                "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
+            )
+
+        pooled_logits = logits.gather_nd(
+            paddle.stack([paddle.arange(paddle.shape(logits)[0]), sequence_lengths], axis=-1)
+        )
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(pooled_logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(pooled_logits, labels)
+
+        if not return_dict:
+            if isinstance(sequence_output, input_type):
+                return (loss, pooled_logits) if loss is not None else pooled_logits
+
+            outputs = (pooled_logits,) + sequence_output[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return SequenceClassifierOutputWithPast(
+            loss=loss,
+            logits=pooled_logits,
+            # past_key_values=sequence_output.past_key_values,
+            # hidden_states=sequence_output.hidden_states,
+            # attentions=sequence_output.attentions,
+        )
 
 
 # these Layers is just for PipelineParallel

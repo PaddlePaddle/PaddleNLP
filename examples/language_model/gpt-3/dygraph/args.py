@@ -225,6 +225,16 @@ def parse_args(MODEL_CLASSES):
         help='The option of profiler, which should be in format "key1=value1;key2=value2;key3=value3".',
     )
 
+    # only for finetune
+    parser.add_argument(
+        "--task_name",
+        type=str,
+        default="sst-2",
+        choices=["cola", "sst-2", "mrpc", "sts-b", "qqp", "mnli", "qnli", "rte"],
+        help="Task name for finetune.",
+    )
+    parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length.")
+
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 
