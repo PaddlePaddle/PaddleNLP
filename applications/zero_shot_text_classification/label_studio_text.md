@@ -83,6 +83,8 @@ label-studio start
 
 项目创建后，可在Setting/Labeling Interface中继续配置标签，详见[项目创建](#label)
 
+默认模式为单标签多分类数据标注。对于多标签多分类数据标注，需要将`choice`的值由`single`改为`multiple`。
+
 <a name="24"></a>
 
 #### 2.4 任务标注

@@ -84,6 +84,8 @@ You can continue to import local txt format data after project creation. See mor
 
 After project creation, you can add/delete labels in Setting/Labeling Interface just as in [Project Creation](#label)
 
+LabelStudio supports single-label data annotation by default. Modify the value of `choice` as `multiple` in the `code` tab when multiple-label annotation is required.
+
 <a name="24"></a>
 
 #### 2.4 Task annotation
