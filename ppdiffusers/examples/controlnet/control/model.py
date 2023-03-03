@@ -117,28 +117,28 @@ class ControlNet(nn.Layer):
         self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.use_ema = model_args.use_ema
         if self.use_ema:
-            self.model_ema = LitEma(self.control_model)
+            self.model_ema = LitEma(self.controlnet)
         self.control_scales = [1.0] * 13
         self.only_mid_control = model_args.only_mid_control
 
     @contextlib.contextmanager
     def ema_scope(self, context=None):
         if self.use_ema:
-            self.model_ema.store(self.control_model.parameters())
-            self.model_ema.copy_to(self.control_model)
+            self.model_ema.store(self.controlnet.parameters())
+            self.model_ema.copy_to(self.controlnet)
             if context is not None:
                 print(f"{context}: Switched to EMA weights")
         try:
             yield None
         finally:
             if self.use_ema:
-                self.model_ema.restore(self.control_model.parameters())
+                self.model_ema.restore(self.controlnet.parameters())
                 if context is not None:
                     print(f"{context}: Restored training weights")
 
     def on_train_batch_end(self):
         if self.use_ema:
-            self.model_ema(self.control_model)
+            self.model_ema(self.controlnet)
 
     def forward(self, input_ids=None, pixel_values=None, controlnet_cond=None, **kwargs):
         self.train()
