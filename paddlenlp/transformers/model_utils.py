@@ -21,7 +21,6 @@ import os
 import re
 import shutil
 import tempfile
-from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
@@ -83,11 +82,11 @@ def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> 
     Prune a linear layer to keep only entries in index.
     Used to remove heads.
     Args:
-        layer (`torch.nn.Linear`): The layer to prune.
+        layer (`paddle.nn.Linear`): The layer to prune.
         index (`paddle.Tensor`): The indices to keep in the layer.
         dim (`int`, *optional*, defaults to 0): The dimension on which to keep the indices.
     Returns:
-        `torch.nn.Linear`: The pruned layer as a new layer with `requires_grad=True`.
+        `paddle.nn.Linear`: The pruned layer as a new layer with `stop_gradient=False`.
     """
     index = index.to(layer.weight)
     W = layer.weight.index_select(dim, index).clone().detach()
@@ -201,22 +200,6 @@ def apply_chunking_to_forward(
 
 
 _init_weights = True
-
-
-@contextmanager
-def no_init_weights(_enable=True):
-    """
-    Context manager to globally disable weight initialization to speed up loading large models.
-    TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
-    """
-    global _init_weights
-    old_init_weights = _init_weights
-    if _enable:
-        _init_weights = False
-    try:
-        yield
-    finally:
-        _init_weights = old_init_weights
 
 
 def unwrap_model(model, *args, **kwargs):
@@ -411,7 +394,7 @@ class ModuleUtilsMixin:
         """-> [num_hidden_layers x batch x num_heads x seq_length x seq_length]"""
         if head_mask.ndim == 1:
             head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-            head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
+            head_mask = head_mask.expand([num_hidden_layers, -1, -1, -1, -1])
         elif head_mask.ndim == 2:
             head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # We can specify head_mask for each layer
         assert head_mask.ndim == 5, f"head_mask.dim != 5, instead {head_mask.ndim}"

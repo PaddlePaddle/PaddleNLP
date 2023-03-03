@@ -48,7 +48,6 @@ from .configuration import Blip2Config, Blip2QFormerConfig, Blip2VisionConfig
 
 BLIP_2_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/blip2-flan-t5-xl",
-    "Salesforce/blip2-flan-t5-xl-coco",
 ]
 
 __all__ = [
