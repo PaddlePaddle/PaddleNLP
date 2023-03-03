@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-### 城市百科知识智能问答系统
+# 城市百科知识智能问答系统
 import argparse
-import logging
 import os
 
-import paddle
 from pipelines.document_stores import FAISSDocumentStore
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_answers
-from pipelines.nodes import ErnieReader, ErnieRanker, DensePassageRetriever
+from pipelines.nodes import DensePassageRetriever, ErnieRanker, ErnieReader
+from pipelines.utils import (
+    convert_files_to_dicts,
+    fetch_archive_from_http,
+    print_answers,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -82,14 +84,14 @@ def dense_qa_pipeline():
         # save index
         document_store.save(args.index_name)
 
-    ### Ranker
+    # Ranker
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
     reader = ErnieReader(
         model_name_or_path="ernie-gram-zh-finetuned-dureader-robust", use_gpu=use_gpu, num_processes=1
     )
 
-    # ### Pipeline
+    # Pipeline
     from pipelines import ExtractiveQAPipeline
 
     pipe = ExtractiveQAPipeline(reader, ranker, retriever)

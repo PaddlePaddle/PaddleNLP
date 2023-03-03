@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 
-import paddle
-from pipelines.nodes import ErnieTextToImageGenerator
 from pipelines import TextToImagePipeline
+from pipelines.nodes import ErnieTextToImageGenerator
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -26,8 +24,7 @@ parser.add_argument("--secret_key", default=None, type=str, help="The secret key
 parser.add_argument("--prompt_text", default='宁静的小镇', type=str, help="The prompt_text.")
 parser.add_argument("--output_dir", default='ernievilg_output', type=str, help="The output path.")
 parser.add_argument("--style", default='探索无限', type=str, help="The style text.")
-parser.add_argument("--size", default='1024*1024',
-    choices=['1024*1024', '1024*1536', '1536*1024'], help="Size of the generation images")
+parser.add_argument("--size", default='1024*1024', choices=['1024*1024', '1024*1536', '1536*1024'], help="Size of the generation images")
 parser.add_argument("--topk", default=5, type=int, help="The top k images.")
 args = parser.parse_args()
 # yapf: enable
@@ -47,6 +44,7 @@ def text_to_image():
             }
         },
     )
+    print(prediction)
     pipe.save_to_yaml("text_to_image.yaml")
 
 
