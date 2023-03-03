@@ -16,7 +16,7 @@ import json
 import logging
 import pprint
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import pandas as pd
 
@@ -161,7 +161,7 @@ def export_answers_to_csv(agg_results: list, output_file):
     assert "query" in agg_results[0], f"Wrong format used for {agg_results[0]}"
     assert "answers" in agg_results[0], f"Wrong format used for {agg_results[0]}"
 
-    data = {}  # type: Dict[str, List[Any]]
+    data = {}
     data["query"] = []
     data["prediction"] = []
     data["prediction_rank"] = []
@@ -193,7 +193,7 @@ def convert_labels_to_squad(labels_file: str):
     for label in labels:
         labels_grouped_by_documents[label["document_id"]].append(label)
 
-    labels_in_squad_format = {"data": []}  # type: Dict[str, Any]
+    labels_in_squad_format = {"data": []}
     for document_id, labels in labels_grouped_by_documents.items():
         qas = []
         for label in labels:
