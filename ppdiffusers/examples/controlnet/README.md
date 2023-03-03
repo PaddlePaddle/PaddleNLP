@@ -159,6 +159,6 @@ img.save("demo.png")
 </p>
 
 
-## 参考资料
+# 参考资料
 - https://github.com/lllyasviel/ControlNet/edit/main/docs/train.md
 - https://github.com/huggingface/diffusers
