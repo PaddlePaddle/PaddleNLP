@@ -201,6 +201,8 @@ class FunnelAttentionStructure(nn.Layer):
             if self.config.separate_cls
             else None
         )
+        if cls_mask is not None:
+            print("cls_mask: ", cls_mask.shape)
         return (position_embeds, token_type_mat, attention_mask, cls_mask)
 
     def token_type_ids_to_mat(self, token_type_ids):
@@ -340,20 +342,14 @@ class FunnelAttentionStructure(nn.Layer):
         # Deal with negative axis
         axis %= tensor.ndim
 
+        axis_slice = (
+            slice(None, -1, 2) if self.config.separate_cls and self.config.truncate_seq else slice(None, None, 2)
+        )
+        enc_slice = [slice(None)] * axis + [axis_slice]
         if self.config.separate_cls:
-            # tensor = paddle.cat([tensor[cls_slice], tensor], axis=axis)
-            if axis == 1:
-                tensor = paddle.concat([tensor[:, :1], tensor], axis=axis)
-            if axis == 2:
-                tensor = paddle.concat([tensor[:, :, :1], tensor], axis=axis)
-            if axis == 0:
-                tensor = paddle.concat([tensor[:1], tensor], axis=axis)
-        if axis == 1:
-            return tensor[:, 0:-1:2].astype("bool")
-        if axis == 0:
-            return tensor[0:-1:2].astype("bool")
-        if axis == 2:
-            return tensor[:, :, 0:-1:2].astype("bool")
+            cls_slice = [slice(None)] * axis + [slice(None, 1)]
+            tensor = paddle.concat([tensor[cls_slice], tensor], axis=axis)
+        return tensor[enc_slice]
 
     def pool_tensor(self, tensor, mode="mean", stride=2):
         """Apply 1D pooling to a tensor of size [B x T (x H)]."""
@@ -399,6 +395,7 @@ class FunnelAttentionStructure(nn.Layer):
                 position_embeds = self.stride_pool(position_embeds[:2], 0) + position_embeds[2:]
             token_type_mat = self.stride_pool(token_type_mat, 1)
             cls_mask = self.stride_pool(cls_mask, 0)
+
             output = self.pool_tensor(output, mode=self.config.pooling_type)
 
         else:
@@ -409,7 +406,8 @@ class FunnelAttentionStructure(nn.Layer):
             cls_mask = self.stride_pool(cls_mask, [1, 2])
             attention_mask = self.pool_tensor(attention_mask, mode="min")
             output = self.pool_tensor(output, mode=self.config.pooling_type)
-
+        print("in pre_attention_pooling:")
+        print(cls_mask.shape)
         attention_inputs = (position_embeds, token_type_mat, attention_mask, cls_mask)
         return output, attention_inputs
 
@@ -423,6 +421,8 @@ class FunnelAttentionStructure(nn.Layer):
             token_type_mat = self.stride_pool(token_type_mat, 2)
             cls_mask = self.stride_pool(cls_mask, 1)
             attention_mask = self.pool_tensor(attention_mask, mode="min")
+        print("in post_attention_pooling:")
+        print(cls_mask.shape)
         attention_inputs = (position_embeds, token_type_mat, attention_mask, cls_mask)
         return attention_inputs
 

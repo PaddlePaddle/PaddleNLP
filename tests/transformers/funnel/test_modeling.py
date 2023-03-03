@@ -166,10 +166,12 @@ class FunnelModelTester:
         self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
         model.config.truncate_seq = False
+        print("truncate_seq=False")
         result = model(input_ids)
         self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
         model.config.separate_cls = False
+        print("seperate_cls=False")
         result = model(input_ids)
         self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.d_model])
 
