@@ -671,18 +671,7 @@ class FunnelEncoder(nn.Layer):
         output_hidden_states=False,
         return_dict=True,
     ):
-        print("inputs_embeds=", inputs_embeds)
-        if attention_mask is not None:
-            print("attention_mask=", attention_mask)
-        else:
-            print("attention mask=None")
-        if token_type_ids is not None:
-            print("token_type_ids=", token_type_ids)
-        else:
-            print("token_type_ids=None")
-        print("output_attentions=", output_attentions)
-        print("output_hidden_states=", output_hidden_states)
-        print("return_dict=", return_dict)
+
         # The pooling is not implemented on long tensors, so we convert this mask.
         attention_mask = attention_mask.astype(inputs_embeds.dtype)
         attention_inputs = self.attention_structure.init_attention_inputs(
