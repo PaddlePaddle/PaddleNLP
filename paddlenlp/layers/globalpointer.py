@@ -113,33 +113,3 @@ class GPLinkerForRelationExtraction(nn.Layer):
         tail_output = self.tail_output(last_hidden_state, attention_mask)
         spo_output = [entity_output, head_output, tail_output]
         return spo_output
-
-
-class GPLinkerForDocExtraction(nn.Layer):
-    def __init__(self, encoder, label_maps, head_size=64):
-        super().__init__()
-        self.encoder = encoder
-        hidden_size = encoder.config["hidden_size"]
-        num_ents = len(label_maps["entity2id"])
-        gpcls = GlobalPointer
-        self.entity_output = gpcls(hidden_size, num_ents, head_size=head_size)
-        self.with_rel = False
-        if label_maps["relation2id"]:
-            num_rels = len(label_maps["relation2id"])
-            self.with_rel = True
-            self.head_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
-            self.tail_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
-
-    def forward(self, input_ids, attention_mask, bbox, image):
-        # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
-        sequence_output, _ = self.encoder(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
-        seq_length = paddle.shape(input_ids)[1]
-        sequence_output = sequence_output[:, :seq_length]
-
-        entity_output = self.entity_output(sequence_output, attention_mask)
-        if not self.with_rel:
-            return [entity_output]
-        else:
-            head_output = self.head_output(sequence_output, attention_mask)
-            tail_output = self.tail_output(sequence_output, attention_mask)
-            return [entity_output, head_output, tail_output]

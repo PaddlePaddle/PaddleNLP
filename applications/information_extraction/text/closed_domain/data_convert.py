@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import DataConverter
 
 
-def do_data_distill():
+def data_convert():
     set_seed(args.seed)
 
     data_converter = DataConverter(
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", default="../data", type=str, help="The directory for labeled data with doccano format and the large scale unlabeled data.")
     parser.add_argument("--model_path", type=str, default="../checkpoint/model_best", help="The path of saved model that you want to load.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
-    parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
+    parser.add_argument("--synthetic_ratio", default=0, type=int, help="The ratio of labeled and synthetic samples.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
 
@@ -123,4 +123,4 @@ if __name__ == "__main__":
 
     args.schema = schema
 
-    do_data_distill()
+    data_convert()
