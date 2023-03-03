@@ -25,3 +25,5 @@ Transformer-XL中的片段循环机制（Segment Recurrent Mechanism）和相对
 
 本项目是XLNet在 Paddle 2.0上的开源实现，由modeling和tokenizer两部分组成。
 """
+from .modeling import *
+from .tokenizer import *

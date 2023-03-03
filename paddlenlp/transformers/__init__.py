@@ -159,8 +159,10 @@ from .unimo.tokenizer import *
 from .unimo.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .xlnet.configuration import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
+from .xlm.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
