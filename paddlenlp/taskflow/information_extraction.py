@@ -410,6 +410,32 @@ class UIETask(Task):
                 "dcb0f3257830c0eb1f2de47f2d86f89a",
             ],
         },
+        "__internal_testing__/tiny-random-uie-x": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/model_state.pdparams",
+                "b62bdbfec23ee839c5d0a8a7e6920075",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/config.json",
+                "abeaeacca5316e2cbe779f37d986efb4",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/special_tokens_map.json",
+                "ba000b17745bb5b5b40236789318847f",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/tokenizer_config.json",
+                "c19bdbcec62476176d268e4dc7f1e506",
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046",
+            ],
+        },
     }
 
     def __init__(self, task, model, schema=None, **kwargs):
@@ -428,7 +454,7 @@ class UIETask(Task):
         self._schema_lang = kwargs.get("schema_lang", "ch")
         self._expand_to_a4_size = False if self._custom_model else True
 
-        if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
+        if self.model in ["uie-m-base", "uie-m-large", "uie-x-base", "__internal_testing__/tiny-random-uie-x"]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
 
         # TODO: temporary solution to support HF Hub due to lack of AutoModel

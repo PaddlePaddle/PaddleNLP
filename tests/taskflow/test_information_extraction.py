@@ -14,21 +14,28 @@
 
 import unittest
 
-from paddlenlp.taskflow import Taskflow
+from paddlenlp import Taskflow
+
+from ..testing_utils import get_tests_dir
 
 
 class TestUIETask(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.taskflow = Taskflow(
+        cls.text_ie = Taskflow(
             task="information_extraction",
             model="__internal_testing__/tiny-random-uie",
         )
 
+        cls.doc_ie = Taskflow(
+            task="information_extraction",
+            model="__internal_testing__/tiny-random-uie-x",
+        )
+
     def test_entity_extraction(self):
         schema = ["时间", "选手", "赛事名称"]
-        self.taskflow.set_schema(schema)
-        outputs = self.taskflow("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
+        self.text_ie.set_schema(schema)
+        outputs = self.text_ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
         self.assertIsNotNone(outputs)
         for output in outputs:
             for field in output:
@@ -36,15 +43,13 @@ class TestUIETask(unittest.TestCase):
                 for entity in output[field]:
                     self.assertIn("text", entity)
                     self.assertIn("probability", entity)
-                    # self.assertIn("start", entity)  # TODO: find out why this fails
-                    # self.assertIn("end", entity)  # TODO: find out why this fails
 
     def test_relation_extraction(self):
         schema = [{"歌曲名称": ["歌手", "所属专辑"]}]
         entity_type = "歌曲名称"
         relation_types = ["歌手", "所属专辑"]
-        self.taskflow.set_schema(schema)
-        outputs = self.taskflow("《告别了》是孙耀威在专辑爱的故事里面的歌曲")
+        self.text_ie.set_schema(schema)
+        outputs = self.text_ie("《告别了》是孙耀威在专辑爱的故事里面的歌曲")
         self.assertIsNotNone(outputs)
         for output in outputs:
             self.assertIn(entity_type, output)
@@ -57,3 +62,55 @@ class TestUIETask(unittest.TestCase):
                     for relation in relations:
                         self.assertIn("text", relation)
                         self.assertIn("probability", relation)
+
+    def test_opinion_extraction(self):
+        schema = [{"评价维度": ["观点词", "情感倾向[正向，负向]"]}]
+        entity_type = "评价维度"
+        relation_types = ["观点词", "情感倾向[正向，负向]"]
+        self.text_ie.set_schema(schema)
+        outputs = self.text_ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")
+        self.assertIsNotNone(outputs)
+        for output in outputs:
+            self.assertIn(entity_type, output)
+            for entity in output[entity_type]:
+                self.assertIn("text", entity)
+                self.assertIn("probability", entity)
+                self.assertIn("relations", entity)
+                for relation_type, relations in entity["relations"].items():
+                    self.assertIn(relation_type, relation_types)
+                    for relation in relations:
+                        self.assertIn("text", relation)
+                        self.assertIn("probability", relation)
+
+    def test_doc_entity_extraction(self):
+        doc_path = get_tests_dir("fixtures/tests_samples/OCR/custom.jpeg")
+
+        schema = ["进口日期", "申报日期"]
+        self.doc_ie.set_schema(schema)
+        outputs = self.doc_ie(
+            {"doc": doc_path},
+            {"text": "进口日期: 2023年3月2日, 申报日期: 2023年3月2日"},
+        )
+        self.assertIsNotNone(outputs)
+        for output in outputs:
+            for field in output:
+                self.assertIn(field, schema)
+                for entity in output[field]:
+                    self.assertIn("text", entity)
+                    self.assertIn("probability", entity)
+                    self.assertIn("bbox", entity)
+
+        # Enable layout analysis
+        self.doc_ie.set_argument({"layout_analysis": True})
+        outputs = self.doc_ie(
+            {"doc": doc_path},
+            {"text": "进口日期: 2023年3月2日, 申报日期: 2023年3月2日"},
+        )
+        self.assertIsNotNone(outputs)
+        for output in outputs:
+            for field in output:
+                self.assertIn(field, schema)
+                for entity in output[field]:
+                    self.assertIn("text", entity)
+                    self.assertIn("probability", entity)
+                    self.assertIn("bbox", entity)
