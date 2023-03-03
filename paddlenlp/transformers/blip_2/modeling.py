@@ -47,6 +47,7 @@ from .configuration import Blip2Config, Blip2QFormerConfig, Blip2VisionConfig
 
 BLIP_2_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/blip2-flan-t5-xl",
+    "Salesforce/blip2-flan-t5-xl-coco",
 ]
 
 __all__ = [
@@ -562,7 +563,6 @@ class Blip2QFormerMultiHeadAttention(nn.Layer):
         past_key_value = (key_layer, value_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        # attention_scores = paddle.matmul(query_layer, key_layer.transpose(-1, -2))
         attention_scores = paddle.matmul(query_layer, key_layer, transpose_y=True)
 
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
@@ -861,14 +861,6 @@ class Blip2QFormerEncoder(nn.Layer):
 
                     return custom_forward
 
-                # layer_outputs = paddle.utils.checkpoint.checkpoint(
-                #     create_custom_forward(layer_module),
-                #     hidden_states,
-                #     attention_mask,
-                #     layer_head_mask,
-                #     encoder_hidden_states,
-                #     encoder_attention_mask,
-                # )
                 layer_outputs = recompute(
                     create_custom_forward(layer_module),
                     hidden_states,
@@ -1518,12 +1510,12 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         >>> import paddle
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(
-        ...     "Salesforce/blip2-flan-t5-xl", paddle_dtype=paddle.float16
+        ...     "Salesforce/blip2-flan-t5-xl"
         ... )
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> inputs = processor(images=image, return_tensors="pt")
-        >>> generated_ids = model.generate(**inputs)
+        >>> inputs = processor(images=image, return_tensors="pd")
+        >>> generated_ids, scores = model.generate(**inputs)
         >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
         >>> print(generated_text)
         two cats laying on a couch
@@ -1536,13 +1528,13 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         >>> import paddle
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(
-        ...     "Salesforce/blip2-flan-t5-xl", paddle_dtype=paddle.float16
+        ...     "Salesforce/blip2-flan-t5-xl"
         ... )
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> prompt = "Question: how many cats are there? Answer:"
-        >>> inputs = processor(images=image, text=prompt, return_tensors="pt")
-        >>> generated_ids = model.generate(**inputs)
+        >>> inputs = processor(images=image, text=prompt, return_tensors="pd")
+        >>> generated_ids, scores= model.generate(**inputs)
         >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
         >>> print(generated_text)
         two

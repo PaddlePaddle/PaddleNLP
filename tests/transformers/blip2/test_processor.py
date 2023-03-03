@@ -46,7 +46,7 @@ class Blip2ProcessorTest(unittest.TestCase):
 
     def prepare_image_inputs(self):
         """This function prepares a list of PIL images, or a list of numpy arrays if one specifies numpify=True,
-        or a list of PyTorch tensors if one specifies torchify=True.
+        or a list of PaddlePaddle tensors if one specifies torchify=True.
         """
 
         image_inputs = [np.random.randint(255, size=(3, 30, 400), dtype=np.uint8)]

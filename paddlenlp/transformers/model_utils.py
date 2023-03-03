@@ -84,7 +84,7 @@ def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> 
     Used to remove heads.
     Args:
         layer (`torch.nn.Linear`): The layer to prune.
-        index (`torch.LongTensor`): The indices to keep in the layer.
+        index (`paddle.Tensor`): The indices to keep in the layer.
         dim (`int`, *optional*, defaults to 0): The dimension on which to keep the indices.
     Returns:
         `torch.nn.Linear`: The pruned layer as a new layer with `requires_grad=True`.
@@ -111,7 +111,7 @@ def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> 
 
 def find_pruneable_heads_and_indices(
     heads: List[int], n_heads: int, head_size: int, already_pruned_heads: Set[int]
-) -> Tuple[Set[int], paddle.LongTensor]:
+) -> Tuple[Set[int], paddle.Tensor]:
     """
     Finds the heads and their indices taking `already_pruned_heads` into account.
     Args:
@@ -120,7 +120,7 @@ def find_pruneable_heads_and_indices(
         head_size (`int`): The size of each head.
         already_pruned_heads (`Set[int]`): A set of already pruned heads.
     Returns:
-        `Tuple[Set[int], torch.LongTensor]`: A tuple with the remaining heads and their corresponding indices.
+        `Tuple[Set[int], paddle.Tensor]`: A tuple with the remaining heads and their corresponding indices.
     """
     mask = paddle.ones([n_heads, head_size])
     heads = set(heads) - already_pruned_heads  # Convert to set and remove already pruned heads
