@@ -12,25 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import os
-import traceback
-import logging
-import json
-from pathlib import Path
-import attr
 
+import attr
 import numpy as np
-from paddlenlp.transformers import BertModel, ErnieModel, ErniePretrainedModel
 import paddle
 from paddle import nn
 from paddle.nn import functional as F
+from text2sql.models import relational_encoder, relational_transformer
+from text2sql.utils import linking_utils, nn_utils, utils
 
-from text2sql.utils import nn_utils
-from text2sql.utils import linking_utils
-from text2sql.utils import utils
-from text2sql.models import relational_encoder
-from text2sql.models import relational_transformer
+from paddlenlp.transformers import BertModel, ErnieModel, ErniePretrainedModel
 
 
 @attr.s
@@ -256,6 +248,6 @@ if __name__ == "__main__":
         ],
     }
 
-    ##model = Text2SQLEncoder()
-    ##outputs = model(inputs)
-    ##print(outputs)
+    # model = Text2SQLEncoder()
+    # outputs = model(inputs)
+    # print(outputs)
