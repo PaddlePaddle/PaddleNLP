@@ -1,21 +1,46 @@
-## ControlNet
-
+# ControlNet
 [ControlNet](https://arxiv.org/abs/2302.05543) 是一种通过添加额外条件来控制扩散模型的神经网络结构。
 <p align="center">
     <img src="https://raw.githubusercontent.com/lllyasviel/ControlNet/main/github_page/he.png">
 </p>
 
-
-## 1.1 安装依赖
-
-在运行这个训练代码前，我们需要安装 develop 分支的 ppdiffusers 模型。
-
+## 安装依赖
+在运行这部分代码前，我们需要安装develop分支的ppdiffusers库：
 ```bash
 cd ppdiffusers
 python setup.py install
 ```
+此外我们还需要安装相关依赖：
+```bash
+pip install -r requirements.txt
+```
 
-## 1.2 Fill50K 训练例子
+
+# ControlNet with Stable Diffusion预训练模型
+除文本提示外，ControlNet还需要一个控制图作为控制条件。每个预训练模型使用不同的控制方法进行训练，其中每种方法对应一种不同的控制图。例如，Canny to Image要求控制图像是Canny边缘检测的输出图像，而Pose to Image要求控制图是OpenPose骨骼姿态检测图像。目前我们支持如下控制方式及预训练模型。
+## Canny to Image
+采用Canny边缘检测图片作为控制条件。
+```
+python gradio_canny2image.py
+```
+![image](https://user-images.githubusercontent.com/20476674/222131385-0dfaa370-fb11-4b2b-9ef5-36143557578b.png)
+
+
+## Pose to Image
+采用OpenPose姿态图片作为控制条件。
+```
+python gradio_pose2image.py
+```
+![image](https://user-images.githubusercontent.com/20476674/222131475-4dc8582a-d2a2-447a-9724-85461de04c26.png)
+## Semantic Segmentation to Image
+采用ADE20K分割协议的图片作为控制条件。
+```
+python gradio_seg2image_segmenter.py
+```
+![image](https://user-images.githubusercontent.com/20476674/222131908-b0c52512-ef42-4e4b-8fde-62c12c600ff2.png)
+# ControlNet模型训练
+
+## Fill50K 训练例子
 
 作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集。
 ```sh
@@ -24,7 +49,7 @@ unzip -o fill50k.zip
 ```
 注意：下面的代码需要在32G V100上才可以正常运行。
 
-### 1.2.1 单机单卡训练
+### 单机单卡训练
 ```bash
 export FLAGS_conv_workspace_size_limit=4096
 python -u train_txt2img_control_trainer.py \
@@ -92,7 +117,7 @@ python -u train_txt2img_control_trainer.py \
     <img src="https://user-images.githubusercontent.com/50394665/222323163-11ecf153-1f79-4384-b455-d5429748d184.png" width="700">
 </p>
 
-### 1.3.2 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
+### 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash
 export FLAGS_conv_workspace_size_limit=4096
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_control_trainer.py \
@@ -120,7 +145,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_co
     --overwrite_output_dir
 ```
 
-## 2 模型推理
+## 模型推理
 待模型训练完毕，会在`output_dir`保存训练好的模型权重，我们可以使用如下的代码进行推理
 ```python
 from ppdiffusers import StableDiffusionControlNetPipeline, ControlNetModel
@@ -137,6 +162,6 @@ img.save("demo.png")
 </p>
 
 
-## 3 参考资料
+# 参考资料
 - https://github.com/lllyasviel/ControlNet/edit/main/docs/train.md
 - https://github.com/huggingface/diffusers
