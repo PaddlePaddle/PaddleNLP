@@ -687,6 +687,7 @@ support_argument_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 

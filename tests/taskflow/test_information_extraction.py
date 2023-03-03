@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
-import io
-import random
 import unittest
 
-from PIL import Image
+from paddlenlp import Taskflow
 
-from paddlenlp.taskflow import Taskflow
+from ..testing_utils import get_tests_dir
 
 
 class TestUIETask(unittest.TestCase):
@@ -46,8 +43,6 @@ class TestUIETask(unittest.TestCase):
                 for entity in output[field]:
                     self.assertIn("text", entity)
                     self.assertIn("probability", entity)
-                    # self.assertIn("start", entity)  # TODO: find out why this fails
-                    # self.assertIn("end", entity)  # TODO: find out why this fails
 
     def test_relation_extraction(self):
         schema = [{"歌曲名称": ["歌手", "所属专辑"]}]
@@ -68,22 +63,48 @@ class TestUIETask(unittest.TestCase):
                         self.assertIn("text", relation)
                         self.assertIn("probability", relation)
 
+    def test_opinion_extraction(self):
+        schema = [{"评价维度": ["观点词", "情感倾向[正向，负向]"]}]
+        entity_type = "评价维度"
+        relation_types = ["观点词", "情感倾向[正向，负向]"]
+        self.text_ie.set_schema(schema)
+        outputs = self.text_ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")
+        self.assertIsNotNone(outputs)
+        for output in outputs:
+            self.assertIn(entity_type, output)
+            for entity in output[entity_type]:
+                self.assertIn("text", entity)
+                self.assertIn("probability", entity)
+                self.assertIn("relations", entity)
+                for relation_type, relations in entity["relations"].items():
+                    self.assertIn(relation_type, relation_types)
+                    for relation in relations:
+                        self.assertIn("text", relation)
+                        self.assertIn("probability", relation)
+
     def test_doc_entity_extraction(self):
-        # Create a random image
-        width, height = 200, 200
-        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        image = Image.new("RGB", (width, height), color)
+        doc_path = get_tests_dir("fixtures/tests_samples/OCR/custom.jpeg")
 
-        # Encode as base64 string
-        buffer = io.BytesIO()
-        image.save(buffer, format="JPEG")
-        base64_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-        schema = ["发票号码", "开票日期"]
+        schema = ["进口日期", "申报日期"]
         self.doc_ie.set_schema(schema)
         outputs = self.doc_ie(
-            {"doc": base64_string},
-            {"text": "发票号码: 656656, 开票日期: 2023年3月2日"},
+            {"doc": doc_path},
+            {"text": "进口日期: 2023年3月2日, 申报日期: 2023年3月2日"},
+        )
+        self.assertIsNotNone(outputs)
+        for output in outputs:
+            for field in output:
+                self.assertIn(field, schema)
+                for entity in output[field]:
+                    self.assertIn("text", entity)
+                    self.assertIn("probability", entity)
+                    self.assertIn("bbox", entity)
+
+        # Enable layout analysis
+        self.doc_ie.set_argument({"layout_analysis": True})
+        outputs = self.doc_ie(
+            {"doc": doc_path},
+            {"text": "进口日期: 2023年3月2日, 申报日期: 2023年3月2日"},
         )
         self.assertIsNotNone(outputs)
         for output in outputs:
