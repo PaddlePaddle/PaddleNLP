@@ -1,8 +1,19 @@
-# ControlNet简介
+# ControlNet
 [ControlNet](https://arxiv.org/abs/2302.05543) 是一种通过添加额外条件来控制扩散模型的神经网络结构。
 <p align="center">
     <img src="https://raw.githubusercontent.com/lllyasviel/ControlNet/main/github_page/he.png">
 </p>
+
+## 安装依赖
+在运行这部分代码前，我们需要安装develop分支的ppdiffusers库：
+```bash
+cd ppdiffusers
+python setup.py install
+```
+此外我们还需要安装相关依赖：
+```bash
+pip install -r requirements.txt
+```
 
 
 # ControlNet with Stable Diffusion预训练模型
@@ -28,14 +39,6 @@ python gradio_seg2image_segmenter.py
 ```
 ![image](https://user-images.githubusercontent.com/20476674/222131908-b0c52512-ef42-4e4b-8fde-62c12c600ff2.png)
 # ControlNet模型训练
-## 安装依赖
-
-在运行这个训练代码前，我们需要安装 develop 分支的 ppdiffusers 模型。
-
-```bash
-cd ppdiffusers
-python setup.py install
-```
 
 ## Fill50K 训练例子
 
