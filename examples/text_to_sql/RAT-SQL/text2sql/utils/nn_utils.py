@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-import json
-
 import numpy as np
 import paddle
 from paddle import nn
@@ -110,7 +104,6 @@ def sequence_mask(seq_hidden, mask, mode="zero"):
 
     Raises: NULL
     """
-    dtype = seq_hidden.dtype
 
     while len(mask.shape) < len(seq_hidden.shape):
         mask = mask.unsqueeze([-1])

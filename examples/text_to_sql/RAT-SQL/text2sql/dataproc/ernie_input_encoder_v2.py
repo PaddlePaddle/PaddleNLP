@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
+import sys
 from collections import namedtuple
+
 import numpy as np
-
-from paddlenlp.transformers import ErnieTokenizer
-from paddlenlp.transformers import BertTokenizer
-
-from text2sql.utils import utils
-from text2sql.utils import text_utils
 from text2sql.dataproc import BaseInputEncoder
+from text2sql.utils import text_utils
+
+from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
 
 ErnieInput = namedtuple(
     "ErnieInput",
@@ -147,7 +142,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                 else:
                     final_candi_num_index.append(token_idx_mapping[idx][0] + 1)
 
-        ## handle question tokens
+        # handle question tokens
         question_tokens = ["[CLS]"] + q_tokens_tmp
         final_tokens = question_tokens[: self.config.max_question_len] + ["[SEP]"]
 
@@ -157,7 +152,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         else:
             column_match_cells = [None] * len(columns)
 
-        ## handle schema tokens
+        # handle schema tokens
         table_indexes = []
         column_indexes = []
         value_indexes = []
@@ -208,7 +203,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                 final_tokens += toks
             final_tokens.append("[SEP]")
 
-            ## handle number value tokens: condition and limit number values
+            # handle number value tokens: condition and limit number values
             num_value_indexes = []
             if candi_nums is not None and len(candi_nums) > 0:
                 value_list += candi_nums
@@ -232,12 +227,12 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             final_tokens.extend(value_list)
         final_tokens.append("[SEP]")
 
-        ###packed_sents_lens = [q_lens, column_tokens_lens, table_tokens_lens, limit_tokens_lens]
-        ##packed_sents, packed_sents_lens = self._pack([question_tokens],
-        ##                                             column_tokens,
-        ##                                             table_tokens,
-        ##                                             limit_tokens,
-        ##                                             value_indexes=column_values_index)
+        # packed_sents_lens = [q_lens, column_tokens_lens, table_tokens_lens, limit_tokens_lens]
+        # packed_sents, packed_sents_lens = self._pack([question_tokens],
+        #                                             column_tokens,
+        #                                             table_tokens,
+        #                                             limit_tokens,
+        #                                             value_indexes=column_values_index)
 
         return (
             final_tokens,
@@ -278,6 +273,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     from pathlib import Path
+
     from text2sql import global_config
     from text2sql.dataproc.dusql_dataset import load_tables
 
