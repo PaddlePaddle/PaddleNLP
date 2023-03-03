@@ -350,6 +350,11 @@ TASKS = {
                 "hidden_size": 8,
                 "task_flag": "information_extraction-tiny-random-uie",
             },
+            "__internal_testing__/tiny-random-uie-x": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie-x",
+            },
         },
         "default": {"model": "uie-base"},
     },
@@ -656,6 +661,7 @@ support_schema_list = [
     "utc-pico",
     "utc-tiny",
     "__internal_testing__/tiny-random-uie",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 support_argument_list = [
@@ -681,6 +687,7 @@ support_argument_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 
