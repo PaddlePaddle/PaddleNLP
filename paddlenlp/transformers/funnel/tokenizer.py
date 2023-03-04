@@ -15,12 +15,10 @@
 
 __all__ = ["FunnelTokenizer"]
 
-from collections.abc import Iterable
 import os
-from ..bert.tokenizer import BertTokenizer
-from .. import BasicTokenizer, WordpieceTokenizer
-from .. import PretrainedTokenizer
 import unicodedata
+
+from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 from ..tokenizer_utils import _is_control
 
 
@@ -31,7 +29,7 @@ def stem(token):
         return token
 
 
-class FunnelTokenizer(BertTokenizer):
+class FunnelTokenizer(PretrainedTokenizer):
     cls_token_type_id = 2
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
