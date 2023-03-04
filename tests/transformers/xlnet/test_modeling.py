@@ -18,8 +18,6 @@ import unittest
 
 import paddle
 from parameterized import parameterized_class
-from test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
-from testing_utils import slow
 
 from paddlenlp.transformers import (  # XLNetForCausalLM,
     XLNetConfig,
@@ -31,6 +29,9 @@ from paddlenlp.transformers import (  # XLNetForCausalLM,
     XLNetModel,
     XLNetPretrainedModel,
 )
+
+from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class XLNetModelTester:
