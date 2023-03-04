@@ -249,7 +249,7 @@ class FunnelModelTester:
 
 
 class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
-    bese_model_class = FunnelModel
+    base_model_class = FunnelModel
     test_head_masking = False
     test_pruning = False
     all_model_classes = (
