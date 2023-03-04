@@ -506,6 +506,7 @@ class ModelTesterMixin:
         if not self.use_test_model_name_list:
             return
         config = self.model_tester.get_config()
+        print(self.base_model_class)
         if isinstance(config, PretrainedConfig):
             model = self.base_model_class(config)
         else:
