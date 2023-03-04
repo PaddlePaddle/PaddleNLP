@@ -653,9 +653,9 @@ class XLMForSequenceClassification(XLMPretrainedModel):
         super().__init__(config)
         self.num_classes = config.num_classes
         self.xlm = XLMModel(config)
-        dropout_prob = config.dropout if config.dropout is not None else self.xlm.config["hidden_dropout_prob"]
+        dropout_prob = config.dropout if config.dropout is not None else config.hidden_dropout_prob
         self.dropout = nn.Dropout(dropout_prob)
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], config.num_classes)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -726,10 +726,8 @@ class XLMForTokenClassification(XLMPretrainedModel):
         super(XLMForTokenClassification, self).__init__(config)
         self.num_classes = config.num_classes
         self.xlm = XLMModel(config)  # allow xlm to be config
-        self.dropout = nn.Dropout(
-            config.dropout if config.dropout is not None else self.xlm.config["hidden_dropout_prob"]
-        )
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], config.num_classes)
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -792,7 +790,7 @@ class XLMForQuestionAnsweringSimple(XLMPretrainedModel):
     def __init__(self, config: XLMConfig):
         super(XLMForQuestionAnsweringSimple, self).__init__(config)
         self.xlm = XLMModel(config)  # allow xlm to be config
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], 2)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -869,14 +867,12 @@ class XLMForMultipleChoice(XLMPretrainedModel):
             instance `xlm`. Defaults to None.
     """
 
-    def __init__(self, config: XLMConfig, *inputs, **kwargs):
-        super(XLMForMultipleChoice, self).__init__(config, *inputs, **kwargs)
+    def __init__(self, config: XLMConfig):
+        super(XLMForMultipleChoice, self).__init__(config)
         # self.num_choices = num_choices
         self.xlm = XLMModel(config)
-        self.dropout = nn.Dropout(
-            config.dropout if config.dropout is not None else self.xlm.config["hidden_dropout_prob"]
-        )
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], 1)
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):

@@ -1571,7 +1571,7 @@ class XLNetLMHeadModel(XLNetPretrainedModel):
         self.transformer = XLNetModel(config)
         self.decoder_weight = self.transformer.word_embedding.weight
         self.decoder_bias = self.create_parameter(
-            shape=[self.transformer.config["vocab_size"]], dtype=self.decoder_weight.dtype, is_bias=True
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
         )
         self.init_weights()
 
@@ -1882,7 +1882,7 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
     def __init__(self, config: XLNetConfig):
         super(XLNetForQuestionAnswering, self).__init__(config)
         self.transformer = XLNetModel(config)
-        self.qa_outputs = nn.Linear(self.transformer.d_model, 2)
+        self.qa_outputs = nn.Linear(config.d_model, 2)
 
         self.init_weights()
 
