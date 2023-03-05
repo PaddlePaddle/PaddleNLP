@@ -30,7 +30,7 @@ from visualdl import LogWriter
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer, PretrainedModel
 from paddlenlp.utils.log import logger
 
 try:
@@ -145,8 +145,6 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
-
     # Detecting last checkpoint.
     last_checkpoint = None
     training_args = args
@@ -170,16 +168,15 @@ def do_train(args):
         global_step = int(str(last_checkpoint).split("-")[-1])
 
     log_writer = None
-    if dp_rank == 0 and mp_rank == 0 and dp_rank == 0:
+    if dp_rank == 0 and mp_rank == 0 and sharding_rank == 0:
         log_writer_path = os.path.join(args.output_dir, default_logdir())
-        if os.path.exists(log_writer_path):
-            import shutil
+        log_writer = LogWriter(logdir=log_writer_path)
 
-            shutil.rmtree(log_writer_path)
-        log_writer = LogWriter(log_writer_path)
-
+    WEIGHTS_NAME = "model_state.pdparams"
+    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
-        GPTForPretraining.resource_files_names = {"model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)}
+        WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
+        GPTForPretraining.resource_files_names = {"model_state": WEIGHTS_NAME}
 
     model = GPTForPretraining.from_pretrained(
         args.model_name_or_path,
@@ -187,7 +184,7 @@ def do_train(args):
         attention_probs_dropout_prob=args.attention_probs_dropout_prob,
         num_partitions=args.mp_degree,
         use_recompute=args.use_recompute,
-        fuse=True,
+        fuse=False,  # NOT USING FuseTransformer.
     )
 
     # Create the critrion for the gpt model
@@ -268,15 +265,6 @@ def do_train(args):
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
 
-    if args.model_name_or_path not in pretrained_models_list:
-        logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
-        opt_path = os.path.join(args.model_name_or_path, "model_state.pdopt")
-        if os.path.exists(opt_path):
-            opt_dict = paddle.load(opt_path)
-            optimizer.set_state_dict(opt_dict)
-        else:
-            logger.warning("No optimizer checkpoint file found in %s." % opt_path)
-
     files = get_train_data_file(args)
     train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
         args,
@@ -301,9 +289,7 @@ def do_train(args):
     if training_args.resume_from_checkpoint and last_checkpoint is not None:
         optimizer.set_state_dict(
             paddlenlp_load(
-                os.path.join(
-                    last_checkpoint, "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
-                ),
+                os.path.join(last_checkpoint, OPTIMIZER_NAME),
                 return_numpy=True,
             )
         )
@@ -356,7 +342,9 @@ def do_train(args):
             continue
 
         if args.use_pure_fp16:
-            scaler.minimize(optimizer, tr_loss)
+            # scaler.minimize(optimizer, tr_loss)
+            scaler.step(optimizer)
+            scaler.update()
         else:
             optimizer.step()
 
@@ -412,28 +400,37 @@ def do_train(args):
                 if paddle.distributed.get_world_size() > 1 and args.sharding_stage not in [2, 3]
                 else model
             )
-            if isinstance(model_to_save, TensorParallel):
-                model_to_save = model_to_save._layers
-
-            output_dir = os.path.join(args.output_dir, "checkpoint-%d" % global_step)
-            os.makedirs(output_dir, exist_ok=True)
-
-            logger.info("Save model to %s" % output_dir)
 
             if args.sharding_stage == 3:
                 # If parameter need to convert to cpu, please add convert2cpu=True
                 model_to_save.get_all_parameters(convert2cpu=True)
 
-            if mp_rank == 0 and sharding_rank == 0:
+            while isinstance(model_to_save, TensorParallel) or isinstance(model_to_save, paddle.DataParallel):
+                model_to_save = model_to_save._layers
+
+            output_dir = os.path.join(args.output_dir, "checkpoint-%d" % global_step)
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info("Save model to %s" % output_dir)
+
+            if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
                 tokenizer.save_pretrained(output_dir)
-            model_to_save.save_pretrained(output_dir)
-            paddle.save(
-                optimizer.state_dict(),
-                os.path.join(
-                    output_dir,
-                    "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank),
-                ),
-            )
+
+            if sharding_rank == 0 and dp_rank == 0:
+                if isinstance(model_to_save, PretrainedModel):
+                    model_to_save.save_pretrained(output_dir)
+                else:
+                    logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
+                    state_dict = model_to_save.state_dict()
+                    paddle.save(state_dict, os.path.join(output_dir, WEIGHTS_NAME))
+
+                paddle.save(
+                    optimizer.state_dict(),
+                    os.path.join(
+                        output_dir,
+                        OPTIMIZER_NAME,
+                    ),
+                )
+
             if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
                 _rotate_checkpoints(args.save_total_limit, output_dir=args.output_dir)
 

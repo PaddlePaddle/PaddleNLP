@@ -85,7 +85,7 @@ class MultiHeadAttention(nn.Layer):
         need_weights=False,
         weight_attr=None,
         bias_attr=None,
-        fuse=True,
+        fuse_qkv=True,
         num_partitions=1,
     ):
         super(MultiHeadAttention, self).__init__()
@@ -95,7 +95,7 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = num_heads
         self.dropout = dropout
         self.need_weights = need_weights
-        self.fuse = fuse
+        self.fuse_qkv = fuse_qkv
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -103,7 +103,7 @@ class MultiHeadAttention(nn.Layer):
         assert self.num_heads % num_partitions == 0
         self.num_heads = self.num_heads // num_partitions
 
-        if self.fuse:
+        if self.fuse_qkv:
             assert self.kdim == embed_dim, "embed_dim should be equal to kdim"
             assert self.vdim == embed_dim, "embed_dim should be equal to vidm"
 
@@ -210,7 +210,7 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if use_cache is False:
-            if self.fuse:
+            if self.fuse_qkv:
                 q, k, v = self._fuse_prepare_qkv(query)
             else:
                 q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
@@ -579,12 +579,12 @@ class GPTPretrainedModel(PretrainedModel):
             "vocab_size": 50304,
             "hidden_size": 5120,
             "num_hidden_layers": 40,
-            "num_attention_heads": 128,
+            "num_attention_heads": 40,
             "intermediate_size": 20480,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
+            "max_position_embeddings": 2048,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "eos_token_id": 50256,
@@ -763,7 +763,11 @@ class GPTModel(GPTPretrainedModel):
             )
 
         self.decoder = TransformerDecoder(
-            decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size, use_recompute=use_recompute
+            decoder_layers,
+            num_hidden_layers,
+            norm="LayerNorm",
+            hidden_size=hidden_size,
+            use_recompute=use_recompute,
         )
 
         self.apply(self.init_weights)
@@ -781,16 +785,16 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
-        # TODO, use registered buffer
-        # causal_mask = paddle.tensor.triu(
-        #     paddle.ones((paddle.shape(input_ids)[-1],
-        #                  paddle.shape(input_ids)[-1])) * -1e9,
-        #     diagonal=1)
+        if self.fuse:
+            # TODO, use registered buffer
+            causal_mask = paddle.tensor.triu(
+                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+            )
 
-        # if attention_mask is not None:
-        #     attention_mask = attention_mask + causal_mask
-        # else:
-        #     attention_mask = causal_mask
+            if attention_mask is not None:
+                attention_mask = attention_mask + causal_mask
+            else:
+                attention_mask = causal_mask
 
         # The tensor returned by triu not in static graph.
         # attention_mask.stop_gradient = True
@@ -798,8 +802,8 @@ class GPTModel(GPTPretrainedModel):
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            # tgt_mask=attention_mask,
-            tgt_mask=None,
+            tgt_mask=attention_mask,
+            # tgt_mask=None,
             use_cache=use_cache,
             cache=cache,
         )
@@ -823,7 +827,13 @@ class GPTForPretraining(GPTPretrainedModel):
         self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
 
     def forward(
-        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+        use_cache=False,
+        cache=None,
     ):
         outputs = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
@@ -858,12 +868,10 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
         if self.mp_size > 1:
             masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-            # print("masked_lm_loss:", masked_lm_loss.abs().mean().item())
         else:
             masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
-        # print("loss_mask:", loss_mask.sum().item())
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
@@ -886,7 +894,13 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         self.apply(self.init_weights)
 
     def model(
-        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+        use_cache=False,
+        cache=None,
     ):
         outputs = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
