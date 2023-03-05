@@ -5,8 +5,8 @@
 |API名称 | 新增API名称                                            |
 |---|----------------------------------------------------|
 |提交作者<input type="checkbox" class="rowselector hidden"> | 丘文波, 刘旺旺                                           |
-|提交时间<input type="checkbox" class="rowselector hidden"> | 2022-03-04                                         |
-|版本号 | V1                                                 |
+|提交时间<input type="checkbox" class="rowselector hidden"> | 2022-03-05                                         |
+|版本号 | V2                                                 |
 |依赖飞桨版本<input type="checkbox" class="rowselector hidden"> | 如无特殊情况，都应基于develop版本开发                             |
 |文件名 | 20230304_api_design_for_tie_weight_task_103.md<br> |
 
@@ -45,24 +45,108 @@ paddle 中并没有对tie weight的统一实现,调用者需自己写代码实�
 
 paddleNLP中的一些示例代码中也找到了一个tie weight的实现.
 
-<img alt="img_3.png" src="img_3.png" width="700"/>
+(1) [代码链接1](https://github.com/qiuwenbogdut/PaddleNLP/blob/develop/examples/language_model/transformer-xl/mem_transformer.py#L811)
+
+```python
+if tie_weight:
+        for i in range(len(self.crit.out_layers_weight)):
+            self.crit.out_layers_weight[i] = self.word_emb.emb_layers[i].weight
+
+if tie_projs:
+        for i, tie_proj in enumerate(tie_projs):
+            if tie_proj and div_val == 1 and d_model != d_embed:
+                self.crit.out_projs[i] = self.word_emb.emb_projs[0]
+            elif tie_proj and div_val != 1:
+                self.crit.out_projs[i] = self.word_emb.emb_projs[i]
+```
+
+(2) [代码链接2](https://github.com/PaddlePaddle/PaddleNLP/blob/4e5df921ff61ddae1d869c37aea621b9cac6bcd4/paddlenlp/transformers/reformer/modeling.py#L1977)
+
+```python
+def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        tie_word_embeddings = (
+            self.tie_word_embeddings
+            if hasattr(self, "tie_word_embeddings")
+            else self.config.get("tie_word_embeddings", False)
+        )
+        if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings") and tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            if output_embeddings is not None:
+                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
+```
+
 
 最好是给基础模型加上tie weight的函数,减少调用者的开发.
 
 # 三、业内方案调研
 描述业内深度学习框架如何实现此功能，包括与此功能相关的现状、未来趋势；调研的范围包括不限于TensorFlow、PyTorch、NumPy等
 
-(1)目前huggingface的transformers库中实现了这个tieweight 这个基础函数.
+(1)目前huggingface的transformers库中实现了这个tieweight 这个基础函数. [代码链接](https://github.com/huggingface/transformers/blob/v4.26.1/src/transformers/modeling_utils.py#L1172)
+```python
+def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        If the `torchscript` flag is set in the configuration, can't handle parameter sharing so we are cloning the
+        weights instead.
+        """
+        if getattr(self.config, "tie_word_embeddings", True):
+            output_embeddings = self.get_output_embeddings()
+            if output_embeddings is not None:
+                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
 
-<img alt="img_4.png" src="img_4.png" width="700"/>
+        if getattr(self.config, "is_encoder_decoder", False) and getattr(self.config, "tie_encoder_decoder", False):
+            if hasattr(self, self.base_model_prefix):
+                self = getattr(self, self.base_model_prefix)
+            self._tie_encoder_decoder_weights(self.encoder, self.decoder, self.base_model_prefix)
 
-(2) tensor2tensor库 tieweight 实现代码
+        for module in self.modules():
+            if hasattr(module, "_tie_weights"):
+                module._tie_weights()
+```
 
-<img alt="img_5.png" src="img_5.png" width="500"/>
 
-(3) fairseq库 中 tie weight实现函数
+(2) tensor2tensor库 tieweight 实现代码 [代码链接](https://github.com/tensorflow/tensor2tensor/blob/316c9ce2f2b2373f44f5be0da712dda3e5861a75/tensor2tensor/layers/modalities.py#L1106)
+```python
+def symbol_top(body_output, targets, model_hparams, vocab_size):
+  del targets  # unused arg
+  if model_hparams.shared_embedding_and_softmax_weights:
+    scope_name = "shared"
+    reuse = tf.AUTO_REUSE
+  else:
+    scope_name = "softmax"
+    reuse = False
+  with tf.variable_scope(scope_name, reuse=reuse):
+    body_output_shape = common_layers.shape_list(body_output)
+    var = get_weights(model_hparams, vocab_size, body_output_shape[-1])
+    if (model_hparams.factored_logits and
+        model_hparams.mode == tf_estimator.ModeKeys.TRAIN):
+      # insert channels dimension
+      body_output = tf.expand_dims(body_output, 3)
+      return common_layers.FactoredTensor(body_output, var)
+    else:
+      body_output = tf.reshape(body_output, [-1, body_output_shape[-1]])
+      logits = tf.matmul(body_output, var, transpose_b=True)
+      return tf.reshape(logits,
+                        body_output_shape[:-1] + [1, vocab_size])
+```
 
-<img alt="img_6.png" src="img_6.png" width="600"/>
+
+(3) fairseq库 中 tie weight实现函数 [代码链接](https://github.com/facebookresearch/fairseq/blob/main/fairseq/models/fconv.py#L480)
+```python
+self.fc2 = Linear(in_channels, out_embed_dim)
+            if share_embed:
+                assert out_embed_dim == embed_dim, (
+                    "Shared embed weights implies same dimensions "
+                    " out_embed_dim={} vs embed_dim={}".format(out_embed_dim, embed_dim)
+                )
+                self.fc3 = nn.Linear(out_embed_dim, num_embeddings)
+                self.fc3.weight = self.embed_tokens.weight
+            else:
+                self.fc3 = Linear(out_embed_dim, num_embeddings, dropout=dropout)
+```
 
 # 四、对比分析
 paddle和 huggingface的transformers 都是基于动态图进行开发, 所以准备参照huggingface的transformers  的 tie weight 函数思路去实现功能.
