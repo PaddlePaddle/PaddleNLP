@@ -1396,7 +1396,7 @@ class BertForMaskedLM(BertPretrainedModel):
             return_dict=return_dict,
         )
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output, masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:
