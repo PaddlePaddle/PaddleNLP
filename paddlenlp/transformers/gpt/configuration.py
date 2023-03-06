@@ -291,4 +291,5 @@ class GPTConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
+        self.fuse_qkv = False
         self.topo = topo
