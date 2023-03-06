@@ -75,6 +75,7 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
     model.eval()
     all_loss = []
     local_time = time.time()
+    iter_step = 0
     for eval_step, batch in enumerate(data_loader):
         with paddle.amp.auto_cast(
             args.use_pure_fp16,
@@ -87,7 +88,13 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
             loss = criterion(preds, labels, loss_mask)
 
         all_loss.append(float(loss))
-        if eval_step >= iter_steps - 1:
+
+        if (eval_step + 1) % args.accumulate_steps == 0:
+            iter_step += 1
+        else:
+            continue
+
+        if iter_step >= iter_steps:
             break
 
     average_loss = sum(all_loss) / len(all_loss)

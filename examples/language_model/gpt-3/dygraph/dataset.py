@@ -319,7 +319,7 @@ def create_pretrained_dataset(
 
         batch_sampler = DistributedBatchSampler(
             dataset,
-            batch_size=args.local_batch_size,
+            batch_size=args.micro_batch_size,
             num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
