@@ -415,7 +415,7 @@ class ZeroShotTextClassificationTask(Task):
             scores = self.sigmoid(np.array(logits))
             output = {}
             output["predictions"] = []
-            for i, class_score in enumerate(scores[0]):
+            for i, class_score in enumerate(scores):
                 if class_score > self._pred_threshold:
                     output["predictions"].append({"label": i, "score": class_score})
             outputs.append(output)
