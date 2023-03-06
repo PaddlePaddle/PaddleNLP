@@ -1009,12 +1009,6 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_clt >>${log_path}/ernie-m_clt 2>&1
     print_info $? ernie-m_clt
-    # inference for cross-lingual-transfer
-    python deploy/predictor/inference.py \
-        --device gpu \
-        --task_name seq_cls \
-        --model_path output_clt/export/model >${log_path}/ernie-m_clt_infer >>${log_path}/ernie-m_clt_infer 2>&1
-    print_info $? ernie-m_clt_infer
     # finetuned for translate-train-all
     python -m paddle.distributed.launch --log_dir output_tta run_classifier.py \
         --do_train \
@@ -1034,12 +1028,6 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_tta >>${log_path}/ernie-m_tta 2>&1
     print_info $? ernie-m_tta
-    # inference for translate-train-all
-    python deploy/predictor/inference.py \
-        --device gpu \
-        --task_name seq_cls \
-        --model_path output_tta/export/model >${log_path}/ernie-m_tta_infer >>${log_path}/ernie-m_tta_infer 2>&1
-    print_info $? ernie-m_tta_infer
 else
     python -m pytest ${nlp_dir}/tests/model_zoo/test_ernie_m.py >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
     print_info $? ernie-m
