@@ -51,6 +51,7 @@ class Predictor(object):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         config.switch_use_feed_fetch_ops(False)
+        config.delete_pass("fused_multi_transformer_encoder_pass")
         self.predictor = paddle.inference.create_predictor(config)
 
         self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
