@@ -33,6 +33,12 @@ class MRR:
         super().__init__()
         self.distance = distance
 
+    def reset_distance(self, distance):
+        """
+        change the algorithm of calculating distance, need to be supported of sklearn.metrics.pairwise_distance
+        """
+        self.distance = distance
+
     def compute_matrix_mrr(self, labels, embeddings):
         """
         A function which can calculate the distance of one embedding to other embeddings
