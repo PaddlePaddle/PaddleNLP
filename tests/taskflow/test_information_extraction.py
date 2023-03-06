@@ -29,7 +29,7 @@ class TestUIETask(unittest.TestCase):
 
         cls.uie_m = Taskflow(
             task="information_extraction",
-            model="__internal_testing__/tiny-random-uie",
+            model="__internal_testing__/tiny-random-uie-m",
         )
 
         cls.uie_x = Taskflow(
