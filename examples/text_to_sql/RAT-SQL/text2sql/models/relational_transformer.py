@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import math
 
-import numpy as np
 import paddle
-from paddle import nn
 import paddle.nn.functional as F
+from paddle import nn
 
 ACT_DICT = {
     "relu": nn.ReLU,

@@ -70,11 +70,11 @@ class BLEU(paddle.metric.Metric):
     provide `vocab`. It should be noted that the BLEU here is different from
     the BLEU calculated in prediction, and it is only for observation during
     training and evaluation.
-    
+
     .. math::
 
         BP & =
-        \begin{cases} 
+        \begin{cases}
         1,  & \text{if }c>r \\
         e_{1-r/c}, & \text{if }c\leq r
         \end{cases}
@@ -109,7 +109,7 @@ class BLEU(paddle.metric.Metric):
             print(bleu.score()) # 0.4671379777282001
 
         2. Using as an instance of `paddle.metric.Metric`.
-                
+
         .. code-block:: python
 
             # You could add the code below to Seq2Seq example in this repo to
@@ -212,7 +212,7 @@ class BLEU(paddle.metric.Metric):
                     _score = 0.0
                 else:
                     _score = self.match_ngram[n_size] / float(self.candi_ngram[n_size])
-            except:
+            except Exception:
                 _score = 0
             if _score == 0:
                 _score = sys.float_info.min

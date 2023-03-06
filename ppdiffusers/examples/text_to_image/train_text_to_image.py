@@ -27,7 +27,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from datasets import DatasetDict, load_dataset
-from diffusers.training_utils import EMAModel
 from huggingface_hub import HfFolder, Repository, create_repo, whoami
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -49,7 +48,7 @@ from ppdiffusers import (
 )
 from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.training_utils import EMAModel, main_process_first
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 

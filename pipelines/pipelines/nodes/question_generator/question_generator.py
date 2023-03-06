@@ -13,19 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import json
-import sys
-import argparse
-import re
-from tqdm import tqdm
+import os
 
 import paddle
-from paddlenlp import Taskflow
-from pipelines.nodes.base import BaseComponent
-from paddlenlp.utils.env import PPNLP_HOME
-from paddlenlp.taskflow.utils import download_file
 from paddle.dataset.common import md5file
+from tqdm import tqdm
+
+from paddlenlp import Taskflow
+from paddlenlp.taskflow.utils import download_file
+from paddlenlp.utils.env import PPNLP_HOME
+from pipelines.nodes.base import BaseComponent
 
 
 class QuestionGenerator(BaseComponent):

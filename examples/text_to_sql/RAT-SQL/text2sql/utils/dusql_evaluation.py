@@ -15,39 +15,35 @@
 Calculating the exact accuracy. For select, where and others schema, it will be
 seen as right if has different order. This script refers to https://github.com/taoyds/spider。
 """
-import sys
-import os
-import traceback
-import logging
-from io import open
-import json
 import copy
-from collections import defaultdict
+import json
+import logging
 import re
-import six
+from collections import defaultdict
+from io import open
 
 from text2sql.utils import text_utils
 
-################################
-# val: number(float)/string(str)/sql(dict)
-# col_unit: (agg_id, col_id)
-# val_unit: (unit_op, col_unit1, col_unit2)
-# table_unit: (table_type, col_unit/sql)
-# cond_unit: (not_op, cond_op, val_unit, val1, val2)
-# condition: [cond_unit1, 'and'/'or', cond_unit2, ...]
-# sql {
-#   'select': [(agg_id, val_unit), (agg_id, val_unit), ...]
-#   'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
-#   'where': condition
-#   'groupBy': [col_unit1, col_unit2, ...]
-#   'orderBy': ('asc'/'desc', [(agg_id, val_unit), ...])
-#   'having': condition
-#   'limit': None/number(int)
-#   'intersect': None/sql
-#   'except': None/sql
-#   'union': None/sql
-# }
-################################
+"""
+val: number(float)/string(str)/sql(dict)
+col_unit: (agg_id, col_id)
+val_unit: (unit_op, col_unit1, col_unit2)
+table_unit: (table_type, col_unit/sql)
+cond_unit: (not_op, cond_op, val_unit, val1, val2)
+condition: [cond_unit1, 'and'/'or', cond_unit2, ...]
+sql {
+  'select': [(agg_id, val_unit), (agg_id, val_unit), ...]
+  'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
+  'where': condition
+  'groupBy': [col_unit1, col_unit2, ...]
+  'orderBy': ('asc'/'desc', [(agg_id, val_unit), ...])
+  'having': condition
+  'limit': None/number(int)
+  'intersect': None/sql
+  'except': None/sql
+  'union': None/sql
+}
+"""
 
 CLAUSE_KEYWORDS = ("select", "from", "where", "group", "order", "limit", "intersect", "union", "except")
 JOIN_KEYWORDS = ("join", "on", "as")
@@ -281,7 +277,7 @@ def parse_value(toks, start_idx, tables_with_alias, schema, default_tables=None)
                 if last == "%":
                     n /= 100
                 return n
-            except:
+            except Exception:
                 last = str_num[-1]
                 str_num = str_num[:-1]
         raise ValueError("not a float number")
@@ -297,7 +293,7 @@ def parse_value(toks, start_idx, tables_with_alias, schema, default_tables=None)
             # val = float(val_str) if val_str[-1] != '%' else float(val_str[:-1]) / 100
             val = _force_float(val_str)
             idx += 1
-        except:
+        except Exception:
             end_idx = idx
             while (
                 end_idx < len_
@@ -645,7 +641,7 @@ class Evaluator(object):
         gold_table_units = gold["from"]["table_units"]
         pred_table_units = pred["from"]["table_units"]
         if len(pred_table_units) != len(gold_table_units) or any(
-            map(lambda x: type(x[0][1]) != type(x[1][1]), zip(pred_table_units, gold_table_units))
+            map(lambda x: type(x[0][1]) != type(x[1][1]), zip(pred_table_units, gold_table_units))  # noqa: E721
         ):
             return 0
         if type(gold_table_units[0][1]) is not dict:
@@ -772,7 +768,7 @@ class Evaluator(object):
 
             p_valid_col_units = build_valid_col_units(pred_sql["from"]["table_units"], schema)
             pred_sql = rebuild_sql_col(p_valid_col_units, pred_sql, kmap, self.eval_value)
-        except Exception as e:
+        except Exception:
             # If pred_sql is not valid, then we will use an empty sql to evaluate with the correct sql
             pred_sql = g_empty_sql
             self.eval_err_num += 1
@@ -1094,7 +1090,7 @@ def get_keywords(sql):
     if len([token for token in ao if token == "or"]) > 0:
         res.add("or")
 
-    ## TODO
+    # TODO
     cond_units = sql["from"]["conds"][::2] + sql["where"][::2] + sql["having"][::2]
     # not keyword
     if len([cond_unit for cond_unit in cond_units if cond_unit[0]]) > 0:
@@ -1162,7 +1158,7 @@ def rebuild_table_unit_col(valid_col_units, table_unit, kmap, eval_value=True):
     table_type, col_unit_or_sql = table_unit
     if isinstance(col_unit_or_sql, dict):
         col_unit_or_sql = rebuild_sql_col(valid_col_units, col_unit_or_sql, kmap, eval_value)
-    elif isinstance(col_unit_or_sql, tuple):  ## useless
+    elif isinstance(col_unit_or_sql, tuple):  # useless
         col_unit_or_sql = rebuild_col_unit_col(valid_col_units, col_unit_or_sql, kmap)
     return table_type, col_unit_or_sql
 

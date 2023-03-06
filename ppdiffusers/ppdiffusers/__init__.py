@@ -42,6 +42,7 @@ else:
     from .modeling_utils import ModelMixin
     from .models import (
         AutoencoderKL,
+        ControlNetModel,
         PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
@@ -114,6 +115,7 @@ else:
         LDMBertModel,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
+        StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
         StableDiffusionImg2ImgPipeline,
@@ -147,6 +149,7 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
 else:
     from .pipelines import (
+        FastDeployCycleDiffusionPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,

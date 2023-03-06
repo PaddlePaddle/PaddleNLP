@@ -134,6 +134,7 @@ from .rembert.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
+from .skep.configuration import *
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
@@ -175,6 +176,7 @@ from .codegen.tokenizer import *
 from .codegen.configuration import *
 from .artist.modeling import *
 from .artist.tokenizer import *
+from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 from .clip.modeling import *

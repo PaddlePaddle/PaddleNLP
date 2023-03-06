@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import jieba
-from .vocab import Vocab
 
 
 def get_idx_from_word(word, word_to_idx, unk_word):

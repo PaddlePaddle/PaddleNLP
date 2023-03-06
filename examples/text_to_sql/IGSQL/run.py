@@ -17,26 +17,22 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import numpy as np
-import random
+import random  # noqa: E402
 
-from parse_args import interpret_args
-
-import data_util
-from data_util import atis_data
-from model.schema_interaction_model import SchemaInteractionATISModel
-from logger import Logger
-from model.model import ATISModel
-from model_util import (
+import numpy as np  # noqa: E402
+import paddle  # noqa: E402
+from data_util import atis_data  # noqa: E402
+from logger import Logger  # noqa: E402
+from model.schema_interaction_model import SchemaInteractionATISModel  # noqa: E402
+from model_util import (  # noqa: E402
     Metrics,
-    evaluate_utterance_sample,
     evaluate_interaction_sample,
-    train_epoch_with_utterances,
-    train_epoch_with_interactions,
     evaluate_using_predicted_queries,
+    evaluate_utterance_sample,
+    train_epoch_with_interactions,
+    train_epoch_with_utterances,
 )
-
-import paddle
+from parse_args import interpret_args  # noqa: E402
 
 np.random.seed(0)
 np.set_printoptions(16)
@@ -100,15 +96,12 @@ def train(model, data, params):
     learning_rate_coefficient = 1.0
     previous_epoch_loss = float("inf")
     previous_valid_acc = 0.0
-    maximum_validation_accuracy = 0.0
     maximum_string_accuracy = 0.0
 
     countdown = int(patience)
 
     keep_training = True
     step = 0
-
-    save_num = 0
 
     # init learning_rate
     model.set_learning_rate(params.initial_learning_rate)

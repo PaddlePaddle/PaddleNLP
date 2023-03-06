@@ -53,10 +53,9 @@ python create_pretraining_data.py \
 GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预先准备，使用`run_glue.py`执行微调时将会自动下载。
 
 ### 执行Pre-training
-
-#### GPU训练
-```shell
-unset CUDA_VISIBLE_DEVICES
+<details>
+<summary>GPU训练</summary>
+<pre><code>unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
@@ -73,30 +72,8 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device gpu \
-    --use_amp False
-```
+    --use_amp False</code></pre>
 
-#### XPU训练
-```shell
-unset FLAGS_selected_xpus
-python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
-    --model_type bert \
-    --model_name_or_path bert-base-uncased \
-    --max_predictions_per_seq 20 \
-    --batch_size 32   \
-    --learning_rate 1e-4 \
-    --weight_decay 1e-2 \
-    --adam_epsilon 1e-6 \
-    --warmup_steps 10000 \
-    --num_train_epochs 3 \
-    --input_dir data/ \
-    --output_dir pretrained_models/ \
-    --logging_steps 1 \
-    --save_steps 20000 \
-    --max_steps 1000000 \
-    --device xpu \
-    --use_amp False
-```
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
@@ -114,6 +91,111 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `max_steps` 表示最大训练步数，达到`max_steps`后就提前结束。注意，我们必须设置 `max_steps`。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
+</details>
+
+#### GPU训练（Trainer版本）
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_pretrain_trainer.py \
+    --model_type bert \
+    --model_name_or_path bert-base-uncased \
+    --max_predictions_per_seq 20 \
+    --per_device_train_batch_size 32   \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 3 \
+    --input_dir data/ \
+    --output_dir pretrained_models/ \
+    --logging_steps 1 \
+    --save_steps 20000 \
+    --max_steps 1000000 \
+    --device gpu \
+    --fp16 False \
+    --do_train
+```
+
+<details>
+<summary>XPU训练</summary>
+<pre><code>unset FLAGS_selected_xpus
+python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
+    --model_type bert \
+    --model_name_or_path bert-base-uncased \
+    --max_predictions_per_seq 20 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 3 \
+    --input_dir data/ \
+    --output_dir pretrained_models/ \
+    --logging_steps 1 \
+    --save_steps 20000 \
+    --max_steps 1000000 \
+    --device xpu \
+    --use_amp False</code></pre>
+
+其中参数释义如下：
+- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `max_predictions_per_seq` 表示每个句子中会被mask的token的最大数目，与创建预训练数据时的设置一致。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
+- `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
+- `warmup_steps` 表示动态学习率热启的step数。
+- `num_train_epochs` 表示训练轮数。
+- `input_dir` 表示输入数据的目录，该目录下所有文件名中包含training的文件将被作为训练数据。
+- `output_dir` 表示模型的保存目录。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `max_steps` 表示最大训练步数，达到`max_steps`后就提前结束。注意，我们必须设置 `max_steps`。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `use_amp` 指示是否启用自动混合精度训练。
+</details>
+
+#### XPU训练（Trainer版本）
+```shell
+unset FLAGS_selected_xpus
+python -m paddle.distributed.launch --xpus "0" run_pretrain_trainer.py \
+    --model_type bert \
+    --model_name_or_path bert-base-uncased \
+    --max_predictions_per_seq 20 \
+    --per_device_train_batch_size 32   \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 3 \
+    --input_dir data/ \
+    --output_dir pretrained_models/ \
+    --logging_steps 1 \
+    --save_steps 20000 \
+    --max_steps 1000000 \
+    --device xpu \
+    --fp16 False \
+    --do_train
+```
+其中参数释义如下：
+- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `max_predictions_per_seq` 表示每个句子中会被mask的token的最大数目，与创建预训练数据时的设置一致。
+- `per_device_train_batch_size` 表示用于训练的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
+- `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
+- `warmup_steps` 表示动态学习率热启的step数。
+- `num_train_epochs` 表示训练轮数。
+- `input_dir` 表示输入数据的目录，该目录下所有文件名中包含training的文件将被作为训练数据。
+- `output_dir` 表示模型的保存目录。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `max_steps` 表示最大训练步数，达到`max_steps`后就提前结束。注意，我们必须设置 `max_steps`。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
+- `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
 
 **NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
 
@@ -123,34 +205,38 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" run_glue.py \
-    --model_type bert \
+python -m paddle.distributed.launch --gpus "0" run_glue_trainer.py \
     --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
+    --per_device_eval_batch_size 32   \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False
+    --fp16 False\
+    --do_train \
+    --do_eval
 ```
 
 其中参数释义如下：
-- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`bert-base-uncased`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下converter中的内容。
 - `task_name` 表示Fine-tuning的任务。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示用于训练的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
+- `per_device_eval_batch_size` 表示用于评估的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
-- `use_amp` 指示是否启用自动混合精度训练。
+- `fp16` 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
+- `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
+- `do_eval` 是否进行评估任务。同上。(`bool`, 可选, 默认为 `False`)
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
@@ -182,66 +268,25 @@ python -u ./export_model.py \
 - `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
 - `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
 
-然后按照如下的方式进行GLUE中的评测任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+完成模型导出后，可以开始部署。`deploy/python/seq_cls_infer.py` 文件提供了python部署预测示例。可执行以下命令运行部署示例：
 
 ```shell
-python -u ./predict_glue.py \
-    --task_name SST2 \
-    --model_type bert \
-    --model_path ./infer_model/model \
-    --batch_size 32 \
-    --max_seq_length 128
+python deploy/python/seq_cls_infer.py --model_dir infer_model/ --device gpu --backend paddle
 ```
 
-其中参数释义如下：
-- `task_name` 表示Fine-tuning的任务。
-- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
-- `model_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
-- `batch_size` 表示每个预测批次的样本数目。
-- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
+运行后预测结果打印如下：
 
-同时支持使用输入样例数据的方式进行预测任务，这里仅以文本情感分类数据[SST-2](https://nlp.stanford.edu/sentiment/index.html)为例，输出样例数据的分类预测结果：
-
-```shell
-python -u ./predict.py \
-    --model_path ./infer_model/model \
-    --device gpu \
-    --max_seq_length 128
+```bash
+[2023-03-02 08:30:03,877] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend	Runtime initialized with Backend::PDINFER in Device::GPU.
+Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.0003, positive prob: 0.9997.
+Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: positive, negative prob: 0.0002, positive prob: 0.9998.
+Batch id: 2, example id: 0, sentence1: at achieving the modest , crowd-pleasing goals it sets for itself, label: positive, negative prob: 0.0017, positive prob: 0.9983.
+Batch id: 3, example id: 0, sentence1: so pat it makes your teeth hurt, label: negative, negative prob: 0.9986, positive prob: 0.0014.
+Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: negative, negative prob: 0.9806, positive prob: 0.0194.
 ```
 
-其中参数释义如下：
-- `model_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-
-样例中的待预测数据返回输出的预测结果如下：
-
-```text
-Data: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting
- Label: positive
- Negative prob: 0.0004963805549778044
- Positive prob: 0.9995037317276001
-
-Data: the situation in a well-balanced fashion
- Label: positive
- Negative prob: 0.000471479695988819
- Positive prob: 0.9995285272598267
-
-Data: at achieving the modest , crowd-pleasing goals it sets for itself
- Label: positive
- Negative prob: 0.0019163173856213689
- Positive prob: 0.998083770275116
-
-Data: so pat it makes your teeth hurt
- Label: negative
- Negative prob: 0.9988648295402527
- Positive prob: 0.0011351780267432332
-
-Data: this new jangle of noise , mayhem and stupidity must be a serious contender for the title .
- Label: negative
- Negative prob: 0.9884825348854065
- Positive prob: 0.011517543345689774
-```
+更多详细用法可参考 [Python 部署](deploy/python/README.md)。
 
 ## 扩展
 
