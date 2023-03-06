@@ -16,7 +16,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.layers.utils import map_structure
+from paddle.utils import map_structure
 
 __all__ = [
     "position_encoding_init",
