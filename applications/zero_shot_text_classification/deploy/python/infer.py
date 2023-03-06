@@ -41,7 +41,7 @@ def parse_arguments():
         "--backend",
         type=str,
         default="paddle",
-        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
+        choices=["onnx_runtime", "paddle", "tensorrt", "paddle_tensorrt"],
         help="The inference runtime backend.",
     )
     parser.add_argument(
