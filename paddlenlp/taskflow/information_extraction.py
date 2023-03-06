@@ -484,7 +484,8 @@ class UIETask(Task):
             "uie-m-base",
             "uie-m-large",
             "uie-x-base",
-            "__internal_testing__/tiny-random-uie-m" "__internal_testing__/tiny-random-uie-x",
+            "__internal_testing__/tiny-random-uie-m",
+            "__internal_testing__/tiny-random-uie-x",
         ]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
 
