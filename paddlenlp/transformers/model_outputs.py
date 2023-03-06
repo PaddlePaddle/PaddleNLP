@@ -338,13 +338,13 @@ def _transformer_encoder_fwd(
             return output
         else:
             return outputs
-    else:
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=output,
-            past_key_values=new_caches,
-            hidden_states=all_hidden_states,
-            attentions=all_attentions,
-        )
+
+    return BaseModelOutputWithPastAndCrossAttentions(
+        last_hidden_state=output,
+        past_key_values=new_caches,
+        hidden_states=all_hidden_states,
+        attentions=all_attentions,
+    )
 
 
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
