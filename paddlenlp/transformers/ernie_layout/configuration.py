@@ -179,7 +179,7 @@ class ErnieLayoutConfig(PretrainedConfig):
         enable_recompute=False,
         classifier_dropout=None,
         has_visual_segment_embedding=False,
-        head_size=64,
+        pointer_inter_size=64,
         entity_id2label=None,
         relation_id2label=None,
         schema=None,
@@ -209,7 +209,7 @@ class ErnieLayoutConfig(PretrainedConfig):
         self.classifier_dropout = classifier_dropout
         self.has_visual_segment_embedding = has_visual_segment_embedding
         self.enable_recompute = enable_recompute
-        self.head_size = head_size
+        self.pointer_inter_size = pointer_inter_size
         self.entity_id2label = entity_id2label
         self.relation_id2label = relation_id2label
         self.schema = schema
