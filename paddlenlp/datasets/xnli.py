@@ -13,24 +13,24 @@
 # limitations under the License.
 
 import collections
-import os
 import csv
-from contextlib import ExitStack
+import os
 import shutil
+from contextlib import ExitStack
 
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url, _decompress, _get_unique_endpoints
+from paddle.utils.download import _decompress, _get_unique_endpoints, get_path_from_url
 
 try:
     from paddle.distributed import ParallelEnv
-except Exception as e:
+except Exception:
     import warnings
 
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
-from paddlenlp.utils.env import DATA_HOME
-from paddlenlp.utils.log import logger
-from . import DatasetBuilder
+from ..utils.env import DATA_HOME
+from ..utils.log import logger
+from .dataset import DatasetBuilder
 
 __all__ = ["XNLI"]
 ALL_LANGUAGES = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]

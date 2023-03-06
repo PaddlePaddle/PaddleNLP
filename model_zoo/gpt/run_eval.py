@@ -39,7 +39,7 @@ parser.add_argument('--overlapping_eval', type=int, default=32, help='Sliding wi
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--seq_length', type=int, default=1024, help='Maximum sequence length to process for evaluation.')
-parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="Select cpu, gpu, xpu devices.")
+parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="Select cpu, gpu, xpu, npu devices.")
 parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
 # yapf: enable
 

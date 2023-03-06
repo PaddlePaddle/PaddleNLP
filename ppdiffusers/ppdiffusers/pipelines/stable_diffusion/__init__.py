@@ -62,6 +62,7 @@ if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_cycle_diffusion import CycleDiffusionPipeline
     from .pipeline_stable_diffusion import StableDiffusionPipeline
     from .pipeline_stable_diffusion_all_in_one import StableDiffusionPipelineAllinOne
+    from .pipeline_stable_diffusion_controlnet import StableDiffusionControlNetPipeline
     from .pipeline_stable_diffusion_img2img import StableDiffusionImg2ImgPipeline
     from .pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
     from .pipeline_stable_diffusion_inpaint_legacy import (
@@ -92,6 +93,7 @@ else:
     from .pipeline_stable_diffusion_k_diffusion import StableDiffusionKDiffusionPipeline
 
 if is_paddlenlp_available() and is_fastdeploy_available():
+    from .pipeline_fastdeploy_cycle_diffusion import FastDeployCycleDiffusionPipeline
     from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline
     from .pipeline_fastdeploy_stable_diffusion_img2img import (
         FastDeployStableDiffusionImg2ImgPipeline,

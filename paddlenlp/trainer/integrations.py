@@ -112,7 +112,7 @@ class VisualDLCallback(TrainerCallback):
             return
 
         if self.vdl_writer is None:
-            self._init_summary_writer(args)
+            return
 
         if self.vdl_writer is not None:
             logs = rewrite_logs(logs)
@@ -155,25 +155,6 @@ class AutoNLPCallback(TrainerCallback):
         metrics = kwargs.get("metrics", None)
         if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
             self.session.report(metrics)
-
-    # report session metrics to Ray to track trial progress
-    def on_epoch_end(self, args, state, control, **kwargs):
-        if not state.is_world_process_zero:
-            return
-
-        metrics = kwargs.get("metrics", None)
-        if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
-            self.session.report(metrics)
-
-    # forward trainer logs
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if not state.is_world_process_zero:
-            return
-
-        if logs is not None:
-            # In AutoNLP's Ray setup, we pipe stdout to a stdout file for logging purposes
-            # TODO: find a better way for this
-            print(logs)
 
 
 INTEGRATION_TO_CALLBACK = {

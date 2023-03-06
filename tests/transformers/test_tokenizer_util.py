@@ -20,6 +20,7 @@ import unittest
 
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 
 
 class EmptyTokenizer(PretrainedTokenizer):
@@ -53,7 +54,9 @@ class TokenizerUtilsTest(unittest.TestCase):
         self.assertEqual(data["tokenizer_class"], "SubEmptyTokenizer")
 
     def test_from_pretrained_cache_dir(self):
-        model_name = "__internal_testing__/bert"
+        model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:
             BertTokenizer.from_pretrained(model_name, cache_dir=tempdir)
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, TOKENIZER_CONFIG_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))

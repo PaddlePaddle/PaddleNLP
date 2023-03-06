@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
-import os.path as osp
-
 URL_ROOT = "https://bj.bcebos.com/paddlenlp"
 EMBEDDING_URL_ROOT = URL_ROOT + "/models/embeddings"
 

@@ -24,14 +24,20 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import ConvBertForSequenceClassification, ConvBertTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ConvBertForSequenceClassification,
+    ConvBertTokenizer,
+    ElectraForSequenceClassification,
+    ElectraTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -135,8 +141,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu"],
-        help="The device to select to train the model, is must be cpu/gpu.",
+        choices=["cpu", "gpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/npu.",
     )
     args = parser.parse_args()
     return args
@@ -270,7 +276,7 @@ def do_train(args):
             dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
         )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

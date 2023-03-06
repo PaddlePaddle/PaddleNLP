@@ -1079,7 +1079,7 @@ class GPTForGeneration(GPTPretrainedModel):
             tgt_pos = paddle.sum(attention_mask, axis=-1, keepdim=True).astype("int64")
             if len(attention_mask.shape) == 2:
                 attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
-            encode_mask = attention_mask + causal_mask
+            encode_mask = (1 - attention_mask) * -1e4 + causal_mask
         else:
             encode_mask = causal_mask
 

@@ -269,7 +269,7 @@ def einsum(equation, *operands):
 
                 idxes_to_output_dims[letters_to_idx[letter_num]] = num_output_dims
                 num_output_dims += 1
-    else:  #  num_eqns_size == 1
+    else:  # num_eqns_size == 1
         # Infer the output dims
         if num_ell_idxes >= 0:
             for j in range(num_ell_idxes):

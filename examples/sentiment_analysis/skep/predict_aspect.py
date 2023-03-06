@@ -12,28 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
-import os
-import random
-import time
+from functools import partial
 
-import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+from tqdm import tqdm
+
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=400, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument(
+    "--model_name",
+    choices=["skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"],
+    default="skep_ernie_1.0_large_ch",
+    help="Select which model to train, defaults to skep_ernie_1.0_large_ch.",
+)
+parser.add_argument("--ckpt_dir", type=str, default=None, help="The directory of saved model checkpoint.")
+parser.add_argument(
+    "--max_seq_len",
+    default=400,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
+)
 parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for prediction.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
 args = parser.parse_args()
-# yapf: enable
 
 
 @paddle.no_grad()
@@ -48,8 +59,8 @@ def predict(model, data_loader, label_map):
     """
     model.eval()
     results = []
-    for batch in data_loader:
-        input_ids, token_type_ids = batch
+    for batch in tqdm(data_loader):
+        input_ids, token_type_ids = batch["input_ids"], batch["token_type_ids"]
         logits = model(input_ids, token_type_ids)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
@@ -59,52 +70,34 @@ def predict(model, data_loader, label_map):
     return results
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False, dataset_name="chnsenticorp"):
+def convert_example_to_feature(example, tokenizer, max_seq_len=512, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed
-    to be used in a sequence-pair classification task.
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
-    ::
-
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
-
-    note: There is no need token type ids for skep_roberta_large_ch model.
-
+    by concatenating and adding special tokens.
 
     Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
+        example(obj:`dict`): Dict of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-        dataset_name((obj:`str`, defaults to "chnsenticorp"): The dataset name, "chnsenticorp" or "sst-2".
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
+        token_type_ids(obj: `list[int]`): The list of token_type_ids.
+        label(obj:`int`, optional): The input label if not is_test.
     """
-    encoded_inputs = tokenizer(text=example["text"], text_pair=example["text_pair"], max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=example["text"], text_pair=example["text_pair"], max_seq_len=max_seq_len)
 
-    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
-    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
-    if not is_test:
-        label = np.array([example["label"]], dtype="int64")
-        return input_ids, token_type_ids, label
+    if is_test:
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids}
     else:
-        return input_ids, token_type_ids
+        label = example["label"]
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids, "labels": label}
 
 
 def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
@@ -125,23 +118,15 @@ if __name__ == "__main__":
     test_ds = load_dataset("seabsa16", "phns", splits=["test"])
     label_map = {0: "negative", 1: "positive"}
 
-    model = SkepForSequenceClassification.from_pretrained("skep_ernie_1.0_large_ch", num_classes=len(label_map))
-    tokenizer = SkepTokenizer.from_pretrained("skep_ernie_1.0_large_ch")
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
+    model = SkepForSequenceClassification.from_pretrained(args.ckpt_dir, num_labels=len(label_map))
 
-    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_test=True)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-    ): [data for data in fn(samples)]
+    trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, max_seq_len=args.max_seq_len, is_test=True)
+    data_collator = DataCollatorWithPadding(tokenizer, padding=True)
 
     test_data_loader = create_dataloader(
-        test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        test_ds, mode="test", batch_size=args.batch_size, batchify_fn=data_collator, trans_fn=trans_func
     )
-
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
 
     results = predict(model, test_data_loader, label_map)
     for idx, text in enumerate(test_ds.data):

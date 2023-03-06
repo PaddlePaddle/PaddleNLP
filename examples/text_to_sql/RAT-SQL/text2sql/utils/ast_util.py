@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
-
-# pylint: disable=unused-import
-from typing import Any, Dict, List, Optional, Sequence, TextIO, Tuple, Union
-
-# pylint: enable=unused-import
+from typing import Any, Dict, Union
 
 import asdl
 import attr
@@ -177,8 +172,6 @@ class ASTWrapper(object):
             self.fieldless_constructors.sort()
 
     def verify_ast(self, node, expected_type=None, field_path=(), is_seq=False):
-        # type: (ASTWrapper, Node, Optional[str], Tuple[str, ...]) -> None
-        # pylint: disable=too-many-branches
         """Checks that `node` conforms to the current ASDL."""
         if node is None:
             raise ValueError(f"node is None. path: {field_path}")
@@ -192,7 +185,7 @@ class ASTWrapper(object):
                 if node_type != expected_type:
                     raise ValueError(f"Expected type {expected_type}, but instead saw {node_type}. path: {field_path}")
             elif isinstance(sum_product, asdl.Sum):
-                possible_names = [t.name for t in sum_product.types]  # type: List[str]
+                possible_names = [t.name for t in sum_product.types]
                 if is_seq:
                     possible_names += [t.name for t in getattr(sum_product, "seq_fragment_types", [])]
                 if node_type not in possible_names:

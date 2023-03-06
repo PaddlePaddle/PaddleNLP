@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
-import json
+import sys
 
 import numpy as np
 import paddle
-
 from text2sql.utils import nn_utils
 
 
@@ -28,9 +24,6 @@ def collate_batch_data_v2(origin_batch, config):
     """format origin batch data for model forward"""
     TOKEN_IDS = []
     SENT_IDS = []
-    INPUT_MASK = []
-    POSITION_IDS = []
-    TASK_IDS = []
 
     QUESTION_TOKENS_INDEX = []
     TABLE_INDEX = []

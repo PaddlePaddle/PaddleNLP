@@ -13,25 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
+
 import json
 import logging
 import os
 import random
-import tarfile
-import tempfile
-import uuid
-import requests
-from tqdm import tqdm
 from abc import ABC, abstractmethod
-from inspect import signature
 from pathlib import Path
-from io import StringIO
-from typing import Optional, Dict, List, Union, Any, Iterable
+from typing import Dict, List, Optional, Union
 
-import pandas as pd
 import numpy as np
-from pipelines.utils.tokenization import tokenize_batch_question_answering
 
 from pipelines.data_handler.dataset import convert_features_to_dataset
 from pipelines.data_handler.samples import (
@@ -41,6 +32,7 @@ from pipelines.data_handler.samples import (
     offset_to_token_idx_vecorized,
 )
 from pipelines.utils.logger import StdoutLogger
+from pipelines.utils.tokenization import tokenize_batch_question_answering
 
 logger = logging.getLogger(__name__)
 
@@ -354,13 +346,13 @@ class SquadProcessor(Processor):
         n_special_tokens = self.tokenizer.num_special_tokens_to_add(pair=True)
         for basket in baskets:
             samples = []
-            ########## perform some basic checking
+            # perform some basic checking
             # TODO, eventually move checking into input validation functions
             # ignore samples with empty context
             if basket.raw["document_text"] == "":
                 logger.warning("Ignoring sample with empty context")
                 continue
-            ########## end checking
+            # end checking
 
             # Calculate the number of tokens that can be reserved for the passage. This is calculated by considering
             # the max_seq_len, the number of tokens in the question and the number of special tokens that will be added
@@ -465,7 +457,7 @@ class SquadProcessor(Processor):
                             label_idxs[i][0] = 0
                             label_idxs[i][1] = 0
 
-                        ########## answer checking ##############################
+                        # answer checking
                         # TODO, move this checking into input validation functions and delete wrong examples there
                         # Cases where the answer is not within the current passage will be turned into no answers by the featurization fn
                         if answer_start_t < 0 or answer_end_t >= passage_len_t:
@@ -493,7 +485,7 @@ class SquadProcessor(Processor):
                                 label_idxs[i][0] = -100  # TODO remove this hack also from featurization
                                 label_idxs[i][1] = -100
                                 break  # Break loop around answers, so the error message is not shown multiple times
-                        ########## end of checking ####################
+                        # end of checking
 
                 sample.tokenized["labels"] = label_idxs  # type: ignore
 
@@ -806,7 +798,7 @@ class TextSimilarityProcessor(Processor):
 
                     if len(tokenized_query) == 0:
                         logger.warning(
-                            f"The query could not be tokenized, likely because it contains a character that the query tokenizer does not recognize"
+                            "The query could not be tokenized, likely because it contains a character that the query tokenizer does not recognize"
                         )
                         return None
 
@@ -814,7 +806,7 @@ class TextSimilarityProcessor(Processor):
                     tokenized["query_tokens"] = tokenized_query
                     features[0]["query_input_ids"] = query_inputs["input_ids"]
                     features[0]["query_segment_ids"] = query_inputs["token_type_ids"]
-                except Exception as e:
+                except Exception:
                     features = None  # type: ignore
 
             sample = Sample(id="", clear_text=clear_text, tokenized=tokenized, features=features)  # type: ignore
@@ -842,7 +834,7 @@ class TextSimilarityProcessor(Processor):
                     hard_negative_ctx_texts = [passage["text"] for passage in hard_negative_context]
 
                     # all context passages and labels: 1 for positive context and 0 for hard-negative context
-                    ctx_label = [1] * self.num_positives + [0] * self.num_hard_negatives
+                    # ctx_label = [1] * self.num_positives + [0] * self.num_hard_negatives
                     # featurize context passages
                     if self.embed_title:
                         # concatenate title with positive context passages + negative context passages
@@ -868,7 +860,7 @@ class TextSimilarityProcessor(Processor):
                     sample.tokenized["passages_tokens"] = tokenized_passage  # type: ignore
                     sample.features[0]["passage_input_ids"] = ctx_inputs["input_ids"]  # type: ignore
                     sample.features[0]["passage_segment_ids"] = ctx_inputs["token_type_ids"]  # type: ignore
-                except Exception as e:
+                except Exception:
                     basket.samples[0].features = None  # type: ignore
 
         return baskets
@@ -924,5 +916,5 @@ def _is_json(x):
     try:
         json.dumps(x)
         return True
-    except:
+    except Exception:
         return False
