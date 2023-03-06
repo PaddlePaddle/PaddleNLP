@@ -916,7 +916,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         if attention_mask is not None and position_ids is None:
             # create position_ids on the fly for batch generation
             position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids.masked_fill_(attention_mask == 0, 1)
+            position_ids = masked_fill(position_ids, attention_mask == 0, 1)
             if past:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
         else:
