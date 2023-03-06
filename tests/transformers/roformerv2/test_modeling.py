@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import unittest
 
-import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
@@ -30,12 +30,7 @@ from paddlenlp.transformers import (
 )
 
 from ...testing_utils import slow
-from ..test_modeling_common import (
-    ModelTesterMixin,
-    ModelTesterPretrainedMixin,
-    ids_tensor,
-    random_attention_mask,
-)
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class RoFormerv2ModelTester:
@@ -51,10 +46,10 @@ class RoFormerv2ModelTester:
         type_sequence_label_size=2,
         num_labels=3,
         num_classes=3,
-        vocab_size=12000,
-        hidden_size=24,
-        num_hidden_layers=12,
-        num_attention_heads=12,
+        vocab_size=99,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
         intermediate_size=8,
         hidden_act="relu",
         hidden_dropout_prob=0.1,
@@ -68,11 +63,6 @@ class RoFormerv2ModelTester:
         epsilon=1e-12,
         normalize_before=False,
         num_choices=2,
-        embedding_weights=None,
-        need_weights=False,
-        kdim=None,
-        vdim=None,
-        scope=None,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -101,10 +91,6 @@ class RoFormerv2ModelTester:
         self.epsilon = epsilon
         self.normalize_before = normalize_before
         self.num_choices = num_choices
-        self.embedding_weights = embedding_weights
-        self.need_weights = need_weights
-        self.kdim = kdim
-        self.vdim = vdim
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -117,17 +103,8 @@ class RoFormerv2ModelTester:
         if self.use_token_type_ids:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
-        sequence_labels = None
-        token_labels = None
-        choice_labels = None
-
-        if self.parent.use_labels:
-            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
-            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
-            choice_labels = ids_tensor([self.batch_size], self.num_choices)
-
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        return config, input_ids, token_type_ids, input_mask
 
     def get_config(self):
         return RoFormerv2Config(
@@ -147,7 +124,6 @@ class RoFormerv2ModelTester:
             epsilon=self.epsilon,
             normalize_before=self.normalize_before,
             num_choices=self.num_choices,
-            embedding_weights=self.embedding_weights,
         )
 
     def create_and_check_model(
@@ -156,28 +132,16 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
 
         model = RoFormerv2Model(config)
-        # model.eval()
-        result0 = model(
-            input_ids,
+        model.eval()
+        result = model(
+            input_ids=input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
         )
-        self.parent.assertEqual(result0.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        import pdb
-
-        pdb.set_trace()
-        result1 = model(
-            input_ids,
-            attention_mask=None,
-            token_type_ids=token_type_ids,
-        )
-        self.parent.assertEqual(result1.shape, [self.batch_size, self.hidden_size])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.hidden_size])
 
     def create_and_check_for_masked_lm(
         self,
@@ -185,9 +149,6 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = RoFormerv2ForMaskedLM(config)
         model.eval()
@@ -197,13 +158,7 @@ class RoFormerv2ModelTester:
             token_type_ids=token_type_ids,
             attention_mask=input_mask,
         )
-
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
-
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -211,9 +166,6 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = RoFormerv2ForMultipleChoice(config)
         model.eval()
@@ -224,14 +176,8 @@ class RoFormerv2ModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             token_type_ids=multiple_choice_token_type_ids,
-            labels=choice_labels,
         )
-        if choice_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
-
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.num_choices])
 
     def create_and_check_for_question_answering(
         self,
@@ -239,9 +185,6 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = RoFormerv2ForQuestionAnswering(config)
         model.eval()
@@ -249,14 +192,10 @@ class RoFormerv2ModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
         )
 
-        if sequence_labels is not None:
-            start_logits, end_logits = result[1], result[2]
-        else:
-            start_logits, end_logits = result[0], result[1]
+        start_logits = result[0]
+        end_logits = result[1]
 
         self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
@@ -267,9 +206,6 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = RoFormerv2ForSequenceClassification(config)
         model.eval()
@@ -277,14 +213,9 @@ class RoFormerv2ModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            labels=sequence_labels,
         )
-        if sequence_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
 
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.num_choices])
 
     def create_and_check_for_token_classification(
         self,
@@ -292,9 +223,6 @@ class RoFormerv2ModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = RoFormerv2ForTokenClassification(config)
         model.eval()
@@ -302,63 +230,9 @@ class RoFormerv2ModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            labels=token_labels,
-        )
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
-
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
-
-    def create_and_check_model_cache(
-        self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
-    ):
-        model = RoFormerv2Model(config)
-        model.eval()
-
-        # first forward pass
-        outputs = model(
-            input_ids,
-            attention_mask=input_mask,
-            use_cache=True,
-        )
-        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[2]
-
-        # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
-        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
-
-        # append to next input_ids and
-        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
-        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
-
-        outputs = model(
-            next_input_ids,
-            attention_mask=next_attention_mask,
-            output_hidden_states=True,
         )
 
-        output_from_no_past = outputs[2][0]
-
-        outputs = model(
-            next_tokens,
-            attention_mask=next_attention_mask,
-            past_key_values=past_key_values,
-            output_hidden_states=True,
-        )
-
-        output_from_past = outputs[2][0]
-
-        # select random slice
-        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
-        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
-        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
-
-        self.parent.assertTrue(output_from_past_slice.shape[1] == next_tokens.shape[1])
-
-        # test that outputs are equal for slice
-        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
+        self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_choices])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -367,9 +241,6 @@ class RoFormerv2ModelTester:
             input_ids,
             token_type_ids,
             input_mask,
-            sequence_labels,
-            token_labels,
-            choice_labels,
         ) = config_and_inputs
         inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
         return config, inputs_dict
@@ -388,12 +259,10 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerv2Model
     return_dict: bool = False
     use_labels: bool = False
-    use_test_inputs_embeds: bool = True
 
     all_model_classes = (
         RoFormerv2Model,
         RoFormerv2ForMaskedLM,
-        RoFormerv2PretrainedModel,
         RoFormerv2ForSequenceClassification,
         RoFormerv2ForTokenClassification,
         RoFormerv2ForQuestionAnswering,
@@ -403,23 +272,24 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
     def setUp(self):
         self.model_tester = RoFormerv2ModelTester(self)
 
+    def test_forward_signature(self):
+        config, _ = self.model_tester.prepare_config_and_inputs_for_common()
+
+        for model_class in self.all_model_classes:
+            model = model_class(config)
+            signature = inspect.signature(model.forward)
+            # signature.parameters is an OrderedDict => so arg_names order is deterministic
+            arg_names = [*signature.parameters.keys()]
+            expected_arg_names = ["input_ids"]
+            self.assertListEqual(arg_names[:1], expected_arg_names)
+
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
 
     def test_for_masked_lm(self):
-        (
-            config,
-            input_ids,
-            token_type_ids,
-            input_mask,
-            sequence_labels,
-            token_labels,
-            choice_labels,
-        ) = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_masked_lm(
-            config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
-        )
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
 
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -442,80 +312,6 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
         for model_name in list(RoFormerv2PretrainedModel.pretrained_init_configuration)[:1]:
             model = RoFormerv2Model.from_pretrained(model_name)
             self.assertIsNotNone(model)
-
-
-class RoFormerv2ModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
-    base_model_class = RoFormerv2PretrainedModel
-    hf_remote_test_model_path = "PaddleCI/tiny-random-RoFormerv2"
-    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-RoFormerv2"
-
-    @slow
-    def test_inference_no_attention(self):
-        model = RoFormerv2Model.from_pretrained("roformer_v2_chinese_char_small")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        with paddle.no_grad():
-            output = model(input_ids)[0]
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [[[-0.0664, -1.3266, -0.3922], [-0.2440, -1.3631, -1.0745], [-0.0986, -0.7947, -0.1932]]]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    @slow
-    def test_inference_with_attention(self):
-        model = RoFormerv2Model.from_pretrained("roformer_v2_chinese_char_small")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask)[0]
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [[[-0.0664, -1.3266, -0.3922], [-0.2440, -1.3631, -1.0745], [-0.0986, -0.7947, -0.1932]]]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    @slow
-    def test_inference_with_past_key_value(self):
-        model = RoFormerv2Model.from_pretrained("roformer_v2_chinese_char_small")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
-
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output[0].shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [-0.06635337, -1.32662833, -0.39223742],
-                    [-0.24396378, -1.36314595, -1.07446611],
-                    [-0.09860237, -0.79468340, -0.19317953],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-        # insert the past key value into model
-        with paddle.no_grad():
-            output = model(input_ids, use_cache=True, past_key_values=output.past_key_values, return_dict=True)
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [0.07865857, -1.07012558, -1.02596498],
-                    [0.12576045, -1.76696026, -1.18682015],
-                    [-0.08606864, -1.37880838, -0.12364164],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import tensor
 from paddle.nn import Layer
-from responses import activate
 
 from .. import PretrainedModel, register_base_model
 from .configuration import (
@@ -38,9 +37,9 @@ __all__ = [
 
 
 class Norm(Layer):
-    def __init__(self, config: RoFormerv2Config):
+    def __init__(self, epsilon=1e-12):
         super().__init__()
-        self._epsilon = config.epsilon
+        self._epsilon = epsilon
 
     def forward(self, x):
         variance = paddle.mean(paddle.square(x), axis=-1, keepdim=True)
@@ -73,12 +72,10 @@ def _convert_attention_mask(attn_mask, dtype):
 
 
 class RotaryPositionEmbedding(Layer):
-    def __init__(self, config: RoFormerv2Config):
+    def __init__(self, dim, max_position_embeddings=512):
         super().__init__()
-        inv_freq = 1.0 / (
-            10000 ** (paddle.arange(0, config.head_dim, 2, dtype=paddle.get_default_dtype()) / config.head_dim)
-        )
-        t = paddle.arange(config.max_position_embeddings, dtype=paddle.get_default_dtype())
+        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        t = paddle.arange(max_position_embeddings, dtype=paddle.get_default_dtype())
         freqs = paddle.matmul(t.unsqueeze(1), inv_freq.unsqueeze(0))
         self.register_buffer("sin", freqs.sin(), persistable=False)
         self.register_buffer("cos", freqs.cos(), persistable=False)
@@ -98,28 +95,35 @@ class RotaryPositionEmbedding(Layer):
 
 
 class MultiHeadAttentionWithRotary(Layer):
-    def __init__(self, config: RoFormerv2Config):
+    def __init__(
+        self,
+        embed_dim,
+        num_heads,
+        dropout=0.0,
+        kdim=None,
+        vdim=None,
+        need_weights=False,
+        rotary_value=False,
+        max_position_embeddings=512,
+    ):
         super(MultiHeadAttentionWithRotary, self).__init__()
-        self.kdim = config.kdim if config.kdim is not None else config.hidden_size
-        self.vdim = config.vdim if config.vdim is not None else config.hidden_size
-        self.num_heads = config.num_attention_heads
-        self.need_weights = config.need_weights
-        self.rotary_value = config.rotary_value
+        self.embed_dim = embed_dim
+        self.kdim = kdim if kdim is not None else embed_dim
+        self.vdim = vdim if vdim is not None else embed_dim
+        self.num_heads = num_heads
+        self.need_weights = need_weights
+        self.rotary_value = rotary_value
 
-        self.head_dim = config.hidden_size // config.num_attention_heads
+        self.head_dim = embed_dim // num_heads
         self.scale = self.head_dim**-0.5
-        assert (
-            self.head_dim * config.num_attention_heads == config.hidden_size
-        ), "config.hidden_size must be divisible by config.num_attention_heads"
+        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
-        self.q_proj = nn.Linear(config.hidden_size, config.hidden_size)
-        self.k_proj = nn.Linear(self.kdim, config.hidden_size)
-        self.v_proj = nn.Linear(self.vdim, config.hidden_size)
-        self.out_proj = nn.Linear(config.hidden_size, config.hidden_size)
-
-        config.head_dim = config.hidden_size // config.num_attention_heads
-        self.rotary = RotaryPositionEmbedding(config)
+        self.dropout = nn.Dropout(dropout)
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(self.kdim, embed_dim)
+        self.v_proj = nn.Linear(self.vdim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.rotary = RotaryPositionEmbedding(self.head_dim, max_position_embeddings)
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
@@ -189,18 +193,15 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
             act_dropout=act_dropout,
             normalize_before=normalize_before,
         )
-        config = RoFormerv2Config()
-        config.hidden_size = d_model
-        config.num_attention_heads = nhead
-        config.intermediate_size = dim_feedforward
-        config.hidden_dropout_prob = dropout
-        config.hidden_act = activate
-        config.act_dropout = act_dropout
-        config.rotary_value = rotary_value
-        config.max_position_embeddings = max_position_embeddings
-        self.self_attn = MultiHeadAttentionWithRotary(config)
-        self.norm1 = Norm(config)
-        self.norm2 = Norm(config)
+        self.self_attn = MultiHeadAttentionWithRotary(
+            d_model,
+            nhead,
+            dropout=attn_dropout,
+            rotary_value=rotary_value,
+            max_position_embeddings=max_position_embeddings,
+        )
+        self.norm1 = Norm()
+        self.norm2 = Norm()
         self._config.update({"rotary_value": rotary_value, "max_position_embeddings": max_position_embeddings})
 
 
@@ -400,9 +401,6 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
                 inputs = {k:paddle.to_tensor([v], dtype="int64") for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
-        import pdb
-
-        pdb.set_trace()
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(paddle.get_default_dtype()) * -1e4, axis=[1, 2]
@@ -736,13 +734,13 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
 
 
 class RoFormerv2LMPredictionHead(Layer):
-    def __init__(self, config: RoFormerv2Config):
+    def __init__(self, config: RoFormerv2Config, embedding_weights=None):
         super(RoFormerv2LMPredictionHead, self).__init__()
         self.use_bias = config.use_bias
         self.decoder_weight = (
             self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype)
-            if config.embedding_weights is None
-            else config.embedding_weights
+            if embedding_weights is None
+            else embedding_weights
         )
         if config.use_bias:
             self.decoder_bias = self.create_parameter(
@@ -770,8 +768,9 @@ class RoFormerv2ForMaskedLM(RoFormerv2PretrainedModel):
     def __init__(self, config: RoFormerv2Config):
         super(RoFormerv2ForMaskedLM, self).__init__(config)
         self.roformerv2 = RoFormerv2Model(config)
-        config.embedding_weights = self.roformerv2.embeddings.word_embeddings.weight
-        self.cls = RoFormerv2LMPredictionHead(config)
+        self.cls = RoFormerv2LMPredictionHead(
+            config, embedding_weights=self.roformerv2.embeddings.word_embeddings.weight
+        )
 
         self.apply(self.init_weights)
 

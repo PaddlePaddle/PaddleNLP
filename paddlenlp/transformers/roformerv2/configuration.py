@@ -82,27 +82,23 @@ class RoFormerv2Config(PretrainedConfig):
 
     def __init__(
         self,
-        vocab_size=12000,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="relu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        act_dropout=0,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        pad_token_id=0,
-        rotary_value=False,
-        use_bias=False,
-        epsilon=1e-12,
-        normalize_before=False,
-        num_choices=2,
-        embedding_weights=None,
-        need_weights=False,
-        kdim=None,
-        vdim=None,
+        vocab_size: int = 12000,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "relu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        act_dropout: float = 0,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 2,
+        pad_token_id: int = 0,
+        rotary_value: bool = False,
+        use_bias: bool = False,
+        epsilon: float = 1e-12,
+        normalize_before: bool = False,
+        num_choices: int = 2,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -124,7 +120,3 @@ class RoFormerv2Config(PretrainedConfig):
         self.epsilon = epsilon
         self.normalize_before = normalize_before
         self.num_choices = num_choices
-        self.embedding_weights = embedding_weights
-        self.need_weights = need_weights
-        self.kdim = kdim
-        self.vdim = vdim
