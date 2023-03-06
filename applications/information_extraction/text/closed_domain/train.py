@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
-    parser.add_argument("--num_epochs", default=100, type=int, help="Number of epoches for training.")
+    parser.add_argument("--num_epochs", default=50, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--model_name_or_path", default="ernie-3.0-base-zh", type=str, help="Select the pretrained model for GP.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
