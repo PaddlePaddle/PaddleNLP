@@ -419,7 +419,7 @@ python compress.py \
 
 ### Python 部署
 
-服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py ) 或者 [token_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
+服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
 
 
 <a name="服务化部署"></a>
