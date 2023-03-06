@@ -1249,13 +1249,14 @@ from paddlenlp import Taskflow
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese`                     | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-zh-dureader-cross-encoder`       | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese` (默认)               | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
+  | `rocketqav2-en-marco-cross-encoder`        | 12-layers, 768-hidden, 12-heads | 英文 |
 
 
 #### 可配置参数说明
@@ -1897,7 +1898,6 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：文本序列的最大长度，默认为128。
-* `_static_mode`：静态图模式，默认开启。
 * `return_tensors`: 返回的类型，有pd和np，默认为pd。
 * `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
 
