@@ -45,7 +45,7 @@ def do_train():
         args.model_name_or_path,
         entity_id2label=label_maps["entity_id2label"],
         relation_id2label=label_maps["relation_id2label"],
-        schema=label_maps["schema"],
+        extraction_schema=label_maps["schema"],
     )
 
     train_ds = load_dataset(

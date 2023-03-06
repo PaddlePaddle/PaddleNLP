@@ -1548,7 +1548,7 @@ class ClosedDomainIETask(IETaskBase):
         self._multi_modal = True if "Layout" in self._init_class else False
         self._get_inference_model()
         self._construct_tokenizer()
-        self.set_schema(config["schema"])
+        self.set_schema(config["extraction_schema"])
         self._load_label_maps()
 
     def _load_label_maps(self):

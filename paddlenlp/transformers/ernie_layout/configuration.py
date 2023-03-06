@@ -182,7 +182,7 @@ class ErnieLayoutConfig(PretrainedConfig):
         pointer_inter_size=64,
         entity_id2label=None,
         relation_id2label=None,
-        schema=None,
+        extraction_schema=None,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -212,4 +212,4 @@ class ErnieLayoutConfig(PretrainedConfig):
         self.pointer_inter_size = pointer_inter_size
         self.entity_id2label = entity_id2label
         self.relation_id2label = relation_id2label
-        self.schema = schema
+        self.extraction_schema = extraction_schema
