@@ -19,6 +19,7 @@ import unittest
 
 import paddlenlp
 from paddlenlp.transformers import AutoTokenizer, is_fast_tokenizer_available
+from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 
 
 class AutoTokenizerTest(unittest.TestCase):
@@ -58,7 +59,9 @@ class AutoTokenizerTest(unittest.TestCase):
         self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)
 
     def test_from_pretrained_cache_dir(self):
-        model_name = "__internal_testing__/bert"
+        model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:
             AutoTokenizer.from_pretrained(model_name, cache_dir=tempdir)
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, TOKENIZER_CONFIG_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))

@@ -55,7 +55,7 @@ python -u examples/language_model/convbert/run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
+- `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU、NPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 
 Fine-tuning过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下格式的日志：
 

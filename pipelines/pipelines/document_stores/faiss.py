@@ -20,25 +20,27 @@ if TYPE_CHECKING:
 
 import json
 import logging
-from pathlib import Path
-from typing import Union, List, Optional, Dict, Generator
-from tqdm.auto import tqdm
 import warnings
-import numpy as np
 from inspect import Signature, signature
+from pathlib import Path
+from typing import Dict, Generator, List, Optional, Union
+
+import numpy as np
+from tqdm.auto import tqdm
 
 try:
     import faiss
-    from pipelines.document_stores.sql import (
+
+    from pipelines.document_stores.sql import (  # its deps are optional, but get installed with the `faiss` extra
         SQLDocumentStore,
-    )  # its deps are optional, but get installed with the `faiss` extra
+    )
 except (ImportError, ModuleNotFoundError) as ie:
     from pipelines.utils.import_utils import _optional_component_not_installed
 
     _optional_component_not_installed(__name__, "faiss", ie)
 
-from pipelines.schema import Document
 from pipelines.document_stores.base import get_batches_from_generator
+from pipelines.schema import Document
 
 logger = logging.getLogger(__name__)
 
@@ -511,7 +513,7 @@ class FAISSDocumentStore(SQLDocumentStore):
             raise NotImplementedError("FAISSDocumentStore does not support headers.")
 
         logger.warning(
-            """DEPRECATION WARNINGS: 
+            """DEPRECATION WARNINGS:
                 1. delete_all_documents() method is deprecated, please use delete_documents method
                 """
         )

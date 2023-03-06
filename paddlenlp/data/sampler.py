@@ -15,7 +15,6 @@
 import collections
 import functools
 import math
-import six
 
 import numpy as np
 
@@ -230,7 +229,6 @@ class SamplerHelper(object):
             key_wrapper = lambda x: len(self.data_source[x])
 
         def _impl():
-            data_source = self.data_source
             buf = []
             for idx in iter(self):
                 buf.append(idx)
@@ -345,7 +343,7 @@ class SamplerHelper(object):
                 Default: None.
             rank (int, optional): The id of current training process. Equal
                 to the value of the environment variable PADDLE_TRAINER_ID. If
-                None, it will be intialized by :meth:`paddle.distributed.get_rank`
+                None, it will be initialized by :meth:`paddle.distributed.get_rank`
                 method. Default: None.
 
         Returns:

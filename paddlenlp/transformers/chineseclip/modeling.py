@@ -19,6 +19,7 @@ from functools import partial
 from typing import Any, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 
@@ -787,6 +788,20 @@ class ChineseCLIPModel(ChineseCLIPPretrainedModel):
         image_embeds = image_embeds / image_embeds.norm(p=2, axis=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(p=2, axis=-1, keepdim=True)
 
+        if paddle.distributed.is_initialized() and dist.get_world_size() > 1:
+            world_size = dist.get_world_size()
+            rank = dist.get_rank()
+            gathered_image_features = [paddle.zeros_like(image_embeds) for _ in range(world_size)]
+            gathered_text_features = [paddle.zeros_like(text_embeds) for _ in range(world_size)]
+            dist.all_gather(gathered_image_features, image_embeds)
+            dist.all_gather(gathered_text_features, text_embeds)
+            # Add current text_embeds image_embeds into the batch for gradient update
+            image_embeds = paddle.concat(
+                [image_embeds] + gathered_image_features[:rank] + gathered_image_features[rank + 1 :]
+            )
+            text_embeds = paddle.concat(
+                [text_embeds] + gathered_text_features[:rank] + gathered_text_features[rank + 1 :]
+            )
         # cosine similarity as logits
         logit_scale = self.logit_scale.exp()
         logits_per_text = paddle.matmul(text_embeds, image_embeds, transpose_y=True) * logit_scale

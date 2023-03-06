@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
-import json
 import time
-import re
 
 
 class Timer(object):
@@ -81,16 +76,15 @@ def count_file_lines(filename):
     return cnt
 
 
-def print_tensors(tag="*", **kwrags):
-    """print tensors for debuging"""
+def print_tensors(tag="*", **kwargs):
+    """print tensors for debugging"""
     print(tag * 50)
-    for key, value in kwrags.items():
+    for key, value in kwargs.items():
         print(key, ":", value)
 
 
 if __name__ == "__main__":
     """run some simple test cases"""
-    import json
     from boomup import data_struct
 
     question = "三峡碧江需要大于2的招聘数量"

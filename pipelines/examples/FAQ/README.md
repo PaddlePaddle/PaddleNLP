@@ -30,8 +30,8 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
-- paddlenlp >= 2.3.5
+- python >= 3.7.3
+- paddlenlp >= 2.4.0
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00

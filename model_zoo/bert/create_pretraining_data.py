@@ -241,7 +241,7 @@ def create_instances_from_document(
                     is_random_next = False
                     for j in range(a_end, len(current_chunk)):
                         tokens_b.extend(current_chunk[j])
-                truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng)
+                truncate_seq_pair(tokens_a, tokens_b, target_seq_length, rng)
 
                 assert len(tokens_a) >= 1
                 assert len(tokens_b) >= 1

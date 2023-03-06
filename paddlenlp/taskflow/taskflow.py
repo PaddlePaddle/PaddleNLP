@@ -71,6 +71,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",
@@ -196,6 +200,10 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": "sentiment_analysis-uie-senta-nano",
             },
+            "__internal_testing__/tiny-random-skep": {
+                "task_class": SkepTask,
+                "task_flag": "sentiment_analysis-tiny-random-skep",
+            },
         },
         "default": {"model": "bilstm"},
     },
@@ -235,6 +243,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
             },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
+            },
         },
         "default": {"model": "simbert-base-chinese"},
     },
@@ -255,8 +267,23 @@ TASKS = {
                 "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
                 "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
             },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese-V1",
+                "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+            },
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+            },
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+            },
         },
-        "default": {"model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"},
+        "default": {"model": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"},
     },
     "word_segmentation": {
         "modes": {
@@ -318,6 +345,16 @@ TASKS = {
                 "task_flag": "information_extraction-uie-x-base",
             },
             "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
+            "__internal_testing__/tiny-random-uie": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie",
+            },
+            "__internal_testing__/tiny-random-uie-x": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie-x",
+            },
         },
         "default": {"model": "uie-base"},
     },
@@ -512,6 +549,10 @@ TASKS = {
                 "task_class": ZeroShotTextClassificationTask,
                 "task_flag": "zero_shot_text_classification-utc-pico",
             },
+            "__internal_testing__/tiny-random-utc": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-tiny-random-utc",
+            },
         },
         "default": {"model": "utc-base"},
     },
@@ -582,6 +623,11 @@ TASKS = {
                 "task_flag": "feature_extraction-openai/clip-rn50x4",
                 "task_priority_path": "openai/clip-rn50x4",
             },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
+            },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
@@ -613,6 +659,9 @@ support_schema_list = [
     "utc-mini",
     "utc-nano",
     "utc-pico",
+    "utc-tiny",
+    "__internal_testing__/tiny-random-uie",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 support_argument_list = [
@@ -638,6 +687,7 @@ support_argument_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 

@@ -138,33 +138,33 @@ Relation XML模板：
     - Step 1. 标注主体（Subject）及客体（Object）
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206094033-e9b42ac3-2de7-4c83-ba9e-38709a7ffea4.png height=400 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218974459-4bf989fc-0e40-4dea-b309-346364cca1b5.png height=400 width=1000 />
         </div>
 
     - Step 2. 关系连线，箭头方向由主体（Subject）指向客体（Object）
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206094569-297d7f09-8f5b-4c1e-9e73-dc1f4e483e31.png height=450 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218975474-0cf933bc-7c1e-4e7d-ada5-685ee5265f61.png height=450 width=1000 />
         </div>
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206094780-8bd07f32-c066-4686-933b-429fd7f0f0f9.png height=400 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218975743-dc718068-6d58-4352-8eb2-8973549dd971.png height=400 width=1000 />
         </div>
 
     - Step 3. 添加对应关系类型标签
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206149014-8669cfed-997d-4ba7-8ab9-a6785256fa81.png height=360 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218976095-ff5a84e8-302c-4789-98df-139a8cef8d5a.png height=360 width=1000 />
         </div>
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206149177-096cc76c-105c-4d8a-aafb-b99a5f4ff1a0.png height=360 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218976368-a4556441-46ca-4372-b68b-e00b45f59260.png height=360 width=1000 />
         </div>
 
     - Step 4. 完成标注
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206095809-742e1ba4-1d5d-4a75-b75b-f9cb09ac7af7.png height=450 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/218976853-4903f2ec-b669-4c63-8c21-5f7184fc03db.png height=450 width=1000 />
         </div>
 
 

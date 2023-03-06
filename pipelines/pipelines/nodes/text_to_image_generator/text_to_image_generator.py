@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import os
 import time
-import requests
-import hashlib
 from io import BytesIO
-from PIL import Image
-from typing import List
 from typing import Optional
+
+import requests
+from PIL import Image
 from tqdm.auto import tqdm
 
-from pipelines.schema import Document
 from pipelines.nodes.base import BaseComponent
+from pipelines.schema import Document
 
 
 class ErnieTextToImageGenerator(BaseComponent):
@@ -207,7 +207,7 @@ class ErnieTextToImageGenerator(BaseComponent):
             for idx, imgdata in enumerate(data["imgUrls"]):
                 try:
                     image = Image.open(BytesIO(requests.get(imgdata["image"]).content))
-                except Exception as e:
+                except Exception:
                     print("Download generated images error, retry one time")
                     try:
                         image = Image.open(BytesIO(requests.get(imgdata["image"]).content))
