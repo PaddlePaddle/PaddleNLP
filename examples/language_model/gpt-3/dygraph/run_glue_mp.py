@@ -548,8 +548,11 @@ def do_train(args):
                     # If parameter need to convert to cpu, please add convert2cpu=True
                     model_to_save.get_all_parameters(convert2cpu=True)
 
-                while isinstance(model_to_save, TensorParallel) or isinstance(model_to_save, paddle.DataParallel):
-                    model_to_save = model_to_save._layers
+                while hasattr(model_to_save, "_layers") or hasattr(model_to_save, "_layer"):
+                    if hasattr(model_to_save, "_layers"):
+                        model_to_save = model_to_save._layers
+                    else:
+                        model_to_save = model_to_save._layer
 
                 output_dir = os.path.join(args.output_dir, "checkpoint-%d" % global_step)
                 os.makedirs(output_dir, exist_ok=True)

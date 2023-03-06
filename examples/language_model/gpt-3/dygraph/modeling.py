@@ -719,13 +719,6 @@ class GPTModel(GPTPretrainedModel):
     ):
         super(GPTModel, self).__init__()
 
-        if num_partitions > 1:
-            hcg = fleet.get_hybrid_communicate_group()
-            mp_rank = hcg.get_model_parallel_rank()
-            GPTPretrainedModel.resource_files_names = {
-                "model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-            }
-
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.hidden_size = hidden_size
