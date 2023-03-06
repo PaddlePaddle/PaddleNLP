@@ -21,6 +21,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
+
 try:
     from paddle.utils import map_structure
 except ImportError:
