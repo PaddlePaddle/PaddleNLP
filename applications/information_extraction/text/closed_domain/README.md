@@ -96,7 +96,7 @@ P-51A是单座单发单翼战斗机，欧战爆发后，英国政府向美国求
 
 #### 2.2.2.2 微调UIE模型
 
-参考[UIE关系抽取微调](../README.md)完成模型微调，得到``../checkpoint/model_best``。
+参考[UIE微调](../README.md)得到``../checkpoint/model_best``。
 
 #### 2.2.2.3 构建封闭域训练样本
 
