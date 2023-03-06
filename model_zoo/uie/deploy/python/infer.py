@@ -29,6 +29,7 @@ from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model, params and vocab file.")
+    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -36,6 +37,7 @@ def parse_arguments():
         choices=["cpu", "gpu"],
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
+    parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
     parser.add_argument("--multilingual", action="store_true", help="Whether is the multilingual model.")
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--device_id", type=int, default=0, help="device(gpu) id")
@@ -69,10 +71,9 @@ class UIEPredictor(object):
             print(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(args.device))
             exit(0)
 
-        model_path = args.model_path_prefix[: -len(os.path.basename(args.model_path_prefix))]
-        self._tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self._position_prob = args.position_prob
-        self._max_seq_len = args.max_seq_len
+        self.max_length = args.max_length
         self._batch_size = args.batch_size
         self._multilingual = args.multilingual
         self._schema_tree = None
@@ -83,6 +84,9 @@ class UIEPredictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        option.set_model_path(model_path, params_path)
         # Set device
         if args.device == "cpu":
             option.use_cpu()
@@ -157,7 +161,7 @@ class UIEPredictor(object):
             input_texts.append(inputs[i]["text"])
             prompts.append(inputs[i]["prompt"])
         # max predict length should exclude the length of prompt and summary tokens
-        max_predict_len = self._max_seq_len - len(max(prompts)) - 3
+        max_predict_len = self.max_length - len(max(prompts)) - 3
         short_input_texts, self.input_mapping = self._auto_splitter(input_texts, max_predict_len, split_sentence=False)
 
         short_texts_prompts = []
@@ -176,7 +180,7 @@ class UIEPredictor(object):
             text=prompts,
             text_pair=texts,
             truncation=True,
-            max_seq_len=self._max_seq_len,
+            max_seq_len=self.max_length,
             pad_to_max_seq_len=True,
             return_attention_mask=True,
             return_position_ids=True,
@@ -516,7 +520,7 @@ if __name__ == "__main__":
         "原告赵六，2022年5月29日生\n委托代理人孙七，深圳市C律师事务所律师。\n被告周八，1990年7月28日出生\n委托代理人吴九，山东D律师事务所律师",
     ]
     schema1 = ["法院", {"原告": "委托代理人"}, {"被告": "委托代理人"}]
-    schema2 = [{"原告": ["出生日期", "委托代理人"]}, {"被告": ["出生日期", "委托代理人"]}]
+    args.schema = schema1
     uie = UIEPredictor(args)
     print("-----------------------------")
     outputs = uie.predict(texts)
@@ -529,8 +533,9 @@ if __name__ == "__main__":
         pprint(output)
         print("-----------------------------")
 
+    schema2 = [{"原告": ["出生日期", "委托代理人"]}, {"被告": ["出生日期", "委托代理人"]}]
     uie.set_schema(schema2)
-    outputs = uie.predict(texts, return_dict=True)
+    outputs = uie.predict(texts)
     for text, output in zip(texts, outputs):
         print("1. Input text: ")
         print(text)
