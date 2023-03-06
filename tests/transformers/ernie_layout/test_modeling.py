@@ -22,6 +22,7 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import (
     UIEX,
     ErnieLayoutConfig,
+    ErnieLayoutForClosedDomainIE,
     ErnieLayoutForQuestionAnswering,
     ErnieLayoutForSequenceClassification,
     ErnieLayoutForTokenClassification,
@@ -61,6 +62,8 @@ class ErnieLayoutModelTester:
         num_labels=3,
         num_choices=4,
         num_classes=3,
+        entity_id2label={"0": "武器名称", "1": "object"},
+        relation_id2label={"0": "产国", "1": "类型", "2": "研发单位"},
         scope=None,
     ):
         self.parent = parent
@@ -244,6 +247,38 @@ class ErnieLayoutModelTester:
 
         self.parent.assertEqual(start_prob.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_prob.shape, [self.batch_size, self.seq_length])
+
+    def create_and_check_for_closed_domain_ie(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        bbox: Tensor,
+        image: Tensor,
+        sequence_labels,
+        token_labels,
+    ):
+        model = ErnieLayoutForClosedDomainIE(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            bbox=bbox,
+            image=image,
+        )
+
+        # Entity space
+        self.parent.assertEqual(
+            result[0].shape, [self.batch_size, len(self.entity_id2label), self.seq_length, self.seq_length]
+        )
+        # Relation space
+        self.parent.assertEqual(
+            result[1].shape, [self.batch_size, len(self.relation_id2label), self.seq_length, self.seq_length]
+        )
+        self.parent.assertEqual(
+            result[2].shape, [self.batch_size, len(self.relation_id2label), self.seq_length, self.seq_length]
+        )
 
     def create_and_check_for_token_classification(
         self,

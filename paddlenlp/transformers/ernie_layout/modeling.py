@@ -1202,14 +1202,14 @@ class ErnieLayoutForClosedDomainIE(ErnieLayoutPretrainedModel):
         self.ernie_layout = ErnieLayoutModel(config)
         num_ents = len(config.entity_id2label)
         num_rels = len(config.relation_id2label)
-        self.entity_output = GlobalPointer(config.hidden_size, num_ents, head_size=config.head_size)
+        self.entity_output = GlobalPointer(config.hidden_size, num_ents, pointer_inter_size=config.pointer_inter_size)
         self.with_rel = True if config.relation_id2label else False
         if self.with_rel:
             self.head_output = GlobalPointer(
-                config.hidden_size, num_rels, head_size=config.head_size, RoPE=False, tril_mask=False
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
             )
             self.tail_output = GlobalPointer(
-                config.hidden_size, num_rels, head_size=config.head_size, RoPE=False, tril_mask=False
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
             )
 
     def forward(self, input_ids, attention_mask, bbox, image, labels=None):

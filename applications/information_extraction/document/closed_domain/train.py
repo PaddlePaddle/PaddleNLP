@@ -39,10 +39,10 @@ def do_train():
 
     label_maps = get_label_maps(args.label_maps_path)
     golds = get_eval_golds(args.dev_path)
-    tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     model = ErnieLayoutForClosedDomainIE.from_pretrained(
-        "ernie-layoutx-base-uncased",
+        args.model_name_or_path,
         entity_id2label=label_maps["entity_id2label"],
         relation_id2label=label_maps["relation_id2label"],
         extraction_schema=label_maps["schema"],
@@ -54,6 +54,7 @@ def do_train():
         tokenizer=tokenizer,
         label_maps=label_maps,
         max_seq_len=args.max_seq_len,
+        doc_stride=args.doc_stride,
         lazy=False,
     )
     dev_ds = load_dataset(
@@ -62,6 +63,7 @@ def do_train():
         tokenizer=tokenizer,
         label_maps=label_maps,
         max_seq_len=args.max_seq_len,
+        doc_stride=args.doc_stride,
         lazy=False,
     )
 
@@ -106,8 +108,13 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
         for batch in train_dataloader:
-            input_ids, attention_masks, bbox, image, _, _, _, _, labels = batch
-            loss, _ = model(input_ids, attention_masks, bbox, image, labels)
+            loss, _ = model(
+                batch["input_ids"],
+                batch["attention_mask"],
+                batch["bbox"],
+                batch["image"],
+                batch["labels"],
+            )
 
             loss.backward()
 
@@ -164,6 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length.")
+    parser.add_argument("--doc_stride", default=256, type=int, help="Window size of sliding window.")
     parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")

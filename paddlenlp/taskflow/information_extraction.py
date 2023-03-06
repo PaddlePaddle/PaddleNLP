@@ -1646,25 +1646,23 @@ class ClosedDomainIETask(IETaskBase):
         cur_doc_id = -1
         for batch in inputs["data_loader"]:
             if self._multi_modal:
-                input_ids, attention_masks, bbox, image, offset_mappings, texts, doc_ids, text_offsets = batch
-                self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
-                self.input_handles[1].copy_from_cpu(attention_masks.numpy().astype("int64"))
-                self.input_handles[2].copy_from_cpu(bbox.numpy().astype("int64"))
-                self.input_handles[3].copy_from_cpu(image.numpy().astype("int64"))
+                self.input_handles[0].copy_from_cpu(batch["input_ids"].numpy().astype("int64"))
+                self.input_handles[1].copy_from_cpu(batch["attention_mask"].numpy().astype("int64"))
+                self.input_handles[2].copy_from_cpu(batch["bbox"].numpy().astype("int64"))
+                self.input_handles[3].copy_from_cpu(batch["image"].numpy().astype("int64"))
             else:
-                input_ids, attention_masks, offset_mappings, texts, doc_ids, text_offsets = batch
-                self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
-                self.input_handles[1].copy_from_cpu(attention_masks.numpy().astype("int64"))
+                self.input_handles[0].copy_from_cpu(batch["input_ids"].numpy().astype("int64"))
+                self.input_handles[1].copy_from_cpu(batch["attention_mask"].numpy().astype("int64"))
             self.predictor.run()
             logits = [paddle.to_tensor(self.output_handle[i].copy_to_cpu()) for i in range(len(self.output_handle))]
             all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess(
                 logits,
                 all_preds,
-                doc_ids,
+                batch["doc_id"],
                 cur_doc_id,
-                offset_mappings,
-                texts,
-                text_offsets,
+                batch["offset_mapping"],
+                batch["text"],
+                batch["text_offset"],
                 self._label_maps,
                 with_prob=True,
             )

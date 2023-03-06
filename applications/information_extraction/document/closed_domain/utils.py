@@ -71,9 +71,9 @@ def create_dataloader(dataset, tokenizer=None, label_maps=None, batch_size=1, mo
     shuffle = True if mode == "train" else False
     batch_sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
 
-    data_collator = DataCollatorForClosedDomainIE(tokenizer, label_maps=label_maps)
+    data_collator = DataCollatorForClosedDomainIE(tokenizer, label_maps=label_maps, multi_modal=True)
 
     dataloader = paddle.io.DataLoader(
-        dataset=dataset, batch_sampler=batch_sampler, collate_fn=data_collator, num_workers=0, return_list=True
+        dataset=dataset, batch_sampler=batch_sampler, collate_fn=data_collator, num_workers=0
     )
     return dataloader

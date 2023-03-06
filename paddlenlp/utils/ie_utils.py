@@ -372,8 +372,6 @@ class ClosedDomainIEProcessor:
                     "text_offset": text_offset,
                 }
 
-                cnt += 1
-
                 if with_label:
                     entity_labels = []
                     for e in example["entity_list"]:
@@ -412,6 +410,7 @@ class ClosedDomainIEProcessor:
 
                     input_list["labels"] = {"entity_labels": entity_labels, "relation_labels": relation_labels}
                 tokenized_examples.append(input_list)
+            cnt += 1
         return tokenized_examples
 
     @staticmethod

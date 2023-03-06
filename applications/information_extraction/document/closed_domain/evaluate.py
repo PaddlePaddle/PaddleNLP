@@ -40,17 +40,20 @@ def evaluate(model, dataloader, label_maps, golds):
     }
     cur_doc_id = -1
     for batch in tqdm(dataloader, desc="Evaluating: ", leave=False):
-        input_ids, attention_masks, bbox, image, offset_mappings, texts, doc_ids, text_offsets, _ = batch
-
-        logits = model(input_ids, attention_masks, bbox, image)
-        all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess_doc(
+        logits = model(
+            batch["input_ids"],
+            batch["attention_mask"],
+            batch["bbox"],
+            batch["image"],
+        )
+        all_preds, cur_doc_id = ClosedDomainIEProcessor.postprocess(
             logits,
             all_preds,
-            doc_ids,
+            batch["doc_id"],
             cur_doc_id,
-            offset_mappings,
-            texts,
-            text_offsets,
+            batch["offset_mapping"],
+            batch["text"],
+            batch["text_offset"],
             label_maps,
         )
 
@@ -97,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("--label_maps_path", default="./data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--doc_stride", type=int, default=256, help="Window size of sliding window.")
 
     args = parser.parse_args()
     # yapf: enable

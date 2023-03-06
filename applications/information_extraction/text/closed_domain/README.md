@@ -44,7 +44,7 @@
 
 该schema表示期望抽取以下三个三元组信息：{武器名称}的{产国}、{武器名称}的{类型}、{武器名称}的{研发单位}。
 
-**NOTE：** `data_convert.py`脚本中的schema需要根据实际使用场景修改，且schema需要包含标注数据中的所有标签类型。。
+**NOTE：** `data_convert.py`脚本中的schema需要根据实际使用场景修改，且schema需要包含标注数据中的所有标签类型。
 
 
 <a name="22"></a>
@@ -66,7 +66,7 @@
 ```shell
 python data_convert.py \
     --label_studio_file ../data/label_studio.json \
-    --splits 0.8 0.1 0.1
+    --splits 0.8 0.2 0
 ```
 
 <a name="222"></a>
@@ -75,7 +75,7 @@ python data_convert.py \
 
 当实际标注数据较少时，可以通过微调后的UIE模型产生更多标注数据。其原理是通过数据作为桥梁，将UIE模型的知识迁移到封闭域信息抽取小模型，以达到精度损失较小的情况下却能达到大幅度预测速度提升的效果。
 
-具体流程：
+具体流程如下：
 
 #### 2.2.2.1 数据准备
 
@@ -92,7 +92,7 @@ P-51A是单座单发单翼战斗机，欧战爆发后，英国政府向美国求
 种。
 ```
 
-`../data`路径下需包含标注数据(label_studio.json)及无监督文本(unlabeled_data.txt)。
+本示例的`../data`路径下包含标注数据(label_studio.json)及无监督文本(unlabeled_data.txt)。
 
 #### 2.2.2.2 微调UIE模型
 
@@ -141,7 +141,8 @@ python train.py \
 - `batch_size`: 批处理大小，默认为16。
 - `learning_rate`: 学习率，默认为3e-5。
 - `save_dir`: 模型存储路径，默认为`./checkpoint`。
-- `max_seq_len`: 最大文本长度，默认为256。
+- `max_seq_len`: 最大文本长度，默认为512。
+- `doc_stride`: 滑窗大小，默认为256.
 - `weight_decay`: 表示AdamW优化器中使用的 weight_decay 的系数。
 - `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 - `num_epochs`: 训练轮数，默认为50。
@@ -170,6 +171,7 @@ python evaluate.py \
 - `label_maps_path`: 学生模型标签字典。
 - `batch_size`: 批处理大小，默认为8。
 - `max_seq_len`: 最大文本长度，默认为512。
+- `doc_stride`: 滑窗大小，默认为256.
 
 <a name="25"></a>
 

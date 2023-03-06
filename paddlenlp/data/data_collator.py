@@ -864,33 +864,37 @@ class DataCollatorForClosedDomainIE:
 
     def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
         labels = [feature["labels"] for feature in features] if "labels" in features[0].keys() else None
-        new_features = [{k: v for k, v in f.items() if k not in ["labels"] + self.doc_feature_names} for f in features]
+        features_to_pad = [
+            {k: v for k, v in f.items() if k not in ["labels"] + self.doc_feature_names} for f in features
+        ]
 
         batch = self.tokenizer.pad(
-            new_features,
+            features_to_pad,
             padding=self.padding,
+            return_tensors="pd",
         )
 
-        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
-
         if self.multi_modal:
-            max_length = batch[1].shape[1]
-            for feature in features:
-                feature["bbox"] = feature["bbox"] + [[0, 0, 0, 0] for _ in range(max_length - len(feature["bbox"]))]
-
+            bbox_list = [feature["bbox"] for feature in features]
+            padded_bbox_list = []
+            max_length = batch["input_ids"].shape[1]
+            for bbox in bbox_list:
+                padded_bbox_list.append(bbox + [[0, 0, 0, 0] for _ in range(max_length - len(bbox))])
             for ignore_key in self.doc_feature_names:
-                if ignore_key in ["bbox", "image"]:
-                    batch.append(paddle.to_tensor([feature[ignore_key] for feature in features]))
+                if ignore_key == "bbox":
+                    batch[ignore_key] = paddle.to_tensor(padded_bbox_list)
+                elif ignore_key == "image":
+                    batch[ignore_key] = paddle.to_tensor([feature[ignore_key] for feature in features])
                 else:
-                    batch.append([feature[ignore_key] for feature in features])
+                    batch[ignore_key] = [feature[ignore_key] for feature in features]
         else:
             for ignore_key in self.text_feature_names:
-                batch.append([feature[ignore_key] for feature in features])
+                batch[ignore_key] = [feature[ignore_key] for feature in features]
 
         if labels is None:
             return batch
 
-        bs = len(batch[0])
+        bs = len(batch["input_ids"])
         # Ensure the dimension is greater or equal to 1
         max_ent_num = max(max([len(lb["entity_labels"]) for lb in labels]), 1)
         num_ents = len(self.label_maps["entity_label2id"])
@@ -900,7 +904,7 @@ class DataCollatorForClosedDomainIE:
                 batch_entity_labels[i, l, eidx, :] = paddle.to_tensor([eh, et])
 
         if not self.label_maps["relation_label2id"]:
-            batch.append([batch_entity_labels])
+            batch["labels"] = [batch_entity_labels]
         else:
             max_spo_num = max(max([len(lb["relation_labels"]) for lb in labels]), 1)
             num_rels = len(self.label_maps["relation_label2id"])
@@ -911,5 +915,5 @@ class DataCollatorForClosedDomainIE:
                 for spidx, (sh, st, p, oh, ot) in enumerate(lb["relation_labels"]):
                     batch_head_labels[i, p, spidx, :] = paddle.to_tensor([sh, oh])
                     batch_tail_labels[i, p, spidx, :] = paddle.to_tensor([st, ot])
-            batch.append([batch_entity_labels, batch_head_labels, batch_tail_labels])
+            batch["labels"] = [batch_entity_labels, batch_head_labels, batch_tail_labels]
         return batch
