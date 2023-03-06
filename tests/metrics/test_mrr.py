@@ -60,7 +60,7 @@ class TestMRR(CommonTest):
         for i in range(step):
             labels, embeddings, distance, _ = self.get_random_case()
             self.mrr.reset_distance(distance)
-            mrr = self.mrr.compute_matrix_mrr(labels, embeddings)
+            self.mrr.compute_matrix_mrr(labels, embeddings)
 
     def test_compute_true_mrr(self):
         labels, embeddings, distance, true_mrr = self.get_true_mrr_case()
