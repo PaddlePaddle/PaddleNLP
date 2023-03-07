@@ -45,13 +45,7 @@ from processor import (
 )
 
 BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "bigscience/bigscience-small-testing",
-    "bigscience/bloom-350m",
-    "bigscience/bloom-760m",
-    "bigscience/bloom-1b3",
-    "bigscience/bloom-2b5",
-    "bigscience/bloom-6b3",
-    "bigscience/bloom",
+    "bigscience/bloom-560m",
 ]
 
 
@@ -582,7 +576,7 @@ class BloomPreTrainedModel(PretrainedModel):
     """
 
     config_class = BloomConfig
-    base_model_prefix = "transformer"
+    base_model_prefix = "bloom"
     supports_gradient_checkpointing = True
     _no_split_modules = ["BloomBlock"]
 
@@ -1222,7 +1216,7 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
     return probs
 
 
-class BloomForGeneration(nn.Layer):
+class BloomForGeneration(BloomPreTrainedModel):
     """
     Bloom Model with pretraining tasks on top.
 
@@ -1232,33 +1226,33 @@ class BloomForGeneration(nn.Layer):
 
     """
 
-    def __init__(self, bloom, configs):
-        super(BloomForGeneration, self).__init__()
-        self.bloom = bloom
-        self.configs = configs
+    def __init__(self, config):
+        super(BloomForGeneration, self).__init__(config) 
+        self.bloom = BloomModel(config)
+        self.config = config
 
-        self.max_length = self.configs.get("max_dec_len", 20)
-        self.min_length = self.configs.get("min_dec_len", 0)
-        self.decode_strategy = self.configs.get("decode_strategy", "sampling")
-        self.temperature = self.configs.get("temperature", 1.0)
-        self.top_k = self.configs.get("top_k", 0)
-        self.top_p = self.configs.get("top_p", 1.0)
-        self.use_topp_sampling = self.configs.get("use_topp_sampling", False)
-        self.inference = self.configs.get("inference", False)
-        self.repetition_penalty = self.configs.get("repetition_penalty", 1.0)
-        self.num_beams = self.configs.get("num_beams", 1)
-        self.num_beam_groups = self.configs.get("num_beam_groups", 1)
-        self.length_penalty = self.configs.get("length_penalty", 0.0)
-        self.early_stopping = self.configs.get("early_stopping", False)
-        self.bos_token_id = self.configs.get("bos_token_id", None)
-        self.eos_token_id = self.configs.get("eos_token_id", None)
-        self.pad_token_id = self.configs.get("pad_token_id", None)
-        self.decoder_start_token_id = self.configs.get("decoder_start_token_id", None)
-        self.forced_bos_token_id = self.configs.get("forced_bos_token_id", None)
-        self.forced_eos_token_id = self.configs.get("forced_eos_token_id", None)
-        self.num_return_sequences = self.configs.get("num_return_sequences", 1)
-        self.diversity_rate = self.configs.get("diversity_rate", 0.0)
-        self.use_cache = self.configs.get("use_cache", True)
+        self.max_length = self.config.get("max_dec_len", 20)
+        self.min_length = self.config.get("min_dec_len", 0)
+        self.decode_strategy = self.config.get("decode_strategy", "sampling")
+        self.temperature = self.config.get("temperature", 1.0)
+        self.top_k = self.config.get("top_k", 0)
+        self.top_p = self.config.get("top_p", 1.0)
+        self.use_topp_sampling = self.config.get("use_topp_sampling", False)
+        self.inference = self.config.get("inference", False)
+        self.repetition_penalty = self.config.get("repetition_penalty", 1.0)
+        self.num_beams = self.config.get("num_beams", 1)
+        self.num_beam_groups = self.config.get("num_beam_groups", 1)
+        self.length_penalty = self.config.get("length_penalty", 0.0)
+        self.early_stopping = self.config.get("early_stopping", False)
+        self.bos_token_id = self.config.get("bos_token_id", None)
+        self.eos_token_id = self.config.get("eos_token_id", None)
+        self.pad_token_id = self.config.get("pad_token_id", None)
+        self.decoder_start_token_id = self.config.get("decoder_start_token_id", None)
+        self.forced_bos_token_id = self.config.get("forced_bos_token_id", None)
+        self.forced_eos_token_id = self.config.get("forced_eos_token_id", None)
+        self.num_return_sequences = self.config.get("num_return_sequences", 1)
+        self.diversity_rate = self.config.get("diversity_rate", 0.0)
+        self.use_cache = self.config.get("use_cache", True)
 
     def prepare_input_ids_for_generation(self, bos_token_id, encoder_output=None):
         batch_size = 1
@@ -1622,23 +1616,23 @@ class BloomForGeneration(nn.Layer):
             decode_strategy
         )
 
-        bos_token_id = bos_token_id if bos_token_id is not None else getattr(self.bloom, "bos_token_id", None)
-        eos_token_id = eos_token_id if eos_token_id is not None else getattr(self.bloom, "eos_token_id", None)
-        pad_token_id = pad_token_id if pad_token_id is not None else getattr(self.bloom, "pad_token_id", None)
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(self.config, "bos_token_id", None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(self.config, "eos_token_id", None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(self.config, "pad_token_id", None)
         forced_bos_token_id = (
             forced_bos_token_id
             if forced_bos_token_id is not None
-            else getattr(self.bloom, "forced_bos_token_id", None)
+            else getattr(self.config, "forced_bos_token_id", None)
         )
         forced_eos_token_id = (
             forced_eos_token_id
             if forced_eos_token_id is not None
-            else getattr(self.bloom, "forced_eos_token_id", None)
+            else getattr(self.config, "forced_eos_token_id", None)
         )
         decoder_start_token_id = (
             decoder_start_token_id
             if decoder_start_token_id is not None
-            else getattr(self.bloom, "decoder_start_token_id", None)
+            else getattr(self.config, "decoder_start_token_id", None)
         )
 
         # params check
