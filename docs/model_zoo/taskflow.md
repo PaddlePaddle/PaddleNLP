@@ -1249,13 +1249,14 @@ from paddlenlp import Taskflow
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese`                     | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-zh-dureader-cross-encoder`       | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese` (默认)               | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
+  | `rocketqav2-en-marco-cross-encoder`        | 12-layers, 768-hidden, 12-heads | 英文 |
 
 
 #### 可配置参数说明
@@ -1785,7 +1786,7 @@ from paddlenlp import Taskflow
 
 <details><summary>&emsp; 基于百度自研中文图文跨模态预训练模型ERNIE-ViL 2.0</summary><div>
 
-#### 支持单条、批量预测
+#### 多模态特征提取
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -1845,6 +1846,61 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `_static_mode`：静态图模式，默认开启。
 * `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
+#### 文本特征提取
+
+```python
+>>> from paddlenlp import Taskflow
+>>> import paddle.nn.functional as F
+>>> text_encoder = Taskflow("feature_extraction", model='rocketqa-zh-base-query-encoder')
+>>> text_embeds = text_encoder(['春天适合种什么花？','谁有狂三这张高清的?'])
+>>> text_features1 = text_embeds["features"]
+>>> text_features1
+Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.27640465, -0.13405125,  0.00612330, ..., -0.15600294,
+         -0.18932408, -0.03029604],
+        [-0.12041329, -0.07424965,  0.07895312, ..., -0.17068857,
+          0.04485796, -0.18887770]])
+>>> text_embeds = text_encoder('春天适合种什么菜？')
+>>> text_features2 = text_embeds["features"]
+>>> text_features2
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.32578075, -0.02398480, -0.18929179, -0.18639392, -0.04062131,
+       ......
+>>> probs = F.cosine_similarity(text_features1, text_features2)
+>>> probs
+Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [0.86455142, 0.41222256])
+```
+
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  层数| 维度  | 语言|
+  | :---: | :--------: | :--------: | :--------: |
+  | `rocketqa-zh-dureader-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-dureader-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-medium-query-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-medium-para-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-mini-query-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-mini-para-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-micro-query-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-micro-para-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-nano-query-encoder`  | 4 | 312 | 中文|
+  | `rocketqa-zh-nano-para-encoder`  | 4 | 312 | 中文|
+  | `rocketqav2-en-marco-query-encoder`  | 12 | 768 | 英文|
+  | `rocketqav2-en-marco-para-encoder`  | 12 | 768 | 英文|
+  | `ernie-search-base-dual-encoder-marco-en"`  | 12 | 768 | 英文|
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_seq_len`：文本序列的最大长度，默认为128。
+* `return_tensors`: 返回的类型，有pd和np，默认为pd。
+* `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
 
 </div></details>
 

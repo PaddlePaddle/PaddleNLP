@@ -23,11 +23,11 @@ from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
-from .feature_extraction import MultimodalFeatureExtractionTask
 from .fill_mask import FillMaskTask
 from .information_extraction import GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
 from .lexical_analysis import LacTask
+from .multimodal_feature_extraction import MultimodalFeatureExtractionTask
 from .named_entity_recognition import NERLACTask, NERWordTagTask
 from .poetry_generation import PoetryGenerationTask
 from .pos_tagging import POSTaggingTask
@@ -36,6 +36,7 @@ from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
+from .text_feature_extraction import TextFeatureExtractionTask
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .text_to_image import (
@@ -242,6 +243,14 @@ TASKS = {
             "rocketqa-nano-cross-encoder": {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
+            },
+            "rocketqav2-en-marco-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-rocketqav2-en-marco-cross-encoder",
+            },
+            "ernie-search-large-cross-encoder-marco-en": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-ernie-search-large-cross-encoder-marco-en",
             },
             "__internal_testing__/tiny-random-bert": {
                 "task_class": TextSimilarityTask,
@@ -563,6 +572,81 @@ TASKS = {
     },
     "feature_extraction": {
         "models": {
+            "rocketqa-zh-dureader-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-dureader-query-encoder",
+                "task_priority_path": "rocketqa-zh-dureader-query-encoder",
+            },
+            "rocketqa-zh-dureader-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-dureader-para-encoder",
+                "task_priority_path": "rocketqa-rocketqa-zh-dureader-para-encoder",
+            },
+            "rocketqa-zh-base-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-query-encoder",
+                "task_priority_path": "rocketqa-zh-base-query-encoder",
+            },
+            "rocketqa-zh-base-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-para-encoder",
+                "task_priority_path": "rocketqa-zh-base-para-encoder",
+            },
+            "rocketqa-zh-medium-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-query-encoder",
+                "task_priority_path": "rocketqa-zh-medium-query-encoder",
+            },
+            "rocketqa-zh-medium-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-para-encoder",
+                "task_priority_path": "rocketqa-zh-medium-para-encoder",
+            },
+            "rocketqa-zh-mini-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-mini-query-encoder",
+                "task_priority_path": "rocketqa-zh-mini-query-encoder",
+            },
+            "rocketqa-zh-mini-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-rocketqa-zh-mini-para-encoder",
+                "task_priority_path": "rocketqa-zh-mini-para-encoder",
+            },
+            "rocketqa-zh-micro-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-query-encoder",
+                "task_priority_path": "rocketqa-zh-micro-query-encoder",
+            },
+            "rocketqa-zh-micro-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-para-encoder",
+                "task_priority_path": "rocketqa-zh-micro-para-encoder",
+            },
+            "rocketqa-zh-nano-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-query-encoder",
+                "task_priority_path": "rocketqa-zh-nano-query-encoder",
+            },
+            "rocketqa-zh-nano-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-para-encoder",
+                "task_priority_path": "rocketqa-zh-nano-para-encoder",
+            },
+            "rocketqav2-en-marco-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqav2-en-marco-query-encoder",
+                "task_priority_path": "rocketqav2-en-marco-query-encoder",
+            },
+            "rocketqav2-en-marco-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqav2-en-marco-para-encoder",
+                "task_priority_path": "rocketqav2-en-marco-para-encoder",
+            },
+            "ernie-search-base-dual-encoder-marco-en": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-ernie-search-base-dual-encoder-marco-en",
+                "task_priority_path": "ernie-search-base-dual-encoder-marco-en",
+            },
             "PaddlePaddle/ernie_vil-2.0-base-zh": {
                 "task_class": MultimodalFeatureExtractionTask,
                 "task_flag": "feature_extraction-PaddlePaddle/ernie_vil-2.0-base-zh",
