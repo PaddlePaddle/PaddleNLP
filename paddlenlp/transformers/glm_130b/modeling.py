@@ -54,7 +54,7 @@ class RotaryEmbeddings(nn.Layer):
             seq_len = x.shape[seq_dim]
         if self.max_seq_len_cached is None or (seq_len > self.max_seq_len_cached):
             self.max_seq_len_cached = seq_len
-            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
             if self.dtype == paddle.float16:
@@ -63,8 +63,8 @@ class RotaryEmbeddings(nn.Layer):
             sin_cached = emb.sin().unsqueeze(1)
 
             if self.dtype == paddle.float16:
-                cos_cached = cos_cached.astype("bfloat16")
-                sin_cached = sin_cached.astype("bfloat16")
+                cos_cached = cos_cached.astype(self.dtype)
+                sin_cached = sin_cached.astype(self.dtype)
 
             self.cos_cached, self.sin_cached = cos_cached, sin_cached
         return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
@@ -83,13 +83,12 @@ class GLM130BAttention(nn.Layer):
                 f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
                 f"heads ({config.num_attention_heads})"
             )
-
+        self.config = config
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        self.rotary_embeddings = RotaryEmbeddings(config.hidden_size, self.attention_head_size, config.paddle_dtype)
         self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
         self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -119,7 +118,13 @@ class GLM130BAttention(nn.Layer):
         return q, k
 
     def forward(
-        self, hidden_states: Tensor, ltor_mask: Tensor, position_ids: Tensor, cache: Tensor = None, label_id=0
+        self,
+        hidden_states: Tensor,
+        ltor_mask: Tensor,
+        position_ids: Tensor,
+        rotary_embeddings: Tensor,
+        cache: Tensor = None,
+        label_id=0,
     ):
         query_length = hidden_states.shape[1]
         if cache is None:
@@ -131,14 +136,25 @@ class GLM130BAttention(nn.Layer):
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
             mixed_q_layer = mixed_q_layer[:, -query_length:]
 
+        print("=" * 20)
+        print(self.query_key_value.weight.mean())
+        print(self.query_key_value.weight)
+        print(hidden_states.mean())
+        print(mixed_layer.mean(), mixed_layer.shape)
+
         q_layer = self._transpose_for_scores(mixed_q_layer)
         k_layer = self._transpose_for_scores(mixed_k_layer)
         v_layer = self._transpose_for_scores(mixed_v_layer)
 
+        print("#" * 20)
+        print(q_layer.mean(), q_layer.shape)
+        print(k_layer.mean(), k_layer.shape)
+        print(v_layer.mean(), v_layer.shape)
+
         if self.config.position_encoding_2d:
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
-            cos, sin = self.rotary_embeddings(q1, seq_len=position_ids.max() + 1)
+            cos, sin = rotary_embeddings(q1, seq_len=position_ids.max() + 1)
             position_ids, block_position_ids = position_ids[:, 0, :].transpose([1, 0]), position_ids[
                 :, 1, :
             ].transpose([1, 0])
@@ -148,7 +164,7 @@ class GLM130BAttention(nn.Layer):
             k_layer = paddle.concat([k1, k2], axis=-1)
         else:
             position_ids = position_ids.transpose([1, 0])
-            cos, sin = self.rotary_embeddings(v_layer, seq_len=position_ids.max() + 1)
+            cos, sin = rotary_embeddings(v_layer, seq_len=position_ids.max() + 1)
             q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
 
         seq_length, batch_size, num_heads, hidden_size = k_layer.shape
@@ -164,7 +180,7 @@ class GLM130BAttention(nn.Layer):
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        attention_scale_coeff = label_id + 1.0
+        attention_scale_coeff = float(label_id) + 1.0
         if self.attention_scale:
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
 
@@ -179,10 +195,10 @@ class GLM130BAttention(nn.Layer):
         ltor_mask = ltor_mask.astype(attention_scores.dtype)
         attention_scores = paddle.multiply(attention_scores, ltor_mask)
         attention_scores = attention_scores + (-10000.0) * (1.0 - ltor_mask)
-        attention_scores = attention_scores * attention_scale_coeff
+        attention_scores = attention_scores.astype("float32") * attention_scale_coeff
 
         attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = self.attention_dropout(attention_probs)
+        attention_probs = self.attention_dropout(attention_probs).astype(self.config.paddle_dtype)
 
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
         v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
@@ -216,12 +232,21 @@ class GLM130BBlock(nn.Layer):
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.mlp = GLM130BMLP(config)
 
-    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, position_ids: Tensor, cache: Tensor = None):
+    def forward(
+        self,
+        hidden_states: Tensor,
+        ltor_mask: Tensor,
+        position_ids: Tensor,
+        rotary_embeddings: Tensor,
+        cache: Tensor = None,
+    ):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
         cache = self.input_layernorm(cache) if cache is not None else None
         # Self attention
-        attention_output = self.attention(layernorm_output, ltor_mask, position_ids, cache, self.layer_id)
+        attention_output = self.attention(
+            layernorm_output, ltor_mask, position_ids, rotary_embeddings, cache, self.layer_id
+        )
         # Residual connection
         alpha = (2 * self.config.num_layers) ** 0.5
         layernorm_input = alpha * layernorm_output + attention_output
@@ -237,9 +262,9 @@ class GLM130BBlock(nn.Layer):
 class GLM130BMLP(nn.Layer):
     def __init__(self, config: GLM130BConfig):
         super(GLM130BMLP, self).__init__()
-        inner_hidden_size = config.hidden_size * 4 * 2 // 3 * 2
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size)
-        self.dense_4h_to_h = nn.Linear(config.hidden_size * 4, config.hidden_size)
+        inner_hidden_size = config.hidden_size * 4 // 3 * 2
+        self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size * 2)
+        self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.output_dropout_prob)
 
     def geglu(self, x):
@@ -263,10 +288,16 @@ class GLM130BStack(nn.Layer):
     def __init__(self, config: GLM130BConfig):
         super(GLM130BStack, self).__init__()
         self.hidden_size = config.hidden_size
-        self.enable_recompute = config.checkpoint_activations
-        self.checkpoint_num_layers = config.checkpoint_num_layers
+        self.enable_recompute = config.recompute
         self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
+        self.word_embeddings = nn.Embedding(
+            config.vocab_size,
+            config.hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+        )
+        attention_head_size = config.hidden_size // config.num_attention_heads
+        self.rotary_embeddings = RotaryEmbeddings(attention_head_size, base=10000, dtype=config.paddle_dtype)
         self.layers = nn.LayerList()
         for index in range(config.num_layers):
             self.layers.append(GLM130BBlock(config, index))
@@ -283,62 +314,45 @@ class GLM130BStack(nn.Layer):
 
             return custom_forward
 
-        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, cache)
+        hidden_states = recompute(
+            create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, self.rotary_embeddings, cache
+        )
         return hidden_states
 
     def forward(
         self,
-        hidden_states: Tensor,
+        input_ids: Tensor,
         position_ids: Tensor,
         attention_mask: Tensor,
         memory_states: Optional[Tensor] = None,
     ):
-        batch_size, query_length = hidden_states.shape[:2]
-        memory_length = memory_states[0].shape[1] if memory_states is not None else 0
+        print(">" * 20)
+        print(self.word_embeddings.weight.mean())
+        print(self.word_embeddings.weight)
+        batch_size, query_length = input_ids.shape
+        word_embeddings = self.word_embeddings(input_ids).transpose([1, 0, 2])
+        # memory_length = memory_states[0].shape[1] if memory_states is not None else 0
 
-        is_scalar = (paddle.numel(attention_mask) == 1)[0]
-        is_sep = is_scalar or paddle.numel(attention_mask) == batch_size
-        if is_sep:
-            scalar_sep = attention_mask[0] if is_scalar else attention_mask
+        if attention_mask is None:
+            attention_mask = paddle.ones([1, 1])
+        print("+" * 20)
+        print(attention_mask)
 
-            # attention mask is the beginning postion of B region in [0, query_len)
-            def build_mask_matrix(seq_length, sep, memory_length=0):
-                mask = paddle.ones([1, seq_length, seq_length])
-                mask = paddle.tril(mask)
-                if is_scalar:
-                    mask[0, :, : int(sep)] = 1
-                else:
-                    mask = mask.expand([batch_size, -1, -1])
-                    ids = paddle.arange(seq_length, dtype=sep.dtype).unsqueeze(0)
-                    m = (ids < sep.reshape([-1, 1])).astype("float32")
-                    m = m.unsqueeze(1).expand_as(mask).astype("bool")
-                    y = paddle.full(mask.shape, 1, mask.dtype)
-                    mask = paddle.where(m, y, mask)
-                if memory_length > 0:
-                    mask = mask.expand([batch_size, -1, -1])
-                    mask = paddle.concat([paddle.ones([batch_size, seq_length, memory_length]), mask], axis=2)
-                mask = mask.unsqueeze(1)
-                return mask
-
-            attention_mask = build_mask_matrix(query_length, scalar_sep, memory_length=memory_length)
-        else:
-            if attention_mask.dim() == 2:
-                attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
-            attention_mask = attention_mask[:, :, :, -query_length - memory_length :]
-
-        hidden_states = self.embedding_dropout(hidden_states)
+        hidden_states = self.embedding_dropout(word_embeddings)
+        print("<" * 20)
+        print(word_embeddings.mean())
+        print(word_embeddings)
 
         memory_layers = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
             mem_i = memory_states[i] if memory_states else None
 
             if self.enable_recompute:
-                # TODO Should the attention_mask be added, it seems missing in original application.
                 hidden_states = self.recompute_training(
                     layer, hidden_states, attention_mask, position_ids, cache=mem_i
                 )
             else:
-                hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
+                hidden_states = layer(hidden_states, attention_mask, position_ids, self.rotary_embeddings, cache=mem_i)
 
             memory_layers.append(hidden_states.detach())
 
@@ -379,23 +393,17 @@ class GLM130BPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
-            layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-            )
+            paddle.set_default_dtype("float32")
+            init_weight = paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=layer.weight.shape)
+            paddle.set_default_dtype(self.config.paddle_dtype)
+            layer.weight.set_value(init_weight.astype(self.config.paddle_dtype))
             if layer.bias is not None:
                 layer.bias.set_value(paddle.zeros_like(layer.bias))
         elif isinstance(layer, nn.Embedding):
-            layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-            )
+            paddle.set_default_dtype("float32")
+            init_weight = paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=layer.weight.shape)
+            paddle.set_default_dtype(self.config.paddle_dtype)
+            layer.weight.set_value(init_weight.astype(self.config.paddle_dtype))
         elif isinstance(layer, nn.LayerNorm):
             layer.weight.set_value(paddle.ones_like(layer.weight))
             layer.bias.set_value(paddle.zeros_like(layer.bias))
@@ -419,11 +427,6 @@ class GLM130BModel(GLM130BPretrainedModel):
         super(GLM130BModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        self.word_embeddings = nn.Embedding(
-            config.vocab_size,
-            config.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-        )
         self.transformer = GLM130BStack(config)
         self.apply(self.init_weights)
 
@@ -442,19 +445,22 @@ class GLM130BModel(GLM130BPretrainedModel):
         use_cache: bool = None,
         return_dict: bool = None,
     ):
-        batch_size = input_ids.shape[0]
-        word_embeddings = self.word_embeddings(input_ids).transpose([1, 0])
-        input_shape = input_ids.shape
+        batch_size, seq_len = input_ids.shape[:2]
 
         if position_ids is None:
-            position_ids = paddle.arange(0, input_shape[-1], dtype="int64")
-            block_position_ids = paddle.zeros(input_shape[-1:], dtype="int64")
+            position_ids = paddle.arange(0, seq_len, dtype="int64")
+            block_position_ids = paddle.zeros([seq_len], dtype="int64")
             position_ids = paddle.stack([position_ids, block_position_ids], axis=0).unsqueeze(0)
 
         if attention_mask is None:
             attention_mask = paddle.zeros([batch_size])
 
-        logits, hidden_layers = self.transformer(word_embeddings, position_ids, attention_mask, cache)
+        logits, hidden_layers = self.transformer(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            memory_states=cache,
+        )
         if self.output_predict:
             logits = F.linear(logits, self.word_embeddings.weight.T).transpose([1, 0])
 

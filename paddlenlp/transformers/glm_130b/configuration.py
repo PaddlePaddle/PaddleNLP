@@ -29,19 +29,21 @@ GLM130B_PRETRAINED_INIT_CONFIGURATION = {
         "hidden_size": 12288,
         "mlp_hidden_size": 12288 * 8 / 3,
         "num_layers": 70,
-        "num_heads": 96,
+        "num_attention_heads": 96,
         "length_per_sample": 2000,
         "max_length": 2048,
         "vocab_size_base": 768,
         "activation": "geglu",
-        "layernorm-epsilon": 1e-5,
-        "paddle_dtype": "bfloat16",
+        "layernorm_epsilon": 1e-5,
+        "paddle_dtype": "float16",
         "attention_dropout_prob": 0.1,
         "attention_scale": True,
         "embedding_dropout_prob": 0.1,
         "initializer_range": 0.0052,
         "output_dropout_prob": 0.1,
         "output_predict": True,
+        "position_encoding_2d": False,
+        "recompute": False,
         "vocab_size": 50304,
     }
 }
@@ -61,14 +63,18 @@ class GLM130BConfig(PretrainedConfig):
         embedding_dropout_prob=0.1,
         hidden_size=12288,
         initializer_range=0.0052,
+        layernorm_epsilon=1e-5,
         length_per_sample=2000,
         max_length=2048,
-        mlp_hidden_size=12288 * 8 // 3,
-        num_heads=96,
+        inner_hidden_size=12288 * 8 // 3,
+        num_attention_heads=96,
         num_layers=70,
         output_dropout_prob=0.1,
         output_predict=True,
-        vocab_size=50304,
+        paddle_dtype="float16",
+        position_encoding_2d=False,
+        recompute=False,
+        vocab_size=150528,
         vocab_size_base=768,
         **kwargs,
     ):
@@ -79,12 +85,16 @@ class GLM130BConfig(PretrainedConfig):
         self.embedding_dropout_prob = embedding_dropout_prob
         self.hidden_size = hidden_size
         self.initializer_range = initializer_range
+        self.layernorm_epsilon = layernorm_epsilon
         self.length_per_sample = length_per_sample
         self.max_length = max_length
-        self.mlp_hidden_size = mlp_hidden_size
-        self.num_heads = num_heads
+        self.inner_hidden_size = inner_hidden_size
+        self.num_attention_heads = num_attention_heads
         self.num_layers = num_layers
         self.output_dropout_prob = output_dropout_prob
         self.output_predict = output_predict
+        self.paddle_dtype = paddle_dtype
+        self.position_encoding_2d = position_encoding_2d
+        self.recompute = recompute
         self.vocab_size = vocab_size
         self.vocab_size_base = vocab_size_base
