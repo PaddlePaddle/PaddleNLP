@@ -31,7 +31,7 @@ class SimCSE(nn.Layer):
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
         # if output_emb_size is greater than 0, then add Linear layer to reduce embedding_size,
-        # we recommend set output_emb_size = 256 considering the trade-off beteween
+        # we recommend set output_emb_size = 256 considering the trade-off between
         # recall performance and efficiency
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:

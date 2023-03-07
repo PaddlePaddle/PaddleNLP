@@ -15,7 +15,7 @@
 import os
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Optional
+from typing import List, Optional
 
 import paddle
 from utils import convert_example, reader
@@ -54,6 +54,11 @@ class DataArguments:
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
+    )
+
+    dynamic_max_length: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "dynamic max length from batch, it can be array of length, eg: 16 32 64 128"},
     )
 
 
@@ -109,7 +114,12 @@ def main():
     # Load and preprocess dataset
     train_ds = load_dataset(reader, data_path=data_args.train_path, max_seq_len=data_args.max_seq_len, lazy=False)
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_len, lazy=False)
-    trans_fn = partial(convert_example, tokenizer=tokenizer, max_seq_len=data_args.max_seq_len)
+    trans_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_len=data_args.max_seq_len,
+        dynamic_max_length=data_args.dynamic_max_length,
+    )
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
 

@@ -217,7 +217,7 @@ def index_sample(x, index):
     arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
     arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
     arr_index = paddle.expand(arr_index, index.shape)
-    # Genrate new index
+    # Generate new index
     new_index = paddle.concat((arr_index, index), -1)
     new_index = paddle.reshape(new_index, (-1, 2))
     # Get output

@@ -13,23 +13,19 @@
 # limitations under the License.
 """Tokenization class for UnifiedTransformer model."""
 
-import copy
-import io
-import json
 import os
-import six
 import re
 import unicodedata
 from shutil import copyfile
 
-import numpy as np
 import jieba
+import numpy as np
 import paddle
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control
 from ...data.vocab import Vocab
+from .. import PretrainedTokenizer
+from ..tokenizer_utils import _is_control, _is_whitespace, convert_to_unicode
 
 __all__ = ["UnifiedTransformerTokenizer"]
 
@@ -257,7 +253,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Args:
             tokens (list[str]):
                 A list of string representing tokens to be converted.
-            keep_space (bool, optinal):
+            keep_space (bool, optional):
                 Whether or not to keep the segmentation with space. Defaults to
                 True.
 

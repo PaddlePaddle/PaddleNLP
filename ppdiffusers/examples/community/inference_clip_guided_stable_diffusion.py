@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 from clip_guided_stable_diffusion import CLIPGuidedStableDiffusion
 from IPython.display import display
 from PIL import Image
@@ -34,7 +35,7 @@ def image_grid(imgs, rows, cols):
 def create_clip_guided_pipeline(
     model_id="CompVis/stable-diffusion-v1-4", clip_model_id="openai/clip-vit-large-patch14", scheduler="plms"
 ):
-    pipeline = StableDiffusionPipeline.from_pretrained(model_id)
+    pipeline = StableDiffusionPipeline.from_pretrained(model_id, paddle_dtype=paddle.float16)
 
     if scheduler == "lms":
         scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
@@ -116,29 +117,31 @@ if __name__ == "__main__":
     clip_guidance_scale = 100  # @param {type: "number"}
     num_cutouts = 4  # @param {type: "number"}
     use_cutouts = False  # @param ["False", "True"]
-    unfreeze_unet = True  # @param ["False", "True"]
-    unfreeze_vae = True  # @param ["False", "True"]
+    unfreeze_unet = False  # @param ["False", "True"]
+    unfreeze_vae = False  # @param ["False", "True"]
     seed = 3788086447  # @param {type: "number"}
 
     model_id = "CompVis/stable-diffusion-v1-4"
     clip_model_id = "openai/clip-vit-large-patch14"  # @param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
     scheduler = "plms"  # @param ['plms', 'lms']
     guided_pipeline = create_clip_guided_pipeline(model_id, clip_model_id)
-    grid_image = infer(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        clip_prompt=clip_prompt,
-        num_return_images=num_return_images,
-        num_images_per_prompt=num_images_per_prompt,
-        num_inference_steps=num_inference_steps,
-        clip_guidance_scale=clip_guidance_scale,
-        guidance_scale=guidance_scale,
-        guided_pipeline=guided_pipeline,
-        use_cutouts=use_cutouts,
-        num_cutouts=num_cutouts,
-        seed=seed,
-        unfreeze_unet=unfreeze_unet,
-        unfreeze_vae=unfreeze_vae,
-    )
+
+    with paddle.amp.auto_cast(True, level="O2"):
+        grid_image = infer(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            clip_prompt=clip_prompt,
+            num_return_images=num_return_images,
+            num_images_per_prompt=num_images_per_prompt,
+            num_inference_steps=num_inference_steps,
+            clip_guidance_scale=clip_guidance_scale,
+            guidance_scale=guidance_scale,
+            guided_pipeline=guided_pipeline,
+            use_cutouts=use_cutouts,
+            num_cutouts=num_cutouts,
+            seed=seed,
+            unfreeze_unet=unfreeze_unet,
+            unfreeze_vae=unfreeze_vae,
+        )
 
     display(grid_image)

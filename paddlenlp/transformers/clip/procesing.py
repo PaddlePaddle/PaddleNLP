@@ -40,6 +40,17 @@ class CLIPProcessor(ProcessorMixin):
     image_processor_class = "CLIPImageProcessor"
     tokenizer_class = "CLIPTokenizer"
 
+    pretrained_init_configuration = {
+        "openai/clip-vit-base-patch32": {"do_lower_case": True},
+        "openai/clip-vit-base-patch16": {"do_lower_case": True},
+        "openai/clip-vit-large-patch14": {"do_lower_case": True},
+        "laion/CLIP-ViT-H-14-laion2B-s32B-b79K": {"do_lower_case": True},
+        "laion/CLIP-ViT-B-32-laion2B-s34B-b79K": {"do_lower_case": True},
+        "openai/clip-rn50": {"do_lower_case": True},
+        "openai/clip-rn101": {"do_lower_case": True},
+        "openai/clip-rn50x4": {"do_lower_case": True},
+    }
+
     def __init__(self, image_processor=None, tokenizer=None, **kwargs):
         if "feature_extractor" in kwargs:
             warnings.warn(

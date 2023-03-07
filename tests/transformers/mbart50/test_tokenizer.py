@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import shutil
 import tempfile
 import unittest
 
 from paddlenlp.transformers import SPIECE_UNDERLINE, MBart50Tokenizer
 from paddlenlp.transformers.mbart.modeling import shift_tokens_right
-from ...testing_utils import get_tests_dir, nested_simplify, slow
 
+from ...testing_utils import get_tests_dir, nested_simplify
 from ..test_tokenizer_common import TokenizerTesterMixin
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")

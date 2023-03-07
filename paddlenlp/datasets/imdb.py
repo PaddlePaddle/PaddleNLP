@@ -16,10 +16,9 @@ import collections
 import io
 import os
 
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-
-from . import DatasetBuilder
+from ..utils.downloader import get_path_from_url
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["Imdb"]
 

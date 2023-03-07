@@ -54,6 +54,8 @@ Args:
 - greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
 - problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
 - output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+- verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs, use verbosity > 0 to set stop the workers from logging to the driver.
+
 
 ### Train
 
@@ -79,7 +81,6 @@ Args:
 - experiment_name: (str, optional): name of the experiment. Experiment log will be stored under `<output_dir>/<experiment_name>`. Defaults to UNIX timestamp.
 - hp_overrides: (dict[str, Any], optional): Advanced users only. override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
 - custom_model_candiates: (dict[str, Any], optional): Advanced users only. Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
-- verbosity: (int, optional): controls the verbosity of the logger. Defaults to `0`, which set the logger level at INFO. To reduce the amount of logs, use `verbosity > 0` to set the logger level to WARNINGS
 
 ### Evaluations and Examine Results
 

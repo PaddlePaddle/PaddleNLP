@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing
-from typing import Dict, List, Optional, Tuple, Union, Generator
-
 import json
 import logging
+import typing
 from datetime import datetime
+from typing import Dict, Generator, List, Optional, Tuple, Union
+
 from elasticsearch.helpers import scan
 from tqdm.auto import tqdm
 
 from pipelines.document_stores.filter_utils import LogicalFilterClause
-from pipelines.schema import Document, Label, Answer, Span
 from pipelines.nodes.preprocessor import PreProcessor
+from pipelines.schema import Answer, Document, Label, Span
 
 if typing.TYPE_CHECKING:
     # This results in a circular import if we don't use typing.TYPE_CHECKING
@@ -151,7 +151,7 @@ def _extract_docs_and_labels_from_dict(
     # get all extra fields from document level (e.g. title)
     meta_doc = {k: v for k, v in document_dict.items() if k not in ("paragraphs", "title")}
     for paragraph in document_dict["paragraphs"]:
-        ## Create Metadata
+        # Create Metadata
         cur_meta = {"name": document_dict.get("title", None)}
         # all other fields from paragraph level
         meta_paragraph = {k: v for k, v in paragraph.items() if k not in ("qas", "context")}
@@ -159,7 +159,7 @@ def _extract_docs_and_labels_from_dict(
         # meta from parent document
         cur_meta.update(meta_doc)
 
-        ## Create Document
+        # Create Document
         cur_full_doc = Document(content=paragraph["context"], meta=cur_meta)
         if preprocessor is not None:
             splits_dicts = preprocessor.process(cur_full_doc.to_dict())
@@ -184,7 +184,7 @@ def _extract_docs_and_labels_from_dict(
             splits = [cur_full_doc]
         docs.extend(splits)
 
-        ## Assign Labels to corresponding documents
+        # Assign Labels to corresponding documents
         for qa in paragraph["qas"]:
             if not qa.get("is_impossible", False):
                 for answer in qa["answers"]:

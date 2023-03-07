@@ -202,7 +202,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
-- `warmup_propotion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `warmup_proportion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
 - `max_seq_len` 模型输入序列的最大长度。
 - `max_target_len` 模型训练时标签的最大长度。
 - `min_dec_len` 模型生成序列的最小长度。

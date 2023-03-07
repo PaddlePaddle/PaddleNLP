@@ -27,6 +27,7 @@ from .fill_mask import FillMaskTask
 from .information_extraction import GPTask, UIETask
 from .knowledge_mining import NPTagTask, WordTagTask
 from .lexical_analysis import LacTask
+from .multimodal_feature_extraction import MultimodalFeatureExtractionTask
 from .named_entity_recognition import NERLACTask, NERWordTagTask
 from .poetry_generation import PoetryGenerationTask
 from .pos_tagging import POSTaggingTask
@@ -35,6 +36,7 @@ from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
+from .text_feature_extraction import TextFeatureExtractionTask
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .text_to_image import (
@@ -70,6 +72,10 @@ TASKS = {
     "dialogue": {
         "models": {
             "plato-mini": {"task_class": DialogueTask, "task_flag": "dialogue-plato-mini"},
+            "__internal_testing__/tiny-random-plato": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-tiny-random-plato",
+            },
         },
         "default": {
             "model": "plato-mini",
@@ -195,6 +201,10 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": "sentiment_analysis-uie-senta-nano",
             },
+            "__internal_testing__/tiny-random-skep": {
+                "task_class": SkepTask,
+                "task_flag": "sentiment_analysis-tiny-random-skep",
+            },
         },
         "default": {"model": "bilstm"},
     },
@@ -234,6 +244,18 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-rocketqa-nano-cross-encoder",
             },
+            "rocketqav2-en-marco-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-rocketqav2-en-marco-cross-encoder",
+            },
+            "ernie-search-large-cross-encoder-marco-en": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-ernie-search-large-cross-encoder-marco-en",
+            },
+            "__internal_testing__/tiny-random-bert": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-tiny-random-bert",
+            },
         },
         "default": {"model": "simbert-base-chinese"},
     },
@@ -254,8 +276,23 @@ TASKS = {
                 "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
                 "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
             },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese-V1",
+                "task_priority_path": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+            },
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+            },
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+                "task_priority_path": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+            },
         },
-        "default": {"model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"},
+        "default": {"model": "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"},
     },
     "word_segmentation": {
         "modes": {
@@ -317,6 +354,21 @@ TASKS = {
                 "task_flag": "information_extraction-uie-x-base",
             },
             "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
+            "__internal_testing__/tiny-random-uie": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie",
+            },
+            "__internal_testing__/tiny-random-uie-m": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie-m",
+            },
+            "__internal_testing__/tiny-random-uie-x": {
+                "task_class": UIETask,
+                "hidden_size": 8,
+                "task_flag": "information_extraction-tiny-random-uie-x",
+            },
         },
         "default": {"model": "uie-base"},
     },
@@ -373,7 +425,7 @@ TASKS = {
         },
     },
     "text_classification": {
-        "models": {
+        "modes": {
             "finetune": {
                 "task_class": TextClassificationTask,
                 "task_flag": "text_classification-finetune",
@@ -383,7 +435,7 @@ TASKS = {
                 "task_flag": "text_classification-prompt",
             },
         },
-        "default": {"model": "finetune"},
+        "default": {"mode": "finetune"},
     },
     "text_to_image": {
         "models": {
@@ -511,8 +563,162 @@ TASKS = {
                 "task_class": ZeroShotTextClassificationTask,
                 "task_flag": "zero_shot_text_classification-utc-pico",
             },
+            "__internal_testing__/tiny-random-utc": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-tiny-random-utc",
+            },
         },
-        "default": {"model": "utc-large"},
+        "default": {"model": "utc-base"},
+    },
+    "feature_extraction": {
+        "models": {
+            "rocketqa-zh-dureader-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-dureader-query-encoder",
+                "task_priority_path": "rocketqa-zh-dureader-query-encoder",
+            },
+            "rocketqa-zh-dureader-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-dureader-para-encoder",
+                "task_priority_path": "rocketqa-rocketqa-zh-dureader-para-encoder",
+            },
+            "rocketqa-zh-base-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-query-encoder",
+                "task_priority_path": "rocketqa-zh-base-query-encoder",
+            },
+            "rocketqa-zh-base-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-base-para-encoder",
+                "task_priority_path": "rocketqa-zh-base-para-encoder",
+            },
+            "rocketqa-zh-medium-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-query-encoder",
+                "task_priority_path": "rocketqa-zh-medium-query-encoder",
+            },
+            "rocketqa-zh-medium-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-medium-para-encoder",
+                "task_priority_path": "rocketqa-zh-medium-para-encoder",
+            },
+            "rocketqa-zh-mini-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-mini-query-encoder",
+                "task_priority_path": "rocketqa-zh-mini-query-encoder",
+            },
+            "rocketqa-zh-mini-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-rocketqa-zh-mini-para-encoder",
+                "task_priority_path": "rocketqa-zh-mini-para-encoder",
+            },
+            "rocketqa-zh-micro-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-query-encoder",
+                "task_priority_path": "rocketqa-zh-micro-query-encoder",
+            },
+            "rocketqa-zh-micro-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-micro-para-encoder",
+                "task_priority_path": "rocketqa-zh-micro-para-encoder",
+            },
+            "rocketqa-zh-nano-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-query-encoder",
+                "task_priority_path": "rocketqa-zh-nano-query-encoder",
+            },
+            "rocketqa-zh-nano-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqa-zh-nano-para-encoder",
+                "task_priority_path": "rocketqa-zh-nano-para-encoder",
+            },
+            "rocketqav2-en-marco-query-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqav2-en-marco-query-encoder",
+                "task_priority_path": "rocketqav2-en-marco-query-encoder",
+            },
+            "rocketqav2-en-marco-para-encoder": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-rocketqav2-en-marco-para-encoder",
+                "task_priority_path": "rocketqav2-en-marco-para-encoder",
+            },
+            "ernie-search-base-dual-encoder-marco-en": {
+                "task_class": TextFeatureExtractionTask,
+                "task_flag": "feature_extraction-ernie-search-base-dual-encoder-marco-en",
+                "task_priority_path": "ernie-search-base-dual-encoder-marco-en",
+            },
+            "PaddlePaddle/ernie_vil-2.0-base-zh": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-PaddlePaddle/ernie_vil-2.0-base-zh",
+                "task_priority_path": "PaddlePaddle/ernie_vil-2.0-base-zh",
+            },
+            "OFA-Sys/chinese-clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-base-patch16",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-base-patch16",
+            },
+            "OFA-Sys/chinese-clip-vit-huge-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-huge-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-huge-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14",
+            },
+            "OFA-Sys/chinese-clip-vit-large-patch14-336px": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-OFA-Sys/chinese-clip-vit-large-patch14-336px",
+                "task_priority_path": "OFA-Sys/chinese-clip-vit-large-patch14-336px",
+            },
+            "openai/clip-vit-base-patch32": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch32",
+                "task_priority_path": "openai/clip-vit-base-patch32",
+            },
+            "openai/clip-vit-base-patch16": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-base-patch16",
+                "task_priority_path": "openai/clip-vit-base-patch16",
+            },
+            "openai/clip-vit-large-patch14": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-vit-large-patch14",
+                "task_priority_path": "openai/clip-vit-large-patch14",
+            },
+            "laion/CLIP-ViT-H-14-laion2B-s32B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+            },
+            "laion/CLIP-ViT-B-32-laion2B-s34B-b79K": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+                "task_priority_path": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+            },
+            "openai/clip-rn50": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50",
+                "task_priority_path": "openai/clip-rn50",
+            },
+            "openai/clip-rn101": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn101",
+                "task_priority_path": "openai/clip-rn101",
+            },
+            "openai/clip-rn50x4": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-openai/clip-rn50x4",
+                "task_priority_path": "openai/clip-rn50x4",
+            },
+            "__internal_testing__/tiny-random-ernievil2": {
+                "task_class": MultimodalFeatureExtractionTask,
+                "task_flag": "feature_extraction-tiny-random-ernievil2",
+                "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
+            },
+        },
+        "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
 }
 
@@ -542,6 +748,10 @@ support_schema_list = [
     "utc-mini",
     "utc-nano",
     "utc-pico",
+    "utc-tiny",
+    "__internal_testing__/tiny-random-uie",
+    "__internal_testing__/tiny-random-uie-m",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 support_argument_list = [
@@ -567,6 +777,8 @@ support_argument_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "__internal_testing__/tiny-random-uie-m",
+    "__internal_testing__/tiny-random-uie-x",
 ]
 
 
@@ -597,7 +809,7 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        if self.task in ["word_segmentation", "ner"]:
+        if self.task in ["word_segmentation", "ner", "text_classification"]:
             tag = "modes"
             ind_tag = "mode"
             self.model = mode

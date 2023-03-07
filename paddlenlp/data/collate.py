@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import numpy as np
-import paddle
 
 __all__ = [
     "Stack",
@@ -160,7 +159,7 @@ class Pad(object):
                     slices = [slice(i, i + 1)] + slices
                     ret[tuple(slices)] = arr
         if self._ret_length:
-            return ret, np.asarray(original_length, dtype="int32") if self._ret_length == True else np.asarray(
+            return ret, np.asarray(original_length, dtype="int32") if self._ret_length else np.asarray(
                 original_length, self._ret_length
             )
         else:

@@ -16,21 +16,18 @@ import argparse
 import os
 import random
 import time
-import math
-from functools import partial
-import distutils.util
+
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import RobertaForMaskedLM, RobertaTokenizer, RobertaModel, RobertaConfig
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-import copy
-from tqdm import tqdm
 from utils import DataCollatorMLM
+
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    RobertaConfig,
+    RobertaForMaskedLM,
+)
 
 parser = argparse.ArgumentParser()
 IGNORE = -100
@@ -51,26 +48,27 @@ parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup o
 parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=10000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
-parser.add_argument("--amp", type=distutils.util.strtobool,default=True, help="use mix precision.")
+parser.add_argument("--amp", type=strtobool, default=True, help="use mix precision.")
 
 roberta_arch = {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 1,
-            "vocab_size": 50265,
-            "layer_norm_eps": 1e-05,
-            "pad_token_id": 1,
-            "cls_token_id": 0
-        }
+    "attention_probs_dropout_prob": 0.1,
+    "hidden_act": "gelu",
+    "hidden_dropout_prob": 0.1,
+    "hidden_size": 768,
+    "initializer_range": 0.02,
+    "intermediate_size": 3072,
+    "max_position_embeddings": 514,
+    "num_attention_heads": 12,
+    "num_hidden_layers": 12,
+    "type_vocab_size": 1,
+    "vocab_size": 50265,
+    "layer_norm_eps": 1e-05,
+    "pad_token_id": 1,
+    "cls_token_id": 0
+}
+
 
 def set_seed(seed):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
@@ -80,6 +78,7 @@ def set_seed(seed):
     # Maybe different op seeds(for dropout) for different procs is better. By:
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(seed)
+
 
 def do_train(args):
     paddle.set_device(args.device)
@@ -104,7 +103,7 @@ def do_train(args):
     tokenizer = AutoTokenizer.from_pretrained('roberta-base')
 
     # Prepare data for training
-    collator_func = DataCollatorMLM(tokenizer=tokenizer) # data collator
+    collator_func = DataCollatorMLM(tokenizer=tokenizer)  # data collator
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
     train_data_loader = DataLoader(
@@ -129,7 +128,7 @@ def do_train(args):
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-    if args.amp: #mixed precision (fp16)
+    if args.amp:  # mixed precision (fp16)
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
     # Start training
@@ -138,16 +137,12 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             input_ids, _, labels = batch
-            with paddle.amp.auto_cast(
-                        args.amp,
-                        #custom_white_list=["layer_norm", "softmax", "gelu"]
-                        ):
+            with paddle.amp.auto_cast(args.amp):
                 logits = model(input_ids=input_ids)
                 loss = loss_fct(logits, labels)
             if args.amp:
                 scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
-                # print(args.amp, args.learning_rate, args.weight_decay)
             else:
                 loss.backward()
                 optimizer.step()
@@ -166,8 +161,7 @@ def do_train(args):
 
             if global_step % args.save_steps == 0:
                 if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                                "paddle_%d" % global_step)
+                    output_dir = os.path.join(args.output_dir, "paddle_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
 
@@ -175,6 +169,7 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
