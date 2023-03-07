@@ -44,7 +44,6 @@ class QuestionGenerationTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        paddle.set_device(kwargs.get("device", "gpu"))
         self._batch_size = kwargs.get("batch_size", 16)
         self._output_scores = kwargs.get("output_scores", False)
         self._is_select_from_num_return_sequences = kwargs.get("is_select_from_num_return_sequences", True)
