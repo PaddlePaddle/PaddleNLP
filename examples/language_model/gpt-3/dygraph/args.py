@@ -233,7 +233,11 @@ def parse_args(MODEL_CLASSES):
         "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="select cpu, gpu, xpu devices."
     )
     parser.add_argument(
-        "--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style."
+        "--lr_decay_style",
+        type=str,
+        default="cosine",
+        choices=["cosine", "linear", "none"],
+        help="Learning rate decay style.",
     )
     parser.add_argument(
         "-p",

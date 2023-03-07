@@ -34,7 +34,13 @@ from visualdl import LogWriter
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer, PretrainedModel
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+    LinearAnnealingWithWarmupDecay,
+    PretrainedModel,
+)
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
@@ -201,21 +207,31 @@ def do_train(args):
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 
+    # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
-    warmup_step = args.warmup_rate * args.decay_steps
+    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
+    args.warmup_steps = args.warmup_rate * args.max_steps
 
     lr_scheduler = None
 
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
             max_lr=args.max_lr,
             min_lr=args.min_lr,
-            warmup_step=warmup_step,
+            warmup_step=args.warmup_steps,
             decay_step=args.decay_steps,
-            last_epoch=global_step,
+            last_epoch=0,
+        )
+    elif args.lr_decay_style == "linear":
+        lr_scheduler = LinearAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
+            last_epoch=0,
         )
 
     clip = None

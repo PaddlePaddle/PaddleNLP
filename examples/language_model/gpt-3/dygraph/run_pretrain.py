@@ -30,14 +30,19 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.distributed.sharding import group_sharded_parallel
 from visualdl import LogWriter
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+    LinearAnnealingWithWarmupDecay,
+)
 from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(filepath, "../"))
-import lr  # noqa e402
+# import lr  # noqa e402
 from args import parse_args  # noqa e402
 from dataset import create_pretrained_dataset  # noqa e402
 from modeling import (  # noqa e402
@@ -208,17 +213,31 @@ def do_train(args):
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 
+    # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
-    warmup_step = args.warmup_rate * args.decay_steps
+    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
+    args.warmup_steps = args.warmup_rate * args.max_steps
 
     lr_scheduler = None
 
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
+            last_epoch=0,
+        )
+    elif args.lr_decay_style == "linear":
+        lr_scheduler = LinearAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
+            last_epoch=0,
         )
 
     clip = None
