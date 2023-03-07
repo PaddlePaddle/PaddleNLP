@@ -99,6 +99,7 @@ def dense_faq_pipeline():
 
 
 def qa_generation_pipeline():
+    # breakpoint()
     answer_extractor = AnswerExtractor(
         model="uie-base-answer-extractor",
         device=args.device,
