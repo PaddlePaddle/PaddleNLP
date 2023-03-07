@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import traceback
-import logging
-import re
 import copy
 import json
+import logging
+import re
 
 op_sql_dict = {0: ">", 1: "<", 2: "==", 3: "!="}
 agg_sql_dict = {0: "", 1: "AVG", 2: "MAX", 3: "MIN", 4: "COUNT", 5: "SUM"}
 conn_sql_dict = {0: "", 1: "and", 2: "or"}
 
-### from IRNet keywords, need to be simplify
+# from IRNet keywords, need to be simplify
 CLAUSE_KEYWORDS = ("select", "from", "where", "group", "order", "limit", "intersect", "union", "except")
 JOIN_KEYWORDS = ("join", "on", "as")
 
@@ -161,16 +160,6 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
     tokens_tmp = _extract_value(string)
 
     two_bytes_op = ["==", "!=", ">=", "<=", "<>", "<in>"]
-    if single_equal:
-        if math:
-            sep1 = re.compile(r"([ \+\-\*/\(\)=,><;])")  # 单字节运算符
-        else:
-            sep1 = re.compile(r"([ \(\)=,><;])")
-    else:
-        if math:
-            sep1 = re.compile(r"([ \+\-\*/\(\),><;])")  # 单字节运算符
-        else:
-            sep1 = re.compile(r"([ \(\),><;])")
     sep2 = re.compile("(" + "|".join(two_bytes_op) + ")")  # 多字节运算符
     tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(" "), lambda x: x.startswith('"'))
     tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep2, x), lambda x: x.startswith('"'))
@@ -262,7 +251,6 @@ def query2sql(query, cols, single_equal=False, with_value=True):
         outs = []
         while idx < len_:
             if toks[idx] in AGG_OPS:
-                agg_id = sql_agg_dict[toks[idx]]
                 idx += 1
                 assert idx < len_ and toks[idx] == "(", toks[idx]
                 idx += 1
@@ -383,11 +371,11 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
                 right += 1
             else:
                 logging.debug("error instance %s:\npred: %s\ngold: %s" % (qid, sql_pred, sql_gold))
-        except Exception as e:
-            ##traceback.print_exc()
+        except Exception:
+            # traceback.print_exc()
             logging.warning("parse sql error, error sql:")
             logging.warning(sql_gold + "|||" + sql_pred)
-            ##raise e
+            # raise e
             continue
 
     scores["all"] = dict([("count", total), ("exact", right), ("acc", right * 1.0 / total)])

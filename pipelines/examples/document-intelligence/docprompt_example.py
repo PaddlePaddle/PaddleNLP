@@ -13,12 +13,9 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
 
-import paddle
-from pipelines.nodes import DocOCRProcessor, DocPrompter
 from pipelines import DocPipeline
+from pipelines.nodes import DocOCRProcessor, DocPrompter
 
 # yapf: disable
 parser = argparse.ArgumentParser()

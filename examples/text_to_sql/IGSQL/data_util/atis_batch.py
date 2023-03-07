@@ -134,9 +134,9 @@ class PredUtteranceItem:
         return self.input_seq_to_use
 
     def histories(self, maximum):
+        histories = []
         if maximum == 0:
             return histories
-        histories = []
         for utterance in self.interaction_item.processed_utterances[: self.index]:
             histories.append(utterance.input_sequence())
         if len(histories) > maximum:

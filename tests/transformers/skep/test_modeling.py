@@ -221,7 +221,7 @@ class SkepModelTester:
         result = model(
             input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict, labels=token_labels
         )
-        # TODO(wj-Mcat): the output of SkepCrfForTokenClassification is wrong
+
         if paddle.is_tensor(result):
             result = [result]
 

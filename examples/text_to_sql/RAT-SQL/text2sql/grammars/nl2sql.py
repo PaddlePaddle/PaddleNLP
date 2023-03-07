@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import collections
-import copy
 import itertools
+import logging
 
-import networkx as nx
 import asdl
 import attr
-
+import networkx as nx
 from text2sql.utils import ast_util
 
 
@@ -210,7 +205,7 @@ class NL2SQLLanguage(object):
         # Spider: (not, between, =, >, <, >=, <=, !=, in, like, is, exists)
         # RAT: (None, Between, Eq, Gt, Lt, Ge, Le, Ne, In, Like, Is, Exists)
         # DuSQL: (NotIn, Between, Eq, Gt, Lt, Ge, Le, Ne, In, Like)
-        ## DIFF: Spider&DuSQL
+        # DIFF: Spider&DuSQL
         range(0, 6),
         ("Gt", "Lt", "Eq", "Ne", "Ge", "Le"),
     )

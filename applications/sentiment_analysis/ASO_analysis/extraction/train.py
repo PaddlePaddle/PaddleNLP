@@ -21,7 +21,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 from data import convert_example_to_feature, load_dict
 from datasets import load_dataset
 from evaluate import evaluate
@@ -100,8 +99,7 @@ def train():
                 batch_data["token_type_ids"],
                 batch_data["labels"],
             )
-            logits = model(input_ids, token_type_ids=token_type_ids)
-            loss = F.cross_entropy(logits.reshape([-1, len(label2id)]), labels.reshape([-1]), ignore_index=-1)
+            loss, logits = model(input_ids, token_type_ids=token_type_ids, labels=labels)
 
             loss.backward()
             lr_scheduler.step()

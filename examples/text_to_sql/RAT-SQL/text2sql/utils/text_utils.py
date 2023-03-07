@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import re
 from collections import defaultdict
-
 from statistics import mean
+
 import cn2an
 from LAC import LAC
 
@@ -33,7 +29,7 @@ g_lac_lac = LAC(mode="lac")
 wordseg = lambda sentence: g_lac_seg.run(sentence)
 lac = lambda sentence: g_lac_lac.run(sentence)
 
-## LAC Tags
+# LAC Tags
 # 标签 含义      标签 含义      标签 含义       标签 含义
 # n    普通名词  f    方位名词  s    处所名词   nw   作品名
 # nz   其他专名  v    普通动词  vd   动副词     vn   名动词
@@ -303,14 +299,14 @@ class CandidateValueExtractor:
             return []
 
         value_score_filter.sort(key=lambda x: x[1], reverse=True)
-        ##if col_type == 'text' \
-        ##        and len(value_score_filter) > g_max_candi_value \
-        ##        and value_score_filter[g_max_candi_value][1] == value_score_filter[0][1]:
-        ##    value_score_filter_tmp = value_score_filter[:50]
-        ##    tmp_score = value_score_filter[g_max_candi_value][1]
-        ##    select_col_values = [x[0] for x in value_score_filter_tmp if x[1] >= tmp_score]
-        ##else:
-        ##    select_col_values = [x[0] for x in value_score_filter[:g_max_candi_value]]
+        # if col_type == 'text' \
+        #        and len(value_score_filter) > g_max_candi_value \
+        #        and value_score_filter[g_max_candi_value][1] == value_score_filter[0][1]:
+        #    value_score_filter_tmp = value_score_filter[:50]
+        #    tmp_score = value_score_filter[g_max_candi_value][1]
+        #    select_col_values = [x[0] for x in value_score_filter_tmp if x[1] >= tmp_score]
+        # else:
+        #    select_col_values = [x[0] for x in value_score_filter[:g_max_candi_value]]
         select_col_values = [x[0] for x in value_score_filter[:g_max_candi_value]]
 
         return select_col_values
