@@ -524,6 +524,8 @@ class GenerationMixin(object):
     def generate(
         self,
         input_ids=None,
+        attention_mask=None,
+        position_ids=None,
         max_length=20,
         min_length=0,
         decode_strategy="greedy_search",
@@ -726,6 +728,16 @@ class GenerationMixin(object):
             decode_strategy
         )
 
+        # Whether to dynamic to static
+        is_inference = False
+        if not paddle.in_dynamic_mode():
+            is_inference = True
+
+        if is_inference:
+            assert decode_strategy in [
+                "sampling",
+            ], "`generate()` only supports 'sampling' temporarily but received {}.".format(decode_strategy)
+
         if getattr(self, "deprecated_warnings", None) is None:
             self.deprecated_warnings = {}
 
@@ -793,6 +805,10 @@ class GenerationMixin(object):
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
 
+        # Add to model_kwargs
+        model_kwargs["attention_mask"] = attention_mask
+        model_kwargs["position_ids"] = position_ids
+
         if model_kwargs.get("attention_mask", None) is None:
             # TODO
             # Init `attention_mask` depending on `pad_token_id`
@@ -857,17 +873,30 @@ class GenerationMixin(object):
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
 
-            return self.sample(
-                input_ids,
-                logits_processors,
-                max_length,
-                pad_token_id,
-                eos_token_id,
-                top_k,
-                top_p,
-                temperature,
-                **model_kwargs,
-            )
+            if is_inference:
+                return self.sample_d2s(
+                    input_ids,
+                    logits_processors,
+                    max_length,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
+            else:
+                return self.sample(
+                    input_ids,
+                    logits_processors,
+                    max_length,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
 
         elif decode_strategy == "beam_search":
             batch_size = input_ids.shape[0]
@@ -1042,6 +1071,123 @@ class GenerationMixin(object):
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
         return input_ids[:, origin_len:], scores
+
+    def sample_d2s(
+        self,
+        input_ids,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        top_k=None,
+        top_p=None,
+        temperature=None,
+        min_tokens_to_keep=1,
+        **model_kwargs
+    ):
+
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        batch_size, cur_len = paddle.shape(input_ids)
+        # used for compute on gpu, avoid memcpy D2H
+        cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
+
+        origin_len = paddle.shape(input_ids)[1]
+        # used for compute on gpu, avoid memcpy D2H
+        origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
+
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+
+        output_ids = paddle.assign(input_ids)
+
+        # use_cache is immutable, we split it off other mutable kwargs.
+        assert "use_cache" in model_kwargs
+        immutable = {"use_cache": model_kwargs["use_cache"]}
+        del model_kwargs["use_cache"]
+
+        def _forward_(**args):
+            model_inputs = self.prepare_inputs_for_generation(input_ids, **args, **immutable)
+            assert "use_cache" in model_inputs
+            del model_inputs["use_cache"]
+            return self(**model_inputs, **immutable)
+
+        def _post_process_(outputs, input_ids, output_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
+            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # [batch_size, vocab_size]
+            logits = logits[:, -1, :]
+
+            # pre-process distribution
+            logits = self.adjust_logits_during_generation(logits)
+            logits = logits_processors(input_ids, logits)
+
+            # sample
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
+
+            if temperature is not None or temperature != 1.0:
+                logits = logits / temperature
+
+            probs = F.softmax(logits)
+            if top_k is not None and top_k != 0:
+                probs = TopKProcess(probs, top_k, min_tokens_to_keep)
+            if top_p is not None and top_p < 1.0:
+                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+
+            next_tokens = paddle.multinomial(probs)
+            next_scores = paddle.index_sample(origin_probs, next_tokens)
+
+            if eos_token_id is not None:
+                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+
+            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+
+            input_ids = next_tokens
+
+            if eos_token_id is not None:
+                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+            )
+
+            output_ids = paddle.concat([output_ids, next_tokens], axis=1)
+
+            return input_ids, output_ids, scores, unfinished_flag, model_kwargs
+
+        outputs = _forward_(**model_kwargs)
+        input_ids, output_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+            outputs, input_ids, output_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
+        )
+
+        paddle.increment(cur_len)
+        paddle.increment(cur_len_gpu)
+
+        attn_mask = model_kwargs["attention_mask"]
+        # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
+        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
+        max_length = paddle.full([1], max_length, dtype="int64")
+
+        while cur_len < max_length:
+            input_ids, output_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                _forward_(**model_kwargs),
+                input_ids,
+                output_ids,
+                cur_len_gpu,
+                origin_len_gpu,
+                scores,
+                unfinished_flag,
+                model_kwargs,
+            )
+            paddle.increment(cur_len)
+            paddle.increment(cur_len_gpu)
+
+            if not paddle.any(unfinished_flag):
+                break
+
+        return output_ids[:, origin_len:], scores
 
     def beam_search(
         self,
