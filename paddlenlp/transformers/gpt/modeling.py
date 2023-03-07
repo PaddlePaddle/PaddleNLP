@@ -66,17 +66,12 @@ class MultiHeadAttention(nn.Layer):
 
     def __init__(
         self,
-        # embed_dim,
-        # num_heads,
-        # dropout=0.0,
         config,
         kdim=None,
         vdim=None,
         need_weights=False,
         weight_attr=None,
         bias_attr=None,
-        # topo=None,
-        # fuse=False,
     ):
         super(MultiHeadAttention, self).__init__()
 
@@ -193,13 +188,7 @@ class MultiHeadAttention(nn.Layer):
         """
         key = query if key is None else key
         value = query if value is None else value
-        # compute q ,k ,v
-        # if use_cache is False:
-        #     if self.fuse_qkv:
-        #         q, k, v = self._fuse_prepare_qkv(query)
-        #     else:
-        #         q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
-        # else:
+
         if self.fuse_qkv:
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
@@ -240,7 +229,6 @@ class TransformerDecoder(nn.Layer):
     def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None):
         super(TransformerDecoder, self).__init__()
 
-        # self.topo = topo
         self.num_layers = num_layers
         self.layers = decoder_layers
         self.norm = norm
@@ -346,7 +334,6 @@ class TransformerDecoderLayer(nn.Layer):
 
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range))
         bias_attr = None
-        # topo=config.topo
 
         self._config = locals()
         self._config.pop("self")
@@ -361,14 +348,10 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(
-            # d_model=config.hidden_size,
-            # nhead=config.num_attention_heads,
-            # dropout=config.attention_probs_dropout_prob,
             config,
             need_weights=True,
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0],
-            # topo=topo,
         )
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
         self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -432,7 +415,6 @@ class GPTEmbeddings(nn.Layer):
         max_position_embeddings=512,
         type_vocab_size=16,
         initializer_range=0.02,
-        # topo=None,
     ):
         super(GPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
@@ -643,7 +625,6 @@ class GPTModel(GPTPretrainedModel):
         self.bos_token_id = config.bos_token_id
         self.eol_token_id = config.eol_token_id
         self.initializer_range = config.initializer_range
-        # self.topo = config.topo
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
         self.bias = paddle.tril(
@@ -657,7 +638,6 @@ class GPTModel(GPTPretrainedModel):
             config.max_position_embeddings,
             config.type_vocab_size,
             self.initializer_range,
-            # config.topo,
         )
 
         decoder_layers = nn.LayerList()
@@ -669,7 +649,6 @@ class GPTModel(GPTPretrainedModel):
             config.num_hidden_layers,
             norm="LayerNorm",
             hidden_size=config.hidden_size,
-            # topo=config.topo,
         )
 
         self.apply(self.init_weights)
@@ -780,7 +759,6 @@ class GPTModel(GPTPretrainedModel):
                 past_length = paddle.shape(cache[0].k)[-2]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
-            # .expand_as(input_ids)
             position_ids = paddle.expand(position_ids, input_shape)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
