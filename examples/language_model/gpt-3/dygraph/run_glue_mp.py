@@ -462,6 +462,8 @@ def do_train(args):
     tr_loss = paddle.to_tensor(0.0)
     loss_global = paddle.to_tensor(0.0)
 
+    if _globalstep_last_logged > args.max_steps:
+        return
     for epoch in range(sys.maxsize):
         train_data_loader.batch_sampler.set_epoch(epoch)
         for step, batch in enumerate(train_data_loader):
@@ -605,34 +607,6 @@ def do_train(args):
 
             reader_start = time.time()
 
-    if args.do_export:
-        from utils import merge_model_parallel
-
-        last_checkpoint = get_last_checkpoint(args.output_dir)
-        from paddlenlp.transformers import GPT2ForSequenceClassification, GPTConfig
-
-        config = GPTConfig.from_pretrained(last_checkpoint)
-        config.fuse_qkv = True
-        model = GPT2ForSequenceClassification(config)
-        missing_keys, unexpected_keys = model.set_state_dict(merge_model_parallel(last_checkpoint, config))
-        print("missing_keys", missing_keys)
-        print("unexpected_keys", unexpected_keys)
-        print(train_ds[0])
-
-        model = paddle.jit.to_static(
-            model,
-            input_spec=[
-                paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            ],
-        )
-
-        infer_path = os.path.jon(args.output_path, "infer", f"{args.task_name}")
-
-        # Save converted static graph model
-        paddle.jit.save(model, infer_path)
-        # # Also save tokenizer for inference usage
-        tokenizer.save_pretrained(os.path.dirname(infer_path))
-
 
 def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
     """_summary_
@@ -688,6 +662,39 @@ def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
     return model, optimizer, scaler
 
 
+def do_export(args):
+    if args.do_export:
+        from utils import merge_model_parallel
+
+        last_checkpoint = get_last_checkpoint(args.output_dir)
+        from paddlenlp.transformers import GPTConfig, GPTForSequenceClassification
+
+        _, tokenizer_class = MODEL_CLASSES[args.model_type]
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+        config = GPTConfig.from_pretrained(last_checkpoint)
+        config.fuse_qkv = True
+        model = GPTForSequenceClassification(config)
+        missing_keys, unexpected_keys = model.set_state_dict(merge_model_parallel(last_checkpoint, config))
+        print("missing_keys", missing_keys)
+        print("unexpected_keys", unexpected_keys)
+        # print(train_ds[0])
+        model = paddle.jit.to_static(
+            model,
+            input_spec=[
+                paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            ],
+        )
+        infer_path = os.path.join(args.output_dir, "infer", f"{args.task_name}")
+
+        # Save converted static graph model
+        paddle.jit.save(model, infer_path)
+        # # Also save tokenizer for inference usage
+        tokenizer.save_pretrained(os.path.dirname(infer_path))
+
+
 if __name__ == "__main__":
     args = parse_args(MODEL_CLASSES)
+    args.do_export = True
     do_train(args)
+    do_export(args)
