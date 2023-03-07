@@ -33,7 +33,7 @@ class SimCSE(nn.Layer):
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(
-                self.ptm.config["hidden_size"], output_emb_size, weight_attr=weight_attr
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
             )
 
         self.margin = margin
