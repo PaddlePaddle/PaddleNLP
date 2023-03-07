@@ -102,7 +102,7 @@ class DocParser(object):
             return box
 
         def _normal_box(box):
-            # Ensure the height and width greater than zero
+            # Ensure the height and width of bbox are greater than zero
             if box[3] - box[1] < 0 or box[2] - box[0] < 0:
                 return False
             return True
