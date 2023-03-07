@@ -57,7 +57,7 @@ class PretrainingDataset(Dataset):
 
     def __getitem__(self, index):
         line = self.lines[index].rstrip()
-        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = self.tokenizer.encode(
+        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = self.tokenizer._encode(
             line, max_seq_len=self.max_encoder_length, max_pred_len=self.max_pred_length
         )
         return [
