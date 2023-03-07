@@ -13,29 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Dict, Any, Union, Callable
-
 import logging
-from tqdm import tqdm
-import multiprocessing
-from pathlib import Path
-from collections import defaultdict
-from time import perf_counter
+from typing import Dict, List, Optional, Union
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
+
 from paddlenlp.data import Stack, Tuple
-
-from pipelines.data_handler.samples import SampleBasket
-from pipelines.data_handler.processor import SquadProcessor, Processor
+from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from pipelines.data_handler.inputs import QAInput, Question
-from pipelines.data_handler.predictions import QAPred, QACandidate
-from pipelines.utils.common_utils import initialize_device_settings, try_get
-
-from pipelines.schema import Document, Answer, Span
+from pipelines.data_handler.predictions import QACandidate, QAPred
+from pipelines.data_handler.processor import SquadProcessor
+from pipelines.data_handler.samples import SampleBasket
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.reader import BaseReader
+from pipelines.schema import Answer, Document, Span
+from pipelines.utils.common_utils import initialize_device_settings, try_get
 
 logger = logging.getLogger(__name__)
 

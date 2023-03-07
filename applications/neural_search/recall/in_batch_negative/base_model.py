@@ -32,7 +32,9 @@ class SemanticIndexBase(nn.Layer):
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
+            )
 
     def get_pooled_embedding(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids, attention_mask)
@@ -95,7 +97,9 @@ class SemanticIndexBaseStatic(nn.Layer):
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
+            )
 
     @paddle.jit.to_static(
         input_spec=[

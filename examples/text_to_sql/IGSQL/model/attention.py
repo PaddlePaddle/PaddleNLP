@@ -15,10 +15,9 @@
 """
 from collections import namedtuple
 
+import numpy as np
 import paddle
 import paddle.nn.functional as F
-import math
-import numpy as np
 
 np.random.seed(0)
 

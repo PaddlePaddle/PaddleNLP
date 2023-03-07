@@ -13,10 +13,9 @@
 # limitations under the License.
 """ Embedder for tokens. """
 
-import paddle
-
 import data_util.snippets as snippet_handler
 import data_util.vocabulary as vocabulary_handler
+import paddle
 
 
 class Embedder(paddle.nn.Layer):
@@ -76,7 +75,6 @@ class Embedder(paddle.nn.Layer):
             self.token_embedding_matrix.weight.set_value(initializer)
         else:
             initializer = paddle.nn.initializer.Uniform(low=-0.1, high=0.1)
-            init_tensor = paddle.ParamAttr(initializer=initializer, trainable=True)
             self.token_embedding_matrix = paddle.nn.Embedding(
                 self.vocabulary_size, embedding_size, weight_attr=initializer
             )

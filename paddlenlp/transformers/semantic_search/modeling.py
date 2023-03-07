@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 from ..ernie.configuration import ErnieConfig
 from ..ernie.modeling import ErnieModel, ErniePretrainedModel
 
-__all__ = ["ErnieDualEncoder", "ErnieCrossEncoder"]
+__all__ = ["ErnieDualEncoder", "ErnieCrossEncoder", "ErnieEncoder"]
 
 
 class ErnieEncoder(ErniePretrainedModel):

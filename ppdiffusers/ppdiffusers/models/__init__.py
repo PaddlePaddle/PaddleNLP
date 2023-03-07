@@ -18,6 +18,7 @@ from ..utils import is_paddle_available
 
 if is_paddle_available():
     from .attention import Transformer2DModel
+    from .controlnet import ControlNetModel
     from .prior_transformer import PriorTransformer
     from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel

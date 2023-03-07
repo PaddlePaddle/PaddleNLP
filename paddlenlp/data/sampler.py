@@ -15,7 +15,6 @@
 import collections
 import functools
 import math
-import six
 
 import numpy as np
 
@@ -230,7 +229,6 @@ class SamplerHelper(object):
             key_wrapper = lambda x: len(self.data_source[x])
 
         def _impl():
-            data_source = self.data_source
             buf = []
             for idx in iter(self):
                 buf.append(idx)

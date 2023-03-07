@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Any, List
-
+import hashlib
 import logging
 import os
 from io import BytesIO
 from pathlib import Path
-import hashlib
+from typing import Any, Dict, List, Optional
+
 import docx
 from docx.document import Document
-from docx.text.paragraph import Paragraph
-from docx.parts.image import ImagePart
 from docx.oxml.shape import CT_Picture
+from docx.parts.image import ImagePart
+from docx.text.paragraph import Paragraph
 from PIL import Image
 
 from pipelines.nodes.file_converter import BaseConverter
@@ -108,7 +108,7 @@ class DocxToTextConverter(BaseConverter):
             # If there is text, Adding the text to text_dict
             if paragraph.text != "":
                 text = paragraph.text
-                if bool(text_dict) == False:
+                if bool(text_dict) is False:
                     text_dict = {"text": [text], "images": []}
                 else:
                     text_dict["text"].append(text)

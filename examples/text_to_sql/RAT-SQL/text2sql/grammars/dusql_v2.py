@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import collections
-import copy
 import itertools
+import logging
 
-import networkx as nx
 import asdl
 import attr
-
+import networkx as nx
 from text2sql.utils import ast_util
 
 
@@ -122,7 +117,7 @@ class DuSQLLanguageV2(object):
         return [field_value_str]
 
     def parse_val(self, val):
-        if isinstance(val, int):  ## Modify: add int
+        if isinstance(val, int):  # Modify: add int
             return {
                 "_type": "Value",
                 "val_id": val,
@@ -351,7 +346,7 @@ class DuSQLLanguageV2(object):
         if not order_by:
             return None
 
-        ## DIFF: Spider&DuSQL
+        # DIFF: Spider&DuSQL
         order, order_units = order_by
         return {
             "_type": "order_by",
@@ -363,7 +358,7 @@ class DuSQLLanguageV2(object):
         # Spider: (not, between, =, >, <, >=, <=, !=, in, like, is, exists)
         # RAT: (None, Between, Eq, Gt, Lt, Ge, Le, Ne, In, Like, Is, Exists)
         # DuSQL: (NotIn, Between, Eq, Gt, Lt, Ge, Le, Ne, In, Like)
-        ## DIFF: Spider&DuSQL
+        # DIFF: Spider&DuSQL
         range(0, 10),
         ("NotIn", "Between", "Eq", "Gt", "Lt", "Ge", "Le", "Ne", "In", "Like"),
     )

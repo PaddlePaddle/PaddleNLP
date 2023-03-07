@@ -12,27 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
-import json
-from pathlib import Path
-from functools import partial
 import random
+import sys
+from functools import partial
+from pathlib import Path
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddlenlp.transformers import BertTokenizer
-
 import text2sql
-from text2sql import global_config
-from text2sql import dataproc
-from text2sql import launch
+from text2sql import dataproc, global_config, launch
+from text2sql.grammars.cspider_v2 import CSpiderLanguageV2
 from text2sql.grammars.dusql_v2 import DuSQLLanguageV2
 from text2sql.grammars.nl2sql import NL2SQLLanguage
-from text2sql.grammars.cspider_v2 import CSpiderLanguageV2
 
 ModelClass = None
 GrammarClass = None

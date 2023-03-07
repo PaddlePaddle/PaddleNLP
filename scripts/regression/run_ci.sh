@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -99,7 +99,7 @@ upload (){
         nlp_build ${build_dev_path}
         nlp_version=$(python -c "from paddlenlp import __version__; print(__version__)")
         # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/ 
+        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/
         # for ci pr test
         cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/paddlenlp-ci-py3-none-any.whl
         echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
@@ -148,6 +148,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
+            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
+            fi
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
         elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
@@ -177,6 +180,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         if [[ ${dir2} =~ "transformers" ]] ;then
             if [[ ${dir3##*.} == "py" ]];then
                 continue
+            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
             else
                 APIcase_list[${#APIcase_list[*]}]=${dir3}
             fi
