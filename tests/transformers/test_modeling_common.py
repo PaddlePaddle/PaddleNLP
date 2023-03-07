@@ -500,7 +500,13 @@ class ModelTesterMixin:
             with paddle.no_grad():
                 embeds_output = model(**inputs)
 
-            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
+            if isinstance(ids_output, tuple):
+                for ids_item, embeds_item in zip(ids_output, embeds_output):
+                    ids_item = ids_item.numpy()
+                    embeds_item = embeds_item.numpy()
+                    self.assertTrue(np.allclose(ids_item, embeds_item, rtol=1e-4, atol=1e-4))
+            else:
+                self.assertTrue(np.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
     def test_model_name_list(self):
         if not self.use_test_model_name_list:
