@@ -267,6 +267,7 @@ def create_pretrained_dataset(
     max_seq_len=1024,
     places=None,
     data_holders=None,
+    current_step=0,
 ):
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -303,7 +304,7 @@ def create_pretrained_dataset(
         splits[-1],
     )
 
-    def build_dataset(index, name, num_samples):
+    def build_dataset(index, name, num_samples, consumed_samples=0):
         dataset = GPTDataset(
             file_path=input_prefix,
             build_data_file=local_rank == 0,
@@ -324,6 +325,7 @@ def create_pretrained_dataset(
             rank=data_world_rank,
             shuffle=False,
             drop_last=True,
+            consumed_samples=consumed_samples,
         )
 
         data_loader = DataLoader(
@@ -341,12 +343,25 @@ def create_pretrained_dataset(
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_data_loader = build_dataset(0, "train", args.local_batch_size * args.max_steps * data_world_size)
+    train_data_loader = build_dataset(
+        0,
+        "train",
+        args.local_batch_size * args.max_steps * data_world_size,
+        consumed_samples=args.global_batch_size * current_step,
+    )
 
     valid_data_loader = build_dataset(
-        1, "valid", args.local_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size
+        1,
+        "valid",
+        args.local_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+        args.local_batch_size * ((current_step + 1) // args.eval_freq) * args.eval_iters * data_world_size,
     )
-    test_data_loader = build_dataset(2, "test", args.local_batch_size * args.test_iters * data_world_size)
+    test_data_loader = build_dataset(
+        2,
+        "test",
+        args.local_batch_size * args.test_iters * data_world_size,
+        0,
+    )
 
     return train_data_loader, valid_data_loader, test_data_loader
 

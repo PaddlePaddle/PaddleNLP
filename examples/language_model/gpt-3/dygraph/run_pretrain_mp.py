@@ -31,6 +31,7 @@ from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer, PretrainedModel
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 try:
@@ -281,6 +282,7 @@ def do_train(args):
         data_world_rank=data_world_rank,
         max_seq_len=args.max_seq_len,
         eos_id=tokenizer.eos_token_id,
+        current_step=global_step,
     )
     # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
     # many times. and start a new random dataloader.
@@ -303,6 +305,8 @@ def do_train(args):
         global_step = int(str(last_checkpoint).split("-")[-1])
 
     _globalstep_last_logged = global_step
+    if isinstance(train_data_loader.batch_sampler, DistributedBatchSampler):
+        _globalstep_last_logged = 0
 
     tr_loss = paddle.to_tensor(0.0)
     loss_global = paddle.to_tensor(0.0)
