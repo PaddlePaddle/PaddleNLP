@@ -806,8 +806,9 @@ class GenerationMixin(object):
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
 
         # Add to model_kwargs
-        model_kwargs["attention_mask"] = attention_mask
-        model_kwargs["position_ids"] = position_ids
+        if is_inference:
+            model_kwargs["attention_mask"] = attention_mask
+            model_kwargs["position_ids"] = position_ids
 
         if model_kwargs.get("attention_mask", None) is None:
             # TODO
