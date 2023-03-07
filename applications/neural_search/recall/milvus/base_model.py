@@ -13,9 +13,6 @@
 # limitations under the License.
 
 import abc
-import sys
-
-import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -35,7 +32,9 @@ class SemanticIndexBase(nn.Layer):
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
+            )
 
     @paddle.jit.to_static(
         input_spec=[
@@ -106,7 +105,9 @@ class SemanticIndexBaseStatic(nn.Layer):
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
+            )
 
     @paddle.jit.to_static(
         input_spec=[
