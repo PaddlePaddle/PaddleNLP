@@ -735,66 +735,8 @@ class XLNetModel(XLNetPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `XLNetModel`.
-            Also is the vocab size of token embedding matrix.
-        mem_len (int or None, optional):
-            The number of tokens to cache. If not 0 or None, the last `mem_len` hidden states
-            in each layer will be cached into memory. Defaults to `None`.
-        reuse_len (int or None, optional):
-            The number of tokens in the current batch to be cached. If positive, then at most
-            `reuse_len` tokens can be cached in the current batch. Otherwise, there is
-            no limit to the number of tokens. Defaults to `None`.
-
-            .. note::
-                The difference between `mem_len` and `reuse_len` is that `mem_len` defines
-                **the total number** of tokens to cache while `reuse_len` defines the number of tokens
-                in **the current batch** to be cached.
-        d_model (int, optional):
-            Dimensionality of the embedding layers, encoder layers and pooler layer.
-            Defaults to 768.
-        same_length (bool, optional):
-            Whether or not to use the same attention length for each token.
-            Defaults to `False`.
-        attn_type (str, optional):
-            The attention type used in the attention layer. Set **"bi"** for ``XLNet``,
-            **"uni"** for ``Transformer-XL``. Defaults to **"bi"**.
-        bi_data (bool, optional):
-            Whether or not to use bidirectional input pipeline. Set to `True` during pretraining and
-            `False` during fine-tuning. Defaults to `False`.
-        clamp_len (int, optional):
-            Maximum relative distance supported. All relative distances larger than `clamp_len` will be clamped.
-            Setting this attribute to -1 means no clamping. Defaults to -1.
-        n_layer (int, optional):
-            The number of hidden layers in the encoder. Defaults to 12.
-        dropout (float, optional):
-            The dropout ratio for all fully connected layers in the embeddings and encoder.
-            Defaults to 0.1.
-        classifier_dropout (float, optional):
-            The dropout ratio for all fully connected layers in the pooler (classification head).
-            Defaults to 0.1.
-        n_head (int, optional):
-            Number of attention heads in each attention layer.
-            Defaults to 12.
-        d_head (int, optional):
-            Dimensionality of each attention head. Defaults to 64.
-
-            .. note::
-                `d_head` should be equal to `d_model` divided by `n_head`.
-        layer_norm_eps (float, optional):
-            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
-            initializing layer normalization layers. Defaults to 1e-12.
-        d_inner (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `d_inner`,
-            and then projected back to `d_model`. Typically `d_inner` is larger than `d_model`.
-            Defaults to 3072.
-        ff_activation (str, optional):
-            The non-linear activation function in the feed-forward layers in the encoder.
-            Choose from the following supported activation functions: `["relu", "gelu", "tanh",
-            "sigmoid", "mish", "swish"]`. Defaults to `"gelu"`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
@@ -1272,10 +1214,8 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to 2.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
     def __init__(self, config: XLNetConfig):
@@ -1423,10 +1363,8 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to 2.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
     def __init__(self, config: XLNetConfig):
@@ -1562,8 +1500,8 @@ class XLNetLMHeadModel(XLNetPretrainedModel):
     XLNet Model with a language modeling head on top (linear layer with weights tied to the input embeddings).
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
     def __init__(self, config: XLNetConfig):
@@ -1697,8 +1635,8 @@ class XLNetForMultipleChoice(XLNetPretrainedModel):
     softmax) e.g. for RACE/SWAG tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
     def __init__(self, config: XLNetConfig):
@@ -1875,8 +1813,8 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
       layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
     def __init__(self, config: XLNetConfig):

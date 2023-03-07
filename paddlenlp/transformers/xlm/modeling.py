@@ -88,7 +88,7 @@ class MultiHeadAttention(nn.Layer):
 
     NEW_ID = itertools.count()
 
-    def __init__(self, n_heads, dim, config: XLMConfig):
+    def __init__(self, n_heads, dim, attention_probs_dropout_prob):
         super().__init__()
         self.layer_id = next(MultiHeadAttention.NEW_ID)
         self.dim = dim
@@ -98,7 +98,7 @@ class MultiHeadAttention(nn.Layer):
         self.k_lin = nn.Linear(dim, dim)
         self.v_lin = nn.Linear(dim, dim)
         self.out_lin = nn.Linear(dim, dim)
-        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(attention_probs_dropout_prob)
         self.dim_per_head = self.dim // self.n_heads
 
     def shape(self, x):
@@ -163,12 +163,12 @@ class MultiHeadAttention(nn.Layer):
 
 
 class TransformerFFN(nn.Layer):
-    def __init__(self, in_dim, dim_hidden, out_dim, config: XLMConfig):
+    def __init__(self, in_dim, dim_hidden, out_dim, hidden_act, dropout_prob):
         super().__init__()
         self.lin1 = nn.Linear(in_dim, dim_hidden)
         self.lin2 = nn.Linear(dim_hidden, out_dim)
-        self.dropout = nn.Dropout(config.dropout_prob)
-        self.act = ACT2FN[config.hidden_act]
+        self.dropout = nn.Dropout(dropout_prob)
+        self.act = ACT2FN[hidden_act]
 
     def forward(self, x):
         x = self.lin1(x)
@@ -192,10 +192,6 @@ class XLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = XLM_PRETRAINED_RESOURCE_FILES_MAP
     model_config_file = CONFIG_NAME
     config_class = XLMConfig
-    # base_model_prefix = "transformer"
-
-    # config_class = XLMConfig
-
     base_model_prefix = "xlm"
 
     def init_weights(self):
@@ -241,64 +237,8 @@ class XLMModel(XLMPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `XLMModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `XLMModel`.
-            Defaults to `95000`.
-        is_encoder(bool, optional):
-            Whether or not the initialized model should be a transformer encoder or decoder as seen in Vaswani et al.
-            Defaults to `True`.
-        causal (bool, optional):
-            Whether or not the model should behave in a causal manner. Causal models use a triangular attention mask in
-            order to only attend to the left-side context instead if a bidirectional context.
-            Defaults to `False`.
-        n_langs (int, optional):
-            The number of languages the model handles. Set to 1 for monolingual models.
-            Defaults to `15`.
-        use_lang_embeddings (bool, optional)
-            Whether to use language embeddings. Some models use additional language embeddings.
-            Defaults to `True`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer. Defaults to `1024`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `8`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        use_sinusoidal_embeddings (bool, optional):
-            Whether or not to use sinusoidal positional embeddings instead of absolute positional embeddings.
-            Defaults to `False`.
-        layer_norm_eps (float, optional):
-            The epsilon used by the layer normalization layers.
-            Defaults to 1e-12.
-        embed_init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing the embedding matrices.
-            Defaults to `(1024*2)^-0.5`.
-        init_std (int, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices except the
-            embedding matrices.
-            Defaults to `0.02`.
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `2`.
-        lang_id (int, optional):
-            The ID of the language used by the model. This parameter is used when generating text in a given language.
-            Defaults to 4.
-        lang2id (Dict[str, int], optional):
-            Dictionary mapping languages string identifiers to their IDs.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
     def __init__(self, config: XLMConfig):
@@ -336,10 +276,20 @@ class XLMModel(XLMPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         for _ in range(self.num_hidden_layers):
-            self.attentions.append(MultiHeadAttention(config.num_attention_heads, config.hidden_size, config))
+            self.attentions.append(
+                MultiHeadAttention(config.num_attention_heads, config.hidden_size, config.attention_probs_dropout_prob)
+            )
             self.layer_norm1.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
 
-            self.ffns.append(TransformerFFN(config.hidden_size, config.hidden_size * 4, config.hidden_size, config))
+            self.ffns.append(
+                TransformerFFN(
+                    config.hidden_size,
+                    config.hidden_size * 4,
+                    config.hidden_size,
+                    config.hidden_act,
+                    config.hidden_dropout_prob,
+                )
+            )
             self.layer_norm2.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
 
         self.register_buffer(
@@ -510,6 +460,12 @@ class XLMModel(XLMPretrainedModel):
 
         return tuple(v for v in [tensor, hidden_states, attentions] if v is not None)
 
+    def get_input_embeddings(self):
+        return self.embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings = value
+
 
 class XLMPredLayer(nn.Layer):
     """
@@ -546,8 +502,8 @@ class XLMWithLMHeadModel(XLMPretrainedModel):
     layer with weights tied to the input embeddings).
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
 
     """
 
@@ -638,14 +594,8 @@ class XLMForSequenceClassification(XLMPretrainedModel):
     `XLMForSequenceClassification` uses the first token in order to do the classification.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
 
     """
 
@@ -712,14 +662,8 @@ class XLMForTokenClassification(XLMPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
     def __init__(self, config: XLMConfig):
@@ -783,8 +727,8 @@ class XLMForQuestionAnsweringSimple(XLMPretrainedModel):
     layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of XLMModel.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
     def __init__(self, config: XLMConfig):
@@ -857,14 +801,8 @@ class XLMForMultipleChoice(XLMPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of XLMModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
     def __init__(self, config: XLMConfig):

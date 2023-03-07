@@ -407,10 +407,10 @@ XLM_PRETRAINED_RESOURCE_FILES_MAP = {
 
 class XLMConfig(PretrainedConfig):
     """
-    This is the configuration class to store the configuration of a [`XLMModel`] or a [`TFXLMModel`]. It is used to
+    This is the configuration class to store the configuration of a [`XLMModel`]. It is used to
     instantiate a XLM model according to the specified arguments, defining the model architecture. Instantiating a
     configuration with the defaults will yield a similar configuration to that of the
-    [xlm-mlm-en-2048](https://huggingface.co/xlm-mlm-en-2048) architecture.
+    [xlm-mlm-en-2048] architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -418,7 +418,7 @@ class XLMConfig(PretrainedConfig):
     Args:
         vocab_size (`int`, *optional*, defaults to 30145):
             Vocabulary size of the BERT model. Defines the number of different tokens that can be represented by the
-            `inputs_ids` passed when calling [`XLMModel`] or [`TFXLMModel`].
+            `inputs_ids` passed when calling [`XLMModel`] .
         emb_dim (`int`, *optional*, defaults to 2048):
             Dimensionality of the encoder layers and the pooler layer.
         n_layer (`int`, *optional*, defaults to 12):
@@ -443,8 +443,7 @@ class XLMConfig(PretrainedConfig):
             The number of languages the model handles. Set to 1 for monolingual models.
         use_lang_emb (`bool`, *optional*, defaults to `True`)
             Whether to use language embeddings. Some models use additional language embeddings, see [the multilingual
-            models page](http://huggingface.co/transformers/multilingual.html#xlm-language-embeddings) for information
-            on how to use them.
+            models page]
         max_position_embeddings (`int`, *optional*, defaults to 512):
             The maximum sequence length that this model might ever be used with. Typically set this to something large
             just in case (e.g., 512 or 1024 or 2048).
@@ -570,6 +569,8 @@ class XLMConfig(PretrainedConfig):
         bos_token_id=0,
         **kwargs,
     ):
+        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, **kwargs)
+
         """Constructs XLMConfig."""
         self.vocab_size = vocab_size
         self.emb_dim = emb_dim
@@ -606,22 +607,3 @@ class XLMConfig(PretrainedConfig):
 
         if "n_words" in kwargs:
             self.n_words = kwargs["n_words"]
-
-        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, **kwargs)
-
-
-# # Copied from transformers.models.bert.configuration_bert.BertOnnxConfig
-# class XLMOnnxConfig(OnnxConfig):
-#     @property
-#     def inputs(self) -> Mapping[str, Mapping[int, str]]:
-#         if self.task == "multiple-choice":
-#             dynamic_axis = {0: "batch", 1: "choice", 2: "sequence"}
-#         else:
-#             dynamic_axis = {0: "batch", 1: "sequence"}
-#         return OrderedDict(
-#             [
-#                 ("input_ids", dynamic_axis),
-#                 ("attention_mask", dynamic_axis),
-#                 ("token_type_ids", dynamic_axis),
-#             ]
-#         )
