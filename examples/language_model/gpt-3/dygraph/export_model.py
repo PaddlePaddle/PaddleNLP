@@ -16,11 +16,11 @@ import argparse
 import os
 
 import paddle
+from modeling import GPTForGeneration
 from utils import merge_model_parallel
 
 from paddlenlp.transformers import (  # GPTChineseTokenizer,; GPTForGreedyGeneration,
     GPTConfig,
-    GPTForGeneration,
     GPTTokenizer,
 )
 

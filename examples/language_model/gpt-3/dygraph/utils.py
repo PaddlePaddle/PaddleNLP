@@ -28,14 +28,13 @@ _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\_mp_(\d+)" + ".pdp
 def get_model_parallel_paramerters(folder):
     content = os.listdir(folder)
     if "model_state.pdparams" in content:
-        return ["model_state.pdparams"]
+        return [os.path.join(folder, "model_state.pdparams")]
 
     checkpoints = [
         path
         for path in content
         if _re_checkpoint.search(path) is not None and os.path.isfile(os.path.join(folder, path))
     ]
-    print("checkpoints", checkpoints)
     if len(checkpoints) == 0:
         raise ValueError("No checkpoint found within folder {}".format(folder))
 
@@ -85,20 +84,21 @@ def merge_column(values):
 
 
 def merge_model_parallel(model_path, config, as_float32=True):
+    final_weight = None
     weights_path = get_model_parallel_paramerters(model_path)
     if len(weights_path) == 1:
-        return paddle.load(weights_path[0], return_numpy=True)
+        final_weight = paddle.load(weights_path[0], return_numpy=True)
+    else:
+        weights_list = []
+        for path in weights_path:
+            weights_list.append(paddle.load(path, return_numpy=True))
 
-    weights_list = []
-    for path in weights_path:
-        weights_list.append(paddle.load(path, return_numpy=True))
+        final_weight = copy.deepcopy(weights_list[0])
+        merged_keys = MergedKeys(config.num_hidden_layers)
 
-    final_weight = copy.deepcopy(weights_list[0])
-    merged_keys = MergedKeys(config.num_hidden_layers)
-
-    for k, func_name in merged_keys.items():
-        func = merge_column if "col" == func_name else merge_rows
-        final_weight[k] = func([weight[k] for weight in weights_list])
+        for k, func_name in merged_keys.items():
+            func = merge_column if "col" == func_name else merge_rows
+            final_weight[k] = func([weight[k] for weight in weights_list])
 
     if as_float32:
         for k in final_weight.keys():

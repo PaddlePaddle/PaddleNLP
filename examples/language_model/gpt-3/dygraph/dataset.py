@@ -268,6 +268,7 @@ def create_pretrained_dataset(
     places=None,
     data_holders=None,
     current_step=0,
+    old_version_accumulate_compatible=False,  # FIXME @ZHUI delete it later.
 ):
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -320,7 +321,7 @@ def create_pretrained_dataset(
 
         batch_sampler = DistributedBatchSampler(
             dataset,
-            batch_size=args.micro_batch_size,
+            batch_size=args.micro_batch_size if not old_version_accumulate_compatible else args.local_batch_size,
             num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
