@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 
 import numpy as np
@@ -25,9 +26,8 @@ from .utils import dygraph_mode_guard, static_mode_guard
 usage = r"""
             from paddlenlp import Taskflow
             from PIL import Image
-
-            # multi modal feature_extraction with ernie_vil-2.0-base-zh
-            vision_language = Taskflow("feature_extraction")
+            # Multi modal feature_extraction with ernie_vil-2.0-base-zh
+            vision_language = Taskflow("feature_extraction", model='PaddlePaddle/ernie_vil-2.0-base-zh')
             image_embeds = vision_language([Image.open("demo/000000039769.jpg")])
             print(image_embeds)
             '''
@@ -211,7 +211,6 @@ class MultimodalFeatureExtractionTask(Task):
     def __init__(self, task, model, batch_size=1, is_static_model=True, max_length=128, return_tensors="pd", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._seed = None
-        # we do not use batch
         self.export_type = "text"
         self._batch_size = batch_size
         self.return_tensors = return_tensors
