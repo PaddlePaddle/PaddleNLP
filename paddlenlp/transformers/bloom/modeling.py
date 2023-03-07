@@ -32,9 +32,9 @@ from paddlenlp.transformers.model_outputs import (
     TokenClassifierOutput,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils.converter import StateDictNameMapping
+from paddlenlp.utils.log import logger
 
-from ...utils.converter import StateDictNameMapping
-from ...utils.log import logger
 from .configuration import BloomConfig
 from .processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -105,7 +105,7 @@ def _expand_mask(mask: Tensor, tgt_length: int) -> Tensor:
     """
     Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
     """
-    batch_size, src_length = mask.shape
+    batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
     expanded_mask = ~(paddle.cast(mask[:, None, None, :], "bool"))
@@ -128,10 +128,10 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
             Token-wise attention mask, this should be of shape (batch_size, max_seq_len).
         num_heads (`int`, *required*):
             number of heads
-        dtype (`paddle.dtype`, *optional*, default=`paddle.bfloat16`):
+        dtype (`torch.dtype`, *optional*, default=`torch.bfloat16`):
             dtype of the output tensor
     """
-    batch_size, seq_length = attention_mask.shape
+    _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
     base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
@@ -151,7 +151,8 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
     arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
     alibi = slopes[..., None] * arange_tensor
-    return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
+    return paddle.cast(alibi.reshape([-1, 1, seq_length]), dtype)
+    # return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
 
 
 def attention_mask_func(attention_scores: Tensor, attention_mask: Tensor, causal_mask: Tensor):
@@ -174,20 +175,39 @@ def attention_mask_func(attention_scores: Tensor, attention_mask: Tensor, causal
     )
 
 
+def dropout_add(x: Tensor, residual: Tensor, prob: float, training: bool) -> Tensor:
+    """
+    Dropout add function
+
+    Args:
+        x (`torch.tensor`, *required*):
+            input tensor
+        residual (`torch.tensor`, *required*):
+            esidual tensor
+        prob (`float`, *required*):
+            dropout probability
+        training (`bool`, *required*):
+            training mode
+    """
+    out = F.dropout(x, p=prob, training=training)
+    out = residual + out
+    return out
+
+
 def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
     """
     Args:
     Pre-process the alibi tensor for padding.
-        alibi: ([`paddle.Tensor`], *required*):
+        alibi: ([`torch.tensor`], *required*):
             alibi tensor to pre-process
-        attention_mask: ([`paddle.Tensor`], *required*):
+        attention_mask: ([`torch.tensor`], *required*):
             attention mask to pre-process"""
 
     # Sanity check if we are not inferring less tokens than the total sequence length
     # This usually happens when the inference is done with past_key_values
     # In this case we re-create the alibi tensor with the correct sequence length
     if attention_mask.shape[-1] != alibi.shape[-1]:
-        alibi = build_alibi_tensor(attention_mask.shape[-1], num_heads, alibi.dtype).repeat_interleave(
+        alibi = build_alibi_tensor(attention_mask, num_heads, alibi.dtype).repeat_interleave(
             attention_mask.shape[0], axis=0
         )
     # Get the indexes of the padding tokens
@@ -196,7 +216,7 @@ def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
 
     # Clone the embeddings  - we can detach because the embeddings are not learned
     # Get a refence tensor
-    slice_reference_alibi = build_alibi_tensor(alibi.shape[-1], num_heads, alibi.dtype)
+    slice_reference_alibi = build_alibi_tensor(attention_mask, num_heads, alibi.dtype)
 
     # Loop over the batch where the padding is and replace the alibi tensor by the reference tensor
     # Only where you do not have padding. Replace padding tokens by zeros
@@ -210,32 +230,13 @@ def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
     return alibi
 
 
-def dropout_add(x, residual, prob, training):
-    """
-    Dropout add function
-
-    Args:
-        x (`paddle.Tensor`, *required*):
-            input tensor
-        residual (`paddle.Tensor`, *rquired*):
-            esidual tensor
-        prob (`float`, *required*):
-            dropout probability
-        training (`bool`, *required*):
-            training mode
-    """
-    out = nn.functional.dropout(x, p=prob, training=training)
-    out = residual + out
-    return out
-
-
 def bloom_gelu_forward(x):
     """
     Custom bias GELU function. Adapted from Megatron-DeepSpeed code. Here we use a simple implementation (inference) to
     make the model jitable.
 
     Args:
-        x (`paddle.Tensor`, *required*):
+        x (`torch.tensor`, *required*):
             input hidden states
     """
     return x * 0.5 * (1.0 + paddle.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
@@ -243,13 +244,13 @@ def bloom_gelu_forward(x):
 
 def bloom_gelu_back(g, x):
     """
-    gradient of tanh approximation of gelu gradient of actual gelu is: 0.5 * (1. + paddle.erf(x * 0.70710678)) +
-    0.3989423 * x * paddle.exp(-0.5 * x * x)
+    gradient of tanh approximation of gelu gradient of actual gelu is: 0.5 * (1. + torch.erf(x * 0.70710678)) +
+    0.3989423 * x * torch.exp(-0.5 * x * x)
 
     Args:
-        g (`paddle.Tensor`, *required*):
+        g (`torch.tensor`, *required*):
             gradient output tensor
-        x (`paddle.Tensor`, *required*):
+        x (`torch.tensor`, *required*):
             input tensor
     """
     x = x[0]  # x is a tuple of 1 element, needs to unpack it first
@@ -260,10 +261,10 @@ def bloom_gelu_back(g, x):
 
 
 def baddbmm(input, batch1, batch2, beta=1.0, alpha=1.0):
-    return beta * input + alpha * paddle.bmm(batch1, batch2)
+    return beta * input + alpha * paddle.matmul(batch1, batch2)
 
 
-# class GeLUFunction(paddle.autograd.Function):
+# class GeLUFunction(torch.autograd.Function):
 #     @staticmethod
 #     def forward(ctx, input):
 #         ctx.save_for_backward(input)
@@ -342,7 +343,7 @@ class BloomAttention(nn.Layer):
         storage as `fused_qkv`
 
         Args:
-            fused_qkv (`paddle.Tensor`, *required*): [batch_size, seq_length, num_heads * 3 * head_dim]
+            fused_qkv (`torch.tensor`, *required*): [batch_size, seq_length, num_heads * 3 * head_dim]
 
         Returns:
             query: [batch_size, seq_length, num_heads, head_dim] key: [batch_size, seq_length, num_heads, head_dim]
@@ -357,10 +358,10 @@ class BloomAttention(nn.Layer):
         Merge heads together over the last dimenstion
 
         Args:
-            x: (`paddle.Tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]
+            x: (`torch.tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]
 
         Returns:
-            paddle.Tensor: [batch_size, seq_length, num_heads * head_dim]
+            torch.tensor: [batch_size, seq_length, num_heads * head_dim]
         """
         # What we want to achieve is:
         # batch_size * num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads * head_dim
@@ -418,7 +419,7 @@ class BloomAttention(nn.Layer):
             present = None
 
         # [batch_size * num_heads, q_length, kv_length]
-        # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
+        # we use `Tensor.baddbmm` instead of `torch.baddbmm` as the latter isn't supported by TorchScript v1.11
         matmul_result = baddbmm(
             alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
         )
@@ -657,14 +658,14 @@ class BloomPreTrainedModel(PretrainedModel):
         """
         Prepare the head mask if needed.
         Args:
-            head_mask (`paddle.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
+            head_mask (`torch.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
                 The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
             num_hidden_layers (`int`):
                 The number of hidden layers in the model.
             is_attention_chunked: (`bool`, *optional*, defaults to `False`):
                 Whether or not the attentions scores are computed by chunks or not.
         Returns:
-            `paddle.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
+            `torch.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
             `[None]` for each layer.
         """
         if head_mask is not None:
@@ -710,11 +711,10 @@ class BloomPreTrainedModel(PretrainedModel):
         return mappings
 
 
-class BloomModel(
-    BloomPreTrainedModel,
-):
+class BloomModel(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
+        self.padding_idx = 0
 
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
@@ -774,7 +774,10 @@ class BloomModel(
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        **kwargs,
     ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+        past_key_values = kwargs.get("cache", past_key_values)
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -817,14 +820,30 @@ class BloomModel(
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
-            attention_mask = paddle.ones((batch_size, seq_length_with_past))
+            logger.warning(
+                "Input_ids should be specified when generating attention_mask, otherwise no attention_mask."
+            )
+            if input_ids is None:
+                attention_mask = paddle.zeros([batch_size, 1, 1, seq_length], dtype=paddle.get_default_dtype())
+
+            else:
+                attention_mask = (
+                    paddle.cast(input_ids == self.padding_idx, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+                    * -1e4
+                )
+
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
 
         alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-        causal_mask = self._prepare_attn_mask(
-            attention_mask,
-            input_shape=(batch_size, seq_length),
-            past_key_values_length=past_key_values_length,
-        )
+        causal_mask = attention_mask
+        # causal_mask = self._prepare_attn_mask(
+        #     attention_mask,
+        #     input_shape=(batch_size, seq_length),
+        #     past_key_values_length=past_key_values_length,
+        # )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             if output_hidden_states:
@@ -845,14 +864,15 @@ class BloomModel(
                     return custom_forward
 
                 # need change this block
-                outputs = paddle.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
-                    hidden_states,
-                    alibi,
-                    causal_mask,
-                    layer_past,
-                    head_mask[i],
-                )
+                # TODO(wj-Mcat): use recompute to refactor
+                # outputs = torch.utils.checkpoint.checkpoint(
+                #     create_custom_forward(block),
+                #     hidden_states,
+                #     alibi,
+                #     causal_mask,
+                #     layer_past,
+                #     head_mask[i],
+                # )
             else:
                 outputs = block(
                     hidden_states,
