@@ -908,13 +908,27 @@ class BloomModel(BloomPreTrainedModel):
         )
 
 
+class BloomLMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+        super(BloomLMHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            if embedding_weights is None
+            else embedding_weights
+        )
+
+    def forward(self, hidden_states):
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        return logits
+
+
 class BloomForCausalLM(BloomPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
         self.transformer = BloomModel(config)
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.lm_head = BloomLMHead(config.hidden_size, config.vocab_size, self.transformer.word_embeddings.weight)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
