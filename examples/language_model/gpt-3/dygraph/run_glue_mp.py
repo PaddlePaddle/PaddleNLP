@@ -559,9 +559,11 @@ def do_train(args):
 
                 logger.info("Save model to %s" % output_dir)
 
+                # tokenizer only need to save on one node
                 if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
                     tokenizer.save_pretrained(output_dir)
 
+                # paramerters is the same in sharding group
                 if sharding_rank == 0 and dp_rank == 0:
                     if isinstance(model_to_save, PretrainedModel):
                         model_to_save.save_pretrained(output_dir)
@@ -570,6 +572,8 @@ def do_train(args):
                         state_dict = model_to_save.state_dict()
                         paddle.save(state_dict, os.path.join(output_dir, WEIGHTS_NAME))
 
+                # ckpt optimizer weight should save on echo sharding rank
+                if dp_rank == 0:
                     paddle.save(
                         optimizer.state_dict(),
                         os.path.join(
