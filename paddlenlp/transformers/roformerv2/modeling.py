@@ -241,7 +241,6 @@ class RoFormerv2PretrainedModel(PretrainedModel):
     """
 
     pretrained_init_configuration = ROFORMERV2_PRETRAINED_INIT_CONFIGURATION
-
     pretrained_resource_files_map = ROFORMERV2_PRETRAINED_RESOURCE_FILES_MAP
 
     base_model_prefix = "roformerv2"
@@ -253,12 +252,10 @@ class RoFormerv2PretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                num_hidden_layers = (
-                    self.num_hidden_layers if hasattr(self, "num_hidden_layers") else self.config.num_hidden_layers
-                )
+                num_hidden_layers = self.config.num_hidden_layers
                 initializer(layer.weight, num_hidden_layers, order=2, gain=1.0)
             if isinstance(layer, nn.Linear):
-                use_bias = self.use_bias if hasattr(self, "use_bias") else self.config.use_bias
+                use_bias = self.config.use_bias
                 if layer.bias is not None and not use_bias:
                     layer.bias = None
         elif isinstance(layer, Norm):

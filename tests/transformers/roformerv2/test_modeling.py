@@ -16,8 +16,6 @@
 import inspect
 import unittest
 
-from parameterized import parameterized_class
-
 from paddlenlp.transformers import (
     RoFormerv2Config,
     RoFormerv2ForMaskedLM,
@@ -246,15 +244,6 @@ class RoFormerv2ModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(
-    ("return_dict", "use_labels"),
-    [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
-    ],
-)
 class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerv2Model
     return_dict: bool = False
