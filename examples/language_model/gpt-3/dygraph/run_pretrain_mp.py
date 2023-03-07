@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import os
 import random
 import sys
@@ -24,6 +25,9 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
 from paddle.distributed.fleet.meta_parallel import TensorParallel, get_rng_state_tracker
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
 from paddle.distributed.sharding import group_sharded_parallel
 from visualdl import LogWriter
 
@@ -54,6 +58,10 @@ MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
     "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
+
+
+def is_dp_group_support_in_group_sharded_parallel():
+    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
 
 
 def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
@@ -125,9 +133,6 @@ def do_train(args):
         "sharding_degree": args.sharding_degree,
     }
 
-    args.accumulate_steps = args.local_batch_size // args.micro_batch_size
-    logger.info(f"accumulate_steps: {args.accumulate_steps}")
-
     # set control in tensor parallel
     strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
@@ -151,7 +156,7 @@ def do_train(args):
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -186,15 +191,13 @@ def do_train(args):
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         GPTForPretraining.resource_files_names = {"model_state": WEIGHTS_NAME}
 
-    model = GPTForPretraining.from_pretrained(
-        args.model_name_or_path,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-        num_partitions=args.mp_degree,
-        use_recompute=args.use_recompute,
-        fuse=False,  # NOT USING FuseTransformer.
-    )
-
+    model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
+    model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+    model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+    model_config["num_partitions"] = args.mp_degree
+    model_config["use_recompute"] = args.use_recompute
+    model_config["fuse"] = False
+    model = GPTForPretraining(GPTModel(**model_config))
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 
@@ -352,6 +355,10 @@ def do_train(args):
         if (step + 1) % args.accumulate_steps != 0:
             continue
 
+        if args.sharding_degree > 1 and args.sharding_stage in [2, 3]:
+            if args.dp_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
+                fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
+
         if args.use_pure_fp16:
             # scaler.minimize(optimizer, tr_loss)
             scaler.step(optimizer)
@@ -481,6 +488,14 @@ def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
     dp_group = hcg.get_data_parallel_group()
     sharding_group = hcg.get_sharding_parallel_group()
 
+    # sync params (broadcast) buffers in dp group
+    if (
+        not is_dp_group_support_in_group_sharded_parallel()
+        and dist_config.dp_degree > 1
+        and dist_config.sharding_stage == 2
+    ):
+        sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
+
     if dist_config.dp_degree > 1 and dist_config.sharding_stage == 3:
         sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
 
@@ -490,6 +505,12 @@ def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
 
     level = "p_g_os" if dist_config.sharding_stage == 3 else "os_g"
     # origin_model = model
+
+    extra_kwargs = {}
+    if is_dp_group_support_in_group_sharded_parallel():
+        extra_kwargs["dp_group"] = dp_group if dp_group.nranks > 1 else None
+        extra_kwargs["exclude_layer"] = ["GroupNorm"]
+
     model, optimizer, scaler = group_sharded_parallel(
         model=model,
         optimizer=optimizer,
@@ -497,7 +518,8 @@ def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
         scaler=scaler,
         group=sharding_group,
         offload=dist_config.sharding_offload,
-        dp_group=dp_group if dp_group.nranks > 1 else None,
+        # dp_group=dp_group if dp_group.nranks > 1 else None,
+        **extra_kwargs,
     )
 
     # if dist_config.sharding.reduce_overlap:

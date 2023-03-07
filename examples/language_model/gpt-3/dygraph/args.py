@@ -61,6 +61,15 @@ def parse_args(MODEL_CLASSES):
             sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
         ),
     )
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        help="Path to pre-trained model or shortcut name selected in the list: "
+        + ", ".join(
+            sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
+        ),
+    )
 
     # Train I/O config
     parser.add_argument(
@@ -85,14 +94,16 @@ def parse_args(MODEL_CLASSES):
         "--global_batch_size",
         default=None,
         type=int,
-        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size.",
+        help="Global batch size for all training process. None for not check the size is valid. "
+        "If we only use data parallelism, it should be device_num * micro_batch_size.",
     )
 
     parser.add_argument(
         "--local_batch_size",
         default=None,
         type=int,
-        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size.",
+        help="Global batch size for all training process. None for not check the size is valid. "
+        "If we only use data parallelism, it should be device_num * micro_batch_size.",
     )
 
     parser.add_argument(
@@ -181,7 +192,12 @@ def parse_args(MODEL_CLASSES):
         "--sharding_stage",
         type=int,
         default=1,
-        help="sharding stage1/2/3. Stage 1: The optimizer states are partitioned across the processes, so that each process updates only its partition. Stage 2: The reduced gradients for updating the model weights are also partitioned such that each process retains only the gradients corresponding to its portion of the optimizer states. Stage 3: The model parameters are partitioned across the processes. stage3 will automatically collect and partition them during the forward and backward passes.",
+        help="sharding stage1/2/3. Stage 1: The optimizer states are partitioned across the processes, "
+        "so that each process updates only its partition. Stage 2: The reduced gradients for updating "
+        "the model weights are also partitioned such that each process retains only the gradients "
+        " corresponding to its portion of the optimizer states. Stage 3: The model parameters are "
+        "partitioned across the processes. stage3 will automatically collect and partition them "
+        "during the forward and backward passes.",
     )
 
     parser.add_argument(
@@ -235,13 +251,16 @@ def parse_args(MODEL_CLASSES):
         choices=["cola", "sst-2", "mrpc", "sts-b", "qqp", "mnli", "qnli", "rte"],
         help="Task name for finetune.",
     )
-    parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length.")
+    parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length for finetune.")
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
+    if args.tokenizer_name_or_path is None:
+        args.tokenizer_name_or_path = args.model_name_or_path
 
     # process batch size
     process_batch_size(args)
+    args.accumulate_steps = args.local_batch_size // args.micro_batch_size
 
     if args.check_accuracy:
         if args.hidden_dropout_prob != 0:
