@@ -243,9 +243,11 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                 seq_2 = seq_0 * model_max_length
                 self.assertGreater(len(seq_2), model_max_length)
 
-                sequence1 = tokenizer(seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False)
+                sequence1 = tokenizer.encode(
+                    seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False
+                )
                 total_length1 = len(sequence1["input_ids"])
-                sequence2 = tokenizer(
+                sequence2 = tokenizer.encode(
                     seq_2, seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False
                 )
                 total_length2 = len(sequence2["input_ids"])
@@ -265,15 +267,15 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                         for truncation_state in [True, "longest_first", "only_first"]:
                             with self.subTest(f"{tokenizer.__class__.__name__} Truncation: {truncation_state}"):
 
-                                output = tokenizer(
+                                output = tokenizer.encode(
                                     seq_2,
                                     seq_1,
                                     padding=padding_state,
                                     truncation=truncation_state,
                                     max_length=model_max_length,
                                 )
-                                self.assertEqual(len(output["input_ids"]), model_max_length)
 
+                                self.assertEqual(len(output["input_ids"]), model_max_length)
                                 output = tokenizer(
                                     [seq_2],
                                     [seq_1],
@@ -284,7 +286,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                                 self.assertEqual(len(output["input_ids"][0]), model_max_length)
 
                         # Simple
-                        output = tokenizer(
+                        output = tokenizer.encode(
                             seq_1, seq_2, padding=padding_state, truncation="only_second", max_length=model_max_length
                         )
                         self.assertEqual(len(output["input_ids"]), model_max_length)
@@ -302,7 +304,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                         # Reset warnings
                         tokenizer.deprecation_warnings = {}
                         with self.assertLogs("PaddleNLP", level="WARNING") as cm:
-                            output = tokenizer(seq_1, seq_2, padding=padding_state, truncation=False)
+                            output = tokenizer.encode(seq_1, seq_2, padding=padding_state, truncation=False)
                             self.assertNotEqual(len(output["input_ids"]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
                         self.assertTrue(
@@ -348,7 +350,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                 # )
 
                 with self.assertRaises(ValueError) as context:
-                    tokenizer(
+                    tokenizer.encode(
                         seq_0,
                         seq_1,
                         max_length=len(sequence) - 2,
@@ -372,7 +374,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
 
                 # No overflowing tokens when using 'longest' in python tokenizers
                 with self.assertRaises(ValueError) as context:
-                    tokenizer(
+                    tokenizer.encode(
                         seq_0,
                         seq_1,
                         max_length=len(sequence) - 2,
@@ -392,7 +394,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                     )
                 )
 
-                information_first_truncated = tokenizer(
+                information_first_truncated = tokenizer.encode(
                     seq_0,
                     seq_1,
                     max_length=len(sequence) - 2,
@@ -414,7 +416,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
                 self.assertEqual(len(overflowing_tokens), 2 + stride)
                 self.assertEqual(overflowing_tokens, seq0_tokens[-(2 + stride) :])
 
-                information_second_truncated = tokenizer(
+                information_second_truncated = tokenizer.encode(
                     seq_0,
                     seq_1,
                     max_length=len(sequence) - 2,
@@ -435,3 +437,95 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
 
                 self.assertEqual(len(overflowing_tokens), 2 + stride)
                 self.assertEqual(overflowing_tokens, seq1_tokens[-(2 + stride) :])
+
+    # __call__(),max_length default 64
+    def test_maximum_encoding_length_single_input(self):
+        tokenizers = self.get_tokenizers(do_lower_case=False, model_max_length=100)
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                seq_0, ids = self.get_clean_sequence(tokenizer, max_length=20)
+
+                sequence = tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                total_length = len(sequence)
+
+                self.assertGreater(total_length, 4, "Issue with the testing sequence, please update it it's too short")
+
+                # Test with max model input length
+                model_max_length = tokenizer.model_max_length
+                self.assertEqual(model_max_length, 100)
+                seq_1 = seq_0 * model_max_length
+
+                sequence1 = tokenizer.encode(
+                    seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False
+                )
+                total_length1 = len(sequence1["input_ids"])
+                self.assertGreater(
+                    total_length1, model_max_length, "Issue with the testing sequence, please update it it's too short"
+                )
+
+                # Simple
+                padding_strategies = (
+                    [False, True, "longest"] if tokenizer.pad_token and tokenizer.pad_token_id >= 0 else [False]
+                )
+                for padding_state in padding_strategies:
+                    with self.subTest(f"Padding: {padding_state}"):
+                        for truncation_state in [True, "longest_first", "only_first"]:
+                            with self.subTest(f"Truncation: {truncation_state}"):
+                                output = tokenizer.encode(seq_1, padding=padding_state, truncation=truncation_state)
+                                self.assertEqual(len(output["input_ids"]), model_max_length)
+
+                                output = tokenizer(
+                                    [seq_1],
+                                    padding=padding_state,
+                                    max_length=model_max_length,
+                                    truncation=truncation_state,
+                                )
+                                self.assertEqual(len(output["input_ids"][0]), model_max_length)
+
+                        # Simple with no truncation
+                        # Reset warnings
+                        tokenizer.deprecation_warnings = {}
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer.encode(seq_1, padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"]), model_max_length)
+                        self.assertEqual(len(cm.records), 1)
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
+
+                        tokenizer.deprecation_warnings = {}
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer([seq_1], padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"][0]), model_max_length)
+                        self.assertEqual(len(cm.records), 1)
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
+
+                # Overflowing tokens
+                stride = 2
+                information = tokenizer.encode(
+                    seq_0,
+                    max_length=total_length - 2,
+                    return_token_type_ids=None,
+                    add_special_tokens=False,
+                    stride=stride,
+                    truncation="longest_first",
+                    return_overflowing_tokens=True,
+                    # add_prefix_space=False,
+                )
+
+                # Overflowing tokens are handled quite differently in slow and fast tokenizers
+
+                truncated_sequence = information["input_ids"]
+                overflowing_tokens = information["overflowing_tokens"]
+
+                self.assertEqual(len(truncated_sequence), total_length - 2)
+                self.assertEqual(truncated_sequence, sequence[:-2])
+
+                self.assertEqual(len(overflowing_tokens), 2 + stride)
+                self.assertEqual(overflowing_tokens, sequence[-(2 + stride) :])
