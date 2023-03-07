@@ -44,7 +44,13 @@ from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer, PretrainedModel
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+    LinearAnnealingWithWarmupDecay,
+    PretrainedModel,
+)
 from paddlenlp.utils.log import logger
 
 # to import data_tools
@@ -236,9 +242,6 @@ def do_train(args):
         "sharding_degree": args.sharding_degree,
     }
 
-    args.accumulate_steps = args.local_batch_size // args.micro_batch_size
-    # strategy.pipeline_configs = {"accumulate_steps": accumulate_steps, "micro_batch_size": args.micro_batch_size}
-
     # set control in tensor parallel
     strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
@@ -357,20 +360,29 @@ def do_train(args):
 
     metric = metric_class()
 
+    # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
-    warmup_step = args.warmup_rate * args.decay_steps
+    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
+    args.warmup_steps = args.warmup_rate * args.max_steps
 
     lr_scheduler = None
+
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
             max_lr=args.max_lr,
             min_lr=args.min_lr,
-            warmup_step=warmup_step,
+            warmup_step=args.warmup_steps,
             decay_step=args.decay_steps,
-            last_epoch=global_step,
+        )
+    elif args.lr_decay_style == "linear":
+        lr_scheduler = LinearAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
         )
 
     clip = None
@@ -592,6 +604,34 @@ def do_train(args):
                 return
 
             reader_start = time.time()
+
+    if args.do_export:
+        from utils import merge_model_parallel
+
+        last_checkpoint = get_last_checkpoint(args.output_dir)
+        from paddlenlp.transformers import GPT2ForSequenceClassification, GPTConfig
+
+        config = GPTConfig.from_pretrained(last_checkpoint)
+        config.fuse_qkv = True
+        model = GPT2ForSequenceClassification(config)
+        missing_keys, unexpected_keys = model.set_state_dict(merge_model_parallel(last_checkpoint, config))
+        print("missing_keys", missing_keys)
+        print("unexpected_keys", unexpected_keys)
+        print(train_ds[0])
+
+        model = paddle.jit.to_static(
+            model,
+            input_spec=[
+                paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            ],
+        )
+
+        infer_path = os.path.jon(args.output_path, "infer", f"{args.task_name}")
+
+        # Save converted static graph model
+        paddle.jit.save(model, infer_path)
+        # # Also save tokenizer for inference usage
+        tokenizer.save_pretrained(os.path.dirname(infer_path))
 
 
 def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
