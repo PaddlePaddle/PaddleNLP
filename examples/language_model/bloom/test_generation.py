@@ -89,38 +89,33 @@ def main():
     config = BloomConfig.from_pretrained(args.model_path)
 
     config.max_dec_len = 20
+    config.temperature = 0.5
+    config.decode_strateg = 'sampling'
     config.eos_token_id = tokenizer.eos_token_id
     config.bos_token_id  = tokenizer.bos_token_id
     config.pad_token_id = tokenizer.pad_token_id
     config.use_cache = True
     config.top_k = 1
+    print("config:{}".format(config))
 
     model = model_class.from_pretrained(args.model_path, config=config)
-    #state_dict = paddle.load('/root/.paddlenlp/models/bigscience/bloom-560m/model_state.pdparams')
-
-    #keys_load = state_dict.keys()
-    #keys_raw = model.state_dict().keys()
-    #for key1, key2 in zip(keys_load, keys_raw):
-    #    print("{}\t{}\n".format(key1, key2))
-    #model.set_state_dict(state_dict)
     
     model.eval()
     # Convert to static graph with specific input description
-    input_text = ["Nice to meet"]#, "Hello "]
+    input_text = ["hello world", 'i love you']
     inputs = tokenizer(input_text)
-    # input_ids = tokenizer.encode(input_text)['input_ids']
-    inputs = tokenizer(input_text)
-    #inputs = left_padding(inputs, tokenizer.bos_token_id)
+    inputs = left_padding(inputs, tokenizer.pad_token_id)
     input_ids = inputs["input_ids"]
 
     input_ids = paddle.to_tensor(input_ids, dtype="int64")
     ret = model(input_ids=input_ids)
-    print(ret)
 
     # ret =  model.generate(input_ids = data["input_ids"])
     for x in ret[0].tolist():
         print("==" * 30)
-        print(tokenizer.convert_ids_to_tokens(x))
+        tokens = tokenizer.convert_ids_to_tokens(x)
+        sentence = tokenizer.convert_tokens_to_string(tokens)
+        print(sentence)
 
 if __name__ == "__main__":
     main()

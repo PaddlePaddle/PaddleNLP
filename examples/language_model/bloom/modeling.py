@@ -72,6 +72,7 @@ def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_
 
 
 def masked_fill(x, mask, value):
+    
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(paddle.cast(mask, "bool"), y, x)
 
@@ -427,7 +428,7 @@ class BloomAttention(nn.Layer):
         if input_dtype == paddle.float16:
             attention_scores = paddle.cast(attention_scores, paddle.float32)
         attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-
+        #attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
         attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
 
         # [batch_size, num_heads, q_length, kv_length]
@@ -815,26 +816,15 @@ class BloomModel(BloomPreTrainedModel):
                 "Input_ids should be specified when generating attention_mask, otherwise no attention_mask."
             )
             if input_ids is None:
-                attention_mask = paddle.zeros([batch_size, 1, 1, seq_length], dtype=paddle.get_default_dtype())
+                attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
 
-            else:
-                attention_mask = (
-                    paddle.cast(input_ids == self.padding_idx, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
-                    * -1e4
-                )
-
-        # For 2D attention_mask from tokenizer
-        elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-            attention_mask = (1.0 - attention_mask) * -1e4
 
         alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-        causal_mask = attention_mask
-        # causal_mask = self._prepare_attn_mask(
-        #     attention_mask,
-        #     input_shape=(batch_size, seq_length),
-        #     past_key_values_length=past_key_values_length,
-        # )
+        causal_mask = self._prepare_attn_mask(
+            attention_mask,
+            input_shape=(batch_size, seq_length),
+            past_key_values_length=past_key_values_length,
+        )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             if output_hidden_states:
@@ -1270,10 +1260,11 @@ class BloomForGeneration(BloomPreTrainedModel):
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * -1e9
+            attention_mask = (input_ids != pad_token_id).astype("int64")
         else:
-            attention_mask = paddle.ones_like(input_ids, dtype=paddle.get_default_dtype())
-        return paddle.unsqueeze(attention_mask, axis=[1, 2])
+            attention_mask = paddle.ones_like(input_ids, dtype="int64")
+        return attention_mask
+
 
     def update_scores_for_generation(self, scores, next_scores, length, unfinished_flag):
         # update scores
@@ -1347,12 +1338,6 @@ class BloomForGeneration(BloomPreTrainedModel):
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None:
-            if len(attention_mask.shape) == 4:
-                attention_mask = attention_mask[:, -1, -1, :]
-
-            if "int" in str(attention_mask.dtype):
-                attention_mask = (1.0 - attention_mask) * -1e4
         return {"input_ids": input_ids, "attention_mask": attention_mask, "cache": cache}
 
     def update_model_kwargs_for_generation(self, next_tokens, outputs, model_kwargs, is_encoder_decoder=False):
@@ -1371,27 +1356,14 @@ class BloomForGeneration(BloomPreTrainedModel):
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
-        # update attention_mask
-        if not is_encoder_decoder and "attention_mask" in model_kwargs:
-            attention_mask = model_kwargs["attention_mask"]
-            # nn.Pad2D don't support the data type `bool`
-            if str(attention_mask.dtype) == "bool":
-                attention_mask = paddle.cast(attention_mask, "int64")
-            if len(attention_mask.shape) == 4:
-                attention_mask = nn.Pad2D([0, 0, 0, 1], mode="replicate")(attention_mask)
-                attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e4)(attention_mask)
-                dtype = str(attention_mask.dtype)
-                if "int" in dtype:
-                    attention_mask[:, :, -1, -1] = 1
-                elif "float" in dtype:
-                    attention_mask[:, :, -1, -1] = 0.0
-                else:
-                    raise ValueError("The data type of input `attention_mask` must " "be bool, int or float")
-            else:
-                attention_mask = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
-            model_kwargs["attention_mask"] = attention_mask
+        if not is_encoder_decoder:
+           # update attention mask
+           if "attention_mask" in model_kwargs:
+               attention_mask = model_kwargs["attention_mask"]
+               model_kwargs["attention_mask"] = paddle.concat(
+                   [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+               )
+               print(model_kwargs['attention_mask'])
 
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
@@ -1521,7 +1493,6 @@ class BloomForGeneration(BloomPreTrainedModel):
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
-            print("current loop probs", logits)
             if not self.use_topp_sampling:
                 next_tokens = paddle.multinomial(probs)
 
