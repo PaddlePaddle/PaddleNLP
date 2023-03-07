@@ -284,7 +284,10 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
 
         # get the text config dict if we are loading from CLIPConfig
         if config_dict.get("model_type") == "clip":
+            projection_dim = config_dict.get("projection_dim", None)
             config_dict = config_dict["text_config"]
+            if projection_dim is not None:
+                config_dict["projection_dim"] = projection_dim
 
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warning(
@@ -399,7 +402,10 @@ class CLIPVisionConfig(Old2NewPretrainedConfig):
 
         # get the vision config dict if we are loading from CLIPConfig
         if config_dict.get("model_type") == "clip":
+            projection_dim = config_dict.get("projection_dim", None)
             config_dict = config_dict["vision_config"]
+            if projection_dim is not None:
+                config_dict["projection_dim"] = projection_dim
 
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warning(

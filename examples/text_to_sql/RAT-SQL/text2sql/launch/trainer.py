@@ -12,18 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import logging
 import os
 import traceback
-import logging
 from pathlib import Path
 
-import paddle
-from paddle import nn
-
-from text2sql import utils
-from text2sql import io
-from text2sql.utils import metrics
+from text2sql import io, utils
 from text2sql.launch import infer
 
 
@@ -71,7 +65,7 @@ def _eval_during_train(model, data, epoch, output_root):
     try:
         output = Path(output_root) / "infer_result" / f"{data.name}.infer_epoch{epoch:03d}.sql"
         infer.inference(model, data, output)
-    except OSError as ose:
+    except OSError:
         traceback.print_exc()
         logging.error(traceback.format_exc())
         return 0, epoch

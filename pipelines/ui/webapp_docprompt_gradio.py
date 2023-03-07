@@ -14,19 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import base64
-from io import BytesIO
-from PIL import Image
-import traceback
 import argparse
+import base64
+import traceback
+from io import BytesIO
 
-import requests
-import numpy as np
-import gradio as gr
-import fitz
 import cv2
+import fitz
+import gradio as gr
+import numpy as np
+import requests
+from PIL import Image
 
 fitz_tools = fitz.Tools()
 
@@ -171,7 +169,7 @@ CSS = """
     padding-bottom: 2px !important;
     padding-left: 8px !important;
     padding-right: 8px !important;
-	margin-top: 10px;
+    margin-top: 10px;
 }
 .gradio-container .gr-button-primary {
     background: linear-gradient(180deg, #CDF9BE 0%, #AFF497 100%);

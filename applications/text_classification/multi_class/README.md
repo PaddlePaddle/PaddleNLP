@@ -339,7 +339,7 @@ checkpoint/prune/
 <a name="模型预测"></a>
 
 ### 2.5 模型预测
-我们推荐使用taskflow进行模型预测。
+我们推荐使用taskflow进行模型预测，请保证paddlenlp版本大于2.5.1。
 ```
 from paddlenlp import Taskflow
 

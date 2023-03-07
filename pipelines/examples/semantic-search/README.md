@@ -42,7 +42,7 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
+- python >= 3.7.3
 - paddlenlp >= 2.2.1
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
@@ -121,6 +121,7 @@ curl http://localhost:9200/_aliases?pretty=true
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
+                            --embed_title True \
                             --delete_index
 ```
 可以使用下面的命令来查看数据：
@@ -137,6 +138,7 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `port`: ANN索引引擎的端口号
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
+* `embed_title`: 是否需要对标题建索引，默认为false，标题默认为文件名
 
 删除索引也可以使用下面的命令：
 

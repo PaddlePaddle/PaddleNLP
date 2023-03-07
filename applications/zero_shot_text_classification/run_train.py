@@ -15,6 +15,7 @@
 from dataclasses import dataclass, field
 
 import paddle
+from paddle.metric import Accuracy
 from paddle.static import InputSpec
 from sklearn.metrics import f1_score
 from utils import UTCLoss, read_local_dataset
@@ -39,6 +40,7 @@ class DataArguments:
     train_file: str = field(default="train.txt", metadata={"help": "Train dataset file name."})
     dev_file: str = field(default="dev.txt", metadata={"help": "Dev dataset file name."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
+    single_label: str = field(default=False, metadata={"help": "Predict exactly one label per sample."})
 
 
 @dataclass
@@ -92,10 +94,20 @@ def main():
     )
 
     # Define the metric function.
+    def compute_metrics_single_label(eval_preds):
+        labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
+        preds = paddle.to_tensor(eval_preds.predictions)
+        preds = paddle.nn.functional.softmax(preds, axis=-1)
+        labels = paddle.argmax(labels, axis=-1)
+        metric = Accuracy()
+        correct = metric.compute(preds, labels)
+        metric.update(correct)
+        acc = metric.accumulate()
+        return {"accuracy": acc}
+
     def compute_metrics(eval_preds):
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
-
         preds = paddle.nn.functional.sigmoid(preds)
         preds = preds[labels != -100].numpy()
         labels = labels[labels != -100].numpy()
@@ -113,7 +125,7 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         callbacks=None,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_single_label if data_args.single_label else compute_metrics,
     )
 
     # Training.

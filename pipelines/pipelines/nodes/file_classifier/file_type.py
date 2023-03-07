@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from multiprocessing.sharedctypes import Value
-from typing import List, Union
+
 from pathlib import Path
+from typing import List, Union
+
 from pipelines.nodes.base import BaseComponent
 
 DEFAULT_TYPES = ["txt", "pdf", "md", "docx", "html", "png", "jpg"]
@@ -60,7 +61,7 @@ class FileTypeClassifier(BaseComponent):
 
         for path in file_paths:
             if path.suffix != extension:
-                raise ValueError(f"Multiple file types are not allowed at once.")
+                raise ValueError("Multiple file types are not allowed at once.")
 
         return extension.lstrip(".")
 
