@@ -315,7 +315,9 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
 
                         tokenizer.deprecation_warnings = {}
                         with self.assertLogs("PaddleNLP", level="WARNING") as cm:
-                            output = tokenizer([seq_1], [seq_2], padding=padding_state, truncation=False)
+                            output = tokenizer(
+                                [seq_1], [seq_2], padding=padding_state, max_length=None, truncation=False
+                            )
                             self.assertNotEqual(len(output["input_ids"][0]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
                         self.assertTrue(
@@ -497,7 +499,7 @@ class TestTokenizationDalleBart(TokenizerTesterMixin, unittest.TestCase):
 
                         tokenizer.deprecation_warnings = {}
                         with self.assertLogs("PaddleNLP", level="WARNING") as cm:
-                            output = tokenizer([seq_1], padding=padding_state, truncation=False)
+                            output = tokenizer([seq_1], padding=padding_state, truncation=False, max_length=None)
                             self.assertNotEqual(len(output["input_ids"][0]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
                         self.assertTrue(

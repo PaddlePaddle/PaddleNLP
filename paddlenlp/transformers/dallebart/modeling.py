@@ -27,8 +27,8 @@ from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from ..generation_utils import BeamSearchScorer
 from .configuration import (
-    DalleBart_PRETRAINED_INIT_CONFIGURATION,
-    DalleBart_PRETRAINED_RESOURCE_FILES_MAP,
+    DALLEBART_PRETRAINED_INIT_CONFIGURATION,
+    DALLEBART_PRETRAINED_RESOURCE_FILES_MAP,
     DalleBartConfig,
 )
 
@@ -94,8 +94,8 @@ class DalleBartPretrainedModel(PretrainedModel):
 
     base_model_prefix = "dallebart"
     model_config_file = CONFIG_NAME
-    pretrained_init_configuration = DalleBart_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = DalleBart_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = DALLEBART_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = DALLEBART_PRETRAINED_RESOURCE_FILES_MAP
     config_class = DalleBartConfig
 
     def init_weights(self, layer):

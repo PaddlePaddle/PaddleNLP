@@ -18,9 +18,9 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["DalleBart_PRETRAINED_INIT_CONFIGURATION", "DalleBartConfig", "DalleBart_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["DALLEBART_PRETRAINED_INIT_CONFIGURATION", "DalleBartConfig", "DALLEBART_PRETRAINED_RESOURCE_FILES_MAP"]
 
-DalleBart_PRETRAINED_RESOURCE_FILES_MAP = {
+DALLEBART_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
         "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
@@ -29,7 +29,7 @@ DalleBart_PRETRAINED_RESOURCE_FILES_MAP = {
     }
 }
 
-DalleBart_PRETRAINED_INIT_CONFIGURATION = {
+DALLEBART_PRETRAINED_INIT_CONFIGURATION = {
     "dalle-mini": {
         "text_vocab_size": 50264,
         "image_vocab_size": 16384,
@@ -198,7 +198,7 @@ class DalleBartConfig(PretrainedConfig):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             Default to `0.02`.
     """
-    pretrained_init_configuration = DalleBart_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = DALLEBART_PRETRAINED_INIT_CONFIGURATION
     model_type = "dallebart"
     attribute_map: Dict[str, str] = {
         "text_vocab_size": "vocab_size",
