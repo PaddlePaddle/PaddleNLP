@@ -18,8 +18,8 @@ import os
 import unittest
 
 from paddlenlp.transformers.xlm.tokenizer import XLMTokenizer
+from tests.testing_utils import get_tests_dir, slow
 
-from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin
 
 
@@ -68,6 +68,39 @@ class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         input_text = "lower newer"
         output_text = "lower newer"
         return input_text, output_text
+
+    def test_get_vocab(self):
+        vocab_keys = list(self.get_tokenizer().get_vocab().keys())
+
+        self.assertEqual(vocab_keys[0], "l")
+        self.assertEqual(vocab_keys[-1], "<special9>")
+        self.assertEqual(len(vocab_keys), 34)
+
+    def test_add_tokens_tokenizer(self):
+        pass
+
+    def test_added_token_serializable(self):
+        pass
+
+    def test_consecutive_unk_string(self):
+        pass
+
+    def test_offsets_mapping(self):
+        pass
+
+    def test_save_and_load_tokenizer(self):
+        pass
+
+    def test_special_tokens_initialization_with_non_empty_additional_special_tokens(self):
+        pass
+
+    def test_add_tokens(self):
+        tokenizer = XLMTokenizer.from_pretrained("xlm-mlm-en-2048")
+        vocab_size = len(tokenizer)
+        self.assertEqual(tokenizer.add_tokens(""), 0)
+        self.assertEqual(tokenizer.add_tokens("testoken"), 1)
+        self.assertEqual(tokenizer.add_tokens(["testoken1", "testtoken2"]), 2)
+        self.assertEqual(len(tokenizer.get_vocab()), vocab_size + 3)
 
     def test_full_tokenizer(self):
         """Adapted from Sennrich et al. 2015 and https://github.com/rsennrich/subword-nmt"""
