@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import distutils.util
 
 from predictor import Predictor
 
@@ -21,12 +22,24 @@ def parse_args():
     # yapf: disable
     parser = argparse.ArgumentParser()
     # Required parameters
-    parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size per GPU for inference.")
     parser.add_argument("--max_seq_length", default=512, type=int, help="The maximum input sequence length. Sequences longer than this will be split automatically.")
     parser.add_argument("--task_type", default="ner", type=str, choices=["ner", "cls", "mrc"], help="Specify the task type.")
     parser.add_argument("--lang", default="en", type=str, choices=["ch", "en"], help="Specify the task type.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+    parser.add_argument("--model_dir", required=True, help="The directory of model.")
+    parser.add_argument("--model_prefix", type=str, default="inference", help="The model and params file prefix.")
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="paddle",
+        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
+        help="The inference runtime backend.",
+    )
+    parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
+    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
+    parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
     args = parser.parse_args()
     # yapf: enable
     return args
