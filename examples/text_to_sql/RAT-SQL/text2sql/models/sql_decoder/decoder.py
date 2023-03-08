@@ -1,21 +1,29 @@
-import collections
-import collections.abc
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
 import itertools
-import json
-import os
 
 import attr
 import paddle
 import paddle.nn.functional as F
-
+from text2sql.dataproc import sql_preproc_v2, vocab
 from text2sql.models import attention
+from text2sql.models.sql_decoder import align_dec_func
 from text2sql.models.sql_decoder.infer_tree_traversal import InferenceTreeTraversal
 from text2sql.models.sql_decoder.train_tree_traversal import TrainTreeTraversal
 from text2sql.models.sql_decoder.tree_traversal import TreeTraversal
-from text2sql.models.sql_decoder import align_dec_func
-from text2sql.dataproc import vocab
-from text2sql.dataproc import sql_preproc_v2
 
 
 def maybe_stack(items, axis=None):
@@ -321,7 +329,7 @@ class Text2SQLDecoder(paddle.nn.Layer):
         """compute mle loss"""
         traversal = TrainTreeTraversal(self, desc_enc, debug)
         traversal.step(None)
-        #### for debug
+        # for debug
         # class List(list):
         #    def __init__(self, *args, **kwargs):
         #        """ """
@@ -394,7 +402,6 @@ class Text2SQLDecoder(paddle.nn.Layer):
                 # - could be bytes, str, int, float, bool, NoneType
                 # - terminal tokens vocabulary is created by turning everything into a string (with `str`)
                 # - at decoding time, cast back to str/int/float/bool
-                field_type = type(node).__name__
                 field_value_split = self.preproc.grammar.tokenize_field_value(node) + [vocab.EOS]
 
                 for token in field_value_split:
@@ -533,7 +540,6 @@ class Text2SQLDecoder(paddle.nn.Layer):
         # token_idx shape: batch (=1), LongTensor
         token_idx = self._index(self.terminal_vocab, token)
         # action_emb shape: batch (=1) x emb_size
-        action_emb = self.terminal_embedding(token_idx)
 
         # +unk, +in desc: copy
         # +unk, -in desc: gen (an unk token)
@@ -549,11 +555,10 @@ class Text2SQLDecoder(paddle.nn.Layer):
                 # log p(copy | output)
                 # shape: batch (=1)
                 paddle.nn.functional.log_sigmoid(-gen_logodds)
-                -
+                - self.xent_loss(copy_loc_logits, self._tensor(desc_locs[0:1]))
                 # xent_loss: -log p(location | output)
                 # TODO: sum the probability of all occurrences
                 # shape: batch (=1)
-                self.xent_loss(copy_loc_logits, self._tensor(desc_locs[0:1]))
             )
         else:
             copy_logprob = None
@@ -566,10 +571,9 @@ class Text2SQLDecoder(paddle.nn.Layer):
                 # log p(gen | output)
                 # shape: batch (=1)
                 paddle.nn.functional.log_sigmoid(gen_logodds)
-                -
+                - self.xent_loss(token_logits, token_idx)
                 # xent_loss: -log p(token | output)
                 # shape: batch (=1)
-                self.xent_loss(token_logits, token_idx)
             )
         else:
             gen_logprob = None

@@ -13,12 +13,7 @@
 # limitations under the License.
 # modified from https://github.com/naver/sqlova
 
-import os, json
-import random as rd
-from copy import deepcopy
-
 import paddle
-import paddle.nn as nn
 
 from paddlenlp.transformers import BertModel, BertPretrainedModel, BertTokenizer
 
@@ -113,7 +108,6 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
     i_nlu = []  # index to retreive the position of contextual vector later.
     i_hds = []
 
-    doc_tokens = []
     nlu_tt = []
 
     t_to_tt_idx = []
@@ -184,9 +178,7 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
 
     # Convert to tensor
     all_input_ids = paddle.to_tensor(input_ids, dtype="int64")
-    all_input_mask = paddle.to_tensor(input_mask, dtype="int64")
     all_segment_ids = paddle.to_tensor(segment_ids, dtype="int64")
-    all_sent_ids = paddle.to_tensor(sent_ids, dtype="int64")
 
     # 4. Generate BERT output.
     all_encoder_layer, pooled_output = model_bert(
@@ -225,12 +217,9 @@ def get_wemb_n(i_nlu, l_n, hS, num_hidden_layers, all_encoder_layer, num_out_lay
     for b in range(bS):
         # [B, max_len, dim]
         # Fill zero for non-exist part.
-        l_n1 = l_n[b]
         i_nlu1 = i_nlu[b]
         for i_noln in range(num_out_layers_n):
             i_layer = num_hidden_layers - 1 - i_noln
-            st = i_noln * hS
-            ed = (i_noln + 1) * hS
             tmp = all_encoder_layer[i_layer][b, i_nlu1[0] : i_nlu1[1], :].unsqueeze(0)
             pad_right = l_n_max - (i_nlu1[1] - i_nlu1[0])
             pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right], data_format="NLC").squeeze(0)
@@ -248,9 +237,7 @@ def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer, num
        [t2-c1-t1, ...,]
     ]
     """
-    bS = len(l_hs)
     l_hpu_max = max(l_hpu)
-    num_of_all_hds = sum(l_hs)
     wemb_h = []
     b_pu = -1
 
@@ -259,8 +246,6 @@ def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer, num
             b_pu += 1
             for i_nolh in range(num_out_layers_h):
                 i_layer = num_hidden_layers - 1 - i_nolh
-                st = i_nolh * hS
-                ed = (i_nolh + 1) * hS
                 tmp = all_encoder_layer[i_layer][b, i_hds11[0] : i_hds11[1], :].unsqueeze(0)
                 pad_right = l_hpu_max - (i_hds11[1] - i_hds11[0])
                 pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right], data_format="NLC").squeeze(0)

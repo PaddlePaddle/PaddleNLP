@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
-import sys
-
-import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -36,7 +32,9 @@ class SimCSE(nn.Layer):
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ptm.config.hidden_size, output_emb_size, weight_attr=weight_attr
+            )
 
         self.margin = margin
         # Used scaling cosine similarity to ease converge
@@ -55,7 +53,7 @@ class SimCSE(nn.Layer):
         # Note: cls_embedding is poolerd embedding with act tanh
         sequence_output, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids, attention_mask)
 
-        if with_pooler == False:
+        if with_pooler is False:
             cls_embedding = sequence_output[:, 0, :]
 
         if self.output_emb_size > 0:

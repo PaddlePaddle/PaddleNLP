@@ -13,18 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Union, Iterator
-
 import logging
 from abc import abstractmethod
-from time import perf_counter
-from functools import wraps
-from tqdm import tqdm
 from copy import deepcopy
+from functools import wraps
+from time import perf_counter
+from typing import Dict, Iterator, List, Optional, Union
 
-from pipelines.schema import Document
-from pipelines.nodes.base import BaseComponent
 from pipelines.document_stores.base import BaseDocumentStore, BaseKnowledgeGraph
+from pipelines.nodes.base import BaseComponent
+from pipelines.schema import Document
 
 logger = logging.getLogger(__name__)
 

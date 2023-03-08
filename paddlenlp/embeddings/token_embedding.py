@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
-import os
 import os.path as osp
-import numpy as np
-import logging
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import _get_sub_home, MODEL_HOME
-from paddlenlp.utils.log import logger
+
 from paddlenlp.data import Vocab, get_idx_from_word
-from .constant import EMBEDDING_URL_ROOT, PAD_TOKEN, UNK_TOKEN, EMBEDDING_NAME_LIST
+from paddlenlp.utils.env import MODEL_HOME, _get_sub_home
+from paddlenlp.utils.log import logger
+
+from .constant import EMBEDDING_NAME_LIST, EMBEDDING_URL_ROOT, PAD_TOKEN, UNK_TOKEN
 
 EMBEDDING_HOME = _get_sub_home("embeddings", parent_home=MODEL_HOME)
 

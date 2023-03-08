@@ -189,10 +189,19 @@ class Task(metaclass=abc.ABCMeta):
         if paddle.get_device() == "cpu":
             self._config.disable_gpu()
             self._config.enable_mkldnn()
+            if self._infer_precision == "int8":
+                # EnableMKLDNN() only works when IR optimization is enabled.
+                self._config.switch_ir_optim(True)
+                self._config.enable_mkldnn_int8()
+                logger.info((">>> [InferBackend] INT8 inference on CPU ..."))
         elif paddle.get_device().split(":", 1)[0] == "npu":
             self._config.disable_gpu()
             self._config.enable_npu(self.kwargs["device_id"])
         else:
+            if self._infer_precision == "int8":
+                logger.info(
+                    ">>> [InferBackend] It is a INT8 model which is not yet supported on gpu, use FP32 to inference here ..."
+                )
             self._config.enable_use_gpu(100, self.kwargs["device_id"])
             # TODO(linjieccc): enable after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
@@ -204,9 +213,7 @@ class Task(metaclass=abc.ABCMeta):
 
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"] or (
-            self.task == "text_classification" and self.model == "prompt"
-        ):
+        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]:
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)
@@ -311,6 +318,10 @@ class Task(metaclass=abc.ABCMeta):
                 raise IOError(
                     f"{self._task_path} should include {self._static_model_name + '.pdmodel'} and {self._static_model_name + '.pdiparams'} while is_static_model is True"
                 )
+            if self.paddle_quantize_model(self.inference_model_path):
+                self._infer_precision = "int8"
+                self._predictor_type = "paddle-inference"
+
         else:
             # Since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way
             _base_path = (
@@ -481,6 +492,18 @@ class Task(metaclass=abc.ABCMeta):
                     )
             concat_results.append(single_results)
         return concat_results
+
+    def paddle_quantize_model(self, model_path):
+        """
+        Determine whether it is an int8 model.
+        """
+        model = paddle.jit.load(model_path)
+        program = model.program()
+        for block in program.blocks:
+            for op in block.ops:
+                if op.type.count("quantize"):
+                    return True
+        return False
 
     def help(self):
         """

@@ -28,6 +28,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.prompt import (
     AutoTemplate,
+    PromptDataCollatorWithPadding,
     PromptModelForSequenceClassification,
     PromptTrainer,
     PromptTuningArguments,
@@ -57,7 +58,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model. Defaut to 'eval_accuracy'.
         greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
@@ -296,6 +297,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                                 )
 
     def _construct_trainer(self, model_config) -> Trainer:
+
         if "early_stopping_patience" in model_config:
             callbacks = [EarlyStoppingCallback(early_stopping_patience=model_config["early_stopping_patience"])]
         else:
@@ -447,6 +449,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return test_output
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
+        """
+        function used by the Trainer to compute metrics during training
+        See :class:`~paddlenlp.trainer.trainer_base.Trainer` for more details.
+        """
         if self.problem_type == "multi_class":
             return self._compute_multi_class_metrics(eval_preds=eval_preds)
         else:  # multi_label
@@ -498,7 +504,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         is_test: bool = False,
     ):
         """
-        preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
+        Preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
         result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
         if not is_test:
@@ -516,7 +522,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         Preprocess dataset from raw features to input features used by the Trainer or PromptTrainer.
         """
-
         if trainer_type == "PromptTrainer":
             if is_test:
                 return dataset
@@ -531,29 +536,35 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         processed_dataset = copy.deepcopy(dataset).map(trans_func, lazy=False)
         return processed_dataset
 
-    def to_taskflow(self, trial_id=None, export_path=None, batch_size=1, precision="fp32"):
+    def to_taskflow(
+        self, trial_id: Optional[str] = None, batch_size: int = 1, precision: str = "fp32", compress: bool = False
+    ):
         """
-        Convert the model from a certain `trial_id` to a Taskflow for model inference
+        Convert the model from a certain `trial_id` to a Taskflow for model inference.
 
         Args:
             trial_id (int): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
-            export_path (str): the filepath to export to.
             batch_size(int): The sample number of a mini-batch. Defaults to 1.
             precision (str): Select among ["fp32", "fp16"]. Default to "fp32".
         """
         model_result = self._get_model_result(trial_id=trial_id)
         trial_id = model_result.metrics["trial_id"]
+        if compress:
+            export_path = os.path.join(model_result.log_dir, self.compress_path)
+        else:
+            export_path = os.path.join(model_result.log_dir, self.export_path)
+        self.export(export_path=export_path, trial_id=trial_id, compress=compress)
 
-        if export_path is None:
-            export_path = os.path.join(self.export_path, trial_id)
+        with open(os.path.join(export_path, "taskflow_config.json"), "r") as f:
+            taskflow_config = json.load(f)
 
-        taskflow_config = self.export(export_path=export_path, trial_id=trial_id)
         taskflow_config["task_path"] = export_path
         taskflow_config["batch_size"] = batch_size
         taskflow_config["precision"] = precision
+
         return Taskflow(**taskflow_config)
 
-    def export(self, export_path, trial_id=None):
+    def export(self, export_path: str, trial_id: Optional[str] = None, compress: bool = False):
         """
         Export the model from a certain `trial_id` to the given file path.
 
@@ -565,40 +576,81 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         trial_id = model_result.metrics["trial_id"]
+        if compress:
+            default_export_path = os.path.join(model_result.log_dir, self.compress_path)
+        else:
+            default_export_path = os.path.join(model_result.log_dir, self.export_path)
 
+        # Check whether it has been exported before
+        is_exported = False
+        if os.path.exists(default_export_path):
+            if model_config["trainer_type"] == "PromptTrainer":
+                files = [
+                    "model.pdiparams",
+                    "model.pdmodel",
+                    "tokenizer_config.json",
+                    "vocab.txt",
+                    "taskflow_config.json",
+                    "plm",
+                    "template_config.json",
+                    "verbalizer_config.json",
+                ]
+            else:
+                files = [
+                    "model.pdiparams",
+                    "model.pdmodel",
+                    "tokenizer_config.json",
+                    "vocab.txt",
+                    "taskflow_config.json",
+                ]
+
+            if all([os.path.exists(os.path.join(default_export_path, file)) for file in files]):
+                is_exported = True
+                if os.path.exists(export_path) and os.path.samefile(export_path, default_export_path):
+                    logger.info(f"Export_path: {export_path} already exists, skipping...")
+                    return
+
+        # Clear export path
         if os.path.exists(export_path):
-            logger.info(
-                f"Export path for {trial_id} already exists: ({export_path}). The model parameter files will be overwritten."
-            )
+            logger.info(f"Export path: {export_path} is not empty. The directory will be deleted.")
+            shutil.rmtree(export_path)
 
-        # construct trainer
+        # Copy directly if it has been exported before
+        if is_exported:
+            logger.info(f"{default_export_path} already exists, copy {default_export_path} into {export_path}")
+            shutil.copytree(default_export_path, export_path)
+            return
+
+        # Construct trainer
         trainer = self._construct_trainer(model_config)
         trainer.load_state_dict_from_checkpoint(
             resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
         )
 
-        # save static model
-        if model_config["trainer_type"] == "PromptTrainer":
+        # Save static model
+        if compress:
+            self.compress(trial_id=trial_id, compress_path=export_path)
+            if model_config["trainer_type"] == "PromptTrainer":
+                trainer.template.save(export_path)
+                trainer.verbalizer.save(export_path)
+                trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
+        elif model_config["trainer_type"] == "PromptTrainer":
             trainer.export_model(export_path)
             trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
-            mode = "prompt"
-            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
         else:
-            if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
-                input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
-            else:
-                input_spec = [
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                ]
+            input_spec = self._get_input_spec(trainer_type=model_config["trainer_type"], trainer=trainer)
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
-            mode = "finetune"
-            max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
 
         # save tokenizer
         trainer.tokenizer.save_pretrained(export_path)
 
         # save taskflow config file
+        if model_config["trainer_type"] == "PromptTrainer":
+            mode = "prompt"
+            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+        else:
+            mode = "finetune"
+            max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
         taskflow_config = {
             "task": "text_classification",
             "mode": mode,
@@ -615,9 +667,136 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             f"Taskflow config saved to {export_path}. You can use the Taskflow config to create a Taskflow instance for inference"
         )
 
+        logger.info(f"Exported trial_id: {trial_id} to export_path: {export_path} sucessfully!")
+
         if os.path.exists(self.training_path):
             logger.info("Removing training checkpoints to conserve disk space")
             shutil.rmtree(self.training_path)
 
-        logger.info(f"Exported {trial_id} to {export_path}")
-        return taskflow_config
+    def _get_input_spec(self, trainer_type: Optional[str] = None, trainer=None, model_config=None):
+        if trainer is None:
+            if model_config is None:
+                raise ValueError("trainer and model_config should not be None at the same time")
+            trainer = self._construct_trainer(model_config)
+            trainer_type = model_config["trainer_type"]
+
+        if trainer_type is None:
+            raise ValueError("trainer_type should not be None when trainer is not None")
+
+        if trainer_type == "PromptTrainer":
+            input_spec = trainer.model.get_input_spec()
+        elif trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
+            input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
+        else:
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            ]
+        if os.path.exists(self.training_path):
+            logger.info("Removing training checkpoints to conserve disk space")
+            shutil.rmtree(self.training_path)
+        return input_spec
+
+    def compress(self, compress_path: str, trial_id: Optional[str] = None):
+        """
+        Evaluate the models from a certain `trial_id` on the given dataset
+        Args:
+            compress_path(str): Path to the save compressed static model.
+            trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
+        """
+        logger.info("Currently Post Training Quantization is the only supported compression strategy.")
+        self._ptq_strategy(compress_path=compress_path, trial_id=trial_id)
+
+    def _ptq_strategy(
+        self,
+        compress_path: str,
+        trial_id: Optional[str] = None,
+        algo: str = "KL",
+        batch_size: int = 4,
+        batch_nums: int = 1,
+    ):
+        try:
+            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+        except ImportError:
+            from paddle.static.quantization import PostTrainingQuantization
+
+        model_result = self._get_model_result(trial_id=trial_id)
+        model_config = model_result.metrics["config"]["candidates"]
+        trial_id = model_result.metrics["trial_id"]
+        export_path = os.path.join(model_result.log_dir, self.export_path)
+        self.export(export_path=export_path, trial_id=trial_id)
+        input_spec = self._get_input_spec(model_config=model_config)
+
+        if model_config["trainer_type"] == "PromptTrainer":
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_result.log_dir, self.save_path))
+            plm_model = AutoModelForMaskedLM.from_pretrained(model_config["model_name_or_path"])
+            max_length = model_config.get("max_length", plm_model.config.max_position_embeddings)
+            template = AutoTemplate.load_from(
+                os.path.join(model_result.log_dir, self.save_path), tokenizer, max_length, plm_model
+            )
+            inputs = [template({self.text_column: eval_ds[self.text_column]}) for eval_ds in self.eval_dataset]
+            collator = PromptDataCollatorWithPadding(
+                tokenizer, padding=True, return_tensors="np", return_attention_mask=True
+            )
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_result.log_dir, self.save_path))
+            model = AutoModelForSequenceClassification.from_pretrained(
+                os.path.join(model_result.log_dir, self.save_path)
+            )
+            max_length = model_config.get("max_length", model.config.max_position_embeddings)
+            inputs = [
+                tokenizer(eval_ds[self.text_column], max_length=max_length, truncation=True)
+                for eval_ds in self.eval_dataset
+            ]
+            collator = DataCollatorWithPadding(tokenizer, return_tensors="np")
+        batches = [collator(inputs[idx : idx + batch_size]) for idx in range(0, len(inputs), batch_size)]
+
+        def _batch_generator_func():
+            for batch in batches:
+                batch_data = []
+                for spec in input_spec:
+                    if spec.name == "attention_mask":
+                        if batch[spec.name].ndim == 2:
+                            batch[spec.name] = (1 - batch[spec.name][:, np.newaxis, np.newaxis, :]) * -1e4
+                        elif batch[spec.name].ndim != 4:
+                            raise ValueError(
+                                "Expect attention mask with ndim=2 or 4, but get ndim={}".format(batch[spec.name].ndim)
+                            )
+                    batch_data.append(batch[spec.name].astype(str(spec.dtype).split(".")[1]))
+                yield batch_data
+
+        paddle.enable_static()
+        place = paddle.fluid.framework._current_expected_place()
+        exe = paddle.static.Executor(place)
+
+        post_training_quantization = PostTrainingQuantization(
+            executor=exe,
+            batch_generator=_batch_generator_func,
+            model_dir=export_path,
+            model_filename="model.pdmodel",
+            params_filename="model.pdiparams",
+            batch_size=batch_size,
+            batch_nums=batch_nums,
+            scope=None,
+            algo=algo,
+            hist_percent=0.9999,
+            round_type="round",
+            bias_correction=False,
+            quantizable_op_type=["matmul", "matmul_v2"],
+            is_full_quantize=False,
+            weight_bits=8,
+            activation_bits=8,
+            activation_quantize_type="range_abs_max",
+            weight_quantize_type="channel_wise_abs_max",
+            onnx_format=False,
+            optimize_model=False,
+        )
+
+        post_training_quantization.quantize()
+        post_training_quantization.save_quantized_model(
+            save_model_path=compress_path,
+            model_filename="model.pdmodel",
+            params_filename="model.pdiparams",
+        )
+
+        paddle.disable_static()
