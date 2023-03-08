@@ -18,7 +18,7 @@ import os
 import unittest
 
 from paddlenlp.transformers.xlm.tokenizer import XLMTokenizer
-from tests.testing_utils import get_tests_dir, slow
+from tests.testing_utils import slow
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
