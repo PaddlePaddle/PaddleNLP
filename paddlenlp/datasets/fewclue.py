@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import json
 import os
 
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 
 class FewCLUE(DatasetBuilder):
@@ -272,7 +272,7 @@ class FewCLUE(DatasetBuilder):
                 ],
                 # Note: FewCLUE cluewsc unlabeled.json() is an empty file.
                 # https://github.com/CLUEbenchmark/FewCLUE/blob/main/datasets/cluewsc/unlabeled.json
-                #'unlabeled': [
+                # 'unlabeled': [
                 #    os.path.join('fewclue_cluewsc', 'unlabeled.json'),
                 #    'd41d8cd98f00b204e9800998ecf8427e'
                 # ],

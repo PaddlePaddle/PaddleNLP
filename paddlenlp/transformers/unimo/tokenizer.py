@@ -14,15 +14,11 @@
 # limitations under the License.
 
 import os
-import pickle
-import six
-import shutil
-import paddle
-from paddle.utils import try_import
-from paddlenlp.utils.env import MODEL_HOME
-import numpy as np
-from ...data.vocab import Vocab
 
+import numpy as np
+import paddle
+
+from ...data.vocab import Vocab
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ["UNIMOTokenizer"]
@@ -375,10 +371,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 returned sequences will be padded on the left. Defaults to False.
             return_tensors (bool, optional): Whether to convert the returned
                 sequences to Tensor. Defaults to False.
-            is_split_into_words(bool, optinal): Whether or not the input text
+            is_split_into_words(bool, optional): Whether or not the input text
                 (`source`, `target` and `title`) has been pretokenized.
                 Defaults to False.
-            continuous_position(bool, optinal): Whether the position ids is
+            continuous_position(bool, optional): Whether the position ids is
                 continuous between source ids and target ids. Defaults to False.
 
         Returns:

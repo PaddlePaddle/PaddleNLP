@@ -133,7 +133,7 @@ class Rouge155(object):
     @property
     def settings_file(self):
         """
-        Path of the setttings file, which stores the ROUGE home dir.
+        Path of the settings file, which stores the ROUGE home dir.
 
         """
         return self._settings_file
@@ -421,7 +421,7 @@ class Rouge155(object):
 
     def __set_rouge_dir(self, home_dir=None):
         """
-        Verfify presence of ROUGE-1.5.5.pl and data folder, and set
+        Verify presence of ROUGE-1.5.5.pl and data folder, and set
         those paths.
 
         """

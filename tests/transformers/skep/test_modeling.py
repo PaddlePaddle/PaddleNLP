@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,88 +14,88 @@
 # limitations under the License.
 
 import unittest
-from typing import Optional, Tuple, Dict, Any
+from typing import Tuple
+
 import paddle
 from paddle import Tensor
 from parameterized import parameterized_class
 
-from dataclasses import dataclass, asdict, fields, Field
 from paddlenlp.transformers import (
-    SkepPretrainedModel,
-    SkepModel,
+    SkepConfig,
+    SkepCrfForTokenClassification,
     SkepForSequenceClassification,
     SkepForTokenClassification,
-    SkepCrfForTokenClassification,
+    SkepModel,
+    SkepPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
-
-
-@dataclass
-class SkepTestModelConfig:
-    """skep model config which keep consist with pretrained_init_configuration sub fields"""
-
-    attention_probs_dropout_prob: float = 0.1
-    hidden_act: str = "relu"
-    hidden_dropout_prob: float = 0.1
-    hidden_size: int = 48
-    initializer_range: float = 0.02
-    intermediate_size: int = 100
-    max_position_embeddings: int = 20
-    num_attention_heads: int = 16
-    num_hidden_layers: int = 24
-    type_vocab_size: int = 4
-    vocab_size: int = 100
-    pad_token_id: int = 0
-
-    @property
-    def model_kwargs(self) -> dict:
-        """get the model kwargs configuration to init the model"""
-        model_config_fields: Tuple[Field, ...] = fields(SkepTestModelConfig)
-        return {field.name: getattr(self, field.name) for field in model_config_fields}
-
-
-@dataclass
-class SkepTestConfig(SkepTestModelConfig):
-    """all of Skep Test configuration"""
-
-    batch_size: int = 2
-    seq_length: int = 7
-    is_training: bool = False
-    use_input_mask: bool = True
-    use_token_type_ids: bool = False
-
-    # used for sequence classification
-    num_classes: int = 3
-    num_choices: int = 3
-    type_sequence_label_size: int = 3
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class SkepModelTester:
     """Base Skep Model tester which can test:"""
 
-    def __init__(self, parent, config: Optional[SkepTestConfig] = None):
+    def __init__(
+        self,
+        parent,
+        batch_size=13,
+        seq_length=7,
+        is_training=True,
+        use_input_mask=True,
+        use_token_type_ids=True,
+        vocab_size=99,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        intermediate_size=37,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        pad_token_id=0,
+        type_sequence_label_size=2,
+        num_labels=3,
+        num_choices=4,
+        num_classes=3,
+        scope=None,
+    ):
         self.parent = parent
-        self.config = config or SkepTestConfig()
+        self.batch_size = batch_size
+        self.seq_length = seq_length
+        self.is_training = is_training
+        self.use_input_mask = use_input_mask
+        self.use_token_type_ids = use_token_type_ids
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.intermediate_size = intermediate_size
+        self.hidden_act = hidden_act
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.max_position_embeddings = max_position_embeddings
+        self.type_vocab_size = type_vocab_size
+        self.initializer_range = initializer_range
+        self.pad_token_id = pad_token_id
+        self.type_sequence_label_size = type_sequence_label_size
+        self.num_classes = num_classes
+        self.num_labels = num_labels
+        self.num_choices = num_choices
+        self.scope = scope
 
-        self.is_training = self.config.is_training
-
-    def __getattr__(self, key: str):
-        if not hasattr(self.config, key):
-            raise AttributeError(f"attribute <{key}> not exist")
-        return getattr(self.config, key)
-
-    def prepare_config_and_inputs(self) -> Tuple[Dict[str, Any], Tensor, Tensor, Tensor]:
-        config = self.config
-        input_ids = ids_tensor([config.batch_size, config.seq_length], config.vocab_size)
+    def prepare_config_and_inputs(self) -> Tuple[SkepConfig, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
 
         input_mask = None
-        if config.use_input_mask:
-            input_mask = random_attention_mask([config.batch_size, config.seq_length])
+        if self.use_input_mask:
+            input_mask = random_attention_mask([self.batch_size, self.seq_length])
 
         token_type_ids = None
-        if config.use_token_type_ids:
-            token_type_ids = ids_tensor([config.batch_size, config.seq_length], config.type_vocab_size)
+        if self.use_token_type_ids:
+            token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
         sequence_labels = None
         token_labels = None
@@ -109,9 +109,28 @@ class SkepModelTester:
         config = self.get_config()
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
+    def get_config(self) -> SkepConfig:
+        return SkepConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=self.pad_token_id,
+            num_class=self.num_classes,
+            num_labels=self.num_labels,
+            num_choices=self.num_choices,
+        )
+
     def create_and_check_model(
         self,
-        config,
+        config: SkepConfig,
         input_ids: Tensor,
         token_type_ids: Tensor,
         input_mask: Tensor,
@@ -119,7 +138,7 @@ class SkepModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = SkepModel(**config)
+        model = SkepModel(config)
         model.eval()
 
         result = model(
@@ -128,10 +147,8 @@ class SkepModelTester:
         result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
         result = model(input_ids, return_dict=self.parent.return_dict)
 
-        self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.hidden_size]
-        )
-        self.parent.assertEqual(result[1].shape, [self.config.batch_size, self.config.hidden_size])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -143,24 +160,23 @@ class SkepModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = SkepForSequenceClassification(SkepModel(**config), num_classes=self.config.num_classes)
+        model = SkepForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            return_dict=self.parent.return_dict,
             labels=sequence_labels,
+            return_dict=self.parent.return_dict,
         )
-        if not self.parent.return_dict and token_labels is None:
+        if not self.parent.return_dict and sequence_labels is None:
             self.parent.assertTrue(paddle.is_tensor(result))
-
-        if token_labels is not None:
+        if sequence_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.num_classes])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
 
     def create_and_check_for_token_classification(
         self,
@@ -172,7 +188,7 @@ class SkepModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = SkepForTokenClassification(SkepModel(**config), num_classes=self.config.num_classes)
+        model = SkepForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -188,9 +204,7 @@ class SkepModelTester:
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.num_classes]
-        )
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
     def create_and_check_for_crf_token_classification(
         self,
@@ -202,24 +216,24 @@ class SkepModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = SkepCrfForTokenClassification(SkepModel(**config), num_classes=self.config.num_classes)
+        model = SkepCrfForTokenClassification(config)
         model.eval()
         result = model(
             input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict, labels=token_labels
         )
-        # TODO(wj-Mcat): the output of SkepCrfForTokenClassification is wrong
+
         if paddle.is_tensor(result):
             result = [result]
 
         if token_labels is not None:
-            self.parent.assertEqual(result[0].shape, [self.config.batch_size])
+            self.parent.assertEqual(result[0].shape, [self.batch_size])
         else:
-            self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.seq_length])
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length])
 
     def create_and_check_model_cache(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = SkepModel(**config)
+        model = SkepModel(config)
         model.eval()
 
         # first forward pass
@@ -281,14 +295,6 @@ class SkepModelTester:
         }
         return config, inputs_dict
 
-    def get_config(self) -> dict:
-        """get the base model kwargs
-
-        Returns:
-            dict: the values of kwargs
-        """
-        return self.config.model_kwargs
-
 
 @parameterized_class(
     ("return_dict", "use_labels"),
@@ -303,6 +309,7 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = SkepModel
     return_dict = False
     use_labels = False
+    use_test_inputs_embeds = True
 
     all_model_classes = (
         SkepModel,
@@ -394,8 +401,6 @@ class SkepModelIntegrationTest(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
-        past_key_value = output.past_key_values[0][0]
-
         expected_shape = [1, 11, 1024]
         self.assertEqual(output[0].shape, expected_shape)
 
@@ -423,7 +428,3 @@ class SkepModelIntegrationTest(unittest.TestCase):
             ]
         )
         self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-
-if __name__ == "__main__":
-    unittest.main()

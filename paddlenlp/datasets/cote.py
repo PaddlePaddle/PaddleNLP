@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import os
 
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["Cote"]
 
@@ -89,7 +89,7 @@ class Cote(DatasetBuilder):
                     try:
                         entity, text = line_stripped[0], line_stripped[1]
                         start_idx = text.index(entity)
-                    except:
+                    except Exception:
                         # drop the dirty data
                         continue
 

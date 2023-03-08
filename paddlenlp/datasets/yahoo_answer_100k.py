@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import collections
+import os
 
-from paddle.io import Dataset
-
-from paddle.utils.download import get_path_from_url
 from paddle.dataset.common import md5file
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+from paddle.utils.download import get_path_from_url
+
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["YahooAnswer100K"]
 

@@ -13,16 +13,12 @@
 # limitations under the License.
 
 import collections
-import json
 import io
 import os
 
-import numpy as np
-
-from paddle.dataset.common import md5file
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+from ..utils.downloader import get_path_from_url
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["Imdb"]
 
@@ -50,7 +46,7 @@ class Imdb(DatasetBuilder):
         filename, _ = self.SPLITS[mode]
         data_dir = os.path.join(default_root, filename)
         if not os.path.exists(data_dir):
-            path = get_path_from_url(self.URL, default_root, self.MD5)
+            get_path_from_url(self.URL, default_root, self.MD5)
         return data_dir
 
     def _read(self, data_dir, *args):

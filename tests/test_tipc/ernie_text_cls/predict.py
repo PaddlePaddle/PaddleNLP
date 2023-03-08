@@ -14,15 +14,15 @@
 
 import argparse
 import os
-from scipy.special import softmax
-import numpy as np
 
+import numpy as np
 import paddle
 from paddle import inference
+from scipy.special import softmax
 
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.data import Tuple, Pad
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -70,7 +70,7 @@ def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=
         for (i, l) in enumerate(label_list):
             label_map[l] = i
 
-        label = label_map[label]
+        label = label_map[example["label"]]
         label = np.array([label], dtype="int64")
         return input_ids, segment_ids, label
     else:
@@ -105,7 +105,7 @@ class Predictor(object):
 
         if device == "gpu":
             # set GPU configs accordingly
-            # such as intialize the gpu memory, enable tensorrt
+            # such as initialize the gpu memory, enable tensorrt
             config.enable_use_gpu(100, 0)
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
@@ -206,21 +206,43 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
-    # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, required=True, help="The directory to static model.")
-    parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument(
+        "--max_seq_length",
+        default=128,
+        type=int,
+        help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-    parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-    parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
-    parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
-    parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
-    parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
-    parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu", "xpu", "npu"],
+        default="gpu",
+        help="Select which device to train model, defaults to gpu.",
+    )
+    parser.add_argument(
+        "--use_tensorrt", default=False, type=eval, choices=[True, False], help="Enable to use tensorrt to speed up."
+    )
+    parser.add_argument(
+        "--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help="The tensorrt precision."
+    )
+    parser.add_argument("--cpu_threads", default=10, type=int, help="Number of threads to predict when using cpu.")
+    parser.add_argument(
+        "--enable_mkldnn",
+        default=False,
+        type=eval,
+        choices=[True, False],
+        help="Enable to use mkldnn to speed up when using cpu.",
+    )
+    parser.add_argument(
+        "--benchmark", type=eval, default=False, help="To log some information about environment and running."
+    )
     parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of predict steps to perform.")
+    parser.add_argument(
+        "--max_steps", default=-1, type=int, help="If > 0: set total number of predict steps to perform."
+    )
     args = parser.parse_args()
-    # yapf: enable
 
     # Define predictor to do prediction.
     predictor = Predictor(

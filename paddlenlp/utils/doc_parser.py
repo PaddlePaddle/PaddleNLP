@@ -23,7 +23,7 @@ from io import BytesIO
 import numpy as np
 import requests
 from packaging.version import Version
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from .image_utils import np2base64
 from .log import logger
@@ -101,6 +101,12 @@ class DocParser(object):
             ]
             return box
 
+        def _normal_box(box):
+            # Ensure the height and width of bbox are greater than zero
+            if box[3] - box[1] < 0 or box[2] - box[0] < 0:
+                return False
+            return True
+
         def _is_ch(s):
             for ch in s:
                 if "\u4e00" <= ch <= "\u9fff":
@@ -120,6 +126,8 @@ class DocParser(object):
             for segment in ocr_result:
                 box = segment[0]
                 box = _get_box(box)
+                if not _normal_box(box):
+                    continue
                 text = segment[1][0]
                 layout.append((box, text))
         else:
@@ -130,6 +138,8 @@ class DocParser(object):
                     for segment in ocr_result:
                         box = segment["text_region"]
                         box = _get_box(box)
+                        if not _normal_box(box):
+                            continue
                         text = segment["text"]
                         layout.append((box, text, region["type"]))
                 else:
@@ -156,6 +166,8 @@ class DocParser(object):
                                 bbox[0] + cell_box[2],
                                 bbox[1] + cell_box[3],
                             ]
+                        if not _normal_box(box):
+                            continue
                         if _is_ch(text):
                             text = text.replace(" ", "")
                         layout.append((box, text, region["type"]))
@@ -187,7 +199,8 @@ class DocParser(object):
         """
         image_buff = self._get_buffer(image)
 
-        _image = np.array(Image.open(BytesIO(image_buff)).convert("RGB"))
+        # Use exif_transpose to correct orientation
+        _image = np.array(ImageOps.exif_transpose(Image.open(BytesIO(image_buff)).convert("RGB")))
         return _image
 
     @classmethod
@@ -216,16 +229,18 @@ class DocParser(object):
             logger.warning("Currently only parse the first page for PDF input with more than one page.")
 
         page = pdf_doc.load_page(0)
-        image = np.array(self.get_page_image(page).convert("RGB"))
+        # The original image is shrunk when convertd from PDF by fitz, so we scale the image size by 10 times
+        matrix = fitz.Matrix(10, 10)
+        image = np.array(self.get_page_image(page, matrix).convert("RGB"))
         return image
 
     @classmethod
-    def get_page_image(self, page):
+    def get_page_image(self, page, matrix):
         """
         get page image
         """
-        pix = page.get_pixmap()
-        image_buff = pix.pil_tobytes("jpeg", optimize=True)
+        pix = page.get_pixmap(matrix=matrix)
+        image_buff = pix.pil_tobytes("jpeg")
         return Image.open(BytesIO(image_buff))
 
     def init_ocr_inference(self):

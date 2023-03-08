@@ -14,25 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
 import argparse
-import json
-import distutils.util
-import random
-from functools import partial
 import contextlib
+import json
+import os
+import random
+import time
+from functools import partial
 
 import numpy as np
-
 import paddle
 import paddle.nn as nn
-
-from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
 from datasets import load_dataset
+
+from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    AutoModelForMultipleChoice,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -48,13 +50,11 @@ def parse_args():
         help="Path to pre-trained model or shortcut name.",
     )
     parser.add_argument("--output_dir", default="best_chid_model", type=str, help="The path of the checkpoints .")
-    parser.add_argument(
-        "--save_best_model", default=True, type=distutils.util.strtobool, help="Whether to save best model."
-    )
+    parser.add_argument("--save_best_model", default=True, type=strtobool, help="Whether to save best model.")
     parser.add_argument(
         "--overwrite_cache",
         default=False,
-        type=distutils.util.strtobool,
+        type=strtobool,
         help="Whether to overwrite cache for dataset.",
     )
     parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")

@@ -16,10 +16,9 @@ import logging
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-import paddle
 from tqdm import tqdm
 
-from paddlenlp.transformers import AutoTokenizer, ErnieCrossEncoder
+from paddlenlp import Taskflow
 from pipelines.nodes.ranker import BaseRanker
 from pipelines.schema import Document
 from pipelines.utils.common_utils import initialize_device_settings
@@ -49,6 +48,7 @@ class ErnieRanker(BaseRanker):
         progress_bar: bool = True,
         batch_size: int = 1000,
         reinitialize: bool = False,
+        embed_title: bool = False,
         use_en: bool = False,
     ):
         """
@@ -70,16 +70,16 @@ class ErnieRanker(BaseRanker):
         self.use_en = use_en
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
+
         print("Loading Parameters from:{}".format(model_name_or_path))
-        self.transformer_model = ErnieCrossEncoder(model_name_or_path, reinitialize=reinitialize)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        self.transformer_model.eval()
+        self.embed_title = embed_title
         self.progress_bar = progress_bar
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
-
-        if len(self.devices) > 1:
-            self.model = paddle.DataParallel(self.transformer_model)
+        # self.transformer_model = ErnieCrossEncoder(model_name_or_path, reinitialize=reinitialize)
+        self.transformer_model = Taskflow(
+            "text_similarity", model=model_name_or_path, batch_size=self.batch_size, device_id=0 if use_gpu else -1
+        )
 
     def predict(self, query: str, documents: List[Document], top_k: Optional[int] = None) -> List[Document]:
         """
@@ -94,23 +94,14 @@ class ErnieRanker(BaseRanker):
         """
         if top_k is None:
             top_k = self.top_k
-
-        features = self.tokenizer(
-            [query for doc in documents],
-            [doc.content for doc in documents],
-            max_seq_len=self.max_seq_len,
-            pad_to_max_seq_len=True,
-            truncation_strategy="longest_first",
-        )
-
-        tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
-
-        with paddle.no_grad():
-            if self.use_en:
-                similarity_scores = self.transformer_model.matching_v2(**tensors).numpy()
+        datasets = []
+        for doc in documents:
+            if self.embed_title:
+                datasets.append([query, doc.meta["name"] + doc.content])
             else:
-                similarity_scores = self.transformer_model.matching(**tensors).numpy()
-            similarity_scores = self.transformer_model.matching(**tensors).numpy()
+                datasets.append([query, doc.content])
+        outputs = self.transformer_model(datasets)
+        similarity_scores = [item["similarity"] for item in outputs]
 
         for doc, rank_score in zip(documents, similarity_scores):
             doc.rank_score = rank_score
@@ -157,22 +148,15 @@ class ErnieRanker(BaseRanker):
 
         preds = []
         for cur_queries, cur_docs in batches:
-            features = self.tokenizer(
-                cur_queries,
-                [doc.content for doc in cur_docs],
-                max_seq_len=self.max_seq_len,
-                pad_to_max_seq_len=True,
-                truncation_strategy="longest_first",
-            )
-
-            tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
-
-            with paddle.no_grad():
-                if self.use_en:
-                    similarity_scores = self.transformer_model.matching_v2(**tensors).numpy()
+            datasets = []
+            for query, doc in zip(cur_queries, cur_docs):
+                if self.embed_title:
+                    datasets.append([query, doc.meta["name"] + doc.content])
                 else:
-                    similarity_scores = self.transformer_model.matching(**tensors).numpy()
-                preds.extend(similarity_scores)
+                    datasets.append([query, doc.content])
+            outputs = self.transformer_model(datasets)
+            similarity_scores = [item["similarity"] for item in outputs]
+            preds.extend(similarity_scores)
 
             for doc, rank_score in zip(cur_docs, similarity_scores):
                 doc.rank_score = rank_score

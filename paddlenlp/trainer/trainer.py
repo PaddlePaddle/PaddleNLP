@@ -41,7 +41,6 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.fluid.dygraph.parallel import sync_params_buffers
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
@@ -133,6 +132,10 @@ def paddlenlp_load(path, return_numpy=False):
         return paddle.load(path, return_numpy=return_numpy)
 
 
+def is_dp_group_support_in_group_sharded_parallel():
+    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
+
+
 __all__ = ["Trainer"]
 
 
@@ -160,9 +163,10 @@ class Trainer:
         train_dataset (`paddle.io.Dataset` or `paddle.io.IterableDataset`, *optional*):
             The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
             `model.forward()` method are automatically removed.
-        eval_dataset (`paddle.io.Dataset`, *optional*):
-             The dataset to use for evaluation. If it is an `datasets.Dataset`, columns not accepted by the
-             `model.forward()` method are automatically removed.
+        eval_dataset (Union[`paddle.io.Dataset`, Dict[str, `paddle.io.Dataset`]],  *optional*):
+             The dataset to use for evaluation. If it is a [`~datasets.Dataset`], columns not accepted by the
+             `model.forward()` method are automatically removed. If it is a dictionary, it will evaluate on each
+             dataset prepending the dictionary key to the metric name.
         tokenizer ([`PretrainedTokenizer`], *optional*):
             The tokenizer used to preprocess the data. If provided, will be used to automatically pad the inputs the
             maximum length when batching inputs, and it will be saved along the model to make it easier to rerun an
@@ -201,7 +205,7 @@ class Trainer:
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[Dataset] = None,
-        eval_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,
         compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
         callbacks: Optional[List[TrainerCallback]] = None,
@@ -257,7 +261,11 @@ class Trainer:
         self.compute_metrics = compute_metrics
         self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
         self.optimizer, self.lr_scheduler = optimizers
-
+        # Label smoothing
+        # if self.args.label_smoothing_factor != 0:
+        #     self.label_smoother = LabelSmoother(epsilon=self.args.label_smoothing_factor)
+        # else:
+        self.label_smoother = None
         self.state = TrainerState()
         self.control = TrainerControl()
         self._signature_columns = None
@@ -667,13 +675,12 @@ class Trainer:
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
-
-                    # Maunally collect gradients
+                    # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
                     # local_rank != -1 don't means dp in networks.
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.dp_degree > 1:
+                        if self.args.dp_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
                             fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
@@ -830,7 +837,15 @@ class Trainer:
 
         metrics = None
         if self.control.should_evaluate:
-            metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            if isinstance(self.eval_dataset, dict):
+                for eval_dataset_name, eval_dataset in self.eval_dataset.items():
+                    metrics = self.evaluate(
+                        eval_dataset=eval_dataset,
+                        ignore_keys=ignore_keys_for_eval,
+                        metric_key_prefix=f"eval_{eval_dataset_name}",
+                    )
+            else:
+                metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
             self._save_checkpoint(model, metrics=metrics)
@@ -1187,7 +1202,13 @@ class Trainer:
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
                 # sync params (broadcast) buffers in dp group
-                if self.args.dp_degree > 1:
+                if not is_dp_group_support_in_group_sharded_parallel() and self.args.dp_degree > 1:
+                    try:
+                        from paddle.fluid.dygraph.parallel import sync_params_buffers
+                    except ImportError:
+                        # fix for new api in paddlepaddle v2.5
+                        from paddle.distributed.parallel import sync_params_buffers
+
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()
                     sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
@@ -1202,8 +1223,21 @@ class Trainer:
 
                 from paddle.distributed.sharding import group_sharded_parallel
 
+                # add dp_group and exclude_layer params
+                # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
+                extra_kwargs = {}
+                if is_dp_group_support_in_group_sharded_parallel():
+                    extra_kwargs["dp_group"] = self.dp_group
+                    extra_kwargs["exclude_layer"] = ["GroupNorm"]
+
                 model, optimizer, _ = group_sharded_parallel(
-                    model, self.optimizer, level=level, scaler=None, group=self.sharding_group, offload=cpu_offload
+                    model,
+                    self.optimizer,
+                    level=level,
+                    scaler=None,
+                    group=self.sharding_group,
+                    offload=cpu_offload,
+                    **extra_kwargs,
                 )
                 self.optimizer = optimizer
 

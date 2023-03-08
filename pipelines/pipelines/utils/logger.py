@@ -14,9 +14,6 @@
 
 import logging
 
-# import
-from requests.exceptions import ConnectionError
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,4 +43,4 @@ class StdoutLogger:
 
     @classmethod
     def end_run(cls):
-        logger.info(f"**** End of Experiment **** ")
+        logger.info("**** End of Experiment **** ")

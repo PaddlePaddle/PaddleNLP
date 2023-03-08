@@ -17,11 +17,10 @@
 import os
 import unicodedata
 from shutil import copyfile
-from typing import List, Optional
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, AddedToken
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = ["XLNetTokenizer"]
 

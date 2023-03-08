@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-import json
-import traceback
 import argparse
-
+import json
+import os
 import sqlite3
-from process_sql import tokenize, get_schema, get_tables_with_alias, Schema, get_sql
+
+from process_sql import Schema, get_schema, get_sql
 
 # Flag to disable value evaluation
 DISABLE_VALUE = True
@@ -469,7 +467,7 @@ def isValidSQL(sql, db):
     cursor = conn.cursor()
     try:
         cursor.execute(sql)
-    except:
+    except Exception:
         return False
     return True
 
@@ -562,7 +560,7 @@ def evaluate(gold, predict, db_dir, etype, kmaps):
 
         try:
             p_sql = get_sql(schema, p_str)
-        except:
+        except Exception:
             # If p_sql is not valid, then we will use an empty sql to evaluate with the correct sql
             p_sql = {
                 "except": None,
@@ -672,7 +670,7 @@ def eval_exec_match(db, p_str, g_str, pred, gold):
     try:
         cursor.execute(p_str)
         p_res = cursor.fetchall()
-    except:
+    except Exception:
         return False
 
     cursor.execute(g_str)

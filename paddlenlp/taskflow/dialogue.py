@@ -74,23 +74,33 @@ class DialogueTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/dialogue/plato-mini/model_config.json",
                 "5e853fda9a9b573815ad112e494a65af",
             ],
-        }
+        },
+        "__internal_testing__/tiny-random-plato": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/model_state.pdparams",
+                "fda5d068908505cf0c3a46125eb4d39e",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/config.json",
+                "3664e658d5273a132f2e7345a8cafa53",
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, max_seq_len=512, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
-        if not self.from_hf_hub:
+        if not self._custom_model:
             self._check_task_files()
-        self._construct_tokenizer(self._task_path if self.from_hf_hub else model)
+        self._construct_tokenizer(self._task_path if self._custom_model else model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._interactive_mode = False
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(self._task_path if self.from_hf_hub else model)
+            self._construct_model(self._task_path if self._custom_model else model)
 
     def _construct_input_spec(self):
         """
@@ -188,7 +198,7 @@ class DialogueTask(Task):
         for texts in data:
             examples.append(self._convert_text_to_input(texts, max_seq_len))
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)

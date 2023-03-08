@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import json
 import os
 
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 
 class Clue(DatasetBuilder):

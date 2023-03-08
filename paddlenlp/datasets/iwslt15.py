@@ -14,13 +14,12 @@
 
 import collections
 import os
-import warnings
 
-from paddle.io import Dataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["IWSLT15"]
 

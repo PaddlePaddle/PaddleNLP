@@ -12,26 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import jieba
 import argparse
 import logging
 import os
 import random
 import time
-import distutils.util
 from functools import partial
 
+import jieba
 import numpy as np
 import paddle
-
+import paddle.nn as nn
+import paddle.nn.functional as F
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
-import paddle.nn.functional as F
-import paddle.nn as nn
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers.roformer.modeling import RoFormerForSequenceClassification, RoFormerPretrainedModel
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import RoFormerTokenizer
+from paddlenlp.transformers.roformer.modeling import (
+    RoFormerForSequenceClassification,
+    RoFormerPretrainedModel,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -145,12 +148,12 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+        choices=["cpu", "gpu", "xpu", "npu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
     parser.add_argument(
         "--use_amp",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=False,
         help="Enable mixed precision training.",
     )

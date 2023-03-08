@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import json
-
 import sqlite3
+
 from nltk import word_tokenize
 
 ################################
@@ -292,7 +292,7 @@ def parse_value(toks, start_idx, tables_with_alias, schema, default_tables=None)
         try:
             val = float(toks[idx])
             idx += 1
-        except:
+        except Exception:
             end_idx = idx
             while (
                 end_idx < len_

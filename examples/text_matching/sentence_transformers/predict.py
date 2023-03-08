@@ -106,13 +106,13 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         )
         examples.append((query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids))
 
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
     ): [data for data in fn(samples)]
 
     results = []
@@ -161,4 +161,4 @@ if __name__ == "__main__":
 
     results = predict(model, data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
-        print("Data: {} \t Lable: {}".format(text, results[idx]))
+        print("Data: {} \t Label: {}".format(text, results[idx]))

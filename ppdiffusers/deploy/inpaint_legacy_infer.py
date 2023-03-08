@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 import time
 from io import BytesIO
@@ -24,6 +23,7 @@ import PIL
 import requests
 from fastdeploy import ModelFormat
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     EulerAncestralDiscreteScheduler,
@@ -75,7 +75,7 @@ def parse_arguments():
         help="The inference runtime device of models.",
     )
     parser.add_argument("--image_path", default="cat_on_bench_new.png", help="The model directory of diffusion_model.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
@@ -102,7 +102,15 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0
+    model_dir,
+    model_prefix,
+    use_trt=False,
+    dynamic_shape=None,
+    use_fp16=False,
+    device_id=0,
+    disable_paddle_trt_ops=[],
+    disable_paddle_pass=[],
+    paddle_stream=None,
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
@@ -110,7 +118,12 @@ def create_paddle_inference_runtime(
         option.use_cpu()
     else:
         option.use_gpu(device_id)
+    if paddle_stream is not None:
+        option.set_external_raw_stream(paddle_stream)
+    for pass_name in disable_paddle_pass:
+        option.paddle_infer_option.delete_pass(pass_name)
     if use_trt:
+        option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
         option.use_trt_backend()
         option.enable_paddle_to_trt()
         if use_fp16:
@@ -205,8 +218,10 @@ if __name__ == "__main__":
     if args.device == "cpu":
         device_id = -1
         paddle.set_device("cpu")
+        paddle_stream = None
     else:
         paddle.set_device(f"gpu:{device_id}")
+        paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -277,6 +292,7 @@ if __name__ == "__main__":
             vae_decoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         vae_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -285,6 +301,7 @@ if __name__ == "__main__":
             vae_encoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
@@ -294,6 +311,7 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":

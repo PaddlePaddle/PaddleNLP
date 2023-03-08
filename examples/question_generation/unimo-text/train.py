@@ -12,25 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
-import math
 import argparse
 import json
-import copy
+import os
+import time
 
 import paddle
 import paddle.distributed as dist
-import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers import LinearDecayWithWarmup
+from gen_utils import create_data_loader, print_args, select_sum, set_seed
 from paddle.optimizer import AdamW
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
 from paddlenlp.metrics import BLEU
-
-from gen_utils import print_args, set_seed, create_data_loader, select_sum
+from paddlenlp.transformers import (
+    BasicTokenizer,
+    LinearDecayWithWarmup,
+    UNIMOLMHeadModel,
+    UNIMOTokenizer,
+)
 
 
 # yapf: disable
@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=5e-5, help='The initial learning rate.')
     parser.add_argument('--weight_decay', type=float, default=0.01, help='The weight decay for optimizer.')
     parser.add_argument('--epochs', type=int, default=3, help='Total number of training epochs to perform.')
-    parser.add_argument('--warmup_propotion', type=float, default=0.02, help='The number of warmup steps.')
+    parser.add_argument('--warmup_proportion', type=float, default=0.02, help='The number of warmup steps.')
     parser.add_argument('--max_grad_norm', type=float, default=1.0, help='The max value of grad norm.')
     parser.add_argument('--beta1', type=float, default=0.9, help='beta1')
     parser.add_argument('--beta2', type=float, default=0.98, help='beta2')
@@ -153,7 +153,7 @@ def run(args):
     if args.do_train:
         num_training_steps = args.epochs * len(train_data_loader)
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_propotion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
 

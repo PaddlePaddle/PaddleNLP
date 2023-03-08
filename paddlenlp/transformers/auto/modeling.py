@@ -29,7 +29,6 @@ from paddlenlp.utils.downloader import (
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from ..utils import resolve_cache_dir
@@ -85,6 +84,7 @@ MAPPING_NAMES = OrderedDict(
         ("MobileBert", "mobilebert"),
         ("MPNet", "mpnet"),
         ("NeZha", "nezha"),
+        ("Nystromformer", "nystromformer"),
         ("PPMiniLM", "ppminilm"),
         ("ProphetNet", "prophetnet"),
         ("Reformer", "reformer"),
@@ -100,6 +100,7 @@ MAPPING_NAMES = OrderedDict(
         ("XLNet", "xlnet"),
         ("XLM", "xlm"),
         ("GPT", "gpt"),
+        ("MT5", "mt5"),
         ("T5", "t5"),
         ("Bert", "bert"),
         ("Bart", "bart"),
@@ -206,7 +207,8 @@ class _BaseAutoModelClass:
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
-        init_class = init_class[:-5] if init_class.endswith("Model") else init_class
+        init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
+        model_name = None
         if init_class:
             for model_flag, name in MAPPING_NAMES.items():
                 if model_flag in init_class:
@@ -218,6 +220,10 @@ class _BaseAutoModelClass:
                 if name in pretrained_model_name_or_path.lower():
                     model_name = model_flag + "Model"
                     break
+        if model_name is None:
+            raise AttributeError(
+                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
+            )
         init_class = cls._name_mapping[model_name + "_Import_Class"]
         class_name = cls._name_mapping[init_class]
         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
@@ -325,9 +331,6 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            )
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
@@ -336,10 +339,10 @@ class _BaseAutoModelClass:
             )
             try:
                 if url_file_exists(standard_community_url):
-                    resolved_vocab_file = get_path_from_url(standard_community_url, default_root)
+                    resolved_vocab_file = get_path_from_url(standard_community_url, cache_dir)
                 elif url_file_exists(legacy_community_url):
                     logger.info("Standard config do not exist, loading from legacy config")
-                    resolved_vocab_file = get_path_from_url(legacy_community_url, default_root)
+                    resolved_vocab_file = get_path_from_url(legacy_community_url, cache_dir)
                 else:
                     raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
             except RuntimeError as err:

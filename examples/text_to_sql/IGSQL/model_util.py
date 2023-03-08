@@ -13,15 +13,15 @@
 # limitations under the License.
 """Basic model training and evaluation functions."""
 
+import json
+import random
 from enum import Enum
 
-import random
-import sys
-import json
-import progressbar
-import model.model_utils
-import data_util.sql_util
 import paddle
+import progressbar
+
+from . import model_utils
+from .data_util import sql_util
 
 
 def write_prediction(
@@ -438,11 +438,8 @@ def evaluate_interaction_sample(
     progbar = get_progressbar(name, len(sample))
     progbar.start()
 
-    num_utterances, num_first_utterances, num_after_first_utterances = 0, 0, 0
-    ignore_with_gpu = [line.strip() for line in open("data/cpu_full_interactions.txt").readlines()]
+    num_utterances = 0
     predictions = []
-
-    use_gpu = not ("--no_gpus" in sys.argv or "--no_gpus=1" in sys.argv)
 
     model.eval()
 
