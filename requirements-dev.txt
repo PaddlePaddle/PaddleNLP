@@ -7,3 +7,6 @@ pytest-cov
 regex
 pytest-xdist
 fast_tokenizer_python
+emoji
+ftfy
+unidecode
