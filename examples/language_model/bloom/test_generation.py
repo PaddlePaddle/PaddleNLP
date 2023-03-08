@@ -117,5 +117,17 @@ def main():
         sentence = tokenizer.convert_tokens_to_string(tokens)
         print(sentence)
 
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        ],
+    )
+
+    # # Save converted static graph model
+    paddle.jit.save(model, args.output_path)
+    # # Also save tokenizer for inference usage
+    tokenizer.save_pretrained(os.path.dirname(args.output_path))
+
 if __name__ == "__main__":
     main()
