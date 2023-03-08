@@ -122,10 +122,16 @@ def create_paddle_inference_runtime(
         if use_fp16:
             option.trt_option.enable_fp16 = True
         else:
-            # Note(zhoushunjie): These two passes don't support fp32 now.
+            # Note(zhoushunjie): These four passes don't support fp32 now.
             # Remove this line of code in future.
-            option.paddle_infer_option.delete_pass("trt_cross_multihead_matmul_fuse_pass")
-            option.paddle_infer_option.delete_pass("trt_flash_multihead_matmul_fuse_pass")
+            only_fp16_passes = [
+                "trt_cross_multihead_matmul_fuse_pass",
+                "trt_flash_multihead_matmul_fuse_pass",
+                "preln_elementwise_groupnorm_act_pass",
+                "elementwise_groupnorm_act_pass",
+            ]
+            for curr_pass in only_fp16_passes:
+                option.paddle_infer_option.delete_pass(curr_pass)
         cache_file = os.path.join(model_dir, model_prefix, "_opt_cache/")
         option.trt_option.serialize_file = cache_file
         # Need to enable collect shape for ernie
