@@ -47,7 +47,8 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
          "skip_bias_add_qkv": False,
          "slow_but_exact": False,
          "unk_token_id": 0,
-         "vocab_size": 250880
+         "vocab_size": 250880,
+         "model_parallel": False
    }
 }
 
@@ -120,6 +121,7 @@ class BloomConfig(PretrainedConfig):
         pretraining_tp=1,  # TP rank used when training with megatron
         dtype="bfloat16",
         slow_but_exact=False,
+        model_parallel=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -140,5 +142,6 @@ class BloomConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
+        self.model_parallel = model_parallel
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
