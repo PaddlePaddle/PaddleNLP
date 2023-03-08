@@ -119,5 +119,5 @@ python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batc
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--device_id | 运行设备的id。默认为0。 |
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
-|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
+|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |

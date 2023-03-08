@@ -127,5 +127,5 @@ python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batc
 |--device | Choose the device，the options are `cpu` and `gpu`. |
 |--device_id | The id of gpu device, default to 0. |
 |--cpu_threads | The number of cpu threads, default to 1.|
-|--backend | Supportted inference runtime backend. The option are 'onnx_runtime', 'paddle', 'openvino', 'tensorrt' and 'paddle_tensorrt', default to 'paddle' |
+|--backend | Supportted inference runtime backend. The option are 'onnx_runtime', 'paddle', 'tensorrt' and 'paddle_tensorrt', default to 'paddle' |
 |--use_fp16 | Whether to use float16 precision, default to False. |
