@@ -17,7 +17,7 @@
 import os
 import unittest
 
-from transformers import FunnelTokenizer
+from paddlenlp.transformers import FunnelTokenizer
 
 from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
