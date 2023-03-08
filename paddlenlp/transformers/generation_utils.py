@@ -26,6 +26,7 @@ try:
     from paddle.utils import map_structure
 except ImportError:
     from paddle.fluid.layers.utils import map_structure
+from paddle.fluid.dygraph.base import in_declarative_mode
 
 from paddlenlp.utils.log import logger
 
@@ -729,11 +730,11 @@ class GenerationMixin(object):
         )
 
         # Whether to dynamic to static
-        is_inference = False
-        if not paddle.in_dynamic_mode():
-            is_inference = True
+        is_tracing = False
+        if in_declarative_mode():
+            is_tracing = True
 
-        if is_inference:
+        if is_tracing:
             assert decode_strategy in [
                 "sampling",
             ], "`generate()` only supports 'sampling' temporarily but received {}.".format(decode_strategy)
@@ -807,7 +808,7 @@ class GenerationMixin(object):
 
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
-        if is_inference:
+        if is_tracing:
             model_kwargs["position_ids"] = position_ids
 
         if model_kwargs.get("attention_mask", None) is None:
@@ -874,7 +875,7 @@ class GenerationMixin(object):
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
 
-            if is_inference:
+            if is_tracing:
                 return self.sample_d2s(
                     input_ids,
                     logits_processors,
