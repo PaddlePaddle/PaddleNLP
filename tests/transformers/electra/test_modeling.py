@@ -20,12 +20,14 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     ElectraConfig,
+    ElectraDiscriminator,
     ElectraForMaskedLM,
     ElectraForMultipleChoice,
     ElectraForPretraining,
     ElectraForQuestionAnswering,
     ElectraForSequenceClassification,
     ElectraForTokenClassification,
+    ElectraGenerator,
     ElectraModel,
     ElectraPretrainedModel,
 )
@@ -271,13 +273,20 @@ class ElectraModelTester:
     ):
         model = ElectraForPretraining(config)
         model.eval()
+
+        generator_labels = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        raw_input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+
         result = model(
             input_ids,
             attention_mask=input_mask,
+            raw_input_ids=raw_input_ids,
             token_type_ids=token_type_ids,
-            inputs_embeds=inputs_embeds,
+            generator_labels=generator_labels,
         )
-        self.parent.assertEqual(result.logits.shape, (self.batch_size, self.seq_length))
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result[2].shape, [self.batch_size, self.seq_length])
 
     def create_and_check_electra_for_sequence_classification(
         self,
@@ -388,6 +397,7 @@ class ElectraModelTester:
             token_labels,
             choice_labels,
         ) = config_and_inputs
+
         inputs_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -421,6 +431,8 @@ class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
         ElectraForTokenClassification,
         ElectraForSequenceClassification,
         ElectraForQuestionAnswering,
+        ElectraDiscriminator,
+        ElectraGenerator,
     )
 
     def setUp(self):
@@ -456,6 +468,10 @@ class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_electra_for_multiple_choice(*config_and_inputs)
+
+    def test_for_electra_for_pretraining(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_electra_for_pretraining(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):

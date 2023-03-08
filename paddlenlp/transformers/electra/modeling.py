@@ -444,7 +444,14 @@ class ElectraDiscriminator(ElectraPretrainedModel):
         self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
         self.init_weights()
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+    ):
         r"""
 
         Args:
@@ -455,6 +462,8 @@ class ElectraDiscriminator(ElectraPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ElectraModel`.
 
         Returns:
@@ -476,7 +485,13 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+        )
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
         return logits
@@ -701,7 +716,12 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         """
 
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
 
         logits_rtd = self.discriminator_rtd(discriminator_sequence_output)
 
@@ -967,9 +987,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
     def __init__(self, config: ElectraConfig):
         super(ElectraForTotalPretraining, self).__init__(config)
-
         self.generator = ElectraGenerator(config)
-        self.discriminator = ErnieHealthDiscriminator(config)
+        self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
         self.init_weights()
 
