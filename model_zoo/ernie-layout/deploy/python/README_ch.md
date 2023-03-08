@@ -33,11 +33,7 @@ wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip &
 - 使用如下命令进行英文文档信息抽取部署
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../ner_export/inference \
-    --task_type ner \
-    --lang "en" \
-    --batch_size 8
+python infer.py --model_dir ../../ner_export --task_type ner --device gpu --lang "en" --batch_size 8
 ```
 
 - 输出样例
@@ -79,11 +75,7 @@ python infer.py \
 - 使用如下命令进行中文文档视觉问答部署
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../mrc_export/inference \
-    --task_type mrc \
-    --lang "ch" \
-    --batch_size 8
+python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --lang "ch" --batch_size 8
 ```
 
 - 输出样例
@@ -106,11 +98,7 @@ python infer.py \
 - 使用如下命令进行英文文档图像分类部署
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../cls_export/inference \
-    --lang "en" \
-    --task_type cls \
-    --batch_size 8
+python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batch_size 8
 ```
 
 - 输出样例
@@ -121,9 +109,15 @@ python infer.py \
 
 ## 5. 更多配置
 
-- `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-- `max_seq_length`: 如果OCR的结果超过设定的最大长度则对OCR结果进行自动切分，默认为512。
-- `task_type`: 选择任务类型，可选有`ner`, `cls`和`mrc`。
-- `lang`: 选择任务的语言类型，可选有`en`, `ch`。
-- `device`: 选用什么设备进行训练，可选`cpu`或`gpu`。
+| 参数 |参数说明 |
+|----------|--------------|
+|--model_dir | 指定部署模型的目录 |
+|--batch_size |输入的batch size，默认为 1|
+|--max_length |最大序列长度，默认为 128|
+|--task_type| 选择任务类型，可选有`ner`, `cls`和`mrc`。|
+|--lang| 选择任务的语言类型，可选有`en`, `ch`。|
+|--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--device_id | 运行设备的id。默认为0。 |
+|--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
+|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
+|--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |

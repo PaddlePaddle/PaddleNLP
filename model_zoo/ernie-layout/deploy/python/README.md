@@ -35,11 +35,7 @@ wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip &
 - Run
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../ner_export/inference \
-    --task_type ner \
-    --lang "en" \
-    --batch_size 8
+python infer.py --model_dir ../../ner_export --task_type ner --device gpu --lang "en" --batch_size 8
 ```
 
 - Output sample
@@ -83,11 +79,7 @@ python infer.py \
 - Run
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../mrc_export/inference \
-    --task_type mrc \
-    --lang "ch" \
-    --batch_size 8
+python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --lang "ch" --batch_size 8
 ```
 
 - Output sample
@@ -112,11 +104,7 @@ python infer.py \
 - Run
 
 ```shell
-python infer.py \
-    --model_path_prefix ../../cls_export/inference \
-    --lang "en" \
-    --task_type cls \
-    --batch_size 8
+python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batch_size 8
 ```
 
 - Output sample
@@ -129,9 +117,15 @@ python infer.py \
 
 ## 5. Parameter Description
 
-- `model_path_prefix`: The file path of the Paddle model for inference, with the file prefix name。For example, the inference model file path is `./export/inference.pdiparams`, then pass `./export/inference`。
-- `batch_size`: number of input of each batch, default to 1.
-- `max_seq_length`: If the OCR result exceeds the set maximum length, the OCR result will be sliced. The default is 512.
-- `task_type`: choose the task type，the options are `ner`, `cls` and `mrc`。
-- `lang`: select the task language，the options are `en` and `ch`。
-- `device`: choose the device，the options are `cpu` and `gpu`。
+| Parameter | Description |
+|----------|--------------|
+|--model_dir | The specified model directory |
+|--batch_size | Number of input of each batch, default to 1.|
+|--max_length | If the OCR result exceeds the set maximum length, the OCR result will be sliced. The default is 512.|
+|--task_type| Choose the task type，the options are `ner`, `cls` and `mrc`.|
+|--lang| Select the task language，the options are `en` and `ch`.|
+|--device | Choose the device，the options are `cpu` and `gpu`. |
+|--device_id | The id of gpu device, default to 0. |
+|--cpu_threads | The number of cpu threads, default to 1.|
+|--backend | Supportted inference runtime backend. The option are 'onnx_runtime', 'paddle', 'openvino', 'tensorrt' and 'paddle_tensorrt', default to 'paddle' |
+|--use_fp16 | Whether to use float16 precision, default to False. |
