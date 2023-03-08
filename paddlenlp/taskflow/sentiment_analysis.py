@@ -242,26 +242,37 @@ class SkepTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/model_config.json",
                 "847b84ab08611a2f5a01a22c18b0be23",
             ],
-        }
+        },
+        "__internal_testing__/tiny-random-skep": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-skep/model_state.pdparams",
+                "3bedff32b4de186252094499d1c8ede3",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/tiny-random-skep/model_config.json",
+                "f891e4a927f946c23bc32653f535510b",
+            ],
+        },
     }
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._label_map = {0: "negative", 1: "positive"}
-        self._check_task_files()
-        self._construct_tokenizer(model)
+        if not self._custom_model:
+            self._check_task_files()
+        self._construct_tokenizer(self._task_path if self._custom_model else model)
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(model)
+            self._construct_model(self._task_path if self._custom_model else model)
         self._usage = usage
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = SkepSequenceModel.from_pretrained(self._task_path, num_classes=len(self._label_map))
+        model_instance = SkepSequenceModel.from_pretrained(self._task_path, num_labels=len(self._label_map))
         self._model = model_instance
         self._model.eval()
 

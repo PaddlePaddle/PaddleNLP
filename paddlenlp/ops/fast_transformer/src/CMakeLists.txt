@@ -233,6 +233,11 @@ else(ON_INFER)
       add_definitions(-DPADDLE_NEW_ALLOCATOR)
   endif()
 
+  if(_INC_PYTHON_VALUES VERSION_GREATER_EQUAL "2.5.0" OR _INC_PYTHON_VALUES VERSION_EQUAL "0.0.0")
+    find_package(PythonLibs REQUIRED)
+    include_directories(${PYTHON_INCLUDE_DIRS})
+  endif()
+
   execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
                   RESULT_VARIABLE _INC_PYTHON_SUCCESS
                   OUTPUT_VARIABLE _INC_PYTHON_VALUES)

@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
-import json
 import time
-import re
 
 
 class Timer(object):
@@ -90,7 +85,6 @@ def print_tensors(tag="*", **kwargs):
 
 if __name__ == "__main__":
     """run some simple test cases"""
-    import json
     from boomup import data_struct
 
     question = "三峡碧江需要大于2的招聘数量"

@@ -101,6 +101,12 @@ class DocParser(object):
             ]
             return box
 
+        def _normal_box(box):
+            # Ensure the height and width of bbox are greater than zero
+            if box[3] - box[1] < 0 or box[2] - box[0] < 0:
+                return False
+            return True
+
         def _is_ch(s):
             for ch in s:
                 if "\u4e00" <= ch <= "\u9fff":
@@ -120,6 +126,8 @@ class DocParser(object):
             for segment in ocr_result:
                 box = segment[0]
                 box = _get_box(box)
+                if not _normal_box(box):
+                    continue
                 text = segment[1][0]
                 layout.append((box, text))
         else:
@@ -130,6 +138,8 @@ class DocParser(object):
                     for segment in ocr_result:
                         box = segment["text_region"]
                         box = _get_box(box)
+                        if not _normal_box(box):
+                            continue
                         text = segment["text"]
                         layout.append((box, text, region["type"]))
                 else:
@@ -156,6 +166,8 @@ class DocParser(object):
                                 bbox[0] + cell_box[2],
                                 bbox[1] + cell_box[3],
                             ]
+                        if not _normal_box(box):
+                            continue
                         if _is_ch(text):
                             text = text.replace(" ", "")
                         layout.append((box, text, region["type"]))

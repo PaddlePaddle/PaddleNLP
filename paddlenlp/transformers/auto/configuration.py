@@ -30,7 +30,6 @@ from paddlenlp.utils.downloader import (
     get_path_from_url,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
@@ -230,8 +229,7 @@ class AutoConfig(PretrainedConfig):
                 logger.warning(f"loading legacy config file<{cls.legacy_config_file}> ...")
                 community_config_path = legacy_community_config_path
 
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            resolved_config_file = get_path_from_url(community_config_path, default_root)
+            resolved_config_file = get_path_from_url(community_config_path, cache_dir)
 
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, resolved_config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))

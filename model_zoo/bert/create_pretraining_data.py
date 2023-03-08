@@ -15,19 +15,17 @@
 # limitations under the License.
 """Create masked LM/next sentence masked_lm examples for BERT."""
 import argparse
-import logging
+import collections
 import os
 import random
 from io import open
+
 import h5py
 import numpy as np
 from tqdm import tqdm
 
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers.tokenizer_utils import convert_to_unicode
-
-import random
-import collections
 
 
 class TrainingInstance(object):
@@ -243,7 +241,7 @@ def create_instances_from_document(
                     is_random_next = False
                     for j in range(a_end, len(current_chunk)):
                         tokens_b.extend(current_chunk[j])
-                truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng)
+                truncate_seq_pair(tokens_a, tokens_b, target_seq_length, rng)
 
                 assert len(tokens_a) >= 1
                 assert len(tokens_b) >= 1
@@ -400,7 +398,7 @@ def main():
         "and ignore vocab_file and do_lower_case.",
     )
 
-    ## Other parameters
+    # Other parameters
     # int
     parser.add_argument(
         "--max_seq_length",

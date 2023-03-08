@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import json
+import logging
 import os
 import traceback
-import logging
-import json
 
 import paddle
 
@@ -36,7 +35,7 @@ def save(model, optimizer, save_path):
     try:
         paddle.save(model.state_dict(), save_path + ".pdparams")
         paddle.save(optimizer.state_dict(), save_path + ".pdopt")
-    except Exception as e:
+    except Exception:
         logging.error("save model and optimizer failed. save path: %s", save_path)
         logging.error(traceback.format_exc())
 

@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
+import traceback
+
 import nvgpu
 
 logging.basicConfig(
@@ -41,6 +40,6 @@ if __name__ == "__main__":
         else:
             print(",".join(nvgpu.available_gpus()))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         exit(-1)

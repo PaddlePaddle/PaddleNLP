@@ -33,7 +33,11 @@ from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    tuple_output,
+)
+from .configuration import (
+    SKEP_PRETRAINED_INIT_CONFIGURATION,
+    SKEP_PRETRAINED_RESOURCE_FILES_MAP,
+    SkepConfig,
 )
 
 __all__ = [
@@ -50,23 +54,15 @@ class SkepEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(
-        self,
-        vocab_size: int,
-        hidden_size: Optional[int] = 768,
-        hidden_dropout_prob: Optional[float] = 0.1,
-        max_position_embeddings: Optional[int] = 512,
-        type_vocab_size: Optional[int] = 16,
-        pad_token_id: Optional[int] = 0,
-    ):
+    def __init__(self, config: SkepConfig):
         super(SkepEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.type_vocab_size = type_vocab_size
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.type_vocab_size = config.type_vocab_size
         if self.type_vocab_size != 0:
-            self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+            self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
         self,
@@ -116,9 +112,9 @@ class SkepPooler(nn.Layer):
     The pooling layer on skep model.
     """
 
-    def __init__(self, hidden_size: int):
+    def __init__(self, config: SkepConfig):
         super(SkepPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states: Tensor):
@@ -140,58 +136,11 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "skep_ernie_1.0_large_ch": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,  # special for ernie-large
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 4,
-            "vocab_size": 12800,
-            "pad_token_id": 0,
-        },
-        "skep_ernie_2.0_large_en": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,  # special for ernie-large
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 4,
-            "vocab_size": 30522,
-            "pad_token_id": 0,
-        },
-        "skep_roberta_large_en": {
-            "attention_probs_dropout_prob": 0.1,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 0,
-            "vocab_size": 50265,
-            "pad_token_id": 1,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "skep_ernie_1.0_large_ch": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.pdparams",
-            "skep_ernie_2.0_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.pdparams",
-            "skep_roberta_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.pdparams",
-        }
-    }
+    config_class = SkepConfig
     base_model_prefix = "skep"
+
+    pretrained_init_configuration = SKEP_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = SKEP_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -202,9 +151,7 @@ class SkepPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.skep.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -227,84 +174,39 @@ class SkepModel(SkepPretrainedModel):
     More details refer to `SKEP <https://www.aclweb.org/anthology/2020.acl-main.374>`.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `SKEPModel`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `SKEPModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layers and the pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
-            is the dimensionality of the sequence in `TinyBertModel`.
-            Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids` passed when calling `~transformers.SkepModel`.
-            Defaults to `2`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to `0.02`.
-
+        vocab_size (`int`, optional, defaults to 12800): Vocabulary size of the SKEP model. Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling [`SKEPModel`].
+        hidden_size (`int`, optional, defaults to 768): Dimensionality of the embedding layer, encoder layers and the pooler layer.
+        num_hidden_layers (int, optional, defaults to 12): Number of hidden layers in the Transformer encoder.
+        num_attention_heads (`int`, optional, defaults to 12):  Number of attention heads for each attention layer in the Transformer encoder.
+        intermediate_size (`int`, optional, defaults to 3072): Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors to ff layers are firstly projected from `hidden_size` to `intermediate_size`, and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+        hidden_act (`str`, optional, defaults to "relu"):The non-linear activation function in the encoder and pooler. "gelu", "relu" and any other paddle supported activation functions are supported.
+        hidden_dropout_prob (`float`, optional, defaults to 0.1): The dropout probability for all fully connected layers in the embeddings and encoder.
+        attention_probs_dropout_prob (`float`, optional, defaults to 0.1): The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+        max_position_embeddings (`int`, optional, defaults to 512): The maximum sequence length that this model might ever be used with. Typically set this to something large (e.g., 512 or 1024 or 2048).
+        type_vocab_size (`int`, optional, defaults to 4): The vocabulary size of the *token_type_ids* passed into [`SKEPModel`].
+        initializer_range (`float`, optional, defaults to 0.02): The standard deviation of the normal initializer.
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`SkepPretrainedModel.init_weights()` for how weights are initialized in `SkepModel`.
-
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
+                See :meth:`SkepPretrainedModel.init_weights()` for how weights are initialized in [`SkepModel`].
+        pad_token_id(int, optional, defaults to 0): The index of padding token in the token vocabulary.
 
     """
 
-    def __init__(
-        self,
-        vocab_size: int,
-        hidden_size: Optional[int] = 768,
-        num_hidden_layers: Optional[int] = 12,
-        num_attention_heads: Optional[int] = 12,
-        intermediate_size: Optional[int] = 3072,
-        hidden_act: Optional[str] = "gelu",
-        hidden_dropout_prob: Optional[float] = 0.1,
-        attention_probs_dropout_prob: Optional[float] = 0.1,
-        max_position_embeddings: Optional[int] = 512,
-        type_vocab_size: Optional[int] = 2,
-        initializer_range: Optional[float] = 0.02,
-        pad_token_id: Optional[int] = 0,
-    ):
-        super(SkepModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = SkepEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size, pad_token_id
-        )
+    def __init__(self, config: SkepConfig):
+        super(SkepModel, self).__init__(config)
+        self.initializer_range = config.initializer_range
+        self.embeddings = SkepEmbeddings(config)
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = SkepPooler(hidden_size)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = SkepPooler(config)
         self.apply(self.init_weights)
 
     def forward(
@@ -339,11 +241,11 @@ class SkepModel(SkepPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
-            position_ids (Tensor, optionals):
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 max_position_embeddings - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 Mask used in multi-head attention to avoid performing attention to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
@@ -364,7 +266,7 @@ class SkepModel(SkepPretrainedModel):
                 If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
                 don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
                 `input_ids` of shape `(batch_size, sequence_length)`.
-            use_cache (`bool`, optional):
+            use_cache (bool, optional):
                 If set to `True`, `past_key_values` key value states are returned.
                 Defaults to `None`.
             output_hidden_states (bool, optional):
@@ -383,7 +285,7 @@ class SkepModel(SkepPretrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
-            if the reuslt is tuple: Returns tuple (`sequence_output`, `pooled_output`).
+            if the result is tuple: Returns tuple (`sequence_output`, `pooled_output`).
 
             With the fields:
 
@@ -425,7 +327,7 @@ class SkepModel(SkepPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids.astype("int64") == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids.astype("int64") == self.config.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2],
             )
             if past_key_values is not None:
@@ -458,7 +360,7 @@ class SkepModel(SkepPretrainedModel):
             return_dict=return_dict,
         )
 
-        if isinstance(encoder_outputs, type(input_ids)):
+        if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = encoder_outputs
             pooled_output = self.pooler(sequence_output)
             return (sequence_output, pooled_output)
@@ -498,23 +400,17 @@ class SkepForSequenceClassification(SkepPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        skep (:class:`SkepModel`):
-            An instance of SkepModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of SKEP.
-            If None, use the same value as `hidden_dropout_prob` of `SkepModel`
-            instance `skep`. Defaults to None.
-
+        config (:class:`SkepConfig`): An instance of SkepConfig used to contruct SkepForSequenceClassification.
     """
 
-    def __init__(self, skep, num_classes=2, dropout=None):
-        super(SkepForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.skep.config["hidden_size"], num_classes)
+    def __init__(self, config: SkepConfig):
+        super(SkepForSequenceClassification, self).__init__(config)
+        self.skep = SkepModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -543,8 +439,8 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 See :class:`SkepModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             inputs_embeds(Tensor, optional):
                 See :class:`SkepModel`.
@@ -595,19 +491,19 @@ class SkepForSequenceClassification(SkepPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[2:]
-            return tuple_output(output, loss)
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -623,23 +519,18 @@ class SkepForTokenClassification(SkepPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        skep (:class:`SkepModel`):
-            An instance of SkepModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of SKEP.
-            If None, use the same value as `hidden_dropout_prob` of `SkepModel`
-            instance `skep`. Defaults to None.
+        config (:class:`SkepConfig`): An instance of SkepConfig used to construct SkepForTokenClassification.
 
     """
 
-    def __init__(self, skep, num_classes=2, dropout=None):
-        super(SkepForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.skep.config["hidden_size"], num_classes)
+    def __init__(self, config: SkepConfig):
+        super(SkepForTokenClassification, self).__init__(config)
+        self.skep = SkepModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -667,7 +558,7 @@ class SkepForTokenClassification(SkepPretrainedModel):
             attention_mask (Tensor, optional):
                 See :class:`SkepModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             inputs_embeds(Tensor, optional):
                 See :class:`SkepModel`.
             output_hidden_states (bool, optional):
@@ -718,11 +609,11 @@ class SkepForTokenClassification(SkepPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
 
         if not return_dict:
             output = (logits,) + outputs[2:]
-            return tuple_output(output, loss)
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -738,30 +629,28 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        skep (:class:`SkepModel`):
-            An instance of SkepModel.
-        num_classes (int):
-            The number of classes.
+        config (:class:`SkepConfig`): An instance of SkepConfig used to construct SkepCrfForTokenClassification.
     """
 
-    def __init__(self, skep: SkepModel, num_classes: int = 3):
-        super().__init__()
-        self.num_classes = num_classes
-        self.skep = skep  # allow skep to be config
+    def __init__(self, config: SkepConfig):
+        super(SkepCrfForTokenClassification, self).__init__(config)
+        self.skep = SkepModel(config)
+        self.num_labels = config.num_labels
         gru_hidden_size = 128
 
-        self.gru = nn.GRU(self.skep.config["hidden_size"], gru_hidden_size, num_layers=2, direction="bidirect")
+        self.gru = nn.GRU(config.hidden_size, gru_hidden_size, num_layers=2, direction="bidirect")
         self.fc = nn.Linear(
             gru_hidden_size * 2,
-            self.num_classes,
+            self.num_labels,
             weight_attr=paddle.ParamAttr(
                 initializer=nn.initializer.Uniform(low=-0.1, high=0.1),
                 regularizer=paddle.regularizer.L2Decay(coeff=1e-4),
             ),
         )
-        self.crf = LinearChainCrf(self.num_classes, crf_lr=0.2, with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_labels, crf_lr=0.2, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
+        # self.apply(self.init_weights)
 
     def forward(
         self,
@@ -833,7 +722,7 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
             return_dict=return_dict,
         )
 
-        bigru_output, _ = self.gru(outputs[0])  # , sequence_length=seq_lens)
+        bigru_output, _ = self.gru(outputs[0])
         emission = self.fc(bigru_output)
 
         if seq_lens is None:
@@ -850,12 +739,11 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
         else:
             _, prediction = self.viterbi_decoder(emission, seq_lens)
 
-        # FIXME(wj-Mcat): the output of this old version model is single tensor when return_dict is False
         if not return_dict:
             # when loss is None, return prediction
             if labels is not None:
-                return loss
-            return prediction
+                return loss if len(outputs[2:]) == 0 else (loss,) + outputs[2:]
+            return prediction if len(outputs[2:]) == 0 else (prediction,) + outputs[2:]
 
         return TokenClassifierOutput(
             loss=loss,

@@ -13,7 +13,10 @@
 # limitations under the License.
 import copy
 import datetime
+import logging
 import os
+import shutil
+import sys
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -51,8 +54,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
     training_path = "training_checkpoints"  # filepath for Trainer's training checkpoints
     save_path = "trained_model"  # filepath for the trained dygraph model
     export_path = "exported_model"  # filepath for the exported static model
+    compress_path = "compressed_model"  # filepath for the compressed static model
     results_filename = "experiment_results.csv"  # filepath for storing experiment results
     experiment_path = None  # filepath for the experiment results
+    visualdl_path = "visualdl"  # filepath for the visualdl
 
     def __init__(
         self,
@@ -98,6 +103,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         Default TrainingArguments for the Trainer
         """
+        return TrainingArguments(
+            output_dir=self.training_path,
+            disable_tqdm=True,
+            load_best_model_at_end=True,
+            save_total_limit=1,
+            report_to=["visualdl", "autonlp"],
+            logging_dir=self.visualdl_path,  # if logging_dir is redefined, the function visualdl() should be redefined as well.
+        )
 
     @property
     @abstractmethod
@@ -108,16 +121,40 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self, dataset_list: List[Dataset]):
         """
-        Performs different data checks and inferences on the training and eval datasets
+        Performs different data checks and inferences on the datasets
         """
 
-    @abstractmethod
-    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
+    def _construct_trainable(self) -> Callable:
         """
         Returns the Trainable functions that contains the main preprocessing and training logic
         """
+
+        def trainable(model_config):
+            # import is required for proper pickling
+            from paddlenlp.utils.log import logger
+
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setFormatter(logger.format)
+            logger.logger.addHandler(stdout_handler)
+
+            # construct trainer
+            model_config = model_config["candidates"]
+            trainer = self._construct_trainer(model_config)
+            # train
+            trainer.train()
+            # evaluate
+            eval_metrics = trainer.evaluate()
+            # save dygraph model
+            trainer.save_model(self.save_path)
+
+            if os.path.exists(self.training_path):
+                logger.info("Removing training checkpoints to conserve disk space")
+                shutil.rmtree(self.training_path)
+            return eval_metrics
+
+        return trainable
 
     @abstractmethod
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
@@ -139,36 +176,36 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def export(self, export_path, trial_id=None):
+    def export(self, export_path: str, trial_id: Optional[str] = None):
         """
         Export the model from a certain `trial_id` to the given file path.
 
         Args:
             export_path (str, required): the filepath to export to
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
 
         raise NotImplementedError
 
     @abstractmethod
-    def to_taskflow(self, trial_id=None):
+    def to_taskflow(self, trial_id: Optional[str] = None):
         """
         Convert the model from a certain `trial_id` to a Taskflow for model inference
 
         Args:
-            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+            trial_id (int, optional): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
         """
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, trial_id=None, eval_dataset=None) -> Dict[str, float]:
+    def evaluate(self, eval_dataset: Optional[Dataset] = None, trial_id: Optional[str] = None) -> Dict[str, float]:
         """
-        Evaluate the models from a certain `trial_id` on the given dataset
+        Run evaluation and returns metrics from a certain `trial_id` on the given dataset.
 
         Args:
             trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
             eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
-                If not provided, defaults to the evaluation dataset used at construction
+                If not provided, defaults to the evaluation dataset used at construction.
         """
         raise NotImplementedError
 
@@ -189,7 +226,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
             if key in new_hp.to_dict():
-                setattr(new_hp, key, value)
+                if key in ["output_dir", "logging_dir"]:
+                    logger.warning(f"{key} cannot be overridden")
+                else:
+                    setattr(new_hp, key, value)
         return new_hp
 
     def _filter_model_candidates(
@@ -302,7 +342,17 @@ class AutoTrainerBase(metaclass=ABCMeta):
             if num_cpus:
                 hardware_resources["cpu"] = num_cpus
             trainable = tune.with_resources(trainable, hardware_resources)
-        tune_config = tune.tune_config.TuneConfig(num_samples=num_models, time_budget_s=time_budget_s, search_alg=algo)
+
+        def trial_creator(trial):
+            return "{}".format(trial.trial_id)
+
+        tune_config = tune.TuneConfig(
+            num_samples=num_models,
+            time_budget_s=time_budget_s,
+            search_alg=algo,
+            trial_name_creator=trial_creator,
+            trial_dirname_creator=trial_creator,
+        )
 
         if experiment_name is None:
             experiment_name = datetime.datetime.now().strftime("%s")
@@ -313,9 +363,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
             tune_config=tune_config,
             run_config=RunConfig(
                 name=experiment_name,
-                log_to_file=True,
+                log_to_file="train.log",
                 local_dir=self.output_dir if self.output_dir else None,
-                callbacks=[tune.logger.CSVLoggerCallback(), tune.logger.JsonLoggerCallback()],
+                callbacks=[tune.logger.CSVLoggerCallback()],
             ),
         )
         self.training_results = self.tuner.fit()
@@ -324,3 +374,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         )
 
         return self.training_results
+
+    def visualdl(self, trial_id: Optional[str] = None):
+        """
+        Return visualdl path to represent the results of the taskflow training.
+        """
+        model_result = self._get_model_result(trial_id=trial_id)
+        return os.path.join(model_result.log_dir, self.visualdl_path)

@@ -45,6 +45,7 @@ from .roberta.tokenizer import *
 from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
+from .electra.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -55,6 +56,7 @@ from .bart.tokenizer import *
 from .bart.configuration import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
+from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
@@ -133,6 +135,7 @@ from .rembert.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
+from .skep.configuration import *
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
@@ -164,6 +167,7 @@ from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
+from .roformerv2.configuration import *
 from .optimization import *
 from .opt.modeling import *
 from .auto.modeling import *
@@ -174,8 +178,10 @@ from .codegen.tokenizer import *
 from .codegen.configuration import *
 from .artist.modeling import *
 from .artist.tokenizer import *
+from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .dallebart.configuration import *
 from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *

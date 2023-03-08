@@ -18,8 +18,6 @@
 
 import csv
 import os
-import textwrap
-import numpy as np
 
 import datasets
 

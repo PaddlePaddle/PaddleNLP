@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
+import os
 
-from text2sql.utils import nn_utils
-from text2sql.utils import dusql_evaluation
 from text2sql.dataproc import sql_label
+from text2sql.utils import dusql_evaluation, nn_utils
 
 
 class MetricSimpleSQLAcc(object):

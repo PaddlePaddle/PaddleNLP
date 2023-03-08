@@ -1,0 +1,34 @@
+_base_: '../_base_/cityscapes_1024x1024.yml'
+
+batch_size: 1
+iters: 160000
+
+model:
+  type: SegFormer
+  backbone:
+    type: MixVisionTransformer_B5
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/backbone/mix_vision_transformer_b5.tar.gz
+  embedding_dim: 768
+  num_classes: 19
+
+optimizer:
+  _inherited_: False
+  type: AdamW
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  learning_rate: 0.00006
+  power: 1
+
+loss:
+  types:
+    - type: CrossEntropyLoss
+  coef: [1]
+
+test_config:
+    is_slide: True
+    crop_size: [1024, 1024]
+    stride: [768, 768]

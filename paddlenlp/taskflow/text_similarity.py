@@ -18,6 +18,7 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from ..data import Pad, Tuple
 from ..transformers import ErnieCrossEncoder, ErnieTokenizer
+from ..utils.log import logger
 from .task import Task
 from .utils import static_mode_guard
 
@@ -36,6 +37,16 @@ usage = r"""
          [{'text1': '光眼睛大就好看吗', 'text2': '眼睛好看吗？', 'similarity': 0.74502707}, {'text1': '小蝌蚪找妈妈怎么样', 'text2': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
          '''
          """
+MATCH_TYPE = {
+    "rocketqa-zh-dureader-cross-encoder": "matching",
+    "rocketqa-base-cross-encoder": "matching",
+    "rocketqa-medium-cross-encoder": "matching",
+    "rocketqa-mini-cross-encoder": "matching",
+    "rocketqa-micro-cross-encoder": "matching",
+    "rocketqa-nano-cross-encoder": "matching",
+    "rocketqav2-en-marco-cross-encoder": "matching_v2",
+    "ernie-search-large-cross-encoder-marco-en": "matching_v3",
+}
 
 
 class TextSimilarityTask(Task):
@@ -122,20 +133,50 @@ class TextSimilarityTask(Task):
                 "dcff14cd671e1064be2c5d63734098bb",
             ],
         },
+        "rocketqav2-en-marco-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqav2-en-marco-cross-encoder/model_state.pdparams",
+                "a5afc77b6a63fc32a1beca3010f40f32",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqav2-en-marco-cross-encoder/config.json",
+                "8f5d5c71c8a891b68d0402a13e38b6f9",
+            ],
+        },
+        "ernie-search-large-cross-encoder-marco-en": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/ernie-search-large-cross-encoder-marco-en/model_state.pdparams",
+                "fdf29f7de0f7fe570740d343c96165e5",
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/ernie-search-large-cross-encoder-marco-en/config.json",
+                "28bad2c7b36fa148fa75a8dc5b690485",
+            ],
+        },
+        "__internal_testing__/tiny-random-bert": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/model_state.pdparams",
+                "a7a54deee08235fc6ae454f5def2d663",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/config.json",
+                "bfaa763f77da7cc796de4e0ad4b389e9",
+            ],
+        },
     }
 
-    def __init__(self, task, model, batch_size=1, max_seq_len=384, **kwargs):
+    def __init__(self, task, model, batch_size=1, max_length=384, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
-        self._check_task_files()
-        self._get_inference_model()
+        if not self.from_hf_hub:
+            self._check_task_files()
         if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
         self._construct_tokenizer(model)
         self._batch_size = batch_size
-        self._max_seq_len = max_seq_len
+        self._max_length = max_length
         self._usage = usage
         self.model_name = model
 
@@ -152,8 +193,11 @@ class TextSimilarityTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if "rocketqa" in model:
-            self._model = ErnieCrossEncoder(model)
+
+        if "rocketqav2-en" in model or "ernie-search" in model:
+            self._model = ErnieCrossEncoder(self._task_path, num_classes=1, reinitialize=True)
+        elif "rocketqa" in model:
+            self._model = ErnieCrossEncoder(self._task_path, num_classes=2)
         else:
             self._model = AutoModel.from_pretrained(self._task_path, pool_act="linear")
         self._model.eval()
@@ -162,7 +206,7 @@ class TextSimilarityTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        if "rocketqa" in model:
+        if "rocketqa" in model or "ernie-search" in model:
             self._tokenizer = ErnieTokenizer.from_pretrained(model)
         else:
             self._tokenizer = AutoTokenizer.from_pretrained(model)
@@ -184,24 +228,25 @@ class TextSimilarityTask(Task):
         examples = []
         for data in inputs:
             text1, text2 = data[0], data[1]
-            if "rocketqa" in self.model_name:
-                encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_seq_len=self._max_seq_len)
+            if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
+                # Todo: wugaosheng, Add erine-search encoding support
+                encoded_inputs = self._tokenizer(text=text1, text_pair=text2, max_length=self._max_length)
                 ids = encoded_inputs["input_ids"]
                 segment_ids = encoded_inputs["token_type_ids"]
                 examples.append((ids, segment_ids))
             else:
-                text1_encoded_inputs = self._tokenizer(text=text1, max_seq_len=self._max_seq_len)
+                text1_encoded_inputs = self._tokenizer(text=text1, max_length=self._max_length)
                 text1_input_ids = text1_encoded_inputs["input_ids"]
                 text1_token_type_ids = text1_encoded_inputs["token_type_ids"]
 
-                text2_encoded_inputs = self._tokenizer(text=text2, max_seq_len=self._max_seq_len)
+                text2_encoded_inputs = self._tokenizer(text=text2, max_length=self._max_length)
                 text2_input_ids = text2_encoded_inputs["input_ids"]
                 text2_token_type_ids = text2_encoded_inputs["token_type_ids"]
 
                 examples.append((text1_input_ids, text1_token_type_ids, text2_input_ids, text2_token_type_ids))
 
         batches = [examples[idx : idx + self._batch_size] for idx in range(0, len(examples), self._batch_size)]
-        if "rocketqa" in self.model_name:
+        if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input ids
                 Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token type ids
@@ -225,7 +270,7 @@ class TextSimilarityTask(Task):
         Run the task model from the outputs of the `_tokenize` function.
         """
         results = []
-        if "rocketqa" in self.model_name:
+        if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
                     input_ids, segment_ids = self._batchify_fn(batch)
@@ -265,6 +310,33 @@ class TextSimilarityTask(Task):
             result["text1"] = text[0]
             result["text2"] = text[1]
             # The numpy.float32 can not be converted to the json format
-            result["similarity"] = float(similarity)
+            if isinstance(similarity, list):
+                result["similarity"] = float(similarity[0])
+            else:
+                result["similarity"] = float(similarity)
             final_results.append(result)
         return final_results
+
+    def _convert_dygraph_to_static(self):
+        """
+        Convert the dygraph model to static model.
+        """
+        assert (
+            self._model is not None
+        ), "The dygraph model must be created before converting the dygraph model to static model."
+        assert (
+            self._input_spec is not None
+        ), "The input spec must be created before converting the dygraph model to static model."
+        logger.info("Converting to the inference model cost a little time.")
+        if self.model in MATCH_TYPE:
+            if MATCH_TYPE[self.model] == "matching":
+                static_model = paddle.jit.to_static(self._model.matching, input_spec=self._input_spec)
+            elif MATCH_TYPE[self.model] == "matching_v2":
+                static_model = paddle.jit.to_static(self._model.matching_v2, input_spec=self._input_spec)
+            elif MATCH_TYPE[self.model] == "matching_v3":
+                static_model = paddle.jit.to_static(self._model.matching_v3, input_spec=self._input_spec)
+        else:
+            static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
+
+        paddle.jit.save(static_model, self.inference_model_path)
+        logger.info("The inference model save in the path:{}".format(self.inference_model_path))

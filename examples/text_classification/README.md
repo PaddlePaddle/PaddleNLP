@@ -12,4 +12,4 @@
 
 ## ERNIE-Doc Text Classification
 
-[ERNIE-Doc Text Classification](./ernie-doc) 展示了如何使用预训练模型ERNIE-Doc完成**超长文本**分类任务。
+[ERNIE-Doc Text Classification](./ernie_doc) 展示了如何使用预训练模型ERNIE-Doc完成**超长文本**分类任务。

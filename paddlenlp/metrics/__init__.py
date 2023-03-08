@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .perplexity import Perplexity
-from .chunk import ChunkEvaluator
 from .bleu import BLEU, BLEUForDuReader
-from .rouge import RougeL, RougeLForDuReader, RougeN, Rouge1, Rouge2
-from .glue import AccuracyAndF1, Mcc, PearsonAndSpearman, MultiLabelsMetric
+from .chunk import ChunkEvaluator
 from .distinct import Distinct
-from .sighan import DetectionF1, CorrectionF1
+from .glue import AccuracyAndF1, Mcc, MultiLabelsMetric, PearsonAndSpearman
+from .mrr import MRR
+from .perplexity import Perplexity
+from .rouge import Rouge1, Rouge2, RougeL, RougeLForDuReader, RougeN
+from .sighan import CorrectionF1, DetectionF1
 from .span import SpanEvaluator

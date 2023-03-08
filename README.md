@@ -30,7 +30,7 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-
+  
 * **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
   * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)
   * 💎 产业应用：信息抽取、文本分类、情感分析、智能问答 四大应用全新升级，发布文档信息抽取 [UIE-X](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列预训练小模型，在低资源和域外数据效果更强，开源 模型裁剪、模型量化、FastDeploy 推理加速、边缘端部署 端到端部署方案，降低预训练模型部署难度

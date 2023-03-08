@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import os
 import argparse
 
-from PIL import Image
-from utils import text_to_image_search
 import gradio as gr
+from utils import text_to_image_search
 
 # yapf: disable
 parser = argparse.ArgumentParser()

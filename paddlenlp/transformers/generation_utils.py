@@ -21,7 +21,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid.layers.utils import map_structure
+
+try:
+    from paddle.utils import map_structure
+except ImportError:
+    from paddle.fluid.layers.utils import map_structure
 
 from paddlenlp.utils.log import logger
 
