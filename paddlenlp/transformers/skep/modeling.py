@@ -360,7 +360,7 @@ class SkepModel(SkepPretrainedModel):
             return_dict=return_dict,
         )
 
-        if isinstance(encoder_outputs, type(input_ids)):
+        if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = encoder_outputs
             pooled_output = self.pooler(sequence_output)
             return (sequence_output, pooled_output)

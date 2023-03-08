@@ -13,29 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import logging
+import sys
 
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
+from starlette.middleware.cors import CORSMiddleware
+
+# flake8: noqa
 sys.path.append(".")
+from rest_api.config import ROOT_PATH
+from rest_api.controller.errors.http_error import http_error_handler
+from rest_api.controller.router import router as api_router
 
 logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
 logger = logging.getLogger(__name__)
 logging.getLogger("elasticsearch").setLevel(logging.WARNING)
 logging.getLogger("pipelines").setLevel(logging.INFO)
 
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.routing import APIRoute
-from fastapi.openapi.utils import get_openapi
-from starlette.middleware.cors import CORSMiddleware
-
-from rest_api.controller.errors.http_error import http_error_handler
-from rest_api.config import ROOT_PATH, PIPELINE_YAML_PATH
-from rest_api.controller.router import router as api_router
-
 try:
     from pipelines import __version__ as pipelines_version
-except:
+except Exception:
     # For development
     pipelines_version = "0.0.0"
 

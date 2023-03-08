@@ -125,6 +125,20 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 
 </details>
 
+同时，我们还提供基于 CycleDiffusion 的文本引导的图像变换示例。下面将指定模型目录，运行 `text_guided_img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
+
+```
+python text_guided_img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --backend paddle_tensorrt --use_fp16 True --device gpu
+```
+
+脚本输入的源提示语句为 **"An astronaut riding a horse"**，目标提示语句为 **"An astronaut riding an elephant"**， 待变换的图像为：
+
+![horse](https://raw.githubusercontent.com/ChenWu98/cycle-diffusion/main/data/dalle2/An%20astronaut%20riding%20a%20horse.png)
+
+运行得到的图像文件为 horse_to_elephant.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
+
+![image](https://user-images.githubusercontent.com/10826371/223315865-4490b586-1de7-4616-a245-9c008c3ffb6b.png)
+
 <a name="文本引导的图像编辑"></a>
 
 ### 文本引导的图像编辑（Text-Guided Image Inpainting）

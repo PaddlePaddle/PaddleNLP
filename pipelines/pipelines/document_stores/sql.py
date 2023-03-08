@@ -13,27 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Union, List, Optional, Generator
-
-import logging
 import itertools
-import numpy as np
+import logging
+from typing import Any, Dict, Generator, List, Optional, Union
 from uuid import uuid4
+
+import numpy as np
 
 try:
     from sqlalchemy import (
-        and_,
-        func,
-        create_engine,
-        Column,
-        String,
-        DateTime,
-        ForeignKey,
-        Boolean,
-        Text,
-        text,
         JSON,
+        Boolean,
+        Column,
+        DateTime,
         ForeignKeyConstraint,
+        String,
+        Text,
+        and_,
+        create_engine,
+        func,
+        text,
     )
     from sqlalchemy.ext.declarative import declarative_base
     from sqlalchemy.orm import relationship, sessionmaker
@@ -43,10 +42,9 @@ except (ImportError, ModuleNotFoundError) as ie:
 
     _optional_component_not_installed(__name__, "sql", ie)
 
-from pipelines.schema import Document, Label, Answer
 from pipelines.document_stores.base import BaseDocumentStore
-
 from pipelines.document_stores.filter_utils import LogicalFilterClause
+from pipelines.schema import Answer, Document, Label
 
 logger = logging.getLogger(__name__)
 Base = declarative_base()  # type: Any
@@ -643,7 +641,7 @@ class SQLDocumentStore(BaseDocumentStore):
             raise NotImplementedError("SQLDocumentStore does not support headers.")
 
         logger.warning(
-            """DEPRECATION WARNINGS: 
+            """DEPRECATION WARNINGS:
                 1. delete_all_documents() method is deprecated, please use delete_documents method
                 """
         )

@@ -12,23 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-import json
 import collections
 import collections.abc
-import copy
-import itertools
+import json
+import logging
+import os
 import shutil
 from pathlib import Path
+
 import attr
-
-import numpy as np
-import paddle
-import paddle.nn.functional as F
-
 from text2sql.dataproc import vocab
 from text2sql.utils import serialization
 
@@ -124,7 +116,7 @@ class SQLPreproc(object):
         def _float(val):
             try:
                 return True, str(int(float(val)))
-            except Exception as e:
+            except Exception:
                 return False, ""
 
         val = str(val)

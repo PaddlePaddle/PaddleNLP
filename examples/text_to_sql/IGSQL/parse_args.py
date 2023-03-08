@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import os
 import sys
 
 args = sys.argv
-
-import os
-import argparse
 
 
 def interpret_args():
@@ -26,7 +25,7 @@ def interpret_args():
 
     parser.add_argument("--no_gpus", type=bool, default=1)
 
-    ### Data parameters
+    # Data parameters
     parser.add_argument(
         "--raw_train_filename", type=str, default="../atis_data/data/resplit/processed/train_with_tables.pkl"
     )
@@ -73,7 +72,7 @@ def interpret_args():
     parser.add_argument("--fine_tune_bert", type=bool, default=True)
     parser.add_argument("--lr_bert", default=1e-5, type=float, help="BERT model learning rate.")
 
-    ### Debugging/logging parameters
+    # Debugging/logging parameters
     parser.add_argument("--reload_embedding", type=bool, default=False)
     parser.add_argument("--logdir", type=str, default="logs")
     parser.add_argument("--deterministic", type=bool, default=False)
@@ -82,7 +81,7 @@ def interpret_args():
     parser.add_argument("--logfile", type=str, default="log.txt")
     parser.add_argument("--results_file", type=str, default="results.txt")
 
-    ### Model architecture
+    # Model architecture
     parser.add_argument("--input_embedding_size", type=int, default=300)
     parser.add_argument("--output_embedding_size", type=int, default=300)
 
@@ -111,7 +110,7 @@ def interpret_args():
     parser.add_argument("--use_schema_self_attention", type=bool, default=False)
     parser.add_argument("--use_schema_encoder_2", type=bool, default=False)
 
-    ### Training parameters
+    # Training parameters
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--train_maximum_sql_length", type=int, default=400)  # 200
     parser.add_argument("--train_evaluation_size", type=int, default=100)
@@ -130,7 +129,7 @@ def interpret_args():
     parser.add_argument("--clip", type=float, default=5.0)
     parser.add_argument("--warmup_step", type=int, default=1000)
 
-    ### Setting
+    # Setting
     parser.add_argument("--train", type=bool, default=False)
     parser.add_argument("--debug", type=bool, default=False)
 

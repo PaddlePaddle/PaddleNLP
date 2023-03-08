@@ -13,16 +13,10 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
-from pprint import pprint
 
-import paddle
 from pipelines.nodes import AnswerExtractor, QAFilter, QuestionGenerator
-from pipelines.nodes import ErnieRanker, DensePassageRetriever
-from pipelines.document_stores import FAISSDocumentStore
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
-from pipelines.pipelines import QAGenerationPipeline, SemanticSearchPipeline
+from pipelines.pipelines import QAGenerationPipeline
 
 # yapf: disable
 parser = argparse.ArgumentParser()

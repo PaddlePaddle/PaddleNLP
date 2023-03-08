@@ -12,18 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-import json
-import attr
-
-import numpy as np
 import paddle
 from paddle import nn
-from paddle.nn import functional as F
-
 from text2sql.models import encoder_v2
 from text2sql.models.sql_decoder import decoder as decoder_v2
 

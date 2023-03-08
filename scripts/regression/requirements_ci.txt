@@ -32,3 +32,5 @@ https://paddle-qa.bj.bcebos.com/PaddleSlim/paddleslim-0.0.0.dev0-py3-none-any.wh
 emoji
 ftfy
 unidecode
+onnxruntime
+
