@@ -23,7 +23,7 @@ import sentencepiece as spm
 from scipy.linalg import block_diag
 
 from ...utils.log import logger
-from .. import BertTokenizer, GPTTokenizer, RobertaTokenizer
+from .. import BertTokenizer, GPTTokenizer
 from ..tokenizer_utils import PretrainedTokenizer
 from ..tokenizer_utils_base import BatchEncoding
 
@@ -221,55 +221,59 @@ class GLMTokenizerMixin:
         return BatchEncoding(batch)
 
 
-class GLMRobertaTokenizer(RobertaTokenizer, GLMTokenizerMixin):
-    model_input_names = ["input_ids", "position_ids", "attention_mask"]
-    truncation_side: str = "left"
-    pretrained_init_configuration = {"glm-roberta-large": {}}
-    pretrained_resource_files_map = {
-        "vocab_file": {"glm-roberta-large": ""},
-        "merges_file": {"glm-roberta-large": ""},
-    }
-    max_model_input_sizes = {
-        "glm-roberta-large": 512,
-    }
-
-    @property
-    def gmask_token_id(self) -> int:
-        raise NotImplementedError("The model doesn't support gMASK")
-
-    @property
-    def smask_token_id(self) -> int:
-        raise NotImplementedError("The model doesn't support sMASK")
-
-    @property
-    def mask_token_ids(self):
-        return [self.mask_token_id]
-
-
 class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
-    vocab_files_names = {"vocab_file": "cog-pretrain.model"}
+    resource_files_names = {"model_file": "cog-pretrain.model"}
     truncation_side: str = "left"
     pretrained_init_configuration = {
-        "glm-10b-chinese": {"do_lower_case": True},
         "glm-large-chinese": {"do_lower_case": True},
+        "glm-10b-chinese": {"do_lower_case": True},
     }
+    cog_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/cog-pretrain.model"
     pretrained_resource_files_map = {
-        "vocab_file": {
-            "glm-10b-chinese": "",
-            "glm-large-chinese": "",
-        },
-        "merges_file": {
-            "glm-10b-chinese": "",
-            "glm-large-chinese": "",
+        "model_file": {
+            "glm-large-chinese": cog_model_link,
+            "glm-10b-chinese": cog_model_link,
         },
     }
     max_model_input_sizes = {"glm-10b-chinese": 1024, "glm-large-chinese": 1024}
 
-    def __init__(self, vocab_file, **kwargs):
-        super().__init__(**kwargs)
-        self.vocab_file = vocab_file
+    def __init__(
+        self,
+        model_file,
+        cls_token="[CLS]",
+        sep_token="[SEP]",
+        unk_token="[UNK]",
+        mask_token="[MASK]",
+        pad_token="<|endoftext|>",
+        eos_token="<|endoftext|>",
+        **kwargs
+    ):
+        super().__init__(
+            cls_token=cls_token,
+            sep_token=sep_token,
+            unk_token=unk_token,
+            mask_token=mask_token,
+            pad_token=pad_token,
+            eos_token=eos_token,
+            **kwargs,
+        )
+        self._model_file = model_file
         self.sp_model = spm.SentencePieceProcessor()
-        self.sp_model.Load(vocab_file)
+        self.sp_model.Load(model_file)
+        self.add_tokens(
+            [
+                "<|endoftext|>",
+                "[SEP]",
+                "[CLS]",
+                "[MASK]",
+                "[UNUSED1]",
+                "[UNUSED2]",
+                "<|startofpiece|>",
+                "<|endofpiece|>",
+                "[sMASK]",
+                "[gMASK]",
+            ]
+        )
 
     @property
     def vocab_size(self):
@@ -327,7 +331,9 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         Returns:
             :obj:`List[int]`: List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
         """
-        assert token_ids_1 is None
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is concatenated directly.")
+            token_ids_0 += token_ids_1
         cls = [self.cls_token_id]
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
@@ -338,22 +344,44 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
     truncation_side: str = "left"
     pretrained_init_configuration = {
         "glm-2b": {},
-        # "glm-10b": {},
+        "glm-10b": {},
     }
     pretrained_resource_files_map = {
         "vocab_file": {
             "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-vocab.json",
-            # "glm-10b": "",
+            "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-vocab.json",
         },
         "merges_file": {
             "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-merges.txt",
-            # "glm-10b": "",
+            "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-merges.txt",
         },
     }
     max_model_input_sizes = {
-        "glm-2b": 1024
-        # "glm-10b": 1024,
+        "glm-2b": 1024,
+        "glm-10b": 1024,
     }
+
+    def __init__(
+        self,
+        cls_token="[CLS]",
+        sep_token="[SEP]",
+        mask_token="[MASK]",
+        pad_token="<|endoftext|>",
+        eos_token="<|endoftext|>",
+        **kwargs
+    ):
+        super().__init__(cls_token=cls_token, sep_token=sep_token, pad_token=pad_token, eos_token=eos_token, **kwargs)
+        self.add_tokens(
+            ["<|startofpiece|>", "<|endofpiece|>", "[CLS]", "[MASK]", "[SEP]", "[UNUSED]", "[gMASK]", "[sMASK]"]
+        )
+
+    def build_inputs_with_special_tokens(self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None):
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is concatenated directly.")
+            token_ids_0 += token_ids_1
+        cls = [self.cls_token_id]
+        eos = [self.eos_token_id]
+        return cls + token_ids_0 + eos
 
 
 class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
@@ -361,30 +389,26 @@ class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
     truncation_side: str = "left"
     pretrained_init_configuration = {
         "glm-515m": {"do_lower_case": True},
-        # "glm-large": {},
     }
     pretrained_resource_files_map = {
         "vocab_file": {
             "glm-515m": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-515m-vocab.txt",
-            # "glm-large": "",
         },
     }
     max_model_input_sizes = {
         "glm-515m": 512,
-        # "glm-large": 512,
     }
 
 
 class GLMTokenizer:
     """
-    GLMTokenizer is a generic tokenizer class that will be instantiated as GLMRobertaTokenizer, GLMChineseTokenizer,
+    GLMTokenizer is a generic tokenizer class that will be instantiated as GLMChineseTokenizer,
     GLMGPT2Tokenizer or GLMBertTokenizer when created with GLMTokenizer.from_pretrained() class method.
     """
 
     bert_model_names = GLMBertTokenizer.pretrained_init_configuration.keys()
     chinese_model_names = GLMChineseTokenizer.pretrained_init_configuration.keys()
     gpt2_model_names = GLMGPT2Tokenizer.pretrained_init_configuration.keys()
-    roberta_model_names = GLMRobertaTokenizer.pretrained_init_configuration.keys()
     tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -402,17 +426,13 @@ class GLMTokenizer:
             return GLMChineseTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
         elif pretrained_model_name_or_path in cls.gpt2_model_names:
             return GLMGPT2Tokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
-        elif pretrained_model_name_or_path in cls.roberta_model_names:
-            return GLMRobertaTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path, cls.tokenizer_config_file)
             with open(config_file, "r", encoding="utf-8") as fp:
                 tokenizer_config = json.load(fp)
             config_tokenizer_class = tokenizer_config.get("tokenizer_class")
-            if config_tokenizer_class == "GLMRobertaTokenizer":
-                tokenizer_class = GLMRobertaTokenizer
-            elif config_tokenizer_class == "GLMChineseTokenizer":
+            if config_tokenizer_class == "GLMChineseTokenizer":
                 tokenizer_class = GLMChineseTokenizer
             elif config_tokenizer_class == "GLMGPT2Tokenizer":
                 tokenizer_class = GLMGPT2Tokenizer

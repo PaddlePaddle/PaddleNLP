@@ -28,11 +28,9 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 
 
-# yafp: disable
 @dataclass
 class DataArgument:
-    data_path: str = field(default="./data", metadata={"help": "The path of dataset."})
-    task_name: str = field(default="cnn_dm", metadata={"help": "The name of task."})
+    task_name: str = field(default="cnn_dailymail", metadata={"help": "The name of task."})
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
@@ -62,9 +60,6 @@ class ModelArgument:
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
 
 
-# yafp: enable
-
-
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -84,7 +79,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds, dev_ds, test_ds = load_dataset("cnn_dailymail", splits=["train", "dev", "test"])
+    train_ds, dev_ds, test_ds = load_dataset(data_args.task_name, splits=["train", "dev", "test"])
     trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     dev_ds = dev_ds.map(trans_func)
@@ -97,8 +92,8 @@ def main():
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
-        predictions = [x[x > -100] for x in eval_preds.predictions]
-        references = [x[x > -100] for x in eval_preds.label_ids]
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
 
         rouge1_score = rouge1.score(predictions, references)
         rouge2_score = rouge2.score(predictions, references)
