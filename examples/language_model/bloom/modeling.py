@@ -24,6 +24,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.fluid.framework import in_dygraph_mode
+from paddle.distributed import fleet
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -48,6 +49,25 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "bigscience/bloom-560m",
 ]
 
+
+def parallel_matmul(lm_output, logit_weights, parallel_output):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    world_size = hcg.get_model_parallel_world_size()
+    # rank = hcg.get_model_parallel_rank()
+
+    if world_size > 1:
+        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+
+        if parallel_output:
+            return logits
+
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        return logits
 
 def finfo(dtype):
     if dtype == paddle.float32:
@@ -123,7 +143,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
             Token-wise attention mask, this should be of shape (batch_size, max_seq_len).
         num_heads (`int`, *required*):
             number of heads
-        dtype (`torch.dtype`, *optional*, default=`torch.bfloat16`):
+        dtype (`paddle.dtype`, *optional*, default=`paddle.bfloat16`):
             dtype of the output tensor
     """
     _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
@@ -175,9 +195,9 @@ def dropout_add(x: Tensor, residual: Tensor, prob: float, training: bool) -> Ten
     Dropout add function
 
     Args:
-        x (`torch.tensor`, *required*):
+        x (`paddle.tensor`, *required*):
             input tensor
-        residual (`torch.tensor`, *required*):
+        residual (`paddle.tensor`, *required*):
             esidual tensor
         prob (`float`, *required*):
             dropout probability
@@ -193,9 +213,9 @@ def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
     """
     Args:
     Pre-process the alibi tensor for padding.
-        alibi: ([`torch.tensor`], *required*):
+        alibi: ([`paddle.tensor`], *required*):
             alibi tensor to pre-process
-        attention_mask: ([`torch.tensor`], *required*):
+        attention_mask: ([`paddle.tensor`], *required*):
             attention mask to pre-process"""
 
     # Sanity check if we are not inferring less tokens than the total sequence length
@@ -231,7 +251,7 @@ def bloom_gelu_forward(x):
     make the model jitable.
 
     Args:
-        x (`torch.tensor`, *required*):
+        x (`paddle.tensor`, *required*):
             input hidden states
     """
     return x * 0.5 * (1.0 + paddle.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
@@ -239,13 +259,13 @@ def bloom_gelu_forward(x):
 
 def bloom_gelu_back(g, x):
     """
-    gradient of tanh approximation of gelu gradient of actual gelu is: 0.5 * (1. + torch.erf(x * 0.70710678)) +
-    0.3989423 * x * torch.exp(-0.5 * x * x)
+    gradient of tanh approximation of gelu gradient of actual gelu is: 0.5 * (1. + paddle.erf(x * 0.70710678)) +
+    0.3989423 * x * paddle.exp(-0.5 * x * x)
 
     Args:
-        g (`torch.tensor`, *required*):
+        g (`paddle.tensor`, *required*):
             gradient output tensor
-        x (`torch.tensor`, *required*):
+        x (`paddle.tensor`, *required*):
             input tensor
     """
     x = x[0]  # x is a tuple of 1 element, needs to unpack it first
@@ -257,20 +277,6 @@ def bloom_gelu_back(g, x):
 
 def baddbmm(input, batch1, batch2, beta=1.0, alpha=1.0):
     return beta * input + alpha * paddle.matmul(batch1, batch2)
-
-
-# class GeLUFunction(torch.autograd.Function):
-#     @staticmethod
-#     def forward(ctx, input):
-#         ctx.save_for_backward(input)
-#         return bloom_gelu_forward(input)
-
-#     @staticmethod
-#     def backward(ctx, grad_output):
-#         input = ctx.saved_tensors
-#         tmp = bloom_gelu_back(grad_output, input)
-#         return tmp
-
 
 class GeLUFunction(PyLayer):
     @staticmethod
@@ -287,10 +293,10 @@ class GeLUFunction(PyLayer):
 class BloomGelu(nn.Layer):
     """
     BloomBiasGelu wrapper function that make use of the simple function on inference mode to make the model
-    torchscriptable and use the autograd function in training mode to get the accurate results of the gradients Partly
+    paddlescriptable and use the autograd function in training mode to get the accurate results of the gradients Partly
     copied from Megatron-DeepSpeed code and adapted for our needs
 
-    See here why autograd functions are not torchscriptable: https://github.com/pytorch/pytorch/issues/22329
+    See here why autograd functions are not paddlescriptable: https://github.com/pypaddle/pypaddle/issues/22329
 
     """
 
@@ -298,11 +304,11 @@ class BloomGelu(nn.Layer):
         super().__init__()
 
     def forward(self, x):
-
-        if self.training and in_dygraph_mode():
-            return GeLUFunction.apply(x)
-        else:
-            return bloom_gelu_forward(x)
+        return bloom_gelu_forward(x)
+        #if self.training and in_dygraph_mode():
+        #    return GeLUFunction.apply(x)
+        #else:
+        #    return bloom_gelu_forward(x)
 
 
 class BloomAttention(nn.Layer):
@@ -328,8 +334,22 @@ class BloomAttention(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
         self.beta = 1.0
 
-        self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias_attr=True)
-        self.dense = nn.Linear(self.hidden_size, self.hidden_size)
+        if config.is_mp:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size, 3 * self.hidden_size, has_bias=True, gather_output=False
+            )
+        else:
+            self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias_attr=True)
+        
+        if config.is_mp:
+            #self.out_proj = fleet.meta_parallel.RowParallelLinear(
+            #      self.hidden_size, self.hidden_size, weight_attr=weight_attr, has_bias=True, input_is_parallel=True)
+            #TODO(wawltor) The weight_attr
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                  self.hidden_size, self.hidden_size, has_bias=True, input_is_parallel=True)
+        else:
+            self.dense = nn.Linear(self.hidden_size, self.hidden_size)
+                
         self.attention_dropout = nn.Dropout(config.attention_dropout)
 
     def _split_heads(self, fused_qkv: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
@@ -338,7 +358,7 @@ class BloomAttention(nn.Layer):
         storage as `fused_qkv`
 
         Args:
-            fused_qkv (`torch.tensor`, *required*): [batch_size, seq_length, num_heads * 3 * head_dim]
+            fused_qkv (`paddle.tensor`, *required*): [batch_size, seq_length, num_heads * 3 * head_dim]
 
         Returns:
             query: [batch_size, seq_length, num_heads, head_dim] key: [batch_size, seq_length, num_heads, head_dim]
@@ -353,10 +373,10 @@ class BloomAttention(nn.Layer):
         Merge heads together over the last dimenstion
 
         Args:
-            x: (`torch.tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]
+            x: (`paddle.tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]
 
         Returns:
-            torch.tensor: [batch_size, seq_length, num_heads * head_dim]
+            paddle.tensor: [batch_size, seq_length, num_heads * head_dim]
         """
         # What we want to achieve is:
         # batch_size * num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads * head_dim
@@ -414,7 +434,7 @@ class BloomAttention(nn.Layer):
             present = None
 
         # [batch_size * num_heads, q_length, kv_length]
-        # we use `Tensor.baddbmm` instead of `torch.baddbmm` as the latter isn't supported by TorchScript v1.11
+        # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
         matmul_result = baddbmm(
             alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
         )
@@ -425,11 +445,12 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = attention_scores.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if input_dtype == paddle.float16:
-            attention_scores = paddle.cast(attention_scores, paddle.float32)
-        attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-        #attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
-        attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
+        with paddle.amp.auto_cast(False):
+            if input_dtype == paddle.float16:
+                attention_scores = paddle.cast(attention_scores, paddle.float32)
+            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            #attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
+            attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
@@ -446,7 +467,7 @@ class BloomAttention(nn.Layer):
         # change view [batch_size, num_heads, q_length, head_dim]
         context_layer = self._merge_heads(context_layer)
 
-        # aggregate results across tp ranks. See here: https://github.com/pytorch/pytorch/issues/76232
+        # aggregate results across tp ranks. See here: https://github.com/pypaddle/pypaddle/issues/76232
         if self.pretraining_tp > 1 and self.slow_but_exact:
             slices = self.hidden_size / self.pretraining_tp
             output_tensor = paddle.zeros_like(context_layer)
@@ -474,8 +495,18 @@ class BloomMLP(nn.Layer):
 
         self.pretraining_tp = config.pretraining_tp
         self.slow_but_exact = config.slow_but_exact
-        self.dense_h_to_4h = nn.Linear(hidden_size, 4 * hidden_size)
-        self.dense_4h_to_h = nn.Linear(4 * hidden_size, hidden_size)
+        if config.is_mp:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                hidden_size, 4 * hidden_size, gather_output=False, has_bias=True
+            )
+
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                4 * hidden_size , hidden_size, input_is_parallel=True, has_bias=True
+            )
+
+        else:
+            self.dense_h_to_4h = nn.Linear(hidden_size, 4 * hidden_size)
+            self.dense_4h_to_h = nn.Linear(4 * hidden_size, hidden_size)
         self.hidden_dropout = config.hidden_dropout
         self.gelu_impl = BloomGelu()
 
@@ -650,14 +681,14 @@ class BloomPreTrainedModel(PretrainedModel):
         """
         Prepare the head mask if needed.
         Args:
-            head_mask (`torch.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
+            head_mask (`paddle.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
                 The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
             num_hidden_layers (`int`):
                 The number of hidden layers in the model.
             is_attention_chunked: (`bool`, *optional*, defaults to `False`):
                 Whether or not the attentions scores are computed by chunks or not.
         Returns:
-            `torch.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
+            `paddle.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
             `[None]` for each layer.
         """
         if head_mask is not None:
@@ -844,16 +875,6 @@ class BloomModel(BloomPreTrainedModel):
 
                     return custom_forward
 
-                # need change this block
-                # TODO(wj-Mcat): use recompute to refactor
-                # outputs = torch.utils.checkpoint.checkpoint(
-                #     create_custom_forward(block),
-                #     hidden_states,
-                #     alibi,
-                #     causal_mask,
-                #     layer_past,
-                #     head_mask[i],
-                # )
             else:
                 outputs = block(
                     hidden_states,
@@ -899,7 +920,8 @@ class BloomLMHead(nn.Layer):
         )
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        #logits = parallel_matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
@@ -908,8 +930,8 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        self.transformer = BloomModel(config)
-        self.lm_head = BloomLMHead(config.hidden_size, config.vocab_size, self.transformer.word_embeddings.weight)
+        self.bloom = BloomModel(config)
+        self.lm_head = BloomLMHead(config.hidden_size, config.vocab_size, self.bloom.word_embeddings.weight)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -966,7 +988,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        transformer_outputs = self.transformer(
+        transformer_outputs = self.bloom(
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -1019,7 +1041,7 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.transformer = BloomModel(config)
+        self.bloom = BloomModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
 
         # Initialize weights and apply final processing
@@ -1048,7 +1070,7 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        transformer_outputs = self.transformer(
+        transformer_outputs = self.bloom(
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -1091,7 +1113,7 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
             if self.config.problem_type is None:
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
-                elif self.num_labels > 1 and labels.dtype == paddle.int:
+                elif self.num_labels > 1 and labels.dtype == paddle.int64:
                     self.config.problem_type = "single_label_classification"
                 else:
                     self.config.problem_type = "multi_label_classification"
@@ -1128,7 +1150,7 @@ class BloomForTokenClassification(BloomPreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.transformer = BloomModel(config)
+        self.bloom = BloomModel(config)
         if hasattr(config, "classifier_dropout") and config.classifier_dropout is not None:
             classifier_dropout = config.classifier_dropout
         elif hasattr(config, "hidden_dropout") and config.hidden_dropout is not None:
@@ -1164,7 +1186,7 @@ class BloomForTokenClassification(BloomPreTrainedModel):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        transformer_outputs = self.transformer(
+        transformer_outputs = self.bloom(
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -1363,7 +1385,6 @@ class BloomForGeneration(BloomPreTrainedModel):
                model_kwargs["attention_mask"] = paddle.concat(
                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
                )
-               print(model_kwargs['attention_mask'])
 
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
@@ -1464,7 +1485,6 @@ class BloomForGeneration(BloomPreTrainedModel):
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-            print("current loop logit", logits)
 
             # pre-process distribution
             logits = logits_processors(input_ids, logits)
