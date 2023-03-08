@@ -417,8 +417,9 @@ export/
 
 #### 5.2 Python部署
 
-导出静态图模型之后可用于部署，项目提供了文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，详见[ERNIE-Layout Python部署指南](./deploy/python/README_ch.md)。
+导出静态图模型之后可用于部署，
 
+目前 ERNIE-Layout 模型已提供基于 FastDeploy 的文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
 
 <a name="References"></a>
 
