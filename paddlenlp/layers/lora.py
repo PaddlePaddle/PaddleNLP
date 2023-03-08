@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-class LoRALinearLayer(nn.Linear):
+class LoRALinear(nn.Linear):
     # LoRA implemented in a dense layer
     def __init__(
         self,
@@ -85,5 +87,32 @@ class LoRALinearLayer(nn.Linear):
         else:
             return F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
 
+    def extra_repr(self):
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}, name={self.name if self.name else ''}"
 
-# class LoRAModel:
+
+# TODO (this is tmp API. will formalize before release)
+def _find_and_replace_module(model, module_name, r, lora_alpha):
+    parent_module = model
+    attribute_chain = module_name.split(".")
+    for name in attribute_chain[:-1]:
+        parent_module = getattr(parent_module, name)
+    module = getattr(parent_module, attribute_chain[-1])
+    lora_module = LoRALinear(
+        in_features=module.weight.shape[0],
+        out_features=module.weight.shape[1],
+        r=r,
+        lora_alpha=lora_alpha,
+    )
+    setattr(parent_module, attribute_chain[-1], lora_module)
+
+
+# TODO (this is tmp API. will formalize before release)
+def get_lora_model(model, lora_config):
+    target_modules = lora_config["target_modules"]
+    for target_module in target_modules:
+        for i in model.named_sublayers():
+            module_name = i[0]
+            if re.fullmatch(target_module, module_name):
+                _find_and_replace_module(model, module_name, lora_config["r"], lora_config["lora_alpha"])
+    return model

@@ -14,17 +14,19 @@
 
 import copy
 import os
+import re
 import unittest
 from tempfile import TemporaryDirectory
 
 import paddle
 
-from paddlenlp.layers import LoRALinearLayer
+from paddlenlp.layers import LoRALinear, get_lora_model
+from paddlenlp.transformers import AutoModel
 
 
 class TestLoraLayer(unittest.TestCase):
     def test_forward(self):
-        lora_layer = LoRALinearLayer(in_features=16, out_features=8, r=4)
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
         x = paddle.randn([2, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
@@ -35,7 +37,7 @@ class TestLoraLayer(unittest.TestCase):
 
     def test_train_eval(self):
         x = paddle.randn([2, 16], "float32")
-        lora_layer = LoRALinearLayer(in_features=16, out_features=8, r=4)
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
         lora_layer.train()
         train_result = lora_layer(x)
         train_weight = copy.deepcopy(lora_layer.weight)  # deep copy since this is a pointer
@@ -47,10 +49,10 @@ class TestLoraLayer(unittest.TestCase):
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
-            lora_layer = LoRALinearLayer(in_features=16, out_features=8, r=4)
+            lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(lora_layer.state_dict(), weights_path)
-            new_lora_layer = LoRALinearLayer(in_features=16, out_features=8, r=4)
+            new_lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
             x = paddle.randn([2, 16], "float32")
@@ -58,15 +60,30 @@ class TestLoraLayer(unittest.TestCase):
 
     def test_load_regular_linear(self):
         with TemporaryDirectory() as tempdir:
-            regular_linear = LoRALinearLayer(in_features=16, out_features=8)
+            regular_linear = LoRALinear(in_features=16, out_features=8)
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
             # should be identical to regular linear
-            lora_layer_r0 = LoRALinearLayer(in_features=16, out_features=8, r=0)
-            lora_layer_r4 = LoRALinearLayer(in_features=16, out_features=8, r=4)
+            lora_layer_r0 = LoRALinear(in_features=16, out_features=8, r=0)
+            lora_layer_r4 = LoRALinear(in_features=16, out_features=8, r=4)
             lora_layer_r0.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
             self.assertFalse(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
+
+
+class TestLoraModel(unittest.TestCase):
+    def test_get_lora_model(self):
+        lora_config = {"target_modules": [".*q_proj.*", ".*v_proj.*"], "r": 4, "lora_alpha": 8}
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        lora_model = get_lora_model(model, lora_config)
+        state_dict = lora_model.state_dict()
+        for weight_name in state_dict:
+            for target_module in lora_config["target_modules"]:
+                if re.fullmatch(target_module, weight_name):
+                    if "lora" in weight_name:
+                        self.assertFalse(state_dict[weight_name].stop_gradient)
+                    else:
+                        self.assertTrue(state_dict[weight_name].stop_gradient)
