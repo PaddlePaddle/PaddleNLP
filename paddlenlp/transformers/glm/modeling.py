@@ -25,7 +25,11 @@ from paddle.distributed.fleet.utils import recompute
 
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import ModelOutput
+from ..model_outputs import (
+    CausalLMOutputWithCrossAttentions,
+    ModelOutput,
+    MultipleChoiceModelOutput,
+)
 from .configuration import (
     GLM_PRETRAINED_INIT_CONFIGURATION,
     GLM_PRETRAINED_RESOURCE_FILES_MAP,
@@ -187,15 +191,6 @@ class GLMStack(nn.Layer):
         self.enable_recompute = config.checkpoint_activations
         self.checkpoint_num_layers = config.checkpoint_num_layers
 
-        # output_layer_init_method = None
-        # if config.use_scaled_init_for_output_weights:
-        #    output_layer_init_method = nn.initializer.Normal(
-        #        mean=0.0, std=config.initializer_range / math.sqrt(2.0 * config.num_layers)
-        #    )
-        # config.init_method = nn.initializer.Normal(mean=0.0, std=config.initializer_range)
-        # config.output_layer_init_method = output_layer_init_method
-        # TODO: How to devide the init_method
-
         self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
         self.block_position_encoding = config.block_position_encoding
 
@@ -355,6 +350,12 @@ class GLMPretrainedModel(PretrainedModel):
             layer.weight.set_value(paddle.ones_like(layer.weight))
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
+        # if config.use_scaled_init_for_output_weights:
+        #    output_layer_init_method = nn.initializer.Normal(
+        #        mean=0.0, std=config.initializer_range / math.sqrt(2.0 * config.num_layers)
+        #    )
+        # TODO: How to devide the init_method
+
 
 @register_base_model
 class GLMModel(GLMPretrainedModel):
@@ -437,11 +438,9 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         choice_ids: Tensor = None,
         choice_indices: Tensor = None,
         labels: Tensor = None,
-        cache: Tensor = None,
-        use_cache: bool = None,
         return_dict: bool = None,
     ):
-        model_output = self.glm(input_ids, position_ids, attention_mask, cache=cache, return_dict=return_dict)
+        model_output = self.glm(input_ids, position_ids, attention_mask, return_dict=return_dict)
         lm_logits = model_output.logits
         log_probs = []
         for output, choices, choice_index in zip(F.log_softmax(lm_logits, axis=-1), choice_ids, choice_indices):
@@ -455,14 +454,13 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             loss = F.cross_entropy(log_probs, labels)
 
         if not return_dict:
-            output = (log_probs, lm_logits, model_output.cache)
+            output = (log_probs, lm_logits)
             return ((loss,) + output) if loss is not None else output
 
-        return ModelOutput(
+        return MultipleChoiceModelOutput(
             loss=loss,
             logits=log_probs,
             hidden_states=lm_logits,
-            cache=model_output.cache,
         )
 
 
@@ -541,4 +539,4 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             output = (lm_logits, cache)
             return ((loss,) + output) if loss is not None else output
 
-        return ModelOutput(loss=loss, logits=lm_logits, cache=model_output.cache)
+        return CausalLMOutputWithCrossAttentions(loss=loss, logits=lm_logits, past_key_values=model_output.cache)

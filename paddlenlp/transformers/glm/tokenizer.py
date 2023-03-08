@@ -71,7 +71,7 @@ class GLMTokenizerMixin:
         token = paddle.to_tensor(context_id, dtype="int64")
         attention_mask = [context["attention_mask"].expand([division, -1])]
         position_id = paddle.arange(division, dtype="int64")
-        block_position_id = paddle.zeros(division, dtype="int64")
+        block_position_id = paddle.zeros([division], dtype="int64")
 
         choice_ids, choice_indices = [], []
 
@@ -103,7 +103,7 @@ class GLMTokenizerMixin:
     def _pad_batch(self, tokens, position_ids, attention_mask, max_seq_length):
         pad_length = max_seq_length - len(tokens)
         attention_mask = F.pad(attention_mask, [0, pad_length, 0, pad_length], mode="constant", value=0)
-        tokens = paddle.concat([tokens, paddle.zeros(pad_length, dtype="int64")])
+        tokens = paddle.concat([tokens, paddle.zeros([pad_length], dtype="int64")])
         if pad_length > 0:
             position_ids = paddle.concat([position_ids, position_ids[..., -1:].expand([-1, pad_length])], axis=-1)
         return tokens, position_ids, attention_mask
@@ -332,8 +332,7 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
             :obj:`List[int]`: List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
         """
         if token_ids_1 is not None:
-            logger.warning("Support single input text and the second one is concatenated directly.")
-            token_ids_0 += token_ids_1
+            logger.warning("Support single input text and the second one is ignored.")
         cls = [self.cls_token_id]
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
@@ -377,8 +376,7 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
 
     def build_inputs_with_special_tokens(self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None):
         if token_ids_1 is not None:
-            logger.warning("Support single input text and the second one is concatenated directly.")
-            token_ids_0 += token_ids_1
+            logger.warning("Support single input text and the second one is ignored.")
         cls = [self.cls_token_id]
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
