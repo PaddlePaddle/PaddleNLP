@@ -113,7 +113,7 @@ def create_paddle_inference_runtime(
     paddle_stream=None,
 ):
     option = fd.RuntimeOption()
-    option.use_paddle_backend()
+    option.use_paddle_infer_backend()
     if device_id == -1:
         option.use_cpu()
     else:
@@ -124,21 +124,22 @@ def create_paddle_inference_runtime(
         option.paddle_infer_option.delete_pass(pass_name)
     if use_trt:
         option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
-        option.use_trt_backend()
-        option.enable_paddle_to_trt()
+        option.paddle_infer_option.enable_trt = True
         if use_fp16:
-            option.enable_trt_fp16()
-        cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+            option.trt_option.enable_fp16 = True
+        else:
+            # Note(zhoushunjie): These two passes don't support fp32 now.
+            # Remove these 2 lines of code in future.
+            option.paddle_infer_option.delete_pass("trt_flash_multihead_matmul_fuse_pass")
+            option.paddle_infer_option.delete_pass("trt_cross_multihead_matmul_fuse_pass")
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache/")
         option.set_trt_cache_file(cache_file)
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
-            option.enable_paddle_trt_collect_shape()
+            option.paddle_infer_option.collect_trt_shape = True
             for key, shape_dict in dynamic_shape.items():
-                option.set_trt_input_shape(
-                    key,
-                    min_shape=shape_dict["min_shape"],
-                    opt_shape=shape_dict.get("opt_shape", None),
-                    max_shape=shape_dict.get("max_shape", None),
+                option.trt_option.set_shape(
+                    key, shape_dict["min_shape"], shape_dict.get("opt_shape", None), shape_dict.get("max_shape", None)
                 )
     model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
     params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")

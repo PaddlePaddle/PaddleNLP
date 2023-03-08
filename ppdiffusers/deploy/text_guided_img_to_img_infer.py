@@ -107,7 +107,7 @@ def create_paddle_inference_runtime(
     paddle_stream=None,
 ):
     option = fd.RuntimeOption()
-    option.use_paddle_backend()
+    option.use_paddle_infer_backend()
     if device_id == -1:
         option.use_cpu()
     else:
@@ -121,7 +121,12 @@ def create_paddle_inference_runtime(
         option.paddle_infer_option.enable_trt = True
         if use_fp16:
             option.trt_option.enable_fp16 = True
-        cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+        else:
+            # Note(zhoushunjie): These two passes don't support fp32 now.
+            # Remove these 2 lines of code in future.
+            option.paddle_infer_option.delete_pass("trt_flash_multihead_matmul_fuse_pass")
+            option.paddle_infer_option.delete_pass("trt_cross_multihead_matmul_fuse_pass")
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache/")
         option.trt_option.serialize_file = cache_file
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
