@@ -1591,7 +1591,7 @@ from paddlenlp import Taskflow
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA`。
+* `model`：可选模型，默认为"PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"，支持的模型有["unimo-text-1.0-summary","IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese", "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese", "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1", "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA", "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"]。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_length`：生成摘要的最大文本长度，默认为128。
 * `min_length`：生成摘要的最小文本长度，默认为0。
