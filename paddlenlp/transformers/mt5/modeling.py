@@ -47,11 +47,11 @@ __all__ = [
 ]
 
 MT5_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "mt5-small",
-    "mt5-base",
-    "mt5-large",
-    "mt5-xl",
-    "mt5-xxl",
+    "google/mt5-small",
+    "google/mt5-base",
+    "google/mt5-large",
+    "google/mt5-xl",
+    "google/mt5-xxl",
 ]
 
 DATA_TYPE_MAP = {
