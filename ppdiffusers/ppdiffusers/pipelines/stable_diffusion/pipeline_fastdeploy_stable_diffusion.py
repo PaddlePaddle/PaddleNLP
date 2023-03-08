@@ -414,7 +414,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 self.unet.zero_copy_infer(
                     prebinded_inputs={
                         unet_input_names[0]: latent_model_input,
-                        unet_input_names[1]: t,
+                        unet_input_names[1]: t.cast("float32"),
                         unet_input_names[2]: text_embeddings,
                     },
                     prebinded_outputs={unet_output_name: noise_pred_unet},
