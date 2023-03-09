@@ -455,13 +455,24 @@ class ReformerEmbeddings(nn.Layer):
             AxialPositionEmbeddings(config) if config.axial_pos_embds else PositionEmbeddings(config)
         )
 
-    def forward(self, input_ids, position_ids=None, start_idx_pos_encodings=0):
-        seq_length = input_ids.shape[1]
-        if position_ids is None:
-            position_ids = paddle.arange(start_idx_pos_encodings, start_idx_pos_encodings + seq_length)
-            position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        start_idx_pos_encodings=0,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
 
-        inputs_embeds = self.word_embeddings(input_ids)
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+
+        if position_ids is None:
+            ones = paddle.ones(input_shape, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=1)
+            position_ids = start_idx_pos_encodings + seq_length - start_idx_pos_encodings - ones
+            position_ids.stop_gradient = True
 
         if position_ids.shape[-1] > self.max_position_embeddings:
             raise ValueError(
@@ -469,12 +480,11 @@ class ReformerEmbeddings(nn.Layer):
                 f"max_position_embeddings {self.max_position_embeddings}."
             )
 
-        # dropout
-        embeddings = F.dropout(inputs_embeds, p=self.dropout, training=self.training)
-
         # add positional embeddings
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = embeddings + position_embeddings
+        embeddings = inputs_embeds + position_embeddings
+        # dropout
+        embeddings = F.dropout(embeddings, p=self.dropout, training=self.training)
         return embeddings
 
 
@@ -2174,6 +2184,7 @@ class ReformerModel(ReformerPretrainedModel):
         num_hashes: Optional[int] = None,
         cache: Optional[List[Tuple[Tensor]]] = None,
         use_cache: Optional[bool] = False,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -2215,6 +2226,9 @@ class ReformerModel(ReformerPretrainedModel):
                 Whether or not to use cache. If set to `True`, `cache` states are returned
                 and can be used to speed up decoding.
                 Defaults to `False`.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers.
                 Defaults to `False`.
@@ -2241,7 +2255,7 @@ class ReformerModel(ReformerPretrainedModel):
                 model = ReformerModel.from_pretrained('reformer-crime-and-punishment')
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
                 outputs = model(**inputs)
@@ -2252,7 +2266,14 @@ class ReformerModel(ReformerPretrainedModel):
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
         return_dict = return_dict if return_dict is not None else False
 
-        input_shape = input_ids.shape
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = input_ids.shape  # noqa: F841
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.shape[:-1]  # noqa: F841
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         assert (
             len(input_shape) == 2
@@ -2289,8 +2310,9 @@ class ReformerModel(ReformerPretrainedModel):
                 )
 
             # pad input
-            (input_ids, attention_mask, position_ids, input_shape,) = self._pad_to_mult_of_chunk_length(
+            input_ids, inputs_embeds, attention_mask, position_ids, input_shape = self._pad_to_mult_of_chunk_length(
                 input_ids,
+                inputs_embeds=inputs_embeds,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 input_shape=input_shape,
@@ -2308,6 +2330,7 @@ class ReformerModel(ReformerPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             start_idx_pos_encodings=start_idx_pos_encodings,
+            inputs_embeds=inputs_embeds,
         )
 
         encoder_outputs = self.encoder(
@@ -2352,20 +2375,22 @@ class ReformerModel(ReformerPretrainedModel):
     def _pad_to_mult_of_chunk_length(
         self,
         input_ids,
+        inputs_embeds=None,
         attention_mask=None,
         position_ids=None,
         input_shape=None,
         padding_length=None,
         padded_seq_length=None,
+        device=None,
     ):
         logger.info(
             f"Input ids are automatically padded from {input_shape[-1]} to {input_shape[-1] + padding_length} to be a "
-            f"multiple of `chunk_length`: {padded_seq_length}"
+            f"multiple of `config.chunk_length`: {padded_seq_length}"
         )
 
         padded_input_ids = paddle.full(
             (input_shape[0], padding_length),
-            self.pad_token_id,
+            self.config.pad_token_id,
             dtype=paddle.int64,
         )
 
@@ -2378,21 +2403,28 @@ class ReformerModel(ReformerPretrainedModel):
             attention_mask = paddle.concat(
                 [
                     paddle.ones(input_shape, dtype=paddle.int64),
-                    paddle.zeros(shape=(input_shape[0], padding_length), dtype=paddle.int64),
+                    paddle.zeros((input_shape[0], padding_length), dtype=paddle.int64),
                 ],
                 axis=-1,
             )
 
-        input_ids = paddle.concat([paddle.cast(input_ids, dtype="int64"), padded_input_ids], axis=-1)
-        input_shape = input_ids.shape
+        # Extend `input_ids` with padding to match least common multiple chunk_length
+        if input_ids is not None:
+            input_ids = paddle.concat([paddle.cast(input_ids, dtype="int64"), padded_input_ids], axis=-1)
+            input_shape = input_ids.shape
 
-        # Pad position ids if given
-        if position_ids is not None:
-            padded_position_ids = paddle.arange(input_shape[-1], padded_seq_length)
-            padded_position_ids = position_ids.unsqueeze(0).expand(shape=[input_shape[0], padding_length])
-            position_ids = paddle.concat([position_ids, padded_position_ids], axis=-1)
+            # Pad position ids if given
+            if position_ids is not None:
+                padded_position_ids = paddle.arange(input_shape[-1], padded_seq_length, dtype=paddle.int64)
+                padded_position_ids = position_ids.unsqueeze(0).expand(input_shape[0], padding_length)
+                position_ids = paddle.concat([position_ids, padded_position_ids], axis=-1)
 
-        return input_ids, attention_mask, position_ids, input_shape
+        # Extend `inputs_embeds` with padding to match least common multiple chunk_length
+        if inputs_embeds is not None:
+            padded_inputs_embeds = self.embeddings(padded_input_ids, position_ids)
+            inputs_embeds = paddle.concat([inputs_embeds, padded_inputs_embeds], axis=-2)
+            input_shape = inputs_embeds.shape
+        return input_ids, inputs_embeds, attention_mask, position_ids, input_shape
 
 
 class ReformerModelWithLMHead(ReformerPretrainedModel):
@@ -2443,6 +2475,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
         num_hashes: Optional[int] = None,
         cache: Optional[List[Tuple[Tensor]]] = None,
         use_cache: Optional[bool] = False,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[Tensor] = None,
         output_attentions: Optional[Tensor] = None,
@@ -2462,6 +2495,8 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             use_cache (bool, optional):
                 See :class:`ReformerModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
             labels (Tensor, optional):
                 Labels for language modeling. Note that the labels **are shifted**
                 inside the model, i.e. you can set `labels = input_ids` Indices are
@@ -2508,7 +2543,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
                 model = ReformerModelWithLMHead.from_pretrained('reformer-crime-and-punishment')
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=inputs["input_ids"])
 
@@ -2524,6 +2559,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
             num_hashes=num_hashes,
             cache=cache,
             use_cache=use_cache,
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
         )
@@ -2592,6 +2628,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         num_hashes: Optional[int] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -2608,6 +2645,8 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
             labels (Tensor, optional):
                 Labels for computing the masked language modeling loss.
                 Indices should be in ``[-100, 0, ..., vocab_size]``
@@ -2655,7 +2694,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 model = ReformerForMaskedLM.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=inputs["input_ids"])
 
@@ -2671,6 +2710,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             attention_mask=attention_mask,
             num_hashes=num_hashes,
             use_cache=False,  # no causal mask
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
@@ -2731,6 +2771,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         num_hashes: Optional[int] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -2747,6 +2788,8 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 See :class:`ReformerModel`.
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
             labels (Tensor, optional):
                 Labels for computing the sequence classification/regression loss. Indices
                 should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression
@@ -2791,7 +2834,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 model = ReformerForSequenceClassification.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=paddle.to_tensor([0]))
 
@@ -2806,6 +2849,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
             position_ids=position_ids,
             attention_mask=attention_mask,
             num_hashes=num_hashes,
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
@@ -2868,6 +2912,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
         num_hashes: Optional[int] = None,
         start_positions: Optional[Tensor] = None,
         end_positions: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -2897,6 +2942,8 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 (`sequence_length`). Position outside of the sequence
                 are not taken into account for computing the loss.
                 Shape is [batch_size,] and dtype is int64.
+            inputs_embeds (Tensor, optional):
+                See :class:`NeZhaModel`.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
             output_hidden_states (bool, optional):
@@ -2942,7 +2989,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 model = ReformerForQuestionAnswering.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
 
@@ -2958,6 +3005,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
             attention_mask=attention_mask,
             num_hashes=num_hashes,
             use_cache=False,  # no causal mask
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
