@@ -409,4 +409,6 @@ elif [ ${MODE} = "benchmark_train" ];then
     python -m pip install -e ../
     # python -m pip install paddlenlp    # PDC 镜像中安装失败
     python -m pip list
+    python -m pip install -e ../ppdiffusers
+
 fi
