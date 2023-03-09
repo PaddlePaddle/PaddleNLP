@@ -223,17 +223,22 @@ class GLMTokenizerMixin:
 
 class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
     model_input_names = ["input_ids", "position_ids", "attention_mask"]
-    resource_files_names = {"model_file": "cog-pretrain.model"}
+    resource_files_names = {"model_file": "cog-pretrain.model", "added_tokens_file": "added_tokens.json"}
     truncation_side: str = "left"
     pretrained_init_configuration = {
         "glm-large-chinese": {"do_lower_case": True},
         "glm-10b-chinese": {"do_lower_case": True},
     }
     cog_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/cog-pretrain.model"
+    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-chinese-added-tokens.json"
     pretrained_resource_files_map = {
         "model_file": {
             "glm-large-chinese": cog_model_link,
             "glm-10b-chinese": cog_model_link,
+        },
+        "added_tokens_file": {
+            "glm-large-chinese": added_tokens_link,
+            "glm-10b-chinese": added_tokens_link,
         },
     }
     max_model_input_sizes = {"glm-10b-chinese": 1024, "glm-large-chinese": 1024}
@@ -261,20 +266,6 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         self._model_file = model_file
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(model_file)
-        self.add_tokens(
-            [
-                "<|endoftext|>",
-                "[SEP]",
-                "[CLS]",
-                "[MASK]",
-                "[UNUSED1]",
-                "[UNUSED2]",
-                "<|startofpiece|>",
-                "<|endofpiece|>",
-                "[sMASK]",
-                "[gMASK]",
-            ]
-        )
 
     @property
     def vocab_size(self):
@@ -346,6 +337,7 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         "glm-2b": {},
         "glm-10b": {},
     }
+    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-added-tokens.json"
     pretrained_resource_files_map = {
         "vocab_file": {
             "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-vocab.json",
@@ -354,6 +346,10 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         "merges_file": {
             "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-merges.txt",
             "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-merges.txt",
+        },
+        "added_tokens_file": {
+            "glm-2b": added_tokens_link,
+            "glm-10b": added_tokens_link,
         },
     }
     max_model_input_sizes = {
@@ -371,9 +367,6 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         **kwargs
     ):
         super().__init__(cls_token=cls_token, sep_token=sep_token, pad_token=pad_token, eos_token=eos_token, **kwargs)
-        self.add_tokens(
-            ["<|startofpiece|>", "<|endofpiece|>", "[CLS]", "[MASK]", "[SEP]", "[UNUSED]", "[gMASK]", "[sMASK]"]
-        )
 
     def build_inputs_with_special_tokens(self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None):
         if token_ids_1 is not None:
