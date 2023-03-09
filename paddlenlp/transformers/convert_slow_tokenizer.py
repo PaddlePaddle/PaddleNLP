@@ -108,6 +108,10 @@ class TinyBertConverter(BertConverter):
     pass
 
 
+class NystromformerConverter(BertConverter):
+    pass
+
+
 # For sentencepiece tokenzier
 class SpmConverter(Converter):
     def __init__(self, *args):
@@ -265,7 +269,8 @@ SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
     "TinyBertTokenizer": TinyBertConverter,
-    "ErnieMTokenizer": ErnieMConverter
+    "ErnieMTokenizer": ErnieMConverter,
+    "NystromformerTokenizer": NystromformerConverter
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 
