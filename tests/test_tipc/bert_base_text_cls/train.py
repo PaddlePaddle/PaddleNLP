@@ -153,8 +153,6 @@ def do_train(args):
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
