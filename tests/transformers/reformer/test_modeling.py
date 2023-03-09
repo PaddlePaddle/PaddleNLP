@@ -553,6 +553,7 @@ class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest
     base_model_class = ReformerModel
     return_dict: bool = False
     use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     def setUp(self):
         self.model_tester = ReformerModelTester(self)
@@ -642,6 +643,7 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     base_model_class = ReformerModel
     return_dict: bool = False
     use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     def setUp(self):
         self.model_tester = ReformerModelTester(
