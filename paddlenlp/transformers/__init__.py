@@ -198,6 +198,9 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .glm.configuration import *
+from .glm.modeling import *
+from .glm.tokenizer import *
 from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *

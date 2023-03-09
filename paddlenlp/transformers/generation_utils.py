@@ -400,7 +400,7 @@ class GenerationMixin(object):
         # update position_ids
         if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[:, -1:] + 1], axis=-1)
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         # update attention_mask
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
