@@ -202,7 +202,8 @@ def _transformer_decoder_fwd(
     for i, mod in enumerate(self.layers):
         if cache is None:
             # if output has no gradient, recompute is unnecessary
-            has_gradient = not tgt.stop_gradient
+            memory_stop_gradient = memory is not None and memory.stop_gradient
+            has_gradient = (not tgt.stop_gradient) or (not memory_stop_gradient)
             if self.enable_recompute and has_gradient:
                 outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask, None, output_attentions)
             else:

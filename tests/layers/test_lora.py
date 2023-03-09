@@ -18,6 +18,7 @@ import re
 import unittest
 from tempfile import TemporaryDirectory
 
+import numpy as np
 import paddle
 
 from paddlenlp.layers import LoRALinear, get_lora_model
@@ -26,7 +27,7 @@ from paddlenlp.transformers import AutoModel
 
 class TestLoraLayer(unittest.TestCase):
     def test_forward(self):
-        lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
         x = paddle.randn([2, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
@@ -60,7 +61,7 @@ class TestLoraLayer(unittest.TestCase):
 
     def test_load_regular_linear(self):
         with TemporaryDirectory() as tempdir:
-            regular_linear = LoRALinear(in_features=16, out_features=8)
+            regular_linear = paddle.nn.Linear(in_features=16, out_features=8)
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
@@ -77,7 +78,10 @@ class TestLoraLayer(unittest.TestCase):
 class TestLoraModel(unittest.TestCase):
     def test_get_lora_model(self):
         lora_config = {"target_modules": [".*q_proj.*", ".*v_proj.*"], "r": 4, "lora_alpha": 8}
-        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        # turn off plm dropout for to test train vs test
+        model = AutoModel.from_pretrained(
+            "__internal_testing__/tiny-random-bert", hidden_dropout_prob=0, attention_probs_dropout_prob=0
+        )
         lora_model = get_lora_model(model, lora_config)
         state_dict = lora_model.state_dict()
         for weight_name in state_dict:
@@ -87,3 +91,14 @@ class TestLoraModel(unittest.TestCase):
                         self.assertFalse(state_dict[weight_name].stop_gradient)
                     else:
                         self.assertTrue(state_dict[weight_name].stop_gradient)
+        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
+        model.train()
+        train_forward_results = model(input_ids)
+        self.assertIsNotNone(train_forward_results)
+        model.eval()
+        eval_forward_results = model(input_ids)
+        self.assertIsNotNone(eval_forward_results)
+        for i, j in zip(train_forward_results, eval_forward_results):
+            print(i[:2, :2])
+            print(j[:2, :2])
+            self.assertTrue(paddle.allclose(i, j))

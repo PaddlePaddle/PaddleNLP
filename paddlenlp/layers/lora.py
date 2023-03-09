@@ -88,7 +88,8 @@ class LoRALinear(nn.Linear):
             return F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
 
     def extra_repr(self):
-        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}, name={self.name if self.name else ''}"
+        name = f", name={self.name}" if self.name else ""
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
 # TODO (this is tmp API. will formalize before release)
