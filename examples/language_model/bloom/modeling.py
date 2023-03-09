@@ -110,8 +110,8 @@ def _make_causal_mask(input_ids_shape, past_key_values_length: int) -> Tensor:
     if past_key_values_length > 0:
         mask[:, :past_key_values_length] = False
 
-    expanded_mask = mask[None, None, :, :].expand(
-        [batch_size, 1, target_length, target_length + past_key_values_length]
+    expanded_mask = mask.unsqueeze(0).expand(
+        [batch_size, target_length, target_length + past_key_values_length]
     )
     return expanded_mask
 
@@ -123,10 +123,10 @@ def _expand_mask(mask: Tensor, tgt_length: int) -> Tensor:
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    expanded_mask = ~(paddle.cast(mask[:, None, None, :], "bool"))
+    expanded_mask = ~(paddle.cast(mask[:, None, :], "bool"))
     expanded_mask = paddle.cast(expanded_mask, dtype=paddle.float32)
 
-    return expanded_mask.expand([batch_size, 1, tgt_length, src_length])
+    return expanded_mask.expand([batch_size, tgt_length, src_length])
 
 
 def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
@@ -166,7 +166,8 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
     arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
     alibi = slopes[..., None] * arange_tensor
-    return paddle.cast(alibi.reshape([-1, 1, seq_length]), dtype)
+    return alibi
+    return paddle.cast(alibi, dtype)
     # return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
 
 
@@ -323,27 +324,22 @@ class BloomAttention(nn.Layer):
         self.head_dim = self.hidden_size // self.num_heads
         self.split_size = self.hidden_size
         self.hidden_dropout = config.hidden_dropout
-
-        if self.head_dim * self.num_heads != self.hidden_size:
-            raise ValueError(
-                f"`hidden_size` must be divisible by num_heads (got `hidden_size`: {self.hidden_size} and `num_heads`:"
-                f" {self.num_heads})."
-            )
+     
+        assert self.num_heads % config.mp_degree == 0
+        self.num_heads = self.num_heads // config.mp_degree 
 
         # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
         self.beta = 1.0
 
-        if config.is_mp:
+        if config.mp_degree > 1:
             self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size, 3 * self.hidden_size, has_bias=True, gather_output=False
             )
         else:
             self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias_attr=True)
         
-        if config.is_mp:
-            #self.out_proj = fleet.meta_parallel.RowParallelLinear(
-            #      self.hidden_size, self.hidden_size, weight_attr=weight_attr, has_bias=True, input_is_parallel=True)
+        if config.mp_degree > 1:
             #TODO(wawltor) The weight_attr
             self.dense = fleet.meta_parallel.RowParallelLinear(
                   self.hidden_size, self.hidden_size, has_bias=True, input_is_parallel=True)
@@ -435,12 +431,12 @@ class BloomAttention(nn.Layer):
 
         # [batch_size * num_heads, q_length, kv_length]
         # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
-        matmul_result = baddbmm(
+        attention_scores = baddbmm(
             alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
         )
 
         # change view to [batch_size, num_heads, q_length, kv_length]
-        attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
+        #attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = attention_scores.dtype
@@ -495,7 +491,7 @@ class BloomMLP(nn.Layer):
 
         self.pretraining_tp = config.pretraining_tp
         self.slow_but_exact = config.slow_but_exact
-        if config.is_mp:
+        if config.mp_degree > 1:
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
                 hidden_size, 4 * hidden_size, gather_output=False, has_bias=True
             )
@@ -856,6 +852,15 @@ class BloomModel(BloomPreTrainedModel):
             input_shape=(batch_size, seq_length),
             past_key_values_length=past_key_values_length,
         )
+        if self.config.mp_rank >= 0:
+            block_size = self.config.n_head // self.config.mp_degree
+            alibi = alibi[:, self.mp_rank * block_size: (self.mp_rank + 1) * block_size]
+            alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
+            causal_mask = paddle.cast(paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), block_size, axis=0), 'bool')
+        else:
+            alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length_with_past])
+            causal_mask = paddle.cast(paddle.cast(paddle.repeat_interleave(causal_mask, self.config.n_head, axis=0), 'int32'), 'bool')
+
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             if output_hidden_states:

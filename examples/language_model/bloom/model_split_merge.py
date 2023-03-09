@@ -96,7 +96,8 @@ def construct_sub_model_name_or_path(model_name_or_path, mp_degree, sharding_deg
     sub_directory_name = os.path.join(model_name_or_path, "splits_mp_{:0>2d}_sharding_{:0>2d}".format(mp_degree, sharding_degree))
     return sub_directory_name
 
-def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree, as_float32=True):
+# TODO(wawltor) just support the model parallel
+def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree, as_float32=False):
     # Get the 3D rank 
     is_path = True if os.path.exists(model_name_or_path) else False 
     if not is_path:

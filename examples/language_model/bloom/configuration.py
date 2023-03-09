@@ -48,7 +48,8 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
          "slow_but_exact": False,
          "unk_token_id": 0,
          "vocab_size": 250880,
-         "is_mp": False
+         "mp_degree": 1,
+         "mp_rank": -1,
    }
 }
 
@@ -121,7 +122,8 @@ class BloomConfig(PretrainedConfig):
         pretraining_tp=1,  # TP rank used when training with megatron
         dtype="bfloat16",
         slow_but_exact=False,
-        is_mp=False,
+        mp_degree=1,
+        mp_rank=0,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -142,6 +144,7 @@ class BloomConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
-        self.is_mp = is_mp 
+        self.mp_degree = mp_degree
+        self.mp_rank = mp_rank
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
