@@ -329,6 +329,27 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
 
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens: bool = False):
+        if already_has_special_tokens:
+            raise ValueError(
+                "You should not supply a second sequence if the provided sequence of "
+                "ids is already formatted with special tokens for the model."
+            )
+            return list(map(lambda x: 1 if x in [self.eos_token_id, self.cls_token_id] else 0, token_ids_0))
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is ignored.")
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is ignored.")
+        return len([self.cls_token_id] + token_ids_0 + [self.eos_token_id]) * [0]
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
 
 class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
     model_input_names = ["input_ids", "position_ids", "attention_mask"]
@@ -359,6 +380,8 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
 
     def __init__(
         self,
+        vocab_file,
+        merges_file,
         cls_token="[CLS]",
         sep_token="[SEP]",
         mask_token="[MASK]",
@@ -366,7 +389,15 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         eos_token="<|endoftext|>",
         **kwargs
     ):
-        super().__init__(cls_token=cls_token, sep_token=sep_token, pad_token=pad_token, eos_token=eos_token, **kwargs)
+        super().__init__(
+            vocab_file=vocab_file,
+            merges_file=merges_file,
+            cls_token=cls_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            eos_token=eos_token,
+            **kwargs,
+        )
 
     def build_inputs_with_special_tokens(self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None):
         if token_ids_1 is not None:
@@ -374,6 +405,27 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         cls = [self.cls_token_id]
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
+
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens: bool = False):
+        if already_has_special_tokens:
+            raise ValueError(
+                "You should not supply a second sequence if the provided sequence of "
+                "ids is already formatted with special tokens for the model."
+            )
+            return list(map(lambda x: 1 if x in [self.eos_token_id, self.cls_token_id] else 0, token_ids_0))
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is ignored.")
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
+        if token_ids_1 is not None:
+            logger.warning("Support single input text and the second one is ignored.")
+        return len([self.cls_token_id] + token_ids_0 + [self.eos_token_id]) * [0]
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
 
 class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
