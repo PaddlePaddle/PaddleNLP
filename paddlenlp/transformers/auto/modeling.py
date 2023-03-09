@@ -78,6 +78,7 @@ MAPPING_NAMES = OrderedDict(
         ("LayoutXLM", "layoutxlm"),
         ("LayoutLMv2", "layoutlmv2"),
         ("LayoutLM", "layoutlm"),
+        ("LLaMA", "llama"),
         ("Luke", "luke"),
         ("MBart", "mbart"),
         ("MegatronBert", "megatronbert"),
