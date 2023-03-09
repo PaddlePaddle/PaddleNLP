@@ -25,28 +25,30 @@ from paddle.io import Dataset
 from scipy.special import expit as sigmoid
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.prompt import (
+from ...data import DataCollatorWithPadding
+from ...prompt import (
     AutoTemplate,
     PromptDataCollatorWithPadding,
     PromptModelForSequenceClassification,
     PromptTrainer,
     PromptTuningArguments,
     SoftVerbalizer,
+    UTCTemplate,
 )
-from paddlenlp.taskflow import Taskflow
-from paddlenlp.trainer import EarlyStoppingCallback, Trainer, TrainingArguments
-from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers import (
+from ...taskflow import Taskflow
+from ...trainer import EarlyStoppingCallback, Trainer, TrainingArguments
+from ...trainer.trainer_utils import EvalPrediction
+from ...transformers import (
+    UTC,
     AutoModelForMaskedLM,
     AutoModelForSequenceClassification,
     AutoTokenizer,
     PretrainedTokenizer,
     export_model,
 )
-from paddlenlp.utils.log import logger
-
+from ...utils.log import logger
 from .auto_trainer_base import AutoTrainerBase
+from .utils import UTCLoss
 
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
@@ -112,7 +114,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return TrainingArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
-            metric_for_best_model="accuracy",
+            metric_for_best_model="accuracy" if self.problem_type == "multi_class" else "macro_f1",
             greater_is_better=True,
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
@@ -127,7 +129,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return PromptTuningArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
-            metric_for_best_model="accuracy",
+            metric_for_best_model="accuracy" if self.problem_type == "multi_class" else "macro_f1",
             greater_is_better=True,
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
@@ -177,6 +179,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             [
                 "ernie-1.0-large-zh-cw",  # 24-layer, 1024-hidden, 16-heads, 272M parameters.
                 "ernie-1.0-base-zh-cw",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+            ],
+        )
+        chinese_utc_models = hp.choice(
+            "utc_models",
+            [
+                "utc-xbase",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
+                "utc-base",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+                "utc-medium",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
+                "utc-mini",  # 6-layer, 384-hidden, 12-heads, 27M parameters
+                "utc-micro",  # 4-layer, 384-hidden, 12-heads, 23M parameters
+                "utc-nano",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
             ],
         )
         return [
@@ -231,7 +244,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "prompt",
                 "language": "Chinese",
                 "trainer_type": "PromptTrainer",
-                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
                 "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
@@ -244,7 +257,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "preset": "prompt",
                 "language": "English",
                 "trainer_type": "PromptTrainer",
-                "template.prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
+                "prompt": "{'mask'}{'soft'}“{'text': '" + self.text_column + "'}”",
                 "early_stopping_patience": 5,
                 "per_device_train_batch_size": train_batch_size,
                 "per_device_eval_batch_size": train_batch_size * 2,
@@ -252,6 +265,18 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "model_name_or_path": english_prompt_models,
                 "learning_rate": 1e-5,
                 "ppt_learning_rate": 1e-4,
+            },
+            # utc tuning candidates
+            {
+                "preset": "utc",
+                "language": "Chinese",
+                "trainer_type": "PromptTrainer",
+                "early_stopping_patience": 5,
+                "per_device_train_batch_size": train_batch_size,
+                "per_device_eval_batch_size": train_batch_size * 2,
+                "num_train_epochs": 100,
+                "model_name_or_path": chinese_utc_models,
+                "learning_rate": 1e-5,
             },
         ]
 
@@ -335,6 +360,36 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 compute_metrics=self._compute_metrics,
                 callbacks=callbacks,
             )
+        elif model_config["trainer_type"] == "PromptTrainer" and "utc" in model_config["model_name_or_path"]:
+            model_path = model_config["model_name_or_path"]
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            model = UTC.from_pretrained(model_path)
+            max_length = model_config.get("max_length", model.config.max_position_embeddings)
+
+            training_args = self._override_hp(model_config, self._default_prompt_tuning_arguments)
+            processed_train_dataset = self._preprocess_dataset(
+                self.train_dataset, max_length, tokenizer, model_config["trainer_type"], is_utc=True
+            )
+            processed_eval_dataset = self._preprocess_dataset(
+                self.eval_dataset, max_length, tokenizer, model_config["trainer_type"], is_utc=True
+            )
+
+            template = UTCTemplate(tokenizer=tokenizer, max_length=max_length)
+            criterion = UTCLoss()
+            prompt_model = PromptModelForSequenceClassification(
+                model, template, None, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
+            )
+
+            trainer = PromptTrainer(
+                model=prompt_model,
+                tokenizer=tokenizer,
+                args=training_args,
+                criterion=criterion,
+                train_dataset=processed_train_dataset,
+                eval_dataset=processed_eval_dataset,
+                callbacks=callbacks,
+                compute_metrics=self._compute_metrics,
+            )
         elif model_config["trainer_type"] == "PromptTrainer":
             model_path = model_config["model_name_or_path"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -350,7 +405,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
 
             template = AutoTemplate.create_from(
-                prompt=model_config["template.prompt"], tokenizer=tokenizer, max_length=max_length, model=model
+                prompt=model_config["prompt"], tokenizer=tokenizer, max_length=max_length, model=model
             )
             verbalizer = SoftVerbalizer(label_words=self.id2label, tokenizer=tokenizer, model=model)
             prompt_model = PromptModelForSequenceClassification(
@@ -390,12 +445,16 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         if eval_dataset is not None:
             self._data_checks_and_inference([eval_dataset])
+            is_utc = False
             if model_config["trainer_type"] == "PromptTrainer":
-                max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+                if "utc" in model_config["model_name_or_path"]:
+                    is_utc = True
+                max_length = model_config.get("max_length", trainer.pretrained_model.config.max_position_embeddings)
             else:
                 max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
+
             processed_eval_dataset = self._preprocess_dataset(
-                eval_dataset, max_length, trainer.tokenizer, model_config["trainer_type"]
+                eval_dataset, max_length, trainer.tokenizer, model_config["trainer_type"], is_utc=is_utc
             )
             eval_metrics = trainer.evaluate(eval_dataset=processed_eval_dataset)
         else:
@@ -432,12 +491,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
         )
 
+        is_utc = False
         if model_config["trainer_type"] == "PromptTrainer":
-            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+            if "utc" in model_config["model_name_or_path"]:
+                is_utc = True
+            max_length = model_config.get("max_length", trainer.pretrained_model.config.max_position_embeddings)
         else:
             max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
         processed_test_dataset = self._preprocess_dataset(
-            test_dataset, max_length, trainer.tokenizer, model_config["trainer_type"], is_test=is_test
+            test_dataset, max_length, trainer.tokenizer, model_config["trainer_type"], is_test=is_test, is_utc=is_utc
         )
         test_output = trainer.predict(test_dataset=processed_test_dataset)
         trainer.log_metrics("test", test_output.metrics)
@@ -459,12 +521,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             return self._compute_multi_label_metrics(eval_preds=eval_preds)
 
     def _compute_multi_class_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
+        if len(eval_preds.label_ids[0]) > 1:
+            label_ids = np.argmax(eval_preds.label_ids, axis=-1)
+        else:
+            label_ids = eval_preds.label_ids
+
         pred_ids = np.argmax(eval_preds.predictions, axis=-1)
         metrics = {}
-        metrics["accuracy"] = accuracy_score(y_true=eval_preds.label_ids, y_pred=pred_ids)
+        metrics["accuracy"] = accuracy_score(y_true=label_ids, y_pred=pred_ids)
         for average in ["micro", "macro"]:
             precision, recall, f1, _ = precision_recall_fscore_support(
-                y_true=eval_preds.label_ids, y_pred=pred_ids, average=average
+                y_true=label_ids, y_pred=pred_ids, average=average
             )
             metrics[f"{average}_precision"] = precision
             metrics[f"{average}_recall"] = recall
@@ -487,13 +554,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             metrics[f"{average}_f1"] = f1
         return metrics
 
-    def _preprocess_labels(self, example):
-        if self.problem_type == "multi_class":
-            example["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
-        # multi_label
-        else:
-            labels = [1.0 if i in example[self.label_column] else 0.0 for i in self.label2id]
-            example["labels"] = paddle.to_tensor(labels, dtype="float32")
+    def _preprocess_labels(self, example, is_test=False, is_utc=False):
+        if is_utc:
+            example["choices"] = list(self.label2id.keys())
+            example["text_a"] = example[self.text_column]
+            example["text_b"] = ""
+        if not is_test:
+            if is_utc or self.problem_type == "multi_label":
+                labels = [1.0 if i in example[self.label_column] else 0.0 for i in self.label2id]
+                example["labels"] = paddle.to_tensor(labels, dtype="float32")
+            elif self.problem_type == "multi_class":
+                example["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
         return example
 
     def _preprocess_fn(
@@ -518,14 +589,13 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         tokenizer: PretrainedTokenizer,
         trainer_type: str,
         is_test: bool = False,
+        is_utc: bool = False,
     ):
         """
         Preprocess dataset from raw features to input features used by the Trainer or PromptTrainer.
         """
         if trainer_type == "PromptTrainer":
-            if is_test:
-                return dataset
-            trans_func = self._preprocess_labels
+            trans_func = functools.partial(self._preprocess_labels, is_utc=is_utc, is_test=is_test)
         elif trainer_type == "Trainer":
             trans_func = functools.partial(
                 self._preprocess_fn,
@@ -558,7 +628,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         with open(os.path.join(export_path, "taskflow_config.json"), "r") as f:
             taskflow_config = json.load(f)
 
-        taskflow_config["task_path"] = export_path
         taskflow_config["batch_size"] = batch_size
         taskflow_config["precision"] = precision
 
@@ -584,14 +653,21 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         # Check whether it has been exported before
         is_exported = False
         if os.path.exists(default_export_path):
-            if model_config["trainer_type"] == "PromptTrainer":
+            if "utc" in model_config["model_name_or_path"]:
                 files = [
                     "model.pdiparams",
                     "model.pdmodel",
                     "tokenizer_config.json",
                     "vocab.txt",
                     "taskflow_config.json",
-                    "plm",
+                ]
+            elif model_config["trainer_type"] == "PromptTrainer":
+                files = [
+                    "model.pdiparams",
+                    "model.pdmodel",
+                    "tokenizer_config.json",
+                    "vocab.txt",
+                    "taskflow_config.json",
                     "template_config.json",
                     "verbalizer_config.json",
                 ]
@@ -630,13 +706,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         # Save static model
         if compress:
             self.compress(trial_id=trial_id, compress_path=export_path)
-            if model_config["trainer_type"] == "PromptTrainer":
+            if model_config["trainer_type"] == "PromptTrainer" and "utc" not in model_config["model_name_or_path"]:
                 trainer.template.save(export_path)
                 trainer.verbalizer.save(export_path)
-                trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
+        elif "utc" in model_config["model_name_or_path"]:
+            input_spec = self._get_input_spec(trainer_type=model_config["trainer_type"], trainer=trainer)
+            export_model(model=trainer.pretrained_model, input_spec=input_spec, path=export_path)
         elif model_config["trainer_type"] == "PromptTrainer":
             trainer.export_model(export_path)
-            trainer.model.plm.save_pretrained(os.path.join(export_path, "plm"))
         else:
             input_spec = self._get_input_spec(trainer_type=model_config["trainer_type"], trainer=trainer)
             export_model(model=trainer.model, input_spec=input_spec, path=export_path)
@@ -645,21 +722,40 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         trainer.tokenizer.save_pretrained(export_path)
 
         # save taskflow config file
-        if model_config["trainer_type"] == "PromptTrainer":
-            mode = "prompt"
-            max_length = model_config.get("max_length", trainer.model.plm.config.max_position_embeddings)
+        if "utc" in model_config["model_name_or_path"]:
+            taskflow_config = {
+                "task": "zero_shot_text_classification",
+                "model": model_config["model_name_or_path"],
+                "schema": list(self.label2id.keys()),
+                "single_label": True if self.problem_type == "multi_class" else False,
+                "is_static_model": True,
+                "pred_threshold": self.multilabel_threshold,
+                "max_seq_len": model_config.get("max_length", trainer.pretrained_model.config.max_position_embeddings),
+                "task_path": export_path,
+            }
+        elif model_config["trainer_type"] == "PromptTrainer":
+            taskflow_config = {
+                "task": "text_classification",
+                "mode": "prompt",
+                "is_static_model": True,
+                "problem_type": self.problem_type,
+                "multilabel_threshold": self.multilabel_threshold,
+                "max_length": model_config.get("max_length", trainer.pretrained_model.config.max_position_embeddings),
+                "id2label": self.id2label,
+                "plm_model_name": model_config["model_name_or_path"],
+                "task_path": export_path,
+            }
         else:
-            mode = "finetune"
-            max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
-        taskflow_config = {
-            "task": "text_classification",
-            "mode": mode,
-            "is_static_model": True,
-            "problem_type": self.problem_type,
-            "multilabel_threshold": self.multilabel_threshold,
-            "max_length": max_length,
-            "id2label": self.id2label,
-        }
+            taskflow_config = {
+                "task": "text_classification",
+                "mode": "finetune",
+                "is_static_model": True,
+                "problem_type": self.problem_type,
+                "multilabel_threshold": self.multilabel_threshold,
+                "max_length": model_config.get("max_length", trainer.model.config.max_position_embeddings),
+                "id2label": self.id2label,
+                "task_path": export_path,
+            }
 
         with open(os.path.join(export_path, "taskflow_config.json"), "w", encoding="utf-8") as f:
             json.dump(taskflow_config, f, ensure_ascii=False)
@@ -683,15 +779,26 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if trainer_type is None:
             raise ValueError("trainer_type should not be None when trainer is not None")
 
-        if trainer_type == "PromptTrainer":
-            input_spec = trainer.model.get_input_spec()
-        elif trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
-            input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
-        else:
+        if trainer_type == "Trainer":
+            if trainer.model.init_config["init_class"] in ["ErnieMForSequenceClassification"]:
+                input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
+            else:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                ]
+        elif trainer_type == "PromptTrainer" and trainer.pretrained_model.init_config["init_class"] in ["UTC"]:
             input_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="omask_positions"),
+                paddle.static.InputSpec(shape=[None], dtype="int64", name="cls_positions"),
             ]
+        else:
+            input_spec = trainer.model.get_input_spec()
+
         if os.path.exists(self.training_path):
             logger.info("Removing training checkpoints to conserve disk space")
             shutil.rmtree(self.training_path)
@@ -726,8 +833,19 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         export_path = os.path.join(model_result.log_dir, self.export_path)
         self.export(export_path=export_path, trial_id=trial_id)
         input_spec = self._get_input_spec(model_config=model_config)
-
-        if model_config["trainer_type"] == "PromptTrainer":
+        if "utc" in model_config["model_name_or_path"]:
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_result.log_dir, self.save_path))
+            model = UTC.from_pretrained(model_config["model_name_or_path"])
+            max_length = model_config.get("max_length", model.config.max_position_embeddings)
+            template = UTCTemplate(tokenizer, max_length)
+            inputs = [
+                template({"text_a": eval_ds[self.text_column], "text_b": "", "choices": list(self.label2id.keys())})
+                for eval_ds in self.eval_dataset
+            ]
+            collator = PromptDataCollatorWithPadding(
+                tokenizer, padding=True, return_tensors="np", return_attention_mask=True
+            )
+        elif model_config["trainer_type"] == "PromptTrainer":
             tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_result.log_dir, self.save_path))
             plm_model = AutoModelForMaskedLM.from_pretrained(model_config["model_name_or_path"])
             max_length = model_config.get("max_length", plm_model.config.max_position_embeddings)
@@ -740,9 +858,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
         else:
             tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_result.log_dir, self.save_path))
-            model = AutoModelForSequenceClassification.from_pretrained(
-                os.path.join(model_result.log_dir, self.save_path)
-            )
+            model = AutoModelForSequenceClassification.from_pretrained(model_config["model_name_or_path"])
             max_length = model_config.get("max_length", model.config.max_position_embeddings)
             inputs = [
                 tokenizer(eval_ds[self.text_column], max_length=max_length, truncation=True)
