@@ -246,75 +246,51 @@ def do_train(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
-                    all_loss = model(
-                        input_ids=masked_input_ids,
-                        raw_input_ids=input_ids,
-                        generator_labels=gen_labels,
+                    loss = model(
+                        input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
                     )
-                    (loss, gen_loss, rtd_loss, mts_loss, csp_loss) = all_loss
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
                 t_loss["loss"] += loss.detach()
-                t_loss["gen"] += gen_loss.detach()
-                t_loss["rtd"] += rtd_loss.detach()
-                t_loss["mts"] += mts_loss.detach()
-                t_loss["csp"] += csp_loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                all_loss = model(
-                    input_ids=masked_input_ids,
-                    raw_input_ids=input_ids,
-                    generator_labels=gen_labels,
+                loss = model(
+                    input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
                 )
-                (loss, gen_loss, rtd_loss, mts_loss, csp_loss) = all_loss
                 loss.backward()
                 t_loss["loss"] += loss.detach()
-                t_loss["gen"] += gen_loss.detach()
-                t_loss["rtd"] += rtd_loss.detach()
-                t_loss["mts"] += mts_loss.detach()
-                t_loss["csp"] += csp_loss.detach()
                 optimizer.step()
 
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
                 local_loss = dict(
-                    [(k, (t_loss[k] - log_loss[k]) / args.logging_steps) for k in ["loss", "gen", "rtd", "mts", "csp"]]
+                    [(k, (t_loss[k] - log_loss[k]) / args.logging_steps) for k in ["loss"]]
                 )
                 if paddle.distributed.get_world_size() > 1:
-                    for k in ["loss", "gen", "rtd", "mts", "csp"]:
-                        paddle.distributed.all_gather(loss_list[k], local_loss[k])
+                    paddle.distributed.all_gather(loss_list["loss"], local_loss["loss"])
                     if paddle.distributed.get_rank() == 0:
                         tmp_loss = dict(
                             [
                                 (k, float((paddle.stack(loss_list[k]).sum() / len(loss_list[k])).numpy()))
-                                for k in ["loss", "gen", "rtd", "mts", "csp"]
+                                for k in ["loss"]
                             ]
                         )
                         log_str = (
                             "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
-                            "avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, "
-                            "seq_contrastive: {8:.15f}, lr: {9:.10f}, speed: {10:.2f} s/it"
+                            "avg_loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
                         ).format(
                             global_step,
                             num_training_steps,
                             epoch,
                             step,
                             tmp_loss["loss"],
-                            tmp_loss["gen"],
-                            tmp_loss["rtd"],
-                            tmp_loss["mts"],
-                            tmp_loss["csp"],
                             optimizer.get_lr(),
                             (time.time() - tic_train) / args.logging_steps,
                         )
                         logger.info(log_str)
                         log_list.append(log_str)
-                        writer.add_scalar("generator_loss", tmp_loss["gen"], global_step)
-                        writer.add_scalar("rtd_loss", tmp_loss["rtd"] * 50, global_step)
-                        writer.add_scalar("mts_loss", tmp_loss["mts"] * 20, global_step)
-                        writer.add_scalar("csp_loss", tmp_loss["csp"], global_step)
                         writer.add_scalar("total_loss", tmp_loss["loss"], global_step)
                         writer.add_scalar("lr", optimizer.get_lr(), global_step)
                     loss_list = defaultdict(list)
@@ -322,31 +298,18 @@ def do_train(args):
                     local_loss = dict([(k, float(v)) for k, v in local_loss.items()])
                     log_str = (
                         "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
-                        "avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, "
-                        "seq_contrastive_loss: {8:.15f}, lr: {9:.10f}, speed: {10:.2f} s/it"
+                        "avg_loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
                     ).format(
                         global_step,
                         num_training_steps,
                         epoch,
                         step,
                         local_loss["loss"],
-                        local_loss["gen"],
-                        local_loss["rtd"],
-                        local_loss["mts"],
-                        local_loss["csp"],
                         optimizer.get_lr(),
                         (time.time() - tic_train) / args.logging_steps,
                     )
                     logger.info(log_str)
                     log_list.append(log_str)
-                    loss_dict = {
-                        "generator_loss": local_loss["gen"],
-                        "rtd_loss": local_loss["rtd"] * 50,
-                        "mts_loss": local_loss["mts"] * 20,
-                        "csp_loss": local_loss["csp"],
-                    }
-                    for k, v in loss_dict.items():
-                        writer.add_scalar("loss/%s" % k, v, global_step)
                     writer.add_scalar("total_loss", local_loss["loss"], global_step)
                     writer.add_scalar("lr", optimizer.get_lr(), global_step)
                 log_loss = dict(t_loss)

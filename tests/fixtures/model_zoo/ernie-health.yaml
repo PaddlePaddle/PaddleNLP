@@ -12,7 +12,7 @@ pretrain:
     save_steps: 5
     warmup_steps: 5
     warmup_ratio: 0.01
-    per_device_train_batch_size: 8
+    per_device_train_batch_size: 4
     overwrite_output_dir: true
     device: cpu
     eval_steps: 10
@@ -35,7 +35,7 @@ pretrain:
     max_grad_norm: 1.0 
     logging_steps: 20 
     dataloader_num_workers: 2 
-    device: cpu
+    device: gpu
     fp16: true
     fp16_opt_level: O1  
     do_train: true

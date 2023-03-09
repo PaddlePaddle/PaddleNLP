@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
+from dataclasses import dataclass
 
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
     MaskedLMOutput,
+    ModelOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
@@ -444,7 +446,14 @@ class ElectraDiscriminator(ElectraPretrainedModel):
         self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
         self.init_weights()
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+    ):
         r"""
 
         Args:
@@ -455,6 +464,8 @@ class ElectraDiscriminator(ElectraPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ElectraModel`.
 
         Returns:
@@ -476,7 +487,13 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+        )
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
         return logits
@@ -701,7 +718,12 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         """
 
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
 
         logits_rtd = self.discriminator_rtd(discriminator_sequence_output)
 
@@ -967,9 +989,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
     def __init__(self, config: ElectraConfig):
         super(ElectraForTotalPretraining, self).__init__(config)
-
         self.generator = ElectraGenerator(config)
-        self.discriminator = ErnieHealthDiscriminator(config)
+        self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
         self.init_weights()
 
@@ -1110,6 +1131,17 @@ class ElectraPooler(nn.Layer):
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
+@dataclass
+class ErnieHealthForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`ErnieHealthForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss of the ELECTRA objective.
+    """
+    loss: Optional[paddle.Tensor] = None
+
 
 class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
     """
@@ -1121,6 +1153,12 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         discriminator (:class:`ErnieHealthDiscriminator):
             An instance of :class:`ErnieHealthDiscriminator`.
     """
+    def __init__(self, config: ElectraConfig):
+        super(ErnieHealthForTotalPretraining, self).__init__(config)
+        self.generator = ElectraGenerator(config)
+        self.discriminator = ErnieHealthDiscriminator(config)
+        self.initializer_range = config.initializer_range
+        self.init_weights()
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample
@@ -1176,8 +1214,11 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         attention_mask=None,
         raw_input_ids=None,
         generator_labels=None,
+        return_dict: Optional[bool] = None,
     ):
         assert generator_labels is not None, "generator_labels should not be None, please check DataCollator"
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         generator_logits = self.generator(input_ids, token_type_ids, position_ids, attention_mask)
 
@@ -1196,19 +1237,20 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         else:
             attention_mask = attention_mask.astype("bool")
 
-        loss = None
-        gen_loss = None
-        rtd_loss = None
-        mts_loss = None
-        csp_loss = None
-        if generator_labels is not None:
+        total_loss = None
+        if generator_labels is not None and disc_labels is not None:
             loss_fct = ErnieHealthPretrainingCriterion(self.config)
-            loss, gen_loss, rtd_loss, mts_loss, csp_loss = loss_fct(
+            total_loss = loss_fct(
                 generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
             )
 
-        return loss, gen_loss, rtd_loss, mts_loss, csp_loss
+        if not return_dict:
+            # return total_loss
+            return total_loss
 
+        return ErnieHealthForPreTrainingOutput(
+            loss=total_loss
+        )
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
     """
@@ -1600,7 +1642,7 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
             + self.csp_weight * disc_csp_loss
         )
 
-        return loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss
+        return loss
 
 
 class ElectraForQuestionAnswering(ElectraPretrainedModel):
