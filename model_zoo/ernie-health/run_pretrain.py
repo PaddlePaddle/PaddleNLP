@@ -246,18 +246,14 @@ def do_train(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
-                    loss = model(
-                        input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
-                    )
+                    loss = model(input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels)
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
                 t_loss["loss"] += loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                loss = model(
-                    input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
-                )
+                loss = model(input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels)
                 loss.backward()
                 t_loss["loss"] += loss.detach()
                 optimizer.step()
@@ -265,9 +261,7 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
-                local_loss = dict(
-                    [(k, (t_loss[k] - log_loss[k]) / args.logging_steps) for k in ["loss"]]
-                )
+                local_loss = dict([(k, (t_loss[k] - log_loss[k]) / args.logging_steps) for k in ["loss"]])
                 if paddle.distributed.get_world_size() > 1:
                     paddle.distributed.all_gather(loss_list["loss"], local_loss["loss"])
                     if paddle.distributed.get_rank() == 0:
