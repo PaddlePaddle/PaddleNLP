@@ -524,10 +524,9 @@ class ReformerTesterMixin:
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_reformer_for_question_answering(*config_and_inputs)
 
-    """todo:
-        def test_reformer_cached_inference(self):
+    def test_reformer_cached_inference(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_cache(*config_and_inputs)"""
+        self.model_tester.create_and_check_cache(*config_and_inputs)
 
     def test_reformer_cached_generate(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
