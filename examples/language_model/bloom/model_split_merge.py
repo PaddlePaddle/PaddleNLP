@@ -122,7 +122,7 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
     # Generate the split files 
     state_dict = paddle.load(os.path.join(model_name_or_path, 'model_state.pdparams'), return_numpy=True)
     state_dict_splits = [copy.deepcopy(state_dict) for i in range(0, mp_degree)]  
-    merged_keys = MergedKeys(24)#config.num_hidden_layer*/)
+    merged_keys = MergedKeys(config.n_layer)
     #reversed_merged_keys = dict(zip(merged_keys.values(), merged_keys.keys()))
     for key, key_type in merged_keys.items():
         parameter = state_dict[key] 
@@ -149,24 +149,41 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
         paddle.save(state_dict_split, weight_name)
     return sub_directory_name
 
-def merge_model_parallel(model_path, config, as_float32=True):
-    weights_path = get_model_parallel_paramerters(model_path)
-    if len(weights_path) == 1:
-        return paddle.load(weights_path[0], return_numpy=True)
+def merge_model_parallel(model_name_or_path, config, as_float32=False):
+    # Get the 3D rank 
+    is_path = True if os.path.exists(model_name_or_path) else False 
+    if not is_path:
+        raise "Please input the path for the model" 
+    weight_file_name = os.path.join(model_name_or_path, "model_state.pdparams")
+    if os.path.exists(os.path.join(model_name_or_path, 'model_state.pdparams')):
+        return weight_file_name 
+    
+    # Collect the split files 
+    file_list = []
+    for file_name in os.listdir(model_name_or_path):
+        if file_name.count('model_state_mp') and file_name.count('pdparams'):
+            file_list.append(file_name) 
+    file_list.sort()
+    state_dict_list = []
+    for file_name in file_list:
+         state_dict = paddle.load(os.path.join(model_name_or_path, file_name), return_numpy=True)
+         state_dict_list.append(state_dict)
 
-    weights_list = []
-    for path in weights_path:
-        weights_list.append(paddle.load(path, return_numpy=True))
-
-    final_weight = copy.deepcopy(weights_list[0])
-    merged_keys = MergedKeys(config.num_hidden_layers)
-
+    # Merge the state_dict 
+    final_weight = copy.deepcopy(state_dict_list[0])
+    merged_keys = MergedKeys(config.n_layer)
+    print(state_dict_list[0].keys())
     for k, func_name in merged_keys.items():
         func = merge_columns if "col" == func_name else merge_rows
-        final_weight[k] = func([weight[k] for weight in weights_list])
+        k = "{}.{}".format(config.model_type, k)
+        final_weight[k] = func([weight[k] for weight in state_dict_list])
 
     if as_float32:
         for k in final_weight.keys():
             final_weight[k] = final_weight[k].astype("float32")
 
-    return final_weight
+    # Save the merge state dict
+    paddle.save(final_weight, weight_file_name)
+
+    return weight_file_name 
+    

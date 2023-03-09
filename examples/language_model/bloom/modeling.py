@@ -841,7 +841,7 @@ class BloomModel(BloomPreTrainedModel):
             logger.warning(
                 "Input_ids should be specified when generating attention_mask, otherwise no attention_mask."
             )
-            if input_ids is None:
+            if input_ids is not None:
                 attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
 
 
