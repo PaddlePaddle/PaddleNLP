@@ -50,24 +50,24 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output):
-    hcg = fleet.get_hybrid_communicate_group()
-    model_parallel_group = hcg.get_model_parallel_group()
-    world_size = hcg.get_model_parallel_world_size()
-    # rank = hcg.get_model_parallel_rank()
-
-    if world_size > 1:
-        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
-
-        if parallel_output:
-            return logits
-
-        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
-    else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
-        return logits
+#def parallel_matmul(lm_output, logit_weights, parallel_output):
+#    hcg = fleet.get_hybrid_communicate_group()
+#    model_parallel_group = hcg.get_model_parallel_group()
+#    world_size = hcg.get_model_parallel_world_size()
+#    # rank = hcg.get_model_parallel_rank()
+#
+#    if world_size > 1:
+#        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+#
+#        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+#
+#        if parallel_output:
+#            return logits
+#
+#        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+#    else:
+#        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+#        return logits
 
 def finfo(dtype):
     if dtype == paddle.float32:
@@ -441,12 +441,11 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = attention_scores.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        with paddle.amp.auto_cast(False):
-            if input_dtype == paddle.float16:
-                attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-            #attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
-            attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
+        if input_dtype == paddle.float16:
+            attention_scores = paddle.cast(attention_scores, paddle.float32)
+        attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+        #attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
+        attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
@@ -761,14 +760,14 @@ class BloomModel(BloomPreTrainedModel):
         self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int
     ) -> Tensor:
         # create causal mask
-        # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
+        # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
         combined_attention_mask = None
         _, src_length = input_shape
 
         if src_length > 1:
             combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
 
-        # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
+        # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
         expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
         combined_attention_mask = (
             expanded_attn_mask
@@ -859,7 +858,7 @@ class BloomModel(BloomPreTrainedModel):
             causal_mask = paddle.cast(paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), block_size, axis=0), 'bool')
         else:
             alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length_with_past])
-            causal_mask = paddle.cast(paddle.cast(paddle.repeat_interleave(causal_mask, self.config.n_head, axis=0), 'int32'), 'bool')
+            causal_mask = paddle.cast(paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), self.config.n_head, axis=0), 'bool')
 
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):

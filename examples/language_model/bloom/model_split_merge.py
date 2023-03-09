@@ -57,10 +57,10 @@ def MergedKeys(num_layers):
     ]
 
     Row = [
-       "h.0.self_attention.dense.bias",
+       #"h.0.self_attention.dense.bias",
        "h.0.self_attention.dense.weight",
        "h.0.mlp.dense_4h_to_h.weight",
-       "h.0.mlp.dense_4h_to_h.bias"
+      # "h.0.mlp.dense_4h_to_h.bias"
     ]
 
     for v in Column:
