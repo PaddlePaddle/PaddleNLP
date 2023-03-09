@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 from collections import UserDict
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
@@ -22,23 +21,17 @@ from paddle import Tensor
 from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.trainer import Trainer
+from paddlenlp.transformers.generation_utils import (
+    LogitsProcessorList,
+    MinLengthLogitsProcessor,
+    NoRepeatNGramLogitsProcessor,
+)
 
 
 class GLMTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
         super().__init__(**kwargs)
-        self.start_token = self.tokenizer.sop_token_id
-        self.end_token = self.tokenizer.eop_token_id
-        self.mask_token = self.tokenizer.smask_token_id
-        self.pad_token = self.tokenizer.pad_token_id
         self.do_generation = do_generation
-        self.processors = LogitsProcessorList()
-        if self.args.min_tgt_length > 0:
-            processor = MinLengthLogitsProcessor(self.args.min_tgt_length, self.end_token)
-            self.processors.append(processor)
-        if self.args.no_repeat_ngram_size > 0:
-            processor = NoRepeatNGramLogitsProcessor(self.args.no_repeat_ngram_size)
-            self.processors.append(processor)
 
     def compute_loss(
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], return_outputs: bool = False
@@ -89,123 +82,19 @@ class GLMTrainer(Trainer):
 
         model.eval()
         with paddle.no_grad():
-            tokens = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
-            position_ids = inputs["position_ids"]
-            batch_size = tokens.shape[0]
-            beam_scorer = BeamSearchScorer(
-                batch_size=batch_size,
-                max_length=self.args.out_seq_length,
-                num_beams=self.args.num_beams,
-                length_penalty=self.args.length_penalty,
-                do_early_stopping=False,
-            )
-            beam_scores = paddle.zeros([batch_size, self.args.num_beams], dtype="float32")
-            beam_scores[:, 1:] = -1e9
-            beam_scores = beam_scores.reshape(
-                [
-                    batch_size * self.args.num_beams,
-                ]
-            )
-            # Run the model forward.
-            counter = 0
-            while counter < self.args.tgt_length:
-                if counter == 0:
-                    next_token_logits, mems = model(
-                        input_ids=tokens,
-                        position_ids=position_ids,
-                        attention_mask=attention_mask,
-                    )
-                    seq_length = next_token_logits.shape[1]
-                    next_token_logits = next_token_logits[:, -1]
-                    next_token_logits = next_token_logits.unsqueeze(1).tile([1, self.args.num_beams, 1])
-                    next_token_logits = next_token_logits.reshape([batch_size * self.args.num_beams, -1])
-                    mems = [
-                        mem.unsqueeze(1)
-                        .tile([1, self.args.num_beams, 1, 1])
-                        .reshape([batch_size * self.args.num_beams, seq_length, -1])
-                        for mem in mems
-                    ]
-                    position_ids = paddle.ones([batch_size, self.args.num_beams, 2, 1], dtype=tokens.dtype)
-                    for i, text in enumerate(tokens.tolist()):
-                        mask_pos = text.index(self.mask_token)
-                        position_ids[i, :, 0] = mask_pos
-                    position_ids = position_ids.reshape([batch_size * self.args.num_beams, 2, 1])
-                    tokens = paddle.zeros([batch_size * self.args.num_beams, 0], dtype=tokens.dtype)
-                else:
-                    if not self.args.no_block_position:
-                        position_ids[:, 1] = counter + 1
-                    last_token = tokens[:, -1:]
-                    cur_attention_mask = paddle.zeros([batch_size * self.args.num_beams], dtype=tokens.dtype)
-                    next_token_logits, mems = model(
-                        input_ids=last_token,
-                        position_ids=position_ids,
-                        attention_mask=cur_attention_mask,
-                        cache=mems,
-                        use_cache=True,
-                    )
-                    next_token_logits = next_token_logits[:, -1]
-                next_token_logits = top_k_logits(next_token_logits, top_k=self.args.top_k, top_p=self.args.top_p)
-                next_token_scores = nn.functional.log_softmax(next_token_logits, axis=-1)
-                next_token_scores = self.processors(tokens, next_token_scores)
-                next_token_scores = next_token_scores + beam_scores[:, None].expand_as(next_token_scores)
-                vocab_size = next_token_scores.shape[-1]
-                next_token_scores = next_token_scores.reshape([batch_size, self.args.num_beams * vocab_size])
-
-                probs = nn.functional.softmax(next_token_scores, axis=-1)
-                if self.args.select_topk:
-                    _, next_tokens = paddle.topk(probs, k=2 * self.args.num_beams, axis=-1, largest=True)
-                else:
-                    next_tokens = paddle.multinomial(probs, num_samples=2 * self.args.num_beams)
-                next_token_scores = paddle.take_along_axis(next_token_scores, next_tokens, axis=-1)
-                next_token_scores = paddle.sort(next_token_scores, descending=True, axis=1)
-                _indices = paddle.argsort(next_token_scores, descending=True, axis=1)
-                next_tokens = paddle.take_along_axis(next_tokens, _indices, axis=-1)
-
-                next_indices = next_tokens // vocab_size
-                next_tokens = next_tokens % vocab_size
-                # stateless
-                beam_outputs = beam_scorer.process(
-                    tokens,
-                    next_token_scores,
-                    next_tokens,
-                    next_indices,
-                    eos_token_id=self.end_token,
-                    pad_token_id=self.pad_token,
-                )
-                beam_scores = beam_outputs["next_beam_scores"]
-                beam_next_tokens = beam_outputs["next_beam_tokens"]
-                beam_idx = beam_outputs["next_beam_indices"]
-                beam_next_tokens = beam_next_tokens.unsqueeze(-1)
-                if tokens.shape[1] == 0:
-                    tokens = beam_next_tokens
-                else:
-                    tokens = paddle.concat(
-                        [paddle.stack([tokens[i, :] for i in beam_idx.tolist()], axis=0), beam_next_tokens], axis=-1
-                    )
-                mems = [mem[beam_idx] for mem in mems] if mems else []
-                if beam_scorer.is_done:
-                    break
-                counter += 1
-            tokens, _, scores = beam_scorer.finalize(
-                tokens,
-                beam_scores,
-                next_tokens,
-                next_indices,
-                eos_token_id=self.end_token,
-                pad_token_id=self.pad_token,
-            )
-            all_preds = []
-            for i, text in enumerate(tokens.tolist()):
-                text = [token for token in text if token not in [self.end_token, self.pad_token]]
-                all_preds.append(text)
+            tokens = model.generate(
+                input_ids=inputs["input_ids"],
+                position_ids=inputs["position_ids"],
+                attention_mask=inputs["attention_mask"],
+            )[0]
+            all_preds = tokens.tolist()
             max_pred_length = max([len(x) for x in all_preds])
             for index, preds in enumerate(all_preds):
                 all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
 
             all_labels = []
-            for label, mask in zip(inputs["labels"].numpy(), attention_mask.numpy()):
-                label = [x for x in label[mask.astype("bool")][0] if x not in [self.end_token, self.pad_token, 0]]
+            for label, mask in zip(inputs["labels"].numpy(), inputs["attention_mask"].numpy()):
+                label = [x for x in label[mask.astype("bool")][0]]
                 all_labels.append(label)
             max_label_length = max([len(x) for x in all_labels])
             for index, labels in enumerate(all_labels):
@@ -230,9 +119,137 @@ class GLMTrainer(Trainer):
         return self.lr_scheduler
 
 
+@paddle.no_grad()
+def generate(
+    self,
+    input_ids=None,
+    position_ids=None,
+    attention_mask=None,
+    max_length=None,
+    tgt_length=256,
+    min_tgt_length=5,
+    num_beams=1,
+    length_penalty=0.0,
+    end_token_id=None,
+    pad_token_id=None,
+    mask_token_id=None,
+    no_block_position=True,
+    no_repeat_ngram_size=None,
+    select_topk=None,
+    top_k=0,
+    top_p=0.0,
+):
+
+    processors = LogitsProcessorList()
+    if min_tgt_length > 0:
+        processor = MinLengthLogitsProcessor(min_tgt_length, end_token_id)
+        processors.append(processor)
+    if no_repeat_ngram_size > 0:
+        processor = NoRepeatNGramLogitsProcessor(no_repeat_ngram_size)
+        processors.append(processor)
+
+    batch_size = input_ids.shape[0]
+    beam_scorer = BeamSearchScorer(
+        batch_size=batch_size,
+        max_length=max_length,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        do_early_stopping=False,
+    )
+    beam_scores = paddle.zeros([batch_size, num_beams], dtype="float32")
+    beam_scores[:, 1:] = -1e9
+    beam_scores = beam_scores.reshape([batch_size * num_beams])
+    # Run the model forward.
+    counter = 0
+    while counter < tgt_length:
+        if counter == 0:
+            next_token_logits, mems = self(
+                input_ids=input_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+            )
+            seq_length = next_token_logits.shape[1]
+            next_token_logits = next_token_logits[:, -1]
+            next_token_logits = next_token_logits.unsqueeze(1).tile([1, num_beams, 1])
+            next_token_logits = next_token_logits.reshape([batch_size * num_beams, -1])
+            mems = [
+                mem.unsqueeze(1).tile([1, num_beams, 1, 1]).reshape([batch_size * num_beams, seq_length, -1])
+                for mem in mems
+            ]
+            position_ids = paddle.ones([batch_size, num_beams, 2, 1], dtype=input_ids.dtype)
+            for i, text in enumerate(input_ids.tolist()):
+                mask_pos = text.index(mask_token_id)
+                position_ids[i, :, 0] = mask_pos
+            position_ids = position_ids.reshape([batch_size * num_beams, 2, 1])
+            input_ids = paddle.zeros([batch_size * num_beams, 0], dtype=input_ids.dtype)
+        else:
+            if not no_block_position:
+                position_ids[:, 1] = counter + 1
+            last_token = input_ids[:, -1:]
+            cur_attention_mask = paddle.zeros([batch_size * num_beams], dtype=input_ids.dtype)
+            next_token_logits, mems = self(
+                input_ids=last_token,
+                position_ids=position_ids,
+                attention_mask=cur_attention_mask,
+                cache=mems,
+                use_cache=True,
+            )
+            next_token_logits = next_token_logits[:, -1]
+        next_token_logits = top_k_logits(next_token_logits, top_k=top_k, top_p=top_p)
+        next_token_scores = nn.functional.log_softmax(next_token_logits, axis=-1)
+        next_token_scores = processors(input_ids, next_token_scores)
+        next_token_scores = next_token_scores + beam_scores[:, None].expand_as(next_token_scores)
+        vocab_size = next_token_scores.shape[-1]
+        next_token_scores = next_token_scores.reshape([batch_size, num_beams * vocab_size])
+
+        probs = nn.functional.softmax(next_token_scores, axis=-1)
+        if select_topk:
+            _, next_tokens = paddle.topk(probs, k=2 * num_beams, axis=-1, largest=True)
+        else:
+            next_tokens = paddle.multinomial(probs, num_samples=2 * num_beams)
+        next_token_scores = paddle.take_along_axis(next_token_scores, next_tokens, axis=-1)
+        next_token_scores = paddle.sort(next_token_scores, descending=True, axis=1)
+        _indices = paddle.argsort(next_token_scores, descending=True, axis=1)
+        next_tokens = paddle.take_along_axis(next_tokens, _indices, axis=-1)
+
+        next_indices = next_tokens // vocab_size
+        next_tokens = next_tokens % vocab_size
+        # stateless
+        beam_outputs = beam_scorer.process(
+            input_ids,
+            next_token_scores,
+            next_tokens,
+            next_indices,
+            eos_token_id=end_token_id,
+            pad_token_id=pad_token_id,
+        )
+        beam_scores = beam_outputs["next_beam_scores"]
+        beam_next_tokens = beam_outputs["next_beam_tokens"]
+        beam_idx = beam_outputs["next_beam_indices"]
+        beam_next_tokens = beam_next_tokens.unsqueeze(-1)
+        if input_ids.shape[1] == 0:
+            input_ids = beam_next_tokens
+        else:
+            input_ids = paddle.concat(
+                [paddle.stack([input_ids[i, :] for i in beam_idx.tolist()], axis=0), beam_next_tokens], axis=-1
+            )
+        mems = [mem[beam_idx] for mem in mems] if mems else []
+        if beam_scorer.is_done:
+            break
+        counter += 1
+    tokens, _, scores = beam_scorer.finalize(
+        input_ids,
+        beam_scores,
+        next_tokens,
+        next_indices,
+        eos_token_id=end_token_id,
+        pad_token_id=pad_token_id,
+    )
+    return tokens, scores
+
+
 def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
-    # This function has been mostly taken from huggingface conversational ai code at
-    # https://medium.com/huggingface/how-to-build-a-state-of-the-art-conversational-ai-with-transfer-learning-2d818ac26313
+    # This functiion is from https://github.com/THUDM/GLM/blob/main/generation_utils.py
 
     if top_k > 0:
         # Remove all tokens with a probability less than the last token of the top-k
@@ -259,115 +276,10 @@ def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
     return logits
 
 
-class LogitsProcessor(ABC):
-    """Abstract base class for all logit processors that can be applied during generation."""
-
-    def __call__(self, input_ids: Tensor, scores: Tensor) -> Tensor:
-        """Paddle method for processing logits."""
-        raise NotImplementedError(
-            f"{self.__class__} is an abstract class. Only classes inheriting this class can be called."
-        )
-
-
-class LogitsProcessorList(list):
-    def __call__(self, input_ids: Tensor, scores: Tensor) -> Tensor:
-        for processor in self:
-            scores = processor(input_ids, scores)
-        return scores
-
-
-class MinLengthLogitsProcessor(LogitsProcessor):
+class BeamSearchScorer(object):
     r"""
-    Enforcing a min-length by setting EOS probability to 0.
-    """
-
-    def __init__(self, min_length: int, eos_token_id: int):
-        if not isinstance(min_length, int) or min_length < 0:
-            raise ValueError(f"`min_length` has to be a positive integer, but is {min_length}")
-
-        if not isinstance(eos_token_id, int) or eos_token_id < 0:
-            raise ValueError(f"`eos_token_id` has to be a positive integer, but is {eos_token_id}")
-
-        self.min_length = min_length
-        self.eos_token_id = eos_token_id
-
-    def __call__(self, input_ids: Tensor, scores: Tensor) -> Tensor:
-        cur_len = input_ids.shape[-1]
-        if cur_len < self.min_length:
-            scores[:, self.eos_token_id] = -float("inf")
-        return scores
-
-
-class NoRepeatNGramLogitsProcessor(LogitsProcessor):
-    r"""
-    Enforces no repetition of n-grams. See `Fairseq
-    <https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345>`__.
-    Args:
-        ngram_size (:obj:`int`):
-            All ngrams of size :obj:`ngram_size` can only occur once.
-    """
-
-    def __init__(self, ngram_size: int):
-        if not isinstance(ngram_size, int) or ngram_size <= 0:
-            raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
-        self.ngram_size = ngram_size
-
-    def __call__(self, input_ids: Tensor, scores: Tensor) -> Tensor:
-        num_batch_hypotheses = scores.shape[0]
-        cur_len = input_ids.shape[-1]
-        banned_batch_tokens = self._calc_banned_ngram_tokens(input_ids, num_batch_hypotheses, cur_len)
-
-        for i, banned_tokens in enumerate(banned_batch_tokens):
-            scores[i, banned_tokens] = -float("inf")
-
-        return scores
-
-    def _calc_banned_ngram_tokens(self, prev_input_ids: Tensor, num_hypos: int, cur_len: int) -> List[Iterable[int]]:
-        """Copied from fairseq for no_repeat_ngram in beam_search"""
-        if cur_len + 1 < self.ngram_size:
-            # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
-            return [[] for _ in range(num_hypos)]
-        generated_ngrams = [{} for _ in range(num_hypos)]
-        for idx in range(num_hypos):
-            gen_tokens = prev_input_ids[idx].tolist()
-            generated_ngram = generated_ngrams[idx]
-            for ngram in zip(*[gen_tokens[i:] for i in range(self.ngram_size)]):
-                prev_ngram_tuple = tuple(ngram[:-1])
-                generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
-
-        def _get_generated_ngrams(hypo_idx):
-            # Before decoding the next token, prevent decoding of ngrams that have already appeared
-            start_idx = cur_len + 1 - self.ngram_size
-            ngram_idx = tuple(prev_input_ids[hypo_idx, start_idx:cur_len].tolist())
-            return generated_ngrams[hypo_idx].get(ngram_idx, [])
-
-        banned_tokens = [_get_generated_ngrams(hypo_idx) for hypo_idx in range(num_hypos)]
-        return banned_tokens
-
-
-class BeamScorer(ABC):
-    """
-    Abstract base class for all beam scorers that are used for :meth:`~transformers.PretrainedModel.beam_search` and
-    :meth:`~transformers.PretrainedModel.beam_sample`.
-    """
-
-    @abstractmethod
-    def process(
-        self, input_ids: Tensor, next_scores: Tensor, next_tokens: Tensor, next_indices: Tensor, **kwargs
-    ) -> Tuple[Tensor]:
-        raise NotImplementedError("This is an abstract method.")
-
-    @abstractmethod
-    def finalize(
-        self, input_ids: Tensor, next_scores: Tensor, next_tokens: Tensor, next_indices: Tensor, **kwargs
-    ) -> Tensor:
-        raise NotImplementedError("This is an abstract method.")
-
-
-class BeamSearchScorer(BeamScorer):
-    r"""
-    Implementing standard beam search decoding. Adapted in part from `Facebook's XLM beam search code
-    <https://github.com/facebookresearch/XLM/blob/9e6f6814d17be4fe5b15f2e6c43eb2b2d76daeb4/src/model/transformer.py#L529>`__.
+    Implementing standard beam search decoding.
+    This class is from https://github.com/THUDM/GLM/blob/main/generation_utils.py.
     Args:
         batch_size (:obj:`int`):
             Batch Size of :obj:`input_ids` for which beam search decoding is run in parallel.
@@ -559,6 +471,7 @@ class BeamSearchScorer(BeamScorer):
 
 
 class BeamHypotheses:
+    # This class is from https://github.com/THUDM/GLM/blob/main/generation_utils.py.
     def __init__(self, num_beams: int, max_length: int, length_penalty: float, early_stopping: bool):
         """
         Initialize n-best list of hypotheses.

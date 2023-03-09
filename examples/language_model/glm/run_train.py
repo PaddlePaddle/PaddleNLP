@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import os
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
 import paddle.nn as nn
 from data import cnn_dm_convert_example
-from utils import GLMTrainer
+from utils import GLMTrainer, generate
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
@@ -65,10 +65,8 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    for field_item in fields(model_args):
-        setattr(training_args, field_item.name, getattr(model_args, field_item.name))
-    for field_item in fields(data_args):
-        setattr(training_args, field_item.name, getattr(data_args, field_item.name))
+    setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     paddle.set_device(training_args.device)
 
@@ -77,6 +75,23 @@ def main():
         model_args.model_name_or_path, output_predict=True, parallel_output=True
     )
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    model.generate = partial(
+        generate,
+        self=model,
+        max_length=data_args.out_seq_length,
+        tgt_length=data_args.tgt_length,
+        min_tgt_length=data_args.min_tgt_length,
+        num_beams=data_args.num_beams,
+        length_penalty=data_args.length_penalty,
+        no_repeat_ngram_size=data_args.no_repeat_ngram_size,
+        end_token_id=tokenizer.eop_token_id,
+        pad_token_id=tokenizer.pad_token_id,
+        mask_token_id=tokenizer.smask_token_id,
+        no_block_position=data_args.no_block_position,
+        select_topk=data_args.select_topk,
+        top_k=data_args.top_k,
+        top_p=data_args.top_p,
+    )
 
     # Load the dataset.
     train_ds, dev_ds, test_ds = load_dataset(data_args.task_name, splits=["train", "dev", "test"])

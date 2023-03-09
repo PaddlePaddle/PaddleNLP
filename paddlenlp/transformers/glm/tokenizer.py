@@ -222,6 +222,7 @@ class GLMTokenizerMixin:
 
 
 class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
+    model_input_names = ["input_ids", "position_ids", "attention_mask"]
     resource_files_names = {"model_file": "cog-pretrain.model"}
     truncation_side: str = "left"
     pretrained_init_configuration = {
