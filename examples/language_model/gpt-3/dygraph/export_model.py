@@ -17,7 +17,7 @@ import os
 
 import paddle
 from modeling import GPTForGeneration
-from utils import merge_model_parallel
+from utils import left_padding, merge_model_parallel
 
 from paddlenlp.transformers import (  # GPTChineseTokenizer,; GPTForGreedyGeneration,
     GPTConfig,
@@ -56,31 +56,6 @@ def parse_args():
     )
     args = parser.parse_args()
     return args
-
-
-def left_padding(inputs, pad_id, padding="longest"):
-    assert "input_ids" in inputs, "input_ids should be in inputs!"
-    max_length = 0
-    for ids in inputs["input_ids"]:
-        max_length = max(max_length, len(ids))
-
-    def extend_max_lenth(value, max_length, to_pad_id):
-        return [to_pad_id] * (max_length - len(value)) + value
-
-    def extend_filed(name, max_length, to_pad_id):
-        values = inputs[name]
-        res = []
-        for index, value in enumerate(values):
-            res.append(extend_max_lenth(value, max_length, to_pad_id))
-        inputs[name] = res
-
-    extend_filed("input_ids", max_length, pad_id)
-    if "attention_mask" in inputs:
-        extend_filed("attention_mask", max_length, 0)
-    if "position_ids" in inputs:
-        extend_filed("position_ids", max_length, 0)
-
-    return inputs
 
 
 def main():
@@ -125,9 +100,9 @@ def main():
     ret = model(input_ids=input_ids)
 
     # ret =  model.generate(input_ids = data["input_ids"])
-    for x in ret[0].tolist():
+    for out_ids, in_txt in zip(ret[0].tolist(), input_text):
         print("==" * 30)
-        print(tokenizer.convert_ids_to_string(x))
+        print(input_text + tokenizer.convert_ids_to_string(out_ids))
 
     model = paddle.jit.to_static(
         model,

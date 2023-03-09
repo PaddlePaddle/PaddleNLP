@@ -12,23 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import os
 import random
-import sys
 import time
 
 import numpy as np
 import paddle
+from args import parse_args
+from dataset import create_pretrained_dataset
+from modeling import GPTForPretraining, GPTModel, GPTPretrainingCriterion
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
-from paddle.distributed.fleet.meta_parallel import TensorParallel, get_rng_state_tracker
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.distributed.sharding import group_sharded_parallel
+from run_pretrain import get_train_data_file
+from utils import (
+    _rotate_checkpoints,
+    all_gather,
+    is_dp_group_support_in_group_sharded_parallel,
+    wrap_sharding_2_3,
+)
 from visualdl import LogWriter
 
 from paddlenlp.trainer import get_last_checkpoint
@@ -44,30 +51,10 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
-try:
-    from paddle.fluid.dygraph.parallel import sync_params_buffers
-except ImportError:
-    from paddle.distributed.parallel import sync_params_buffers
-
-
-# to import data_tools
-filepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(filepath, "../"))
-import lr  # noqa e402
-from args import parse_args  # noqa e402
-from dataset import create_pretrained_dataset  # noqa e402
-from modeling import GPTForPretraining, GPTModel, GPTPretrainingCriterion  # noqa e402
-from run_glue_mp import _rotate_checkpoints, all_gather  # noqa e402
-from run_pretrain import get_train_data_file  # noqa e402
-
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
     "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
-
-
-def is_dp_group_support_in_group_sharded_parallel():
-    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
 
 
 def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
@@ -479,75 +466,6 @@ def do_train(args):
             return
 
         reader_start = time.time()
-
-
-def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
-    """_summary_
-
-    Args:
-        model (_type_): _description_
-        optimizer (_type_): _description_
-        scaler (_type_): _description_
-        dist_config (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    # group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
-    # level = "p_g_os" if dist_config.sharding_stage == 3 else "os_g"
-    # return group_sharded_parallel(
-    #     model=model, optimizer=optimizer, level=level, scaler=scaler, group=group, offload=dist_config.sharding_offload,
-
-    # )
-
-    hcg = fleet.get_hybrid_communicate_group()
-    dp_group = hcg.get_data_parallel_group()
-    sharding_group = hcg.get_sharding_parallel_group()
-
-    # sync params (broadcast) buffers in dp group
-    if (
-        not is_dp_group_support_in_group_sharded_parallel()
-        and dist_config.dp_degree > 1
-        and dist_config.sharding_stage == 2
-    ):
-        sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
-
-    if dist_config.dp_degree > 1 and dist_config.sharding_stage == 3:
-        sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
-
-    if dist_config.mp_degree > 1:
-        assert dist_config.sharding_stage == 2, "only support mp + sharding stage2 hybrid parallel now."
-        model = TensorParallel(model, hcg, strategy=None)
-
-    level = "p_g_os" if dist_config.sharding_stage == 3 else "os_g"
-    # origin_model = model
-
-    extra_kwargs = {}
-    if is_dp_group_support_in_group_sharded_parallel():
-        extra_kwargs["dp_group"] = dp_group if dp_group.nranks > 1 else None
-        extra_kwargs["exclude_layer"] = ["GroupNorm"]
-
-    model, optimizer, scaler = group_sharded_parallel(
-        model=model,
-        optimizer=optimizer,
-        level=level,
-        scaler=scaler,
-        group=sharding_group,
-        offload=dist_config.sharding_offload,
-        # dp_group=dp_group if dp_group.nranks > 1 else None,
-        **extra_kwargs,
-    )
-
-    # if dist_config.sharding.reduce_overlap:
-    #     model._set_reduce_overlap(dist_config.sharding.reduce_overlap)
-
-    # if dist_config.sharding.broadcast_overlap:
-    #     optimizer._set_broadcast_overlap(
-    #         dist_config.sharding.broadcast_overlap,
-    #         layers=origin_model,
-    #         num_groups=2)
-
-    return model, optimizer, scaler
 
 
 if __name__ == "__main__":

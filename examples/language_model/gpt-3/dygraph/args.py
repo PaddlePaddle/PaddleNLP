@@ -256,6 +256,35 @@ def parse_args(MODEL_CLASSES):
         help="Task name for finetune.",
     )
     parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length for finetune.")
+    parser.add_argument(
+        "--max_source_length",
+        default=1024,
+        type=int,
+        help="The maximum total input sequence length after tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument(
+        "--min_target_length",
+        default=0,
+        type=int,
+        help="The minimum total sequence length for target text when generating. ",
+    )
+    parser.add_argument(
+        "--max_target_length",
+        default=142,
+        type=int,
+        help="The maximum total sequence length for target text after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded. during ``evaluate`` and ``predict``.",
+    )
+    parser.add_argument(
+        "--ignore_pad_token_for_loss",
+        action="store_true",
+        help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.",
+    )
+    parser.add_argument(
+        "--dataset_name",
+        default="squad",
+        type=str,
+        help="The name of the dataset to use. Selected in the list: " + "squad",
+    )
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
