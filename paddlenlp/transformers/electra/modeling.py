@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
+from dataclasses import dataclass
+from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
-from dataclasses import dataclass
 
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
@@ -1131,6 +1131,7 @@ class ElectraPooler(nn.Layer):
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
+
 @dataclass
 class ErnieHealthForPreTrainingOutput(ModelOutput):
     """
@@ -1140,6 +1141,7 @@ class ErnieHealthForPreTrainingOutput(ModelOutput):
         loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
             Total loss of the ELECTRA objective.
     """
+
     loss: Optional[paddle.Tensor] = None
 
 
@@ -1153,6 +1155,7 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         discriminator (:class:`ErnieHealthDiscriminator):
             An instance of :class:`ErnieHealthDiscriminator`.
     """
+
     def __init__(self, config: ElectraConfig):
         super(ErnieHealthForTotalPretraining, self).__init__(config)
         self.generator = ElectraGenerator(config)
@@ -1248,9 +1251,8 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
             # return total_loss
             return total_loss
 
-        return ErnieHealthForPreTrainingOutput(
-            loss=total_loss
-        )
+        return ErnieHealthForPreTrainingOutput(loss=total_loss)
+
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
     """

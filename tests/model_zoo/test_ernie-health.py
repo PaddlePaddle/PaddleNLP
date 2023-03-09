@@ -17,12 +17,10 @@ from __future__ import annotations
 import sys
 from unittest import TestCase
 
-from paddlenlp.utils.log import logger
 from tests.testing_utils import argv_context_guard, load_test_config
 
 
 class ERNIEHEALTH_Test(TestCase):
-
     def setUp(self) -> None:
         self.path = "./model_zoo/ernie-health"
         self.config_path = "./tests/fixtures/model_zoo/ernie-health.yaml"
