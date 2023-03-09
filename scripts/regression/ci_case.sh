@@ -1241,11 +1241,6 @@ print_info $? ernie-layout_train
 # export ner
 python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export >${log_path}/ernie-layout_export>>${log_path}/ernie-layout_export2>&1
 print_info $? ernie-layout_export
-# deploy ner
-cd ${nlp_dir}/model_zoo/ernie-layout/deploy/python
-wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
-python infer.py --model_path_prefix ../../ner_export/inference --task_type ner --lang "en" --batch_size 8 >${log_path}/ernie-layout_deploy>>${log_path}/ernie-layout_deploy 2>&1
-print_info $? ernie-layout_deploy
 }
 ernie-1.0(){
     ernie
