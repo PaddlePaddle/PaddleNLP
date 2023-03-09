@@ -259,7 +259,7 @@ python train_dreambooth_lora.py \
 from ppdiffusers import DiffusionPipeline, DPMSolverMultistepScheduler
 import paddle
 
-pipe = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", paddle_dtype=paddle.float16)
+pipe = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 ```
 

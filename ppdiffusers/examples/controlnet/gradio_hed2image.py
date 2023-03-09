@@ -14,18 +14,22 @@
 
 import random
 
+import cv2
 import gradio as gr
 import paddle
-from annotator.canny import CannyDetector
+from annotator.hed import HEDdetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
-from ppdiffusers import StableDiffusionControlNetPipeline
+from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
-apply_canny = CannyDetector()
+apply_hed = HEDdetector()
 
 
-pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_canny", safety_checker=None)
+controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-hed")
+pipe = StableDiffusionControlNetPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
+)
 
 
 def process(
@@ -35,20 +39,22 @@ def process(
     n_prompt,
     num_samples,
     image_resolution,
+    detect_resolution,
     ddim_steps,
     guess_mode,
     strength,
     scale,
     seed,
     eta,
-    low_threshold,
-    high_threshold,
 ):
     with paddle.no_grad():
-        img = resize_image(HWC3(input_image), image_resolution)
-        H, W, C = img.shape
-        detected_map = apply_canny(img, low_threshold, high_threshold)
+        input_image = HWC3(input_image)
+        detected_map = apply_hed(resize_image(input_image, detect_resolution))
         detected_map = HWC3(detected_map)
+        img = resize_image(input_image, image_resolution)
+        H, W, C = img.shape
+
+        detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_LINEAR)
 
         control = paddle.to_tensor(detected_map.copy(), dtype=paddle.float32) / 255.0
         control = control.unsqueeze(0).transpose([0, 3, 1, 2])
@@ -74,13 +80,13 @@ def process(
             ).images[0]
             results.append(img)
 
-    return [255 - detected_map] + results
+    return [detected_map] + results
 
 
 block = gr.Blocks().queue()
 with block:
     with gr.Row():
-        gr.Markdown("## Control Stable Diffusion with Canny Edge Maps")
+        gr.Markdown("## Control Stable Diffusion with HED Maps")
     with gr.Row():
         with gr.Column():
             input_image = gr.Image(source="upload", type="numpy")
@@ -91,8 +97,7 @@ with block:
                 image_resolution = gr.Slider(label="Image Resolution", minimum=256, maximum=768, value=512, step=64)
                 strength = gr.Slider(label="Control Strength", minimum=0.0, maximum=2.0, value=1.0, step=0.01)
                 guess_mode = gr.Checkbox(label="Guess Mode", value=False)
-                low_threshold = gr.Slider(label="Canny low threshold", minimum=1, maximum=255, value=100, step=1)
-                high_threshold = gr.Slider(label="Canny high threshold", minimum=1, maximum=255, value=200, step=1)
+                detect_resolution = gr.Slider(label="HED Resolution", minimum=128, maximum=1024, value=512, step=1)
                 ddim_steps = gr.Slider(label="Steps", minimum=1, maximum=100, value=20, step=1)
                 scale = gr.Slider(label="Guidance Scale", minimum=0.1, maximum=30.0, value=9.0, step=0.1)
                 seed = gr.Slider(label="Seed", minimum=-1, maximum=2147483647, step=1, randomize=True)
@@ -113,16 +118,15 @@ with block:
         n_prompt,
         num_samples,
         image_resolution,
+        detect_resolution,
         ddim_steps,
         guess_mode,
         strength,
         scale,
         seed,
         eta,
-        low_threshold,
-        high_threshold,
     ]
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name="0.0.0.0", server_port=8513)
+block.launch(server_name="0.0.0.0", server_port=8235)

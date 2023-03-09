@@ -181,6 +181,7 @@ from .artist.tokenizer import *
 from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .dallebart.configuration import *
 from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *
