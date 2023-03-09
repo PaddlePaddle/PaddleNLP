@@ -214,8 +214,8 @@ class GLMModelTester:
         model.eval()
         result = model(input_ids, attention_mask=attention_mask, position_ids=position_ids, return_dict=True)
         self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(result.cache), self.num_layers + 1)
-        self.parent.assertEqual(result.cache[0].shape, [self.seq_length, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(len(result.past_key_values), self.num_layers + 1)
+        self.parent.assertEqual(result.past_key_values[0].shape, [self.seq_length, self.seq_length, self.hidden_size])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs("GLMModel")

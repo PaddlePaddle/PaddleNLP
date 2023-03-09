@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -325,6 +326,56 @@ class GLMPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_init_configuration = GLM_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = GLM_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_name_mappings(cls, config):
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["word_embeddings.weight", "word_embeddings.weight"],
+            ["transformer.position_embeddings.weight", "transformer.position_embeddings.weight"],
+            ["transformer.block_position_embeddings.weight", "transformer.block_position_embeddings.weight"],
+            ["transformer.final_layernorm.weight", "transformer.final_layernorm.weight"],
+            ["transformer.final_layernorm.bias", "transformer.final_layernorm.bias"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = []
+            transpose_names = [
+                "attention.query_key_value.weight",
+                "attention.dense.weight",
+                "mlp.dense_h_to_4h.weight",
+                "mlp.dense_4h_to_h.weight",
+            ]
+            mapping_names = [
+                "attention.query_key_value.bias",
+                "input_layernorm.weight",
+                "input_layernorm.bias",
+                "attention.dense.bias",
+                "post_attention_layernorm.weight",
+                "post_attention_layernorm.bias",
+                "mlp.dense_h_to_4h.bias",
+                "mlp.dense_4h_to_h.bias",
+            ]
+            for name in mapping_names:
+                layer_mappings.append(
+                    [f"transformer.layers.{layer_index}.{name}", f"transformer.layers.{layer_index}.{name}"]
+                )
+            for name in transpose_names:
+                layer_mappings.append(
+                    [
+                        f"transformer.layers.{layer_index}.{name}",
+                        f"transformer.layers.{layer_index}.{name}",
+                        "transpose",
+                    ]
+                )
+
+            model_mappings.extend(layer_mappings)
+
+        if cls.__name__ != "GLMModel":
+            for mapping in model_mappings:
+                mapping[1] = "glm." + mapping[1]
+
+        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
