@@ -180,15 +180,9 @@ class TransformerEncoder(Layer):
             if rand_mask_idx_list is not None:
                 rand_mask_id = rand_mask_idx_list[i]
             if i != 0:
-                if src_mask_list is None:
-                    output = mod(output.src, None, rand_mask_id, query_mask, key_mask)
-                else:
-                    output = mod(output.src, src_mask_list[i], rand_mask_id, query_mask, key_mask)
+                output = mod(output.src, None, rand_mask_id, query_mask, key_mask)
             if i == 0:
-                if src_mask_list is None:
-                    output = mod(output, None, rand_mask_id, query_mask, key_mask)
-                else:
-                    output = mod(output, src_mask_list[i], rand_mask_id, query_mask, key_mask)
+                output = mod(output, None, rand_mask_id, query_mask, key_mask)
             hidden_states = output.src
             attn_output = output.attn_output
 
