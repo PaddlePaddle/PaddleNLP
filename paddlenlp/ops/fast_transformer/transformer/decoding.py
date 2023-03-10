@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import functools
+import inspect
 import os
 from collections import defaultdict
 from functools import partial
@@ -23,7 +24,7 @@ from paddle.common_ops_import import LayerHelper
 
 import paddlenlp
 from paddlenlp.ops.ext_utils import LOADED_EXT, load
-from paddlenlp.transformers import OPTForCausalLM
+from paddlenlp.transformers import OPTForCausalLM, PretrainedConfig
 from paddlenlp.transformers.t5.modeling import T5DenseGatedGeluDense, T5DenseReluDense
 from paddlenlp.transformers.utils import fn_args_to_dict
 from paddlenlp.utils.log import logger
@@ -2881,10 +2882,14 @@ def enable_ft_para(tensor_para_size=None, layer_para_size=None, layer_para_batch
     def block_init_wrapper(func):
         @functools.wraps(func)
         def _impl(self, *args, **kwargs):
-            init_dict = fn_args_to_dict(func, *((self,) + args), **kwargs)
+            init_dict = inspect.signature(func).bind(*((self,) + args), **kwargs).arguments
             init_dict.pop("self")
-            num_layers = init_dict["num_hidden_layers"]
-            init_dict["num_hidden_layers"] //= _ft_para_conf.layer_para_size
+            if isinstance(init_dict.get("config", None), PretrainedConfig):
+                num_layers = init_dict["config"].num_hidden_layers
+                init_dict["config"].num_hidden_layers //= _ft_para_conf.layer_para_size
+            else:
+                num_layers = init_dict["num_hidden_layers"]
+                init_dict["num_hidden_layers"] //= _ft_para_conf.layer_para_size
             func(self, **init_dict)
             self.num_layers = num_layers
             self.config["num_hidden_layers"] = num_layers
@@ -2931,8 +2936,8 @@ def enable_ft_para(tensor_para_size=None, layer_para_size=None, layer_para_batch
     # but in GPTModel.
     block_init_fn = paddlenlp.transformers.gpt.modeling.GPTModel.__init__
     paddlenlp.transformers.gpt.modeling.GPTModel.__init__ = block_init_wrapper(block_init_fn)
-    block_state_fn = paddlenlp.transformers.gpt.modeling.GPTModel.state_dict
-    paddlenlp.transformers.gpt.modeling.GPTModel.state_dict = block_state_wrapper(block_state_fn)
+    block_state_fn = paddlenlp.transformers.gpt.modeling.GPTModel._state_dict_impl
+    paddlenlp.transformers.gpt.modeling.GPTModel._state_dict_impl = block_state_wrapper(block_state_fn)
     # PLATO
     paddle.nn.TransformerEncoderLayer.__init__ = layer_init_wrapper(paddle.nn.TransformerEncoderLayer.__init__)
     _ft_para_conf.set_partial_model(True)
