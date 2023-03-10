@@ -33,4 +33,5 @@ emoji
 ftfy
 unidecode
 onnxruntime
+sacremoses
 
