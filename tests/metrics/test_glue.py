@@ -11,15 +11,54 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
 import unittest
 
+import numpy as np
 import numpy.random
 import paddle
-from paddlenlp.metrics.glue import MultiLabelsMetric
 from sklearn.metrics import precision_recall_fscore_support
 
-import unittest
+from paddlenlp.metrics.glue import (
+    AccuracyAndF1,
+    Mcc,
+    MultiLabelsMetric,
+    PearsonAndSpearman,
+)
+
+
+class TestAccuracyAndF1(unittest.TestCase):
+    def test_metric(self):
+        x = paddle.to_tensor([[0.1, 0.9], [0.5, 0.5], [0.6, 0.4], [0.7, 0.3]])
+        y = paddle.to_tensor([[1], [0], [1], [1]])
+
+        m = AccuracyAndF1()
+        correct = m.compute(x, y)
+        m.update(correct)
+        res = m.accumulate()
+        self.assertEqual(res, (0.5, 0.5, 0.3333333333333333, 0.4, 0.45))
+
+
+class TestMcc(unittest.TestCase):
+    def test_metric(self):
+        x = paddle.to_tensor([[-0.1, 0.12], [-0.23, 0.23], [-0.32, 0.21], [-0.13, 0.23]])
+        y = paddle.to_tensor([[1], [0], [1], [1]])
+
+        m = Mcc()
+        (preds, label) = m.compute(x, y)
+        m.update((preds, label))
+        res = m.accumulate()
+        self.assertEqual(res, (0.0,))
+
+
+class TestPearsonAndSpearman(unittest.TestCase):
+    def test_metric(self):
+        x = paddle.to_tensor([[0.1], [1.0], [2.4], [0.9]])
+        y = paddle.to_tensor([[0.0], [1.0], [2.9], [1.0]])
+
+        m = PearsonAndSpearman()
+        m.update((x, y))
+        res = m.accumulate()
+        self.assertEqual(res, (0.9985229081857804, 1.0, 0.9992614540928901))
 
 
 class TestMultiLabelsMetric(unittest.TestCase):
