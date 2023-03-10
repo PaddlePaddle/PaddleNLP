@@ -50,7 +50,7 @@ if __name__ == "__main__":
         "--output_path",
         type=str,
         default="paddle_models/sd-controlnet-canny",
-        help="The model output path.",
+        help="The output path.",
     )
     args = parser.parse_args()
 
