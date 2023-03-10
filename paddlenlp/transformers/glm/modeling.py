@@ -83,7 +83,7 @@ class GLMAttention(nn.Layer):
 
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool = False, cache: Tensor = None):
         query_length = hidden_states.shape[1]
-        if use_cache is False:
+        if use_cache is False or cache is None:
             mixed_layer = self.query_key_value(hidden_states)
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
         else:
@@ -148,7 +148,7 @@ class GLMBlock(nn.Layer):
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool = False, cache: Tensor = None):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
-        if use_cache:
+        if use_cache and cache:
             cache = self.input_layernorm(cache)
         else:
             cache = None
@@ -300,7 +300,7 @@ class GLMStack(nn.Layer):
 
         new_caches = [hidden_states.detach()] if use_cache else None
         for i, layer in enumerate(self.layers):
-            mem_i = cache[i] if use_cache else None
+            mem_i = cache[i] if use_cache and cache else None
 
             if self.enable_recompute:
                 hidden_states = self.recompute_training(layer, hidden_states, attention_mask, use_cache, cache=mem_i)
