@@ -197,7 +197,7 @@ def do_train(args):
 
         model_config["num_partitions"] = args.mp_degree
         model_config["use_recompute"] = args.use_recompute
-        model_config["fuse"] = args.fuse_transformer
+        model_config["enable_fuse_transformer"] = args.fuse_transformer
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:

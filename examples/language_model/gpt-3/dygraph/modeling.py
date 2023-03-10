@@ -339,7 +339,7 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attr=None,
         bias_attr=None,
         num_partitions=1,
-        fuse=False,
+        enable_fuse_transformer=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -347,7 +347,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         super(TransformerDecoderLayer, self).__init__()
 
-        self.fuse = fuse
+        self.enable_fuse_transformer = enable_fuse_transformer
         attn_dropout = dropout if attn_dropout is None else attn_dropout
         act_dropout = dropout if act_dropout is None else act_dropout
         self.normalize_before = normalize_before
@@ -355,7 +355,7 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        if self.fuse:
+        if self.enable_fuse_transformer:
             hcg = fleet.get_hybrid_communicate_group()
             mp_nranks = hcg.get_model_parallel_world_size()
             mp_group = hcg.get_model_parallel_group()
@@ -414,7 +414,7 @@ class TransformerDecoderLayer(nn.Layer):
             self.activation = getattr(F, activation)
 
     def forward(self, tgt, memory=None, tgt_mask=None, use_cache=False, cache=None):
-        if self.fuse:
+        if self.enable_fuse_transformer:
             if use_cache:
                 attn_output, cache_kv_out = self.self_attn(tgt, attn_mask=tgt_mask, cache=cache.kv)
             else:
@@ -725,7 +725,7 @@ class GPTModel(GPTPretrainedModel):
         eol_token_id=3,
         num_partitions=1,
         use_recompute=False,
-        fuse=False,
+        enable_fuse_transformer=False,
     ):
         super(GPTModel, self).__init__()
 
@@ -734,7 +734,7 @@ class GPTModel(GPTPretrainedModel):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
 
-        self.fuse = fuse
+        self.enable_fuse_transformer = enable_fuse_transformer
 
         self.embeddings = GPTEmbeddings(
             vocab_size,
@@ -762,7 +762,7 @@ class GPTModel(GPTPretrainedModel):
                     ),
                     bias_attr=None,
                     num_partitions=num_partitions,
-                    fuse=self.fuse,
+                    enable_fuse_transformer=self.enable_fuse_transformer,
                 )
             )
 
@@ -791,7 +791,7 @@ class GPTModel(GPTPretrainedModel):
 
         softmax_mask_fuse_upper_triangle = strtobool(os.getenv("softmax_mask_fuse_upper_triangle", True))
 
-        if self.fuse or not softmax_mask_fuse_upper_triangle:
+        if self.enable_fuse_transformer or not softmax_mask_fuse_upper_triangle:
             length = paddle.shape(input_ids)[-1]
             # TODO, use registered buffer
             causal_mask = self.bias[:, :, 0:length, :length]

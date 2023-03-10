@@ -297,7 +297,7 @@ def do_train(args):
         attention_probs_dropout_prob=args.attention_probs_dropout_prob,
         num_partitions=args.mp_degree,
         use_recompute=args.use_recompute,
-        fuse=False,
+        enable_fuse_transformer=False,
         num_labels=num_classes,
     )
 

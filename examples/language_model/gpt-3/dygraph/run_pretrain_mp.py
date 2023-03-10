@@ -189,7 +189,7 @@ def do_train(args):
     model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     model_config["num_partitions"] = args.mp_degree
     model_config["use_recompute"] = args.use_recompute
-    model_config["fuse"] = False
+    model_config["enable_fuse_transformer"] = False
     model = GPTForPretraining(GPTModel(**model_config))
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
