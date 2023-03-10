@@ -808,7 +808,7 @@ class GenerationMixin(object):
 
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
-        if is_tracing:
+        if position_ids is not None:
             model_kwargs["position_ids"] = position_ids
 
         if model_kwargs.get("attention_mask", None) is None:
@@ -834,13 +834,20 @@ class GenerationMixin(object):
             pad_token_id = eos_token_id
 
         model_kwargs["use_cache"] = use_cache
-        max_length += input_ids.shape[-1]
-        generate_min_length = min_length
-        min_length += input_ids.shape[-1]
+
+        if is_tracing:
+            min_len = input_ids.shape[-1]
+            max_len = input_ids.shape[-1]
+            paddle.increment(min_len, min_length)
+            paddle.increment(max_len, max_length)
+        else:
+            input_len = input_ids.shape[-1]
+            min_len = input_len + min_length
+            max_len = input_len + max_length
 
         logits_processors = self.get_logits_processor(
-            min_length=min_length if generate_min_length > 0 else None,
-            max_length=max_length,
+            min_length=min_len if min_length > 0 else None,
+            max_length=max_len,
             eos_token_id=eos_token_id,
             forced_bos_token_id=forced_bos_token_id,
             forced_eos_token_id=forced_eos_token_id,
@@ -866,7 +873,7 @@ class GenerationMixin(object):
                 )
 
             return self.greedy_search(
-                input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs
+                input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
             )
 
         elif decode_strategy == "sampling":
@@ -879,7 +886,7 @@ class GenerationMixin(object):
                 return self.sample_d2s(
                     input_ids,
                     logits_processors,
-                    max_length,
+                    max_len,
                     pad_token_id,
                     eos_token_id,
                     top_k,
@@ -891,7 +898,7 @@ class GenerationMixin(object):
                 return self.sample(
                     input_ids,
                     logits_processors,
-                    max_length,
+                    max_len,
                     pad_token_id,
                     eos_token_id,
                     top_k,
@@ -917,7 +924,7 @@ class GenerationMixin(object):
             if num_beam_groups > 1:
                 diverse_beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
-                    max_length=max_length,
+                    max_length=max_len,
                     num_beams=num_beams,
                     length_penalty=length_penalty,
                     do_early_stopping=early_stopping,
@@ -934,7 +941,7 @@ class GenerationMixin(object):
                     input_ids,
                     diverse_beam_scorer,
                     logits_processors,
-                    max_length,
+                    max_len,
                     pad_token_id,
                     eos_token_id,
                     **model_kwargs,
@@ -942,7 +949,7 @@ class GenerationMixin(object):
             else:
                 beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
-                    max_length=max_length,
+                    max_length=max_len,
                     num_beams=num_beams,
                     length_penalty=length_penalty,
                     do_early_stopping=early_stopping,
@@ -957,7 +964,7 @@ class GenerationMixin(object):
                     input_ids,
                     beam_scorer,
                     logits_processors,
-                    max_length,
+                    max_len,
                     diversity_rate,
                     pad_token_id,
                     eos_token_id,
