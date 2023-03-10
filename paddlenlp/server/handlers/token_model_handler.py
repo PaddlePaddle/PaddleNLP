@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+
+from ...data import Pad, Tuple
 from .base_handler import BaseModelHandler
-from ...transformers import AutoTokenizer
-from ...data import Tuple, Pad
-from ...utils.log import logger
 
 
 class TokenClsModelHandler(BaseModelHandler):
@@ -81,7 +80,7 @@ class TokenClsModelHandler(BaseModelHandler):
         examples = []
         for input_ids, token_type_ids in zip(tokenizer_result["input_ids"], tokenizer_result["token_type_ids"]):
             examples.append((input_ids, token_type_ids))
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -100,7 +99,7 @@ class TokenClsModelHandler(BaseModelHandler):
                 for i, out in enumerate(output):
                     results[i].append(out)
             else:
-                outputs = predictor._predictor.run(None, {"input_ids": input_ids, "token_type_ids": token_type_ids})
+                output = predictor._predictor.run(None, {"input_ids": input_ids, "token_type_ids": token_type_ids})
                 for i, out in enumerate(output):
                     results[i].append(out)
 

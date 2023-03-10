@@ -266,7 +266,11 @@ class TextClassificationTask(Task):
             collator = PromptDataCollatorWithPadding(
                 self._tokenizer, padding=True, return_tensors="np", return_attention_mask=True
             )
-            template_inputs = [self._template({"text_a": x}) for x in inputs]
+            part_text = "text"
+            for part in self._template.prompt:
+                if "text" in part:
+                    part_text = part["text"]
+            template_inputs = [self._template({part_text: x}) for x in inputs]
             batches = [template_inputs[idx : idx + batch_size] for idx in range(0, len(template_inputs), batch_size)]
         else:
             raise NotImplementedError(
@@ -297,6 +301,14 @@ class TextClassificationTask(Task):
         }
         with static_mode_guard():
             for batch in inputs["batches"]:
+                if "attention_mask" in batch:
+                    input_name = "attention_mask"
+                    if batch[input_name].ndim == 2:
+                        batch[input_name] = (1 - batch[input_name][:, np.newaxis, np.newaxis, :]) * -1e4
+                    elif batch[input_name].ndim != 4:
+                        raise ValueError(
+                            "Expect attention mask with ndim=2 or 4, but get ndim={}".format(batch[input_name].ndim)
+                        )
                 if self._predictor_type == "paddle-inference":
                     for i, input_name in enumerate(self.predictor.get_input_names()):
                         self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
@@ -305,15 +317,6 @@ class TextClassificationTask(Task):
                 else:
                     input_dict = {}
                     for input_name in self.input_handler:
-                        if input_name == "attention_mask":
-                            if batch[input_name].ndim == 2:
-                                batch[input_name] = (1 - batch[input_name][:, np.newaxis, np.newaxis, :]) * -1e4
-                            elif batch[input_name].ndim != 4:
-                                raise ValueError(
-                                    "Expect attention mask with ndim=2 or 4, but get ndim={}".format(
-                                        batch[input_name].ndim
-                                    )
-                                )
                         input_dict[input_name] = batch[input_name].astype(dtype_dict[input_name])
                     logits = self.predictor.run(None, input_dict)[0].tolist()
                 outputs["batch_logits"].append(logits)

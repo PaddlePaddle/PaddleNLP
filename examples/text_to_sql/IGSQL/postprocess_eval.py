@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import sqlparse
 import argparse
+import json
+import os
 import subprocess
+import traceback
 from collections import defaultdict
+
+import sqlparse
 
 
 def find_shortest_path(start, end, graph):
@@ -88,7 +90,7 @@ def gen_from(candidate_tables, schema):
                     schema["column_names_original"][bcol][1],
                 )
                 prev_table = node
-    except:
+    except Exception:
         traceback.print_exc()
         print("db:{}".format(schema["db_id"]))
         return table_alias_dict, ret
@@ -307,11 +309,7 @@ def postprocess_nested(format_sql_2, schema):
         # case 2: nested queries in condition
         final_sql = []
 
-        num_keywords = format_sql_2.count("except") + format_sql_2.count("union") + format_sql_2.count("intersect")
-        num_select = format_sql_2.count("select")
-
         def postprocess_subquery(sub_query_one, schema, start_alias_id_1):
-            num_select = sub_query_one.count("select ")
             final_sub_sql = []
             sub_query = []
             for sub_sql in sub_query_one.split("\n"):
@@ -372,7 +370,7 @@ def postprocess_one(pred_sql, schema):
 
     try:
         format_sql = sqlparse.format(pred_sql, reindent=True)
-    except:
+    except Exception:
         return pred_sql
     format_sql_2 = normalize_space(format_sql)
 

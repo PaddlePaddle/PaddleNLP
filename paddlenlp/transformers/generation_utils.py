@@ -21,7 +21,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid.layers.utils import map_structure
+
+try:
+    from paddle.utils import map_structure
+except ImportError:
+    from paddle.fluid.layers.utils import map_structure
 
 from paddlenlp.utils.log import logger
 
@@ -396,7 +400,7 @@ class GenerationMixin(object):
         # update position_ids
         if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[:, -1:] + 1], axis=-1)
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         # update attention_mask
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
@@ -405,8 +409,14 @@ class GenerationMixin(object):
             if convert_dtype(attention_mask.dtype) == "bool":
                 attention_mask = paddle.cast(attention_mask, "int64")
             if len(attention_mask.shape) == 4:
-                attention_mask = nn.Pad2D([0, 0, 0, 1], mode="replicate")(attention_mask)
-                attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e4)(attention_mask)
+                cur_device = paddle.get_device()
+                if cur_device.split(":")[0] == "npu":
+                    attention_mask = nn.Pad2D([0, 0, 0, 1], mode="constant")(attention_mask)
+                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=0)(attention_mask)
+                else:
+                    attention_mask = nn.Pad2D([0, 0, 0, 1], mode="replicate")(attention_mask)
+                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e4)(attention_mask)
+
                 dtype = convert_dtype(attention_mask.dtype)
                 if "int" in dtype:
                     attention_mask[:, :, -1, -1] = 1

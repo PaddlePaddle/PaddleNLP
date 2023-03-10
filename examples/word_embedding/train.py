@@ -74,7 +74,7 @@ class BoWModel(nn.Layer):
     """
     This class implements the Bag of Words Classification Network model to classify texts.
     At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
+    a word embedding. Then, we encode these representations with a `BoWEncoder`.
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     Args:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    # Constructs the newtork.
+    # Constructs the network.
     model = BoWModel(
         vocab_size=len(vocab),
         num_classes=len(train_ds.label_list),

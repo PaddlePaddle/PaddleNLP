@@ -34,7 +34,7 @@ from ..testing_utils import slow
 
 def ids_tensor(shape, vocab_size, dtype="int32"):
     #  Creates a random int32 tensor of the shape within the vocab size
-    return paddle.randint(low=0, high=vocab_size, dtype=dtype, shape=shape)
+    return paddle.randint(low=1, high=vocab_size, dtype=dtype, shape=shape)
 
 
 def random_attention_mask(shape, dtype="int32"):
@@ -465,6 +465,15 @@ class ModelTesterMixin:
 
             self.assertTrue(models_equal)
 
+    def _compare_tensor(self, tensor1, tensor2, rtol=1e-04, atol=1e-04):
+        if tensor1.dtype != tensor2.dtype:
+            return False
+
+        if tensor1.dtype in [paddle.float32, paddle.float64]:
+            return paddle.allclose(tensor1, tensor2, rtol=rtol, atol=atol)
+        else:
+            return paddle.equal_all(tensor1, tensor2)
+
     def test_inputs_embeds(self):
         # pass the test if don't need to test inputs embeddings
         if not self.use_test_inputs_embeds:
@@ -500,7 +509,11 @@ class ModelTesterMixin:
             with paddle.no_grad():
                 embeds_output = model(**inputs)
 
-            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
+            if isinstance(embeds_output, paddle.Tensor):
+                self.assertTrue(self._compare_tensor(ids_output, embeds_output))
+            else:
+                for ids_item, embeds_item in zip(ids_output, embeds_output):
+                    self.assertTrue(self._compare_tensor(ids_item, embeds_item))
 
     def test_model_name_list(self):
         if not self.use_test_model_name_list:

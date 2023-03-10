@@ -231,6 +231,28 @@ class ZeroShotTextClassificationTask(Task):
                 "dcb0f3257830c0eb1f2de47f2d86f89a",
             ],
         },
+        "__internal_testing__/tiny-random-utc": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/model_state.pdparams",
+                "5ca864e9cc07b54e66f5caa184ddfffb",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/config.json",
+                "1e8b508d0fbefca16f94c96ef72b3dd3",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/vocab.txt",
+                "fd630e130f707f860b0edd148f0445d9",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/tokenizer_config.json",
+                "dcb0f3257830c0eb1f2de47f2d86f89a",
+            ],
+        },
     }
 
     def __init__(self, task: str, model: str, schema: list = None, **kwargs):

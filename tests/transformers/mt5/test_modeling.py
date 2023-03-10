@@ -489,6 +489,7 @@ class MT5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     test_model_parallel = True
     use_test_inputs_embeds = True
     is_encoder_decoder = True
+    use_test_model_name_list = False
     # The small MT5 model needs higher percentages for CPU/MP tests
     model_split_percents = [0.8, 0.9]
 
@@ -705,6 +706,7 @@ class MT5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 
 class MT5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -736,6 +738,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter_from_local_dir_with_enable_torch(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -756,6 +759,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             model_utils.ENABLE_TORCH_CHECKPOINT = True
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -791,6 +795,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
+    @slow
     def test_mt5_for_conditional_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"

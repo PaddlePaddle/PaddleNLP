@@ -16,7 +16,11 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.layers.utils import map_structure
+
+try:
+    from paddle.utils import map_structure
+except ImportError:
+    from paddle.fluid.layers.utils import map_structure
 from paddle.nn import (
     TransformerDecoder,
     TransformerDecoderLayer,

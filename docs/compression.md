@@ -419,14 +419,14 @@ python compress.py \
 
 ### Python 部署
 
-服务端部署可以从这里开始。可以利用 [预测 backend 脚本](../model_zoo/ernie-3.0/deploy/predictor/ernie_predictor.py)，并参考 [infer_cpu.py](../model_zoo/ernie-3.0/deploy/predictor/infer_cpu.py) 或者 [infer_gpu.py](../model_zoo/ernie-3.0/deploy/predictor/infer_gpu.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/predictor) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
+服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
 
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
-- [基于Triton Inference Server的服务化部署](../model_zoo/ernie-3.0/deploy/triton_serving/README.md)
+- [FastDeploy ERNIE 3.0 模型 Serving 部署示例](../model_zoo/ernie-3.0/deploy/serving/README.md)
 - [基于PaddleNLP SimpleServing 的服务化部署](../model_zoo/ernie-3.0/deploy/simple_serving/README.md)
 
 ### 移动端部署

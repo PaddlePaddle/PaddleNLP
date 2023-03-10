@@ -12,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-import json
-import attr
-import networkx as nx
 import collections
-import copy
 import itertools
 
 import asdl
-
+import attr
+import networkx as nx
 from text2sql.utils import ast_util
 
 

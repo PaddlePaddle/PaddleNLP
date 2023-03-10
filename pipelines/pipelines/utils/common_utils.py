@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Iterator, Tuple, List
-
 import logging
 import os
-import pickle
 import random
-import signal
 from copy import deepcopy
-from itertools import islice
+from typing import List, Tuple
+
 import numpy as np
 import paddle
 

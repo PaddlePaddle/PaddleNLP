@@ -13,19 +13,23 @@
 # limitations under the License.
 
 import os
-import logging
 import random
 import time
-import numpy as np
 
+import args
+import numpy as np
 import paddle
 from paddle.io import DataLoader, Dataset
 
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import BigBirdForPretraining, BigBirdModel, BigBirdPretrainingCriterion
-from paddlenlp.transformers import BigBirdTokenizer, LinearDecayWithWarmup, create_bigbird_rand_mask_idx_list
+from paddlenlp.data import Stack
+from paddlenlp.transformers import (
+    BigBirdForPretraining,
+    BigBirdPretrainingCriterion,
+    BigBirdTokenizer,
+    LinearDecayWithWarmup,
+    create_bigbird_rand_mask_idx_list,
+)
 from paddlenlp.utils.log import logger
-import args
 
 MODEL_CLASSES = {
     "bigbird": (BigBirdForPretraining, BigBirdTokenizer),
@@ -53,7 +57,7 @@ class PretrainingDataset(Dataset):
 
     def __getitem__(self, index):
         line = self.lines[index].rstrip()
-        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = self.tokenizer.encode(
+        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = self.tokenizer._encode(
             line, max_seq_len=self.max_encoder_length, max_pred_len=self.max_pred_length
         )
         return [
@@ -90,7 +94,7 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size, max_encode
         for i in [0, 1, 5]:
             out[i] = stack_fn([x[i] for x in data])
         batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[2]) for x in data)
+        size = sum(len(x[2]) for x in data)
         out[2] = np.full(size, 0, dtype=np.int32)
         # masked_lm_labels
         out[3] = np.full([size, 1], -1, dtype=np.int64)
@@ -151,14 +155,13 @@ def do_train(args):
     # Define the pretrain model and metric
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
-        model = BigBirdForPretraining(
-            BigBirdModel(**model_class.pretrained_init_configuration[args.model_name_or_path])
-        )
+        config = model_class.config_class.from_pretrained(args.model_name_or_path)
+        model = model_class(config)
     else:
         model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
     # Get bigbird config for generate random attention mask
     config = getattr(model, BigBirdForPretraining.base_model_prefix).config
-    criterion = BigBirdPretrainingCriterion(config["vocab_size"], args.use_nsp)
+    criterion = BigBirdPretrainingCriterion(config, args.use_nsp)
     if worker_num > 1:
         model = paddle.DataParallel(model)
 

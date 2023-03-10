@@ -19,9 +19,6 @@ import platform
 import sys
 from typing import Dict, List, Tuple, Union
 
-from . import core_tokenizers as C
-from .c_wrap import *
-
 try:
     current_path = os.path.abspath(os.path.dirname(__file__))
     if os.name == "nt":
@@ -54,6 +51,9 @@ except ImportError as e:
         )
 except Exception as e:
     raise e
+
+from . import core_tokenizers as C
+from .c_wrap import *
 
 from . import decoders, models, normalizers, postprocessors, pretokenizers
 from .tokenizers_impl import (

@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-import json
-
 import numpy as np
 import paddle
 from paddle import nn
@@ -53,7 +47,7 @@ def lstm_init(num_layers, hidden_size, *batch_sizes):
 
 
 def batch_gather_2d(var, indices):
-    """Gather slices from var in each batch, according to corrensponding
+    """Gather slices from var in each batch, according to corresponding
     index in indices. Currently, it only support 2d Tensor.
 
     Args:
@@ -110,7 +104,6 @@ def sequence_mask(seq_hidden, mask, mode="zero"):
 
     Raises: NULL
     """
-    dtype = seq_hidden.dtype
 
     while len(mask.shape) < len(seq_hidden.shape):
         mask = mask.unsqueeze([-1])
@@ -156,7 +149,7 @@ def pad_sequences_for_3d(seqs, max_col, max_num, dtype=np.int64):
 
 
 def pad_index_sequences(seqs, max_col, max_row, dtype=np.int64):
-    """padding squences for column token indexs"""
+    """padding sequences for column token indexes"""
     padded = []
     for query in seqs:
         new_cols = []

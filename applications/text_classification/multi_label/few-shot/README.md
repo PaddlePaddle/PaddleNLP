@@ -1,5 +1,7 @@
 # 小样本场景下的多标签分类任务指南
 
+**零样本/小样本文本分类推荐使用 UTC 模型，详情见[目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification)，本项目将会在2.5.2版本下线。**
+
 ## 目录
 
 - [1. 项目说明](#项目说明)

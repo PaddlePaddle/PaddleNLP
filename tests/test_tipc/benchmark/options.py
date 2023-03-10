@@ -27,6 +27,7 @@ from .modules.lr_scheduler import *  # noqa: F403
 from .modules.optimizer import *  # noqa: F403
 from .modules.rnnlm import RNNLMBenchmark
 from .modules.seq2seq import Seq2SeqBenchmark
+from .modules.stablediffusion import StableDiffusionBenchmark
 from .modules.t5_for_conditional_generation import T5ForConditionalGenerationBenchmark
 from .modules.xlnet import XLNetBenchmark
 
@@ -48,6 +49,7 @@ MODEL_REGISTRY = {
     "bert_for_question_answering": BertForQuestionAnsweringBenchmark,
     "gpt_for_sequence_classification": GPTForSequenceClassificationBenchmark,
     "t5_for_conditional_generation": T5ForConditionalGenerationBenchmark,
+    "stablediffusion": StableDiffusionBenchmark,
 }
 
 OPTIMIZER_REGISTRY = {

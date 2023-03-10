@@ -13,18 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import sys
-import errno
-import json
-import math
 import threading
 from multiprocessing import cpu_count
+
 import paddle
-from paddle import inference
-from ..transformers import PretrainedModel
+
 from ..utils.log import logger
-from ..taskflow.utils import dygraph_mode_guard
 
 
 class Predictor:
@@ -69,7 +66,6 @@ class Predictor:
         static_model_path = self._get_default_static_model_path()
 
         # Convert the Draph Model to Static Model
-        is_from_static = True
         if static_model_path is None:
             raise RuntimeError("The model path do not include the inference model, please check!")
         is_int8_model = self._is_int8_model(static_model_path)
@@ -95,13 +91,13 @@ class Predictor:
         else:
             if device.count("gpu") and self._precision == "fp16":
                 try:
-                    import onnx
-                    import onnxruntime as ort
-                    import paddle2onnx
-                    from onnxconverter_common import float16
+                    import onnx  # noqa F401
+                    import onnxruntime as ort  # noqa F401
+                    import paddle2onnx  # noqa F401
+                    from onnxconverter_common import float16  # noqa F401
 
                     predictor_type = "onnxruntime"
-                except:
+                except Exception:
                     logger.error(
                         "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, you could use the commands as fololws:\n"
                         " ****** pip uninstall onnxruntime ******\n"
@@ -121,14 +117,12 @@ class Predictor:
             self._config.enable_mkldnn()
             self._config.enable_memory_optim()
             if self._precision == "int8":
-                config.enable_mkldnn_bfloat16()
+                self._config.enable_mkldnn_bfloat16()
             elif self._precision == "fp16":
-                config.enable_mkldnn_int8()
+                self._config.enable_mkldnn_int8()
         else:
             self._config.enable_use_gpu(100, int(self._device.split(":")[-1]))
-            precision_type = inference.PrecisionType.Float32
             if self._precision == "int8":
-                precision_type = inference.PrecisionType.INT8
                 # FIXME(wawltor) The paddlenlp serving support the int8 model
                 logger.warning("The PaddleNLP serving do not support the INT8 model, we will support later!")
                 sys.exit(-1)
@@ -176,7 +170,7 @@ class Predictor:
         )
         self._output_num = len(self._predictor.get_outputs())
         assert "CUDAExecutionProvider" in self._predictor.get_providers(), (
-            f"The environment for GPU inference is not set properly. "
+            "The environment for GPU inference is not set properly. "
             "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
             "Please run the following commands to reinstall: \n "
             "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -200,7 +194,7 @@ class Predictor:
             save_path = os.path.join(self._model_path, self._default_static_model_path, "inference")
             paddle.jit.save(static_model, save_path)
             logger.info("The static inference model save in the path:{}".format(save_path))
-        except:
+        except Exception:
             logger.warning(
                 "Fail convert to inference model, please create the issue for the developers,"
                 "the issue link: https://github.com/PaddlePaddle/PaddleNLP/issues"

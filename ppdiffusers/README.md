@@ -20,6 +20,8 @@
 **PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库，具体来说，PPDiffusers具有以下特性：
 
 ## News 📢
+* 🔥 **2023.03.08 发布 0.11.1 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理**
+
 * 🔥 **2023.01.18 发布 0.11.0 版本，新增Heun和Single step DPM-Solver噪声调度器，支持Karlo UnCLIP、Paint-by-example、Depth-Guided Stable Diffusion等图像生成扩散模型， 支持Audio Diffusion音频生成扩散模型；**
 
 * 🔥 **2022.12.06 发布 0.9.0 版本，支持 [StableDiffusion2.0](https://github.com/Stability-AI/stablediffusion) 的文生图、图生图、图像编辑及图像超分等功能；**

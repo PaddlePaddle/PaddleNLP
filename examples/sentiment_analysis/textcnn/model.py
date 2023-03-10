@@ -22,7 +22,7 @@ class TextCNNModel(nn.Layer):
     """
     This class implements the Text Convolution Neural Network model.
     At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `CNNEncoder`.
+    a word embedding. Then, we encode these representations with a `CNNEncoder`.
     The CNN has one convolution layer for each ngram filter size. Each convolution operation gives
     out a vector of size num_filter. The number of times a convolution layer will be used
     is `num_tokens - ngram_size + 1`. The corresponding maxpooling layer aggregates all these
