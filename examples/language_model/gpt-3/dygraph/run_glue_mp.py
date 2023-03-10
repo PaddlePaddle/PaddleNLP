@@ -567,7 +567,7 @@ def do_export(args):
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
         config = GPTConfig.from_pretrained(last_checkpoint)
-        config.fuse_qkv = True
+        config.fuse_attention_qkv = True
         model = GPTForSequenceClassification(config)
         missing_keys, unexpected_keys = model.set_state_dict(merge_model_parallel(last_checkpoint, config))
         print("missing_keys", missing_keys)

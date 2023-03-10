@@ -93,7 +93,7 @@ class MultiHeadAttention(nn.Layer):
         need_weights=False,
         weight_attr=None,
         bias_attr=None,
-        fuse_qkv=True,
+        fuse_attention_qkv=True,
         num_partitions=1,
     ):
         super(MultiHeadAttention, self).__init__()
@@ -103,7 +103,7 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = num_heads
         self.dropout = dropout
         self.need_weights = need_weights
-        self.fuse_qkv = fuse_qkv
+        self.fuse_attention_qkv = fuse_attention_qkv
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -111,7 +111,7 @@ class MultiHeadAttention(nn.Layer):
         assert self.num_heads % num_partitions == 0
         self.num_heads = self.num_heads // num_partitions
 
-        if self.fuse_qkv:
+        if self.fuse_attention_qkv:
             assert self.kdim == embed_dim, "embed_dim should be equal to kdim"
             assert self.vdim == embed_dim, "embed_dim should be equal to vidm"
 
@@ -218,7 +218,7 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if use_cache is False:
-            if self.fuse_qkv:
+            if self.fuse_attention_qkv:
                 q, k, v = self._fuse_prepare_qkv(query)
             else:
                 q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)

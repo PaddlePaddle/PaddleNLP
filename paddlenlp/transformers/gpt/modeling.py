@@ -82,12 +82,12 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
-        self.fuse_qkv = config.fuse_qkv
+        self.fuse_attention_qkv = config.fuse_attention_qkv
 
         self.head_dim = embed_dim // self.num_heads
         assert self.head_dim * self.num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        if self.fuse_qkv:
+        if self.fuse_attention_qkv:
             assert self.kdim == embed_dim
             assert self.vdim == embed_dim
             self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
@@ -189,7 +189,7 @@ class MultiHeadAttention(nn.Layer):
         key = query if key is None else key
         value = query if value is None else value
 
-        if self.fuse_qkv:
+        if self.fuse_attention_qkv:
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)

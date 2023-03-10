@@ -71,7 +71,7 @@ def main():
     # args.model_path = "gpt2-medium-en"
     config = GPTConfig.from_pretrained(args.model_path)
 
-    config.fuse_qkv = True
+    config.fuse_attention_qkv = True
     # config.max_predict_len = 8
     config.max_dec_len = 20
     config.eos_token_id = tokenizer.eos_token_id
