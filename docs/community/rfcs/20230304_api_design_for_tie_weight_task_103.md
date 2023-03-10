@@ -5,8 +5,8 @@
 |API名称 | 新增API名称                                            |
 |---|----------------------------------------------------|
 |提交作者<input type="checkbox" class="rowselector hidden"> | 丘文波, 刘旺旺                                           |
-|提交时间<input type="checkbox" class="rowselector hidden"> | 2022-03-05                                         |
-|版本号 | V2                                                 |
+|提交时间<input type="checkbox" class="rowselector hidden"> | 2022-03-10                                         |
+|版本号 | V3                                                 |
 |依赖飞桨版本<input type="checkbox" class="rowselector hidden"> | 如无特殊情况，都应基于develop版本开发                             |
 |文件名 | 20230304_api_design_for_tie_weight_task_103.md<br> |
 
@@ -78,8 +78,51 @@ def tie_weights(self):
                 self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
 ```
 
+(3) [代码链接3](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/ernie/modeling.py#L748)
+```python
+class ErnieLMPredictionHead(nn.Layer):
+    r"""
+    Ernie Model with a `language modeling` head on top.
+    """
 
-最好是给基础模型加上tie weight的函数,减少调用者的开发.
+    def __init__(
+        self,
+        config: ErnieConfig,
+        embedding_weights=None,
+        weight_attr=None,
+    ):
+        super(ErnieLMPredictionHead, self).__init__()
+
+        self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
+        self.activation = getattr(nn.functional, config.hidden_act)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.decoder_weight = (
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=self.transform.weight.dtype,
+                attr=weight_attr,
+                is_bias=False,
+            )
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.decoder_bias = self.create_parameter(
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
+```
+
+
+其实paddlenlp内大部分的tie_weights实现是直接在模型layer定义层面实现的，见[代码](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/ernie/modeling.py#L748)
+，而不是类似transformers一样在模型以外统一实现的。这个项目的目标就是看一下能否在模型外统一实现，而不用每个模型都自己实现一次
+
+paddle里面tie_weghts实现主要有两种方式:
+* 一种在modeling.py中定义了tie_weghts函数，相应的模型也实现了get_input_embeding()和get_output_embeding()来获取输入和输出embeding层权重,然后通过赋值方式进行绑定。如上面的代码链接(1)(2) 
+* 另外一种是 在定义模型层的时候 直接将输入input_embeding的weight，赋值给输出层weight. 将embedding的weight直接传给head来构建linear输出层，期望是在get_input_embeding()拿到weight，然后传给head层，如上面代码链接(3) 
+
+
+
+最好是在模型[基类里面model_utils.py#L897](https://github.com/PaddlePaddle/PaddleNLP/blob/be80a3e30fb681e53773c265babe611d4df62ead/paddlenlp/transformers/model_utils.py#L897)
+去统一实现 tie_weights,减少调用者的开发.
 
 # 三、业内方案调研
 描述业内深度学习框架如何实现此功能，包括与此功能相关的现状、未来趋势；调研的范围包括不限于TensorFlow、PyTorch、NumPy等
@@ -152,14 +195,15 @@ self.fc2 = Linear(in_channels, out_embed_dim)
 paddle和 huggingface的transformers 都是基于动态图进行开发, 所以准备参照huggingface的transformers  的 tie weight 函数思路去实现功能.
 
 # 五、设计思路与实现方案
-
 参考huggingface的 transformers中的实现思路来基于paddle进行开发
 
 实现tie_weight函数步骤:
-
 1. 获取模型input embedding  权重对象 A
 2. 获取模型 output embedding 权重对象 B
 3. 让A和B 都指向同一个权重值
+
+
+
 
 ## 命名与参数设计
 参考：[飞桨API 设计及命名规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_design_guidelines_standard_cn.html)
@@ -169,7 +213,50 @@ paddle和 huggingface的transformers 都是基于动态图进行开发, 所以�
 # 六、测试和验收的考量
 参考：[新增API 测试及验收规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_accpetance_criteria_cn.html)
 
+测试tie_weight有两个办法:
+* 直接判断输出层weight和输入层weight的id，如果一致即通过，否则Failed.
+* 训练几个step，经过几个反向后，看下输出层weight和输入层weight是否一致，如果一致即通过，否则Failed.
+
+用过id的一致性判断是否绑定成功, 简单高效,后面准备采用这种方式进行单侧:
+构建单元测试, 测试模型的get_input_embeding得到的权重的id 和get_output_embeding 得到的权重id 是都一致, 如果是一致就通过,都则不通过
+
+
+
 # 七、可行性分析和排期规划
+
+设计一个小脚本验证一下这种方式的有效性:
+```python
+import numpy as np
+from paddle.nn import Embedding
+
+"""step1 定义两个不同的embedding 对象 AA 和 BB"""
+print('------------step1')
+AA = Embedding(1,2)
+BB = Embedding(1,2)
+
+AA.weight = BB.weight # 进行权重的绑定
+
+""" step2 测试一下绑定结果"""
+print('------------step2')
+print('检测 AA 和 BB 的id是否一致:', AA is BB,id(AA), id(BB))                               # AA 和 BB 的id 不一致
+print('检测 AA.weight 和 BB.weight 的id是否一致:',AA.weight is BB.weight,id(AA.weight), id(BB.weight))   # 但是AA.weight 和 BB.weight 的id是一致的
+
+print("AA.weight: ",AA.weight)
+print("BB.weight: ",BB.weight)
+
+
+
+""" step3 尝试修改一下AA的weight的值 BB的weight的值是否也跟着会一起修改"""
+# 修改一下其中一个AA 的权重值, 看一下 BB的权重值会不会变化
+print('------------step3')
+AA.weight.set_value(np.array([[4.0,6.0]],dtype=np.float32))
+
+print('检测 修改后的 AA.weight 和 BB.weight 的id是否一致:',AA.weight is BB.weight,id(AA.weight), id(BB.weight)) # AA.weight 和 BB.weight 的id是一致的
+print("AA.weight 修改后的值: ",AA.weight)
+print("BB.weight:",BB.weight)
+
+```
+
 时间和开发排期规划，主要milestone
 - 3.10 跟官方确认好开发思路
 - 3.17 提交实现代码
