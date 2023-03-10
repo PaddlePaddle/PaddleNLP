@@ -77,6 +77,7 @@ class Predictor(object):
         option = fd.RuntimeOption()
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        print("init before")
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
@@ -103,6 +104,7 @@ class Predictor(object):
                 option.trt_option.enable_fp16 = True
                 trt_file = trt_file + ".fp16"
             option.trt_option.serialize_file = trt_file
+        print("init after")
         return fd.Runtime(option)
 
     def preprocess(self, input_text):
@@ -134,7 +136,9 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
+    print("before args")
     args = parse_arguments()
+    print("after args")
     predictor = Predictor(args)
     all_texts = [
         "it 's a charming and often affecting journey",

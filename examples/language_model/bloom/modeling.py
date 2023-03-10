@@ -930,6 +930,34 @@ class BloomLMHead(nn.Layer):
         return logits
 
 
+class BloomPretrainingCriterion(paddle.nn.Layer):
+    """
+    Criterion for GPT.
+    It calculates the final loss.
+    """
+
+    def __init__(self, pad_token_id=None, mp_degree=1):
+        super(BloomPretrainingCriterion, self).__init__()
+        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        self.mp_degree = mp_degree
+        self.pad_token_id = pad_token_id
+
+    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
+        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = masked_lm_loss.astype("float32")
+            if loss_mask is not None:
+                loss_mask = loss_mask.reshape([-1])
+                masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+                loss = masked_lm_loss / loss_mask.sum()
+            else:
+                assert self.pad_token_id is not None
+                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
+                loss = paddle.mean(masked_lm_loss)
+
+        return loss
+
+
 class BloomForCausalLM(BloomPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
@@ -937,6 +965,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         super().__init__(config)
         self.bloom = BloomModel(config)
         self.lm_head = BloomLMHead(config.hidden_size, config.vocab_size, self.bloom.word_embeddings.weight)
+        self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -1012,11 +1041,10 @@ class BloomForCausalLM(BloomPreTrainedModel):
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
+            shift_logits = lm_logits[..., :-1, :]
+            shift_labels = labels[..., 1:]
             # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape([-1, shift_logits.shape[-1]]), shift_labels.reshape([-1]))
+            loss = self.criterion(shift_logits, shift_labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import distutils.util
 import os
 
@@ -115,7 +114,9 @@ class Predictor(object):
         return input_map
 
     def infer(self, input_map):
+        print("before predict")
         results = self.runtime.infer(input_map)
+        print("after predict")
         return results
 
     def postprocess(self, infer_data):
