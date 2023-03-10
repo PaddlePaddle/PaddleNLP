@@ -2496,7 +2496,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
             use_cache (bool, optional):
                 See :class:`ReformerModel`.
             inputs_embeds (Tensor, optional):
-                See :class:`NeZhaModel`.
+                See :class:`ReformerModel`.
             labels (Tensor, optional):
                 Labels for language modeling. Note that the labels **are shifted**
                 inside the model, i.e. you can set `labels = input_ids` Indices are
@@ -2646,7 +2646,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
             inputs_embeds (Tensor, optional):
-                See :class:`NeZhaModel`.
+                See :class:`ReformerModel`.
             labels (Tensor, optional):
                 Labels for computing the masked language modeling loss.
                 Indices should be in ``[-100, 0, ..., vocab_size]``
@@ -2789,7 +2789,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
             inputs_embeds (Tensor, optional):
-                See :class:`NeZhaModel`.
+                See :class:`ReformerModel`.
             labels (Tensor, optional):
                 Labels for computing the sequence classification/regression loss. Indices
                 should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression
@@ -2943,7 +2943,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 are not taken into account for computing the loss.
                 Shape is [batch_size,] and dtype is int64.
             inputs_embeds (Tensor, optional):
-                See :class:`NeZhaModel`.
+                See :class:`ReformerModel`.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
             output_hidden_states (bool, optional):
