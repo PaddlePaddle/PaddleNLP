@@ -132,9 +132,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
         def trainable(model_config):
-            import paddle
-
-            paddle.set_device("gpu:4")
             # import is required for proper pickling
             from paddlenlp.utils.log import logger
 
