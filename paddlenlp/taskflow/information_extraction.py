@@ -438,12 +438,12 @@ class UIETask(Task):
         },
         "__internal_testing__/tiny-random-uie-x": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/model_state.pdparams",
-                "b62bdbfec23ee839c5d0a8a7e6920075",
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x_v1.0/model_state.pdparams",
+                "d9b573b31a82b860b6e5a3005d7b879e",
             ],
             "config": [
-                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/config.json",
-                "abeaeacca5316e2cbe779f37d986efb4",
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x_v1.0/config.json",
+                "27d715e680596a69d882056a400d97db",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-uie-x/vocab.txt",
