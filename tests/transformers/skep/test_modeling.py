@@ -309,6 +309,7 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = SkepModel
     return_dict = False
     use_labels = False
+    use_test_inputs_embeds = True
 
     all_model_classes = (
         SkepModel,

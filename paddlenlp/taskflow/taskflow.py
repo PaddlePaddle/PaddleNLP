@@ -801,7 +801,6 @@ class Taskflow(object):
     def __init__(self, task, model=None, mode=None, device_id=0, from_hf_hub=False, **kwargs):
         assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
-
         # Set the device for the task
         device = get_env_device()
         if device == "cpu" or device_id == -1:

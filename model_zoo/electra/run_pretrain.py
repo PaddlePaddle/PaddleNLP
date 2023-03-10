@@ -13,28 +13,23 @@
 # limitations under the License.
 
 import argparse
-import collections
-import itertools
+import copy
+import io
+import json
 import logging
 import os
-import io
 import random
 import time
-import json
-import copy
-from functools import partial
-from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-
 import paddle
-import paddle.distributed as dist
-from paddle.io import DataLoader, Dataset
 
-from paddlenlp.transformers import ElectraForTotalPretraining, ElectraModel, ElectraPretrainingCriterion
-from paddlenlp.transformers import ElectraDiscriminator, ElectraGenerator
-from paddlenlp.transformers import ElectraTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import (
+    ElectraForTotalPretraining,
+    ElectraPretrainingCriterion,
+    ElectraTokenizer,
+    LinearDecayWithWarmup,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -241,7 +236,7 @@ class DataCollatorForElectra(object):
             if self.tokenizer.pad_token is not None:
                 pad_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.pad_token)
                 labels[labels == pad_token_id] = -100
-            return batch, raw_inputs, labels
+            return batch, raw_inputs, labels  # noqa:821
 
     def tensorize_batch(self, examples, dtype):
         if isinstance(examples[0], (list, tuple)):
@@ -254,9 +249,9 @@ class DataCollatorForElectra(object):
             raise ValueError("the tensor in examples not have same shape, please check input examples")
 
     def add_special_tokens_and_set_maskprob(self, inputs, truncation, max_seq_length):
-        sep_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.sep_token)
+        # sep_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.sep_token)
         pad_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.pad_token)
-        cls_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.cls_token)
+        # cls_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.cls_token)
         full_inputs = []
         full_maskprob = []
         max_length = 0
@@ -348,31 +343,18 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args)
-    worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
+    # worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     # Loads or initializes a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
-
-    def get_opt_config(model_cls, name):
-        config = model_cls.pretrained_init_configuration[name]
-        # Optimize for AMP.
-        if "vocab_size" in config:
-            if config["vocab_size"] % 8 != 0:
-                config["vocab_size"] += 8 - (config["vocab_size"] % 8)
-        return config
+    config = model_class.config_class.from_pretrained(args.model_name_or_path)
 
     if args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        generator = ElectraGenerator(
-            ElectraModel(**get_opt_config(model_class, args.model_name_or_path + "-generator"))
-        )
-        discriminator = ElectraDiscriminator(
-            ElectraModel(**get_opt_config(model_class, args.model_name_or_path + "-discriminator"))
-        )
-        model = model_class(generator, discriminator)
+        model = model_class(config)
         args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
@@ -382,11 +364,7 @@ def do_train(args):
                 config_dict = json.load(f)
                 model_name = config_dict["model_name"]
             if model_name in pretrained_models:
-                generator = ElectraGenerator(ElectraModel(**get_opt_config(model_class, model_name + "-generator")))
-                discriminator = ElectraDiscriminator(
-                    ElectraModel(**get_opt_config(model_class, model_name + "-discriminator"))
-                )
-                model = model_class(generator, discriminator)
+                model = model_class.from_pretrained(args.model_name_or_path)
                 model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
             else:
                 raise ValueError(
@@ -402,11 +380,7 @@ def do_train(args):
                 "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
             )
 
-    criterion = ElectraPretrainingCriterion(
-        getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"],
-        model.gen_weight,
-        model.disc_weight,
-    )
+    criterion = ElectraPretrainingCriterion(config)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -543,16 +517,13 @@ def do_train(args):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                     config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config)
-                    if "self" in config_to_save:
-                        del config_to_save["self"]
+                    config_to_save.to_json_file(os.path.join(output_dir, "model_config.json"))
                     run_states = {
                         "model_name": model_name if args.init_from_ckpt else args.model_name_or_path,
                         "global_step": global_step,
                         "epoch": epoch,
                         "step": step,
                     }
-                    with open(os.path.join(output_dir, "model_config.json"), "w") as f:
-                        json.dump(config_to_save, f)
                     with open(os.path.join(output_dir, "run_states.json"), "w") as f:
                         json.dump(run_states, f)
                     paddle.save(model.state_dict(), os.path.join(output_dir, "model_state.pdparams"))

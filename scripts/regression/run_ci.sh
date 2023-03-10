@@ -70,6 +70,7 @@ echo "python="${python}
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
+    python -m pip install -r requirements-dev.txt
     python -m pip uninstall paddlepaddle -y
     python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
@@ -85,7 +86,7 @@ nlp_build (){
     rm -rf paddle_pipelines.egg-info/
     rm -rf dist/
 
-    python -m pip install  -r requirements.txt
+    python -m pip install -r requirements.txt
     python setup.py bdist_wheel
     # python -m pip install --ignore-installed  dist/p****.whl
 }

@@ -14,53 +14,15 @@
 
 import random
 
-import cv2
 import gradio as gr
-import numpy as np
 import paddle
+from annotator.canny import CannyDetector
+from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import StableDiffusionControlNetPipeline
 
-
-class CannyDetector:
-    def __call__(self, img, low_threshold, high_threshold):
-        return cv2.Canny(img, low_threshold, high_threshold)
-
-
 apply_canny = CannyDetector()
-
-
-def HWC3(x):
-    assert x.dtype == np.uint8
-    if x.ndim == 2:
-        x = x[:, :, None]
-    assert x.ndim == 3
-    H, W, C = x.shape
-    assert C == 1 or C == 3 or C == 4
-    if C == 3:
-        return x
-    if C == 1:
-        return np.concatenate([x, x, x], axis=2)
-    if C == 4:
-        color = x[:, :, 0:3].astype(np.float32)
-        alpha = x[:, :, 3:4].astype(np.float32) / 255.0
-        y = color * alpha + 255.0 * (1.0 - alpha)
-        y = y.clip(0, 255).astype(np.uint8)
-        return y
-
-
-def resize_image(input_image, resolution):
-    H, W, C = input_image.shape
-    H = float(H)
-    W = float(W)
-    k = float(resolution) / min(H, W)
-    H *= k
-    W *= k
-    H = int(np.round(H / 64.0)) * 64
-    W = int(np.round(W / 64.0)) * 64
-    img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
-    return img
 
 
 pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_canny", safety_checker=None)
@@ -163,4 +125,4 @@ with block:
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name="0.0.0.0", server_port=8511)
+block.launch(server_name="0.0.0.0", server_port=8513)
