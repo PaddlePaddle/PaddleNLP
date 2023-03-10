@@ -15,6 +15,7 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     BigBirdForMultipleChoice,
@@ -83,6 +84,7 @@ class BigBirdModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.key_length = self.hidden_size // self.num_attention_heads
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -139,9 +141,11 @@ class BigBirdModelTester:
     ):
         model = BigBirdModel(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
@@ -163,8 +167,12 @@ class BigBirdModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             rand_mask_idx_list=None,
+            labels=choice_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if choice_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
@@ -185,8 +193,14 @@ class BigBirdModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.parent.return_dict,
         )
-        start_logits, end_logits = result[0], result[1]
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
 
         self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
@@ -203,8 +217,17 @@ class BigBirdModelTester:
     ):
         model = BigBirdForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, rand_mask_idx_list=None)
-        if paddle.is_tensor(result):
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            rand_mask_idx_list=None,
+            labels=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
@@ -225,8 +248,12 @@ class BigBirdModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
@@ -246,11 +273,19 @@ class BigBirdModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BigBirdModel
     return_dict: bool = False
     use_labels: bool = False
-    test_resize_embeddings: bool = False
 
     all_model_classes = (
         BigBirdModel,

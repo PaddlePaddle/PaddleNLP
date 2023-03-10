@@ -16,9 +16,8 @@ import enum
 
 import attr
 import pyrsistent
-
-from text2sql.utils import nn_utils
 from text2sql.dataproc import vocab
+from text2sql.utils import nn_utils
 
 
 @attr.s
@@ -79,7 +78,7 @@ class TreeTraversal:
         self.model = model
         self.desc_enc = desc_enc
 
-        ##< TODO: model.state_update.set_dropout_masks(batch_size=1)
+        # TODO: model.state_update.set_dropout_masks(batch_size=1)
         self.recurrent_state = nn_utils.lstm_init(None, self.model.recurrent_size, 1)
         self.prev_action_emb = model.zero_rule_emb
 
@@ -119,7 +118,7 @@ class TreeTraversal:
     def step(self, last_choice, extra_choice_info=None, attention_offset=None):
         """step"""
         while True:
-            ##<debug print('2' * 10, 'in one step...', 'last_choice:', last_choice, 'cur_item:', self.cur_item.to_str())
+            # <debug print('2' * 10, 'in one step...', 'last_choice:', last_choice, 'cur_item:', self.cur_item.to_str())
             self.update_using_last_choice(last_choice, extra_choice_info, attention_offset)
 
             handler_name = TreeTraversal.Handler.handlers[self.cur_item.state]
@@ -129,7 +128,7 @@ class TreeTraversal:
                 last_choice = choices
                 continue
             else:
-                ##<debug print('>>>', '2' * 10, 'one step finished.')
+                # <debug print('>>>', '2' * 10, 'one step finished.')
                 return choices
 
     def update_using_last_choice(self, last_choice, extra_choice_info, attention_offset):
@@ -162,8 +161,8 @@ class TreeTraversal:
 
     def pop(self):
         """pop"""
-        ##<debug print('v' * 66)
-        ##<debug print([x.to_str() for x in self.queue])
+        # <debug print('v' * 66)
+        # <debug print([x.to_str() for x in self.queue])
         if self.queue:
             self.cur_item = self.queue[-1]
             self.queue = self.queue.delete(-1)

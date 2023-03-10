@@ -14,47 +14,44 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Any, Union
 
-import copy
-import json
 import inspect
 import logging
 import traceback
-import numpy as np
-import pandas as pd
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 import networkx as nx
-from pandas.core.frame import DataFrame
 import yaml
 from networkx import DiGraph
 from networkx.drawing.nx_agraph import to_agraph
+from pandas.core.frame import DataFrame
 
 from pipelines.pipelines.config import (
     get_component_definitions,
     get_pipeline_definition,
     read_pipeline_config_from_yaml,
 )
-from pipelines.schema import Document, Label, MultiLabel
 from pipelines.pipelines.utils import generate_code
+from pipelines.schema import Document, MultiLabel
 
 try:
-    from ray import serve
     import ray
-except:
+    from ray import serve
+except Exception:
     ray = None  # type: ignore
     serve = None  # type: ignore
 
 try:
     from pipelines import __version__
-except:
+except Exception:
     # For development
     __version__ = "0.0.0"
 
-from pipelines.schema import Document
-from pipelines.nodes.base import BaseComponent
-from pipelines.nodes.retriever.base import BaseRetriever
+
+from pipelines.nodes.base import BaseComponent  # isort: skip
 from pipelines.document_stores.base import BaseDocumentStore
+from pipelines.nodes.retriever.base import BaseRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -694,15 +691,6 @@ class Pipeline(BasePipeline):
 
         :param path: the path to save the image.
         """
-        try:
-            import pygraphviz
-        except ImportError:
-            raise ImportError(
-                f"Could not import `pygraphviz`. Please install via: \n"
-                f"pip install pygraphviz\n"
-                f"(You might need to run this first: apt install libgraphviz-dev graphviz )"
-            )
-
         graphviz = to_agraph(self.graph)
         graphviz.layout("dot")
         graphviz.draw(path)

@@ -168,8 +168,8 @@ class ArtistTokenizer(BertTokenizer):
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         if isinstance(ids, int):
-            if ids in self.added_tokens_decoder:
-                return self.added_tokens_decoder[ids]
+            if ids - self.image_vocab_size in self.added_tokens_decoder:
+                return self.added_tokens_decoder[ids - self.image_vocab_size]
             else:
                 # note: process image_vocab_size offset
                 return self._convert_id_to_token(ids - self.image_vocab_size)
@@ -178,8 +178,8 @@ class ArtistTokenizer(BertTokenizer):
             index = int(index)
             if skip_special_tokens and index in self.all_special_ids:
                 continue
-            if index in self.added_tokens_decoder:
-                tokens.append(self.added_tokens_decoder[index])
+            if index - self.image_vocab_size in self.added_tokens_decoder:
+                tokens.append(self.added_tokens_decoder[index - self.image_vocab_size])
             else:
                 # note: process image_vocab_size offset
                 tokens.append(self._convert_id_to_token(index - self.image_vocab_size))

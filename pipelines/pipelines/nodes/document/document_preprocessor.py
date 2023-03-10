@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import logging
-from typing import List, Dict
-import numpy as np
 import base64
-from PIL import Image
+import logging
+import os
 from io import BytesIO
 
+import numpy as np
 import paddle
 from paddleocr import PaddleOCR
-from pathlib import Path
-from paddlenlp.taskflow.utils import download_file
+from PIL import Image
 
+from paddlenlp.taskflow.utils import download_file
 from pipelines.nodes.base import BaseComponent
 
 logger = logging.getLogger(__name__)
@@ -78,7 +76,7 @@ class DocOCRProcessor(BaseComponent):
                                 img.save("./tmp.jpg")
                                 data["doc"] = "./tmp.jpg"
                         else:
-                            raise ValueError(f"Incorrect path or url, URLs must start with `http://` or `https://`")
+                            raise ValueError("Incorrect path or url, URLs must start with `http://` or `https://`")
                     if "prompt" not in example.keys():
                         raise ValueError("Invalid inputs, the inputs should contain the prompt.")
                     else:

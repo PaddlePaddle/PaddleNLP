@@ -14,17 +14,15 @@
 """ Decoder for the SQL generation problem."""
 
 from collections import namedtuple
-import numpy as np
 
+import data_util.snippets as snippet_handler
+import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from . import model_utils
-
-from .token_predictor import PredictionInput, PredictionInputWithSchema
-import data_util.snippets as snippet_handler
-from . import embedder
 from data_util.vocabulary import EOS_TOK, UNK_TOK
+
+from . import embedder
+from .token_predictor import PredictionInputWithSchema
 
 np.random.seed(0)
 

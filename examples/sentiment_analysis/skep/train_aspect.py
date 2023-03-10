@@ -147,7 +147,6 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
-    criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     global_step = 0
@@ -156,8 +155,7 @@ if __name__ == "__main__":
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch["input_ids"], batch["token_type_ids"], batch["labels"]
-            logits = model(input_ids, token_type_ids)
-            loss = criterion(logits, labels)
+            loss, logits = model(input_ids, token_type_ids, labels=labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
             metric.update(correct)
