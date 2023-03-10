@@ -303,9 +303,9 @@ class GLMStack(nn.Layer):
             mem_i = cache[i] if use_cache else None
 
             if self.enable_recompute:
-                hidden_states = self.recompute_training(layer, hidden_states, attention_mask, cache=mem_i)
+                hidden_states = self.recompute_training(layer, hidden_states, attention_mask, use_cache, cache=mem_i)
             else:
-                hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
+                hidden_states = layer(hidden_states, attention_mask, use_cache, cache=mem_i)
 
             if use_cache:
                 new_caches.append(hidden_states.detach())

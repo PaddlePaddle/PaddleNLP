@@ -384,6 +384,7 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         merges_file,
         cls_token="[CLS]",
         sep_token="[SEP]",
+        unk_token="[UNK]",
         mask_token="[MASK]",
         pad_token="<|endoftext|>",
         eos_token="<|endoftext|>",
@@ -396,6 +397,8 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
             sep_token=sep_token,
             pad_token=pad_token,
             eos_token=eos_token,
+            unk_token=unk_token,
+            mask_token=mask_token,
             **kwargs,
         )
 
