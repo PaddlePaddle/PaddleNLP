@@ -13,23 +13,12 @@
 # limitations under the License.
 """ Class for the Sequence to sequence model for ATIS."""
 
-import os
-
+import numpy as np
 import paddle
-
-from . import model_utils
-from . import bert_utils
-
 from data_util.vocabulary import DEL_TOK, UNK_TOK
 
+from . import bert_utils
 from .embedder import Embedder
-from .token_predictor import construct_token_predictor
-
-import numpy as np
-
-from data_util.atis_vocab import ATISVocabulary
-
-import pickle
 
 
 def get_token_indices(token, index_to_token):
@@ -336,7 +325,6 @@ class ATISModel(paddle.nn.Layer):
                     parameters=params_bert_trainer, learning_rate=self.scheduler, grad_clip=clip
                 )
             else:
-                yyy = 1.0
                 self.bert_trainer = paddle.optimizer.Adam(
                     parameters=params_bert_trainer, learning_rate=1.0, grad_clip=clip
                 )

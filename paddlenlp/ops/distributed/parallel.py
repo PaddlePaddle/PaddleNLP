@@ -17,7 +17,7 @@ import paddle.nn as nn
 
 try:
     from paddle.distributed.fleet import fleet
-except Exception as e:
+except Exception:
     import warnings
 
     warnings.warn("paddle.distributed is not contains in you paddle!")
@@ -148,11 +148,9 @@ class ColumnParallelLiner(nn.Layer):
 
         if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
         else:
             assert fleet._role_maker, "To use paddle.distributed.split, " "you must call fleet.init() firstly."
             rank = fleet.worker_index()
-            nranks = fleet.worker_num()
 
         # rank within a model parallel group
         inner_rank = rank % num_partitions
@@ -186,7 +184,7 @@ class ColumnParallelLiner(nn.Layer):
         main_block.vars[weight.name].is_distributed = True
         # set is_distributed for splited bias
         # if a linear layer is splited by col, the bias would also be split into each rank as its weight
-        if self.linear._bias_attr != False:
+        if self.linear._bias_attr:
             startup_block.vars[self.linear.bias.name].is_distributed = True
             main_block.vars[self.linear.bias.name].is_distributed = True
             self.bias = self.linear.bias
@@ -237,11 +235,9 @@ class RowParallelLiner(nn.Layer):
 
         if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
         else:
             assert fleet._role_maker, "To use paddle.distributed.split, " "you must call fleet.init() firstly."
             rank = fleet.worker_index()
-            nranks = fleet.worker_num()
 
         # rank within a model parallel group
         inner_rank = rank % num_partitions

@@ -16,7 +16,6 @@
 import collections
 import collections.abc
 import json
-import operator
 
 UNK = "<UNK>"
 BOS = "<BOS>"

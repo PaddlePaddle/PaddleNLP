@@ -26,6 +26,7 @@ export log_path=${nlp_dir}/logs
 ####################################
 # for paddlenlp env
 python -c 'import sys; print(sys.version_info[:])'
+python -c 'import nltk; nltk.download("punkt")'
 set -x
 python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 nlp1_build (){

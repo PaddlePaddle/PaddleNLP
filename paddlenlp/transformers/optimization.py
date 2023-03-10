@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import math
 
 from paddle.optimizer.lr import LambdaDecay, LRScheduler
@@ -28,9 +27,7 @@ __all__ = [
 
 
 def is_integer(number):
-    if sys.version > "3":
-        return isinstance(number, int)
-    return isinstance(number, (int, long))
+    return isinstance(number, int)
 
 
 class CosineAnnealingWithWarmupDecay(LRScheduler):

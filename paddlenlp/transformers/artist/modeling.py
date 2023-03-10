@@ -20,6 +20,11 @@ import paddle.nn.functional as F
 from ...utils.log import logger
 from ..dallebart.modeling import VQGanDetokenizer
 from ..gpt.modeling import GPTLMHead, GPTLMHeadModel, GPTModel
+from .configuration import (
+    ARTIST_PRETRAINED_INIT_CONFIGURATION,
+    ARTIST_PRETRAINED_RESOURCE_FILES_MAP,
+    ArtistConfig,
+)
 
 __all__ = [
     "ArtistModel",
@@ -30,107 +35,10 @@ __all__ = [
 # set gelu_new
 F.gelu_python = F.gelu
 
-pretrained_init_configuration = {
-    "pai-painter-base-zh": {
-        "vocab_size": 37512,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu_python",
-        "hidden_dropout_prob": 0.0,
-        "attention_probs_dropout_prob": 0.0,
-        "max_position_embeddings": 288,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 16486,  # 102 + 16384
-        "bos_token_id": 16485,  # 101 + 16384
-        "eol_token_id": 16486,  # 102 + 16384
-    },
-    "pai-painter-painting-base-zh": {
-        "vocab_size": 37512,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu_python",
-        "hidden_dropout_prob": 0.0,
-        "attention_probs_dropout_prob": 0.0,
-        "max_position_embeddings": 288,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 16486,  # 102 + 16384
-        "bos_token_id": 16485,  # 101 + 16384
-        "eol_token_id": 16486,  # 102 + 16384
-    },
-    "pai-painter-scenery-base-zh": {
-        "vocab_size": 37512,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu_python",
-        "hidden_dropout_prob": 0.0,
-        "attention_probs_dropout_prob": 0.0,
-        "max_position_embeddings": 288,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 16486,  # 102 + 16384
-        "bos_token_id": 16485,  # 101 + 16384
-        "eol_token_id": 16486,  # 102 + 16384
-    },
-    "pai-painter-commercial-base-zh": {
-        "vocab_size": 37512,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu_python",
-        "hidden_dropout_prob": 0.0,
-        "attention_probs_dropout_prob": 0.0,
-        "max_position_embeddings": 288,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 16486,  # 102 + 16384
-        "bos_token_id": 16485,  # 101 + 16384
-        "eol_token_id": 16486,  # 102 + 16384
-    },
-    "pai-painter-large-zh": {
-        "vocab_size": 37512,
-        "hidden_size": 1024,
-        "num_hidden_layers": 24,
-        "num_attention_heads": 16,
-        "intermediate_size": 4096,
-        "hidden_act": "gelu_python",
-        "hidden_dropout_prob": 0.0,
-        "attention_probs_dropout_prob": 0.0,
-        "max_position_embeddings": 288,
-        "type_vocab_size": 1,
-        "initializer_range": 0.02,
-        "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 16486,  # 102 + 16384
-        "bos_token_id": 16485,  # 101 + 16384
-        "eol_token_id": 16486,  # 102 + 16384
-    },
-}
-pretrained_resource_files_map = {
-    "model_state": {
-        "pai-painter-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
-        "pai-painter-painting-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
-        "pai-painter-scenery-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/model_state.pdparams",
-        "pai-painter-commercial-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/model_state.pdparams",
-        "pai-painter-large-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
-    }
-}
-
 
 class ArtistModel(GPTModel):
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
 
 class ArtistForConditionalGeneration(GPTLMHeadModel):
@@ -143,12 +51,12 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     """
 
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
-    def __init__(self, gpt):
-        super().__init__(gpt)
-        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"], self.gpt.config["vocab_size"])
+    def __init__(self, config: ArtistConfig):
+        super().__init__(config)
+        self.lm_head = GPTLMHead(config.hidden_size, config.vocab_size)
         self.apply(self.init_weights)
 
     @staticmethod
@@ -168,11 +76,11 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             The vocabulary size of image.
             Defaults to `16384`.
     """
-    pretrained_init_configuration = pretrained_init_configuration
-    pretrained_resource_files_map = pretrained_resource_files_map
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
-    def __init__(self, gpt, image_vocab_size=16384):
-        super().__init__(gpt)
+    def __init__(self, config: ArtistConfig, image_vocab_size=16384):
+        super().__init__(config)
         logger.warning(
             f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
             "Please Refer to PPDiffusers for Text-to-Image Capabilities"

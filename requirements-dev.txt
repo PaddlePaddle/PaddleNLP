@@ -1,4 +1,5 @@
 paddlepaddle>=2.4.1
+paddleocr
 pre-commit
 pytest
 parameterized
@@ -6,3 +7,6 @@ pytest-cov
 regex
 pytest-xdist
 fast_tokenizer_python
+emoji
+ftfy
+unidecode
