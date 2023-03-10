@@ -45,6 +45,7 @@ from .roberta.tokenizer import *
 from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
+from .electra.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -180,6 +181,7 @@ from .artist.tokenizer import *
 from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .dallebart.configuration import *
 from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *

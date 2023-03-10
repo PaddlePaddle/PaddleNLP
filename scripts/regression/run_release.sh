@@ -40,6 +40,7 @@ nlp2_build (){
     rm -rf dist/
 
     python -m pip install -r requirements.txt
+    python -m pip install -r requirements-dev.txt
     python setup.py bdist_wheel
     python -m pip install -U dist/paddlenlp****.whl
 }
