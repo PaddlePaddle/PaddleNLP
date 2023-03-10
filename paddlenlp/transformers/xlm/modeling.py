@@ -88,7 +88,7 @@ class MultiHeadAttention(nn.Layer):
 
     NEW_ID = itertools.count()
 
-    def __init__(self, n_heads, dim, attention_probs_dropout_prob):
+    def __init__(self, n_heads, dim, config: XLMConfig):
         super().__init__()
         self.layer_id = next(MultiHeadAttention.NEW_ID)
         self.dim = dim
@@ -98,7 +98,7 @@ class MultiHeadAttention(nn.Layer):
         self.k_lin = nn.Linear(dim, dim)
         self.v_lin = nn.Linear(dim, dim)
         self.out_lin = nn.Linear(dim, dim)
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.dim_per_head = self.dim // self.n_heads
 
     def shape(self, x):
@@ -163,12 +163,12 @@ class MultiHeadAttention(nn.Layer):
 
 
 class TransformerFFN(nn.Layer):
-    def __init__(self, in_dim, dim_hidden, out_dim, hidden_act, dropout_prob):
+    def __init__(self, in_dim, dim_hidden, out_dim, config: XLMConfig):
         super().__init__()
         self.lin1 = nn.Linear(in_dim, dim_hidden)
         self.lin2 = nn.Linear(dim_hidden, out_dim)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.act = ACT2FN[hidden_act]
+        self.dropout = nn.Dropout(config.dropout_prob)
+        self.act = ACT2FN[config.hidden_act]
 
     def forward(self, x):
         x = self.lin1(x)
@@ -276,9 +276,7 @@ class XLMModel(XLMPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         for _ in range(self.num_hidden_layers):
-            self.attentions.append(
-                MultiHeadAttention(config.num_attention_heads, config.hidden_size, config.attention_probs_dropout_prob)
-            )
+            self.attentions.append(MultiHeadAttention(config.num_attention_heads, config.hidden_size, config))
             self.layer_norm1.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
 
             self.ffns.append(
@@ -286,8 +284,7 @@ class XLMModel(XLMPretrainedModel):
                     config.hidden_size,
                     config.hidden_size * 4,
                     config.hidden_size,
-                    config.hidden_act,
-                    config.hidden_dropout_prob,
+                    config,
                 )
             )
             self.layer_norm2.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
