@@ -27,7 +27,7 @@ __all__ = [
 
 
 GLM_PRETRAINED_INIT_CONFIGURATION = {
-    "glm-515m": {
+    "THUDM/glm-515m": {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
@@ -52,7 +52,7 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "use_scaled_init_for_output_weights": True,
         "vocab_size": 30592,
     },
-    "glm-2b": {
+    "THUDM/glm-2b": {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
@@ -75,7 +75,7 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "spell_length": None,
         "vocab_size": 50304,
     },
-    "glm-10b": {
+    "THUDM/glm-10b": {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
@@ -98,7 +98,7 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "spell_length": None,
         "vocab_size": 50304,
     },
-    "glm-large-chinese": {
+    "THUDM/glm-large-chinese": {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
@@ -122,7 +122,7 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "spell_length": None,
         "vocab_size": 50048,
     },
-    "glm-10b-chinese": {
+    "THUDM/glm-10b-chinese": {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
@@ -150,11 +150,11 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
 
 GLM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "glm-515m": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-515m.pdparams",
-        "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b.pdparams",
-        "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b.pdparams",
-        "glm-large-chinese": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-large-chinese.pdparams",
-        "glm-10b-chinese": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-chinese.pdparams",
+        "THUDM/glm-515m": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-515m.pdparams",
+        "THUDM/glm-2b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-2b.pdparams",
+        "THUDM/glm-10b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-10b.pdparams",
+        "THUDM/glm-large-chinese": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-large-chinese.pdparams",
+        "THUDM/glm-10b-chinese": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-10b-chinese.pdparams",
     }
 }
 
@@ -237,6 +237,7 @@ class GLMConfig(PretrainedConfig):
         pool_token="cls",
         layernorm_epsilon=1e-5,
         paddle_dtype="float32",
+        use_scaled_init_for_output_weights=False,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -261,3 +262,4 @@ class GLMConfig(PretrainedConfig):
         self.pool_token = pool_token
         self.layernorm_epsilon = layernorm_epsilon
         self.paddle_dtype = paddle_dtype
+        self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights

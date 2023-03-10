@@ -25,6 +25,7 @@ from paddle.distributed.fleet.utils import recompute
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
+from ...utils.initializer import normal_, ones_, zeros_
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     CausalLMOutputWithCrossAttentions,
@@ -286,7 +287,6 @@ class GLMStack(nn.Layer):
             mem_i = memory_states[i] if memory_states else None
 
             if self.enable_recompute:
-                # TODO Should the attention_mask be added, it seems missing in original application.
                 hidden_states = self.recompute_training(layer, hidden_states, attention_mask, cache=mem_i)
             else:
                 hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
@@ -380,32 +380,18 @@ class GLMPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
-            layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-            )
+            std = self.config.initializer_range
+            # TODO: initialization for glm-515m
+            # if self.config.use_scaled_init_for_output_weights and _is_output_dense(layer):
+            #     std = self.config.initializer_range / math.sqrt(2.0 * self.config.num_layers)
+            normal_(layer.weight, mean=0.0, std=std)
             if layer.bias is not None:
-                layer.bias.set_value(paddle.zeros_like(layer.bias))
+                zeros_(layer.bias)
         elif isinstance(layer, nn.Embedding):
-            layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-            )
+            normal_(layer.weight, mean=0.0, std=self.config.initializer_range)
         elif isinstance(layer, nn.LayerNorm):
-            layer.weight.set_value(paddle.ones_like(layer.weight))
-            layer.bias.set_value(paddle.zeros_like(layer.bias))
-
-        # if config.use_scaled_init_for_output_weights:
-        #    output_layer_init_method = nn.initializer.Normal(
-        #        mean=0.0, std=config.initializer_range / math.sqrt(2.0 * config.num_layers)
-        #    )
-        # TODO: How to devide the init_method
+            ones_(layer.weight)
+            zeros_(layer.bias)
 
 
 @register_base_model
