@@ -1143,6 +1143,10 @@ class ErnieHealthForPreTrainingOutput(ModelOutput):
     """
 
     loss: Optional[paddle.Tensor] = None
+    gen_loss: Optional[paddle.Tensor] = None
+    disc_rtd_loss: Optional[paddle.Tensor] = None
+    disc_mts_loss: Optional[paddle.Tensor] = None
+    disc_csp_loss: Optional[paddle.Tensor] = None
 
 
 class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
@@ -1241,17 +1245,22 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
             attention_mask = attention_mask.astype("bool")
 
         total_loss = None
+        gen_loss = None
+        disc_rtd_loss = None
+        disc_mts_loss = None
+        disc_csp_loss = None
+
         if generator_labels is not None and disc_labels is not None:
             loss_fct = ErnieHealthPretrainingCriterion(self.config)
-            total_loss = loss_fct(
+            total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss = loss_fct(
                 generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
             )
 
         if not return_dict:
             # return total_loss
-            return total_loss
+            return total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss
 
-        return ErnieHealthForPreTrainingOutput(loss=total_loss)
+        return ErnieHealthForPreTrainingOutput(total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss)
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
@@ -1644,7 +1653,7 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
             + self.csp_weight * disc_csp_loss
         )
 
-        return loss
+        return loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss
 
 
 class ElectraForQuestionAnswering(ElectraPretrainedModel):
