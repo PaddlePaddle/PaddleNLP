@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import shutil
 import unittest
 
 from paddlenlp import Taskflow
+from paddlenlp.utils.env import PPNLP_HOME
 
 from ..testing_utils import get_tests_dir
 
@@ -31,6 +34,22 @@ class TestUIETask(unittest.TestCase):
             task="information_extraction",
             model="__internal_testing__/tiny-random-uie-m",
         )
+
+        tiny_uie_m_path = os.path.join(
+            PPNLP_HOME, "taskflow/information_extraction/__internal_testing__/tiny-random-uie-m/"
+        )
+        tiny_uie_x_path = os.path.join(
+            PPNLP_HOME, "taskflow/information_extraction/__internal_testing__/tiny-random-uie-x/"
+        )
+
+        if not os.path.exists(tiny_uie_x_path):
+            os.mkdir(tiny_uie_x_path)
+
+        for file_to_copy in ["vocab.txt", "sentencepiece.bpe.model"]:
+            shutil.copy(
+                os.path.join(tiny_uie_m_path, file_to_copy),
+                os.path.join(tiny_uie_x_path, file_to_copy),
+            )
 
         cls.uie_x = Taskflow(
             task="information_extraction",
