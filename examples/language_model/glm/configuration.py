@@ -261,3 +261,5 @@ class GLMConfig(PretrainedConfig):
         self.pool_token = pool_token
         self.layernorm_epsilon = layernorm_epsilon
         self.paddle_dtype = paddle_dtype
+        self.mp_degree = kwargs.pop("mp_degree", 1)
+        self.mp_rank = kwargs.pop("mp_rank", 0)

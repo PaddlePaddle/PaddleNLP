@@ -236,6 +236,111 @@ class StateDictKeysChecker:
         return all_diff_keys
 
 
+def merge_tensor_parallel_weight(weight_list, is_column=True):
+    """
+
+    [A1],[A2]  => [A1, A2]
+
+    Args:
+        weight_list (_type_): _description_
+        is_column (bool, optional): _description_. Defaults to True. is column or row linear
+
+    Returns:
+        _type_: _description_
+    """
+    if is_column:
+        return np.concatenate(weight_list, axis=-1)
+    else:
+        return np.concatenate(weight_list, axis=0)
+
+
+def split_tensor_parallel_weight(weight, mp_degree, mp_rank=None, is_column=True):
+    """
+
+    [A1, A2]  =>  [A1],[A2]
+
+    Args:
+        weight (_type_): _description_
+        mp_degree (_type_): _description_
+        mp_rank (_type_): _description_
+        is_column (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        _type_: _description_
+    """
+    if is_column:
+        splited_weights = np.split(weight, mp_degree, axis=-1)
+    else:
+        splited_weights = np.split(weight, mp_degree, axis=0)
+
+    if mp_rank is not None:
+        return splited_weights[mp_rank]
+
+    return splited_weights
+
+
+"""
+There're three types of MultiHeadAttention QKV Layout in Transfomers
+
+tensor_parallel_qkv = [q1, k1, v1, q2, k2, v2]
+naive_merged_qkv    = [q1, q1, k1, k2, v1, v2]
+splited_qkv         = [q1, q1], [k1, k2], [v1, v2]
+
+naive_merged_qkv -> tensor_parallel_qkv
+    : naive_merged_qkv_to_tensor_parallel_qkv
+
+splited_qkv -> tensor_parallel_qkv
+    : splited_qkv_to_tensor_parallel_qkv
+
+
+"""
+
+
+def tensor_parallel_qkv_to_naive_merged_qkv(weight, num_attention_heads):
+    """
+    [q1, q1, k1, k2, v1, v2] => [q1, k1, v1, q2, k2, v2]
+    """
+    qkvs = []
+    partition_dim = -1
+    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+    qkv_weight_num = 3
+
+    for i in range(qkv_weight_num):
+        qkv = np.concatenate(split_heads[i::qkv_weight_num], axis=partition_dim)
+        qkvs.append(qkv)
+
+    return np.concatenate(qkvs, axis=partition_dim)
+
+
+def naive_merged_qkv_to_tensor_parallel_qkv(weight, num_attention_heads):
+    """
+    [q1, q1, k1, k2, v1, v2] => [q1, k1, v1, q2, k2, v2]
+    """
+    qkv_pairs = []
+    partition_dim = -1
+    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+
+    for i in range(num_attention_heads):
+        qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
+        qkv_pairs.append(qkv_pair)
+
+    return np.concatenate(qkv_pairs, axis=partition_dim)
+
+
+def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
+    """
+    [q1, k1, v1], [q2, k2, v2] => [q1, q1, k1, k2, v1, v2]
+
+    Args:
+        weight_list (_type_): [Q,K,V] tensor list
+    """
+    assert len(
+        weight_list
+    ), f"weight_list length is not equal 3, it should be Q K V list. but got length {len(weight_list)}"
+    weight = np.concatenate(weight_list, axis=-1)
+    return naive_merged_qkv_to_tensor_parallel_qkv(weight)
+
+
 @dataclass
 class StateDictNameMapping:
     """NameMapping of StateDict between two models"""
@@ -265,6 +370,8 @@ class StateDictNameMapping:
             ndarray: the final tensor
         """
         tensor = state_dict.pop(name)
+        if callable(self.action):
+            return self.action(tensor)
         if self.action == "transpose":
             return transpose(tensor, [1, 0])
         if self.action == "merge_last_two_dim":
@@ -273,12 +380,13 @@ class StateDictNameMapping:
             return np.reshape(tensor, [shape[0], -1])
         if self.action == "split":
             assert self.index is not None, "when action is `split`, index field is required."
-
+            # FIXME if the order of split starts from index=2, no tensor left.
             if self.index < 2:
                 state_dict[name] = tensor
             # qkv is stored in same tensor, so it should be split into 3 arr
             tensors = np.split(tensor, 3, axis=-1)
             return tensors[self.index]
+
         return tensor
 
     def matched(self, text: str) -> bool:

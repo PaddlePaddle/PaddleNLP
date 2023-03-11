@@ -15,27 +15,29 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
-from ...utils.env import CONFIG_NAME
-from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    CausalLMOutputWithCrossAttentions,
-    ModelOutput,
-    MultipleChoiceModelOutput,
-)
-from .configuration import (
+from paddlenlp.transformers import PretrainedModel
+from paddlenlp.transformers.glm.configuration import (
     GLM_PRETRAINED_INIT_CONFIGURATION,
     GLM_PRETRAINED_RESOURCE_FILES_MAP,
     GLMConfig,
 )
+from paddlenlp.transformers.model_outputs import (
+    CausalLMOutputWithCrossAttentions,
+    ModelOutput,
+    MultipleChoiceModelOutput,
+)
+from paddlenlp.utils.converter import StateDictNameMapping
+from paddlenlp.utils.env import CONFIG_NAME
 
 __all__ = [
     "GLMModel",
@@ -64,9 +66,15 @@ class GLMAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+        if config.mp_degree > 1:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(config.hidden_size, 3 * config.hidden_size)
+            self.dense = fleet.meta_parallel.RowParallelLinear(config.hidden_size, config.hidden_size)
+            self.num_attention_heads = config.num_attention_heads // config.mp_degree
+        else:
+            self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+
         self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.output_dropout = nn.Dropout(config.output_dropout_prob)
 
     def _transpose_for_scores(self, inputs: Tensor):
@@ -80,7 +88,7 @@ class GLMAttention(nn.Layer):
         outputs = paddle.transpose(outputs, [0, 2, 1, 3])
         return outputs
 
-    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
+    def _core_attention(self, hidden_states: Tensor, cache: Tensor = None):
         query_length = hidden_states.shape[1]
         if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
@@ -94,6 +102,37 @@ class GLMAttention(nn.Layer):
         q_layer = self._transpose_for_scores(mixed_q_layer)
         k_layer = self._transpose_for_scores(mixed_k_layer)
         v_layer = self._transpose_for_scores(mixed_v_layer)
+
+        return q_layer, k_layer, v_layer
+
+    def _core_parallel_attention(self, hidden_states: Tensor, cache: Tensor = None):
+        query_length = hidden_states.shape[1]
+        if cache is None:
+            mixed_layer = self.query_key_value(hidden_states)
+
+            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_attention_heads, 3 * self.attention_head_size])
+            mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
+            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
+
+        else:
+            concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
+            mixed_layer = self.query_key_value(concat_hidden_states)
+            # [bs. seq_length, num_heads, head_dim]
+            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+            # [bs, num_heads, seq_length, head_dim]
+            mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
+            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
+
+            mixed_q_layer = mixed_q_layer[:, -query_length:]  # ?? FIXME
+
+        return mixed_q_layer, mixed_k_layer, mixed_v_layer
+
+    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
+
+        if self.config.mp_degree > 1:
+            q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
+        else:
+            q_layer, k_layer, v_layer = self._core_attention(hidden_states, cache)
 
         if self.attention_scale > 1.0:
             attention_scores = paddle.matmul(
@@ -166,8 +205,12 @@ class GPT2MLP(nn.Layer):
 
     def __init__(self, config: GLMConfig):
         super(GPT2MLP, self).__init__()
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.hidden_size * 4)
-        self.dense_4h_to_h = nn.Linear(config.hidden_size * 4, config.hidden_size)
+        if config.mp_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(config.hidden_size, config.hidden_size * 4)
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(config.hidden_size * 4, config.hidden_size)
+        else:
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.hidden_size * 4)
+            self.dense_4h_to_h = nn.Linear(config.hidden_size * 4, config.hidden_size)
         self.dropout = nn.Dropout(config.output_dropout_prob)
 
     def forward(self, hidden_states):
@@ -370,6 +413,64 @@ class GLMPretrainedModel(PretrainedModel):
 
             model_mappings.extend(layer_mappings)
 
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, transpose=True, is_column=True, is_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x)
+            return split_tensor_parallel_weight(
+                x, mp_degree=config.mp_degree, mp_rank=config.mp_rank, is_column=is_column
+            )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(
+                    fn, transpose=False, is_column=True, is_qkv=False
+                ),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(
+                    fn, transpose=True, is_column=True, is_qkv=False
+                ),
+                "transformer.layers.0.attention.query_key_value.bias": partial(
+                    fn, transpose=False, is_column=True, is_qkv=True
+                ),
+                "transformer.layers.0.attention.query_key_value.weight": partial(
+                    fn, transpose=True, is_column=True, is_qkv=True
+                ),
+                # Row Linear
+                "word_embeddings.weight": partial(fn, transpose=False, is_column=False, is_qkv=False),
+                # 'transformer.layers.0.attention.dense.bias',
+                "transformer.layers.0.attention.dense.weight": partial(
+                    fn, transpose=True, is_column=False, is_qkv=False
+                ),
+                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(
+                    fn, transpose=True, is_column=False, is_qkv=False
+                ),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        if config.mp_degree > 1:
+            tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+            for mapping in model_mappings:
+                if mapping[1] in tp_split_mappings:
+                    mapping[2] = tp_split_mappings[mapping[1]]
+
         if cls.__name__ != "GLMModel":
             for mapping in model_mappings:
                 mapping[1] = "glm." + mapping[1]
@@ -408,7 +509,6 @@ class GLMPretrainedModel(PretrainedModel):
         # TODO: How to devide the init_method
 
 
-@register_base_model
 class GLMModel(GLMPretrainedModel):
     r"""
     The GLM Model transformer can behave as an encoder (with only self-attention) as well as a decoder, where
