@@ -64,10 +64,16 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
+    SAFE_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHTS_NAME,
     WEIGHTS_INDEX_NAME,
+    WEIGHTS_NAME,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
+    convert_file_size_to_int,
     fn_args_to_dict,
+    is_safetensors_available,
+    paddlenlp_load,
     resolve_cache_dir,
 )
 
@@ -76,11 +82,21 @@ __all__ = [
     "register_base_model",
 ]
 
-WEIGHTS_NAME = "model_state.pdparams"
+
+if is_safetensors_available():
+    from safetensors import safe_open
+    from safetensors.paddle import load_file as safe_load_file
+    from safetensors.paddle import save_file as safe_save_file
 
 
 def unwrap_model(model, *args, **kwargs):
-    raw_model = model._layers if isinstance(model, paddle.DataParallel) else model
+    raw_model = model
+    while hasattr(raw_model, "_layers") or hasattr(raw_model, "_layer"):
+        if hasattr(raw_model, "_layers"):
+            raw_model = raw_model._layers
+        else:
+            raw_model = raw_model._layer
+
     return raw_model
 
 
@@ -231,7 +247,7 @@ def dtype_byte_size(dtype):
     4
     ```
     """
-    if dtype == torch.bool:
+    if dtype == paddle.bool:
         return 1 / 8
     bit_search = re.search(r"[^\d](\d+)$", str(dtype))
     if bit_search is None:
@@ -250,7 +266,7 @@ def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
 
 
 def shard_checkpoint(
-    state_dict: Dict[str, torch.Tensor], max_shard_size: Union[int, str] = "10GB", weights_name: str = WEIGHTS_NAME
+    state_dict: Dict[str, paddle.Tensor], max_shard_size: Union[int, str] = "10GB", weights_name: str = WEIGHTS_NAME
 ):
     """
     Splits a model state dictionary in sub-checkpoints so that the final size of each sub-checkpoint does not exceed a
@@ -269,11 +285,11 @@ def shard_checkpoint(
     </Tip>
 
     Args:
-        state_dict (`Dict[str, torch.Tensor]`): The state dictionary of a model to save.
+        state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
         max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
             The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
             (like `"5MB"`).
-        weights_name (`str`, *optional*, defaults to `"pytorch_model.bin"`):
+        weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
             The name of the model save file.
     """
     max_shard_size = convert_file_size_to_int(max_shard_size)
@@ -284,8 +300,7 @@ def shard_checkpoint(
     total_size = 0
 
     for key, weight in state_dict.items():
-        weight_size = weight.numel() * dtype_byte_size(weight.dtype)
-
+        weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
         # If this weight is going to tip up over the maximal size, we split.
         if current_block_size + weight_size > max_shard_size:
             sharded_state_dicts.append(current_block)
@@ -307,7 +322,7 @@ def shard_checkpoint(
     weight_map = {}
     shards = {}
     for idx, shard in enumerate(sharded_state_dicts):
-        shard_file = weights_name.replace(".bin", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.bin")
+        shard_file = weights_name.replace(".pdparams", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.pdparams")
         shard_file = shard_file.replace(
             ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
         )
@@ -324,14 +339,13 @@ def shard_checkpoint(
 def load_sharded_checkpoint(model, folder, strict=True):
     """
     This is the same as
-    [`torch.nn.Module.load_state_dict`](https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=load_state_dict#torch.nn.Module.load_state_dict)
     but for a sharded checkpoint.
 
     This load is performed efficiently: each checkpoint shard is loaded one by one in RAM and deleted after being
     loaded in the model.
 
     Args:
-        model (`torch.nn.Module`): The model in which to load the checkpoint.
+        model (`paddle.nn.Module`): The model in which to load the checkpoint.
         folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
         strict (`bool`, *optional`, defaults to `True`):
             Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
@@ -367,7 +381,7 @@ def load_sharded_checkpoint(model, folder, strict=True):
         raise RuntimeError(error_message)
 
     for shard_file in shard_files:
-        state_dict = torch.load(os.path.join(folder, shard_file), map_location="cpu")
+        state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
         model.load_state_dict(state_dict, strict=False)
 
         # Make sure memory is fred before we load the next state dict.
@@ -375,7 +389,7 @@ def load_sharded_checkpoint(model, folder, strict=True):
         gc.collect()
 
     # Return the same thing as PyTorch load_state_dict function.
-    return torch.nn.modules.module._IncompatibleKeys(missing_keys, unexpected_keys)
+    return paddle.nn.modules.module._IncompatibleKeys(missing_keys, unexpected_keys)
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -525,6 +539,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
+
+    def can_generate(self) -> bool:
+        """
+        Returns whether this model can generate sequences with `.generate()`.
+        Returns:
+            `bool`: Whether this model can generate sequences with `.generate()`.
+        """
+        # Detects whether `prepare_inputs_for_generation` has been overwritten, which is a requirement for generation
+        if "GenerationMixin" in str(self.prepare_inputs_for_generation):
+            return False
+        return True
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of model
@@ -813,7 +838,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # The other workers wait util pickle finish and then load the corresponding
         # partial weights. Also we can directly use separate weight files for
         # simplicity.
-        state_dict = paddle.load(weight_path, return_numpy=load_state_as_np)
+        state_dict = paddlenlp_load(weight_path, return_numpy=load_state_as_np)
 
         # Make sure we are able to load base models as well as derived models
         # (with heads)
@@ -963,8 +988,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
         if self.constructed_from_pretrained_config():
-
-            raise ValueError()
             return self.save_pretrained_v2(
                 save_dir,
                 is_main_process,
@@ -1144,6 +1167,39 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         value = adapt_stale_fwd_patch(self, name, value)
         return super(PretrainedModel, self).__setattr__(name, value)
 
+
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
+    # Convert old format to new format if needed from a PyTorch state_dict
+
+    # copy state_dict so _load_from_state_dict can modify it
+    metadata = getattr(state_dict, "_metadata", None)
+    state_dict = state_dict.copy()
+    if metadata is not None:
+        state_dict._metadata = metadata
+
+    error_msgs = []
+
+    # PyTorch's `_load_from_state_dict` does not copy parameters in a module's descendants
+    # so we need to apply the function recursively.
+    def load(module: nn.Module, state_dict, prefix=""):
+        local_metadata = {} if metadata is None else metadata.get(prefix[:-1], {})
+        args = (state_dict, prefix, local_metadata, True, [], [], error_msgs)
+        # Parameters of module and children will start with prefix. We can exit early if there are none in this
+        # state_dict
+        if len([key for key in state_dict if key.startswith(prefix)]) > 0:
+            module._load_from_state_dict(*args)
+
+        for name, child in module._modules.items():
+            if child is not None:
+                load(child, state_dict, prefix + name + ".")
+
+    load(model_to_load, state_dict, prefix=start_prefix)
+    # Delete `state_dict` so it could be collected by GC earlier. Note that `state_dict` is a copy of the argument, so
+    # it's safe to delete it.
+    del state_dict
+
+    return error_msgs
+
     @classmethod
     def _resolve_model_file_path(
         cls: Type[PretrainedModel],
@@ -1272,6 +1328,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
+        pretrained_model_name_or_path,
         ignore_mismatched_sizes=False,
         dtype=None,
     ) -> Tuple[List[str]]:
@@ -1428,6 +1485,46 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
 
+        if len(unexpected_keys) > 0:
+            logger.warning(
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
+                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
+                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
+                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
+            )
+        else:
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
+
+        if len(missing_keys) > 0:
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
+                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
+            )
+        elif len(mismatched_keys) == 0:
+            logger.info(
+                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
+                " training."
+            )
+        if len(mismatched_keys) > 0:
+            mismatched_warning = "\n".join(
+                [
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
+                    for key, shape1, shape2 in mismatched_keys
+                ]
+            )
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
+                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
+                " to use it for predictions and inference."
+            )
+
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
@@ -1496,7 +1593,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
-        model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
@@ -1508,6 +1604,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
+        else:
+            model_kwargs = kwargs
+
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
@@ -1538,7 +1637,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
         else:
             # 4. loading the state dict
-            model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+            model_state_dict = paddlenlp_load(model_weight_file, return_numpy=load_state_as_np)
 
         # 3. init the model
         init_args = config["init_args"] or ()
@@ -1551,49 +1650,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             model=model,
             state_dict=model_state_dict,
             loaded_keys=loaded_state_dict_keys,
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
             ignore_mismatched_sizes=ignore_mismatched_sizes,
             dtype=dtype,
         )
 
-        if len(unexpected_keys) > 0:
-            logger.warning(
-                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
-                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
-                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
-                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
-                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
-                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
-                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
-            )
-        else:
-            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
-
-        if len(missing_keys) > 0:
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
-                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
-            )
-        elif len(mismatched_keys) == 0:
-            logger.info(
-                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
-                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
-                " training."
-            )
-        if len(mismatched_keys) > 0:
-            mismatched_warning = "\n".join(
-                [
-                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
-                    for key, shape1, shape2 in mismatched_keys
-                ]
-            )
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
-                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
-                " to use it for predictions and inference."
-            )
         if paddle.in_dynamic_mode():
             return model
 
@@ -1664,10 +1725,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Only save the model itself if we are using distributed training
         model_to_save = unwrap_model(self)
 
-        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         dtype = get_parameter_dtype(model_to_save)
-        # model_to_save.config.torch_dtype = str(dtype).split(".")[1]
+        # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         # Attach architecture to the config
@@ -1697,7 +1758,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in distributed settings to avoid race conditions.
             weights_no_suffix = weights_name.replace(".pdparams", "").replace(".safetensors", "")
 
-            # make sure that file to be deleted matches format of sharded file, e.g. pytorch_model-00001-of-00005
+            # make sure that file to be deleted matches format of sharded file, e.g. paddle_model-00001-of-00005
             filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
             reg = re.compile("(.*?)-\d{5}-of-\d{5}")
 

@@ -15,7 +15,7 @@
 import sys
 import unittest
 
-import numpy as np
+# import numpy as np
 
 
 class TestCkptShard(unittest.TestCase):
@@ -66,9 +66,11 @@ class TestCkptShard(unittest.TestCase):
             print(sorted(os.listdir(tmp_dir)))
         # ['config.json', 'pytorch_model.bin']
         # Now let’s use a maximum shard size of 200MB:
-
-        raise ValueError()
+        # raise ValueError()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            model.save_pretrained(tmp_dir, max_shard_size="200MB")
+            model.save_pretrained(tmp_dir, max_shard_size="200MB", safe_serialization=True)
             print(sorted(os.listdir(tmp_dir)))
+            new_model = AutoModel.from_pretrained(tmp_dir)
+            print(new_model.state_dict.keys())
         # ['config.json', 'pytorch_model-00001-of-00003.bin', 'pytorch_model-00002-of-00003.bin', 'pytorch_model-00003-of-00003.bin', 'pytorch_model.bin.index.json']
+        raise ValueError()
