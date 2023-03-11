@@ -48,6 +48,7 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
         "vocab_size": 250880,
         "mp_degree": 1,
         "mp_rank": -1,
+        "use_recompute": False,
     }
 }
 
@@ -118,6 +119,7 @@ class BloomConfig(PretrainedConfig):
         slow_but_exact=False,
         mp_degree=1,
         mp_rank=0,
+        use_recompute=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -140,5 +142,6 @@ class BloomConfig(PretrainedConfig):
         self.slow_but_exact = slow_but_exact
         self.mp_degree = mp_degree
         self.mp_rank = mp_rank
+        self.use_recompute = use_recompute
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)

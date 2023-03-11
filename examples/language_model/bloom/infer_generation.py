@@ -17,7 +17,33 @@ import os
 import fastdeploy as fd
 import numpy as np
 from transformers import AutoTokenizer
-from utils import left_padding
+
+# from utils import left_padding
+
+
+def left_padding(inputs, pad_id, padding="longest"):
+    assert "input_ids" in inputs, "input_ids should be in inputs!"
+    max_length = 0
+    for ids in inputs["input_ids"]:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(name, max_length, to_pad_id):
+        values = inputs[name]
+        res = []
+        for index, value in enumerate(values):
+            res.append(extend_max_lenth(value, max_length, to_pad_id))
+        inputs[name] = res
+
+    extend_filed("input_ids", max_length, pad_id)
+    if "attention_mask" in inputs:
+        extend_filed("attention_mask", max_length, 0)
+    if "position_ids" in inputs:
+        extend_filed("position_ids", max_length, 0)
+
+    return inputs
 
 
 def parse_arguments():
@@ -114,9 +140,7 @@ class Predictor(object):
         return input_map
 
     def infer(self, input_map):
-        print("before predict")
         results = self.runtime.infer(input_map)
-        print("after predict")
         return results
 
     def postprocess(self, infer_data):
@@ -138,9 +162,11 @@ class Predictor(object):
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
-    all_texts = ["i love you", "hello world", "i am so happy"]
+    all_texts = [
+        'answer: Carolina Panthers context: Super Bowl 50 was an American football game to determine the champion of the National Football League (NFL) for the 2015 season. The American Football Conference (AFC) champion Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers 24–10 to earn their third Super Bowl title. The game was played on February 7, 2016, at Levi\'s Stadium in the San Francisco Bay Area at Santa Clara, California. As this was the 50th Super Bowl, the league emphasized the "golden anniversary" with various gold-themed initiatives, as well as temporarily suspending the tradition of naming each Super Bowl game with Roman numerals (under which the game would have been known as "Super Bowl L"), so that the logo could prominently feature the Arabic numerals 50. </s>'
+    ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
-            print("question:{}, answer:{}".format(text, result))
+            print("{} \n question:{}".format(text, result))

@@ -25,6 +25,7 @@ from configuration import BloomConfig
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
 from processor import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -779,6 +780,28 @@ class BloomModel(BloomPreTrainedModel):
     def set_input_embeddings(self, new_embeddings: Tensor):
         self.word_embeddings = new_embeddings
 
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self, block, hidden_states, layer_past, attention_mask, head_mask, use_cache, output_attentions, alibi
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(block),
+            hidden_states,
+            layer_past,
+            attention_mask,
+            head_mask,
+            use_cache,
+            output_attentions,
+            alibi,
+        )
+        return hidden_states
+
     def forward(
         self,
         input_ids=None,
@@ -866,20 +889,17 @@ class BloomModel(BloomPreTrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.gradient_checkpointing and self.training:
-                if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                    )
-                    use_cache = False
-
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        # None for past_key_value
-                        return module(*inputs, use_cache=use_cache, output_attentions=output_attentions)
-
-                    return custom_forward
-
+            if self.config.use_recompute:
+                outputs = self.recompute_training(
+                    block,
+                    hidden_states,
+                    layer_past=layer_past,
+                    attention_mask=causal_mask,
+                    head_mask=head_mask[i],
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    alibi=alibi,
+                )
             else:
                 outputs = block(
                     hidden_states,

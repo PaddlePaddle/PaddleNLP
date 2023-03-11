@@ -70,31 +70,6 @@ def _sorted_checkpoints(output_dir=None, checkpoint_prefix="checkpoint", use_mti
     return checkpoints_sorted
 
 
-def left_padding(inputs, pad_id, padding="longest"):
-    assert "input_ids" in inputs, "input_ids should be in inputs!"
-    max_length = 0
-    for ids in inputs["input_ids"]:
-        max_length = max(max_length, len(ids))
-
-    def extend_max_lenth(value, max_length, to_pad_id):
-        return [to_pad_id] * (max_length - len(value)) + value
-
-    def extend_filed(name, max_length, to_pad_id):
-        values = inputs[name]
-        res = []
-        for index, value in enumerate(values):
-            res.append(extend_max_lenth(value, max_length, to_pad_id))
-        inputs[name] = res
-
-    extend_filed("input_ids", max_length, pad_id)
-    if "attention_mask" in inputs:
-        extend_filed("attention_mask", max_length, 0)
-    if "position_ids" in inputs:
-        extend_filed("position_ids", max_length, 0)
-
-    return inputs
-
-
 def all_gather(v, group=None):
     if paddle.distributed.get_world_size() <= 1:
         return v.item()
