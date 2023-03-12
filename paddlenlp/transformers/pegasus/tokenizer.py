@@ -16,6 +16,8 @@
 import collections
 import os
 import re
+import string
+
 import jieba
 import shutil
 from paddle.utils import try_import
@@ -53,14 +55,14 @@ def _is_chinese_char(cp):
     # space-separated words, so they are not treated specially and handled
     # like the all of the other languages.
     if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)
-        or (cp >= 0x20000 and cp <= 0x2A6DF)
-        or (cp >= 0x2A700 and cp <= 0x2B73F)
-        or (cp >= 0x2B740 and cp <= 0x2B81F)
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)
+            (cp >= 0x4E00 and cp <= 0x9FFF)
+            or (cp >= 0x3400 and cp <= 0x4DBF)
+            or (cp >= 0x20000 and cp <= 0x2A6DF)
+            or (cp >= 0x2A700 and cp <= 0x2B73F)
+            or (cp >= 0x2B740 and cp <= 0x2B81F)
+            or (cp >= 0x2B820 and cp <= 0x2CEAF)
+            or (cp >= 0xF900 and cp <= 0xFAFF)
+            or (cp >= 0x2F800 and cp <= 0x2FA1F)
     ):
         return True
 
@@ -126,25 +128,24 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
-        self,
-        vocab_file,
-        do_lower_case=True,
-        do_basic_tokenize=True,
-        never_split=None,
-        pad_token="<pad>",
-        eos_token="</s>",
-        unk_token="<unk>",
-        mask_token="<mask_2>",
-        mask_token_sent="<mask_1>",
-        additional_special_tokens=None,
-        sep_token="[SEP]",
-        cls_token="[CLS]",
-        tokenize_chinese_chars=True,
-        strip_accents=None,
-        offset=100,
-        **kwargs
+            self,
+            vocab_file,
+            do_lower_case=True,
+            do_basic_tokenize=True,
+            never_split=None,
+            pad_token="<pad>",
+            eos_token="</s>",
+            unk_token="<unk>",
+            mask_token="<mask_2>",
+            mask_token_sent="<mask_1>",
+            additional_special_tokens=None,
+            sep_token="[SEP]",
+            cls_token="[CLS]",
+            tokenize_chinese_chars=True,
+            strip_accents=None,
+            offset=100,
+            **kwargs
     ):
-
         self.offset = offset
 
         if additional_special_tokens is not None:
@@ -309,7 +310,10 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
                 text += token
             elif len(token) == 1 and _is_punctuation(token):
                 text += token
-                text += " "
+            elif len(token) == 1 and len(text) > 0 and _is_chinese_char(ord(text[-1])):
+                text += token
+            elif len(token) == 1 and len(text) > 0 and _is_punctuation(text[-1]):
+                text += token
             elif i > 0 and _is_chinese_char(ord(text[-1])):
                 text += token
             elif tokens == "</s>":
@@ -322,6 +326,8 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         text = re.sub("' (re|m|s|t|ve|d|ll) ", "'\\1 ", text)
         punctuation = re.sub(" +", "", self._cjk_punctuation()).strip() + "+-/={(<["
         punctuation_regex = "|".join([re.escape(p) for p in punctuation])
+        text = re.sub(r'(\s+)(?=%s)' % punctuation_regex, '', text)
+        text = re.sub(r'(\s+)(?=[\u4e00-\u9fa5])', '', text)
         punctuation_regex = "(%s) " % punctuation_regex
         text = re.sub(punctuation_regex, "\\1", text)
         text = re.sub(r"(\d\.) (\d)", "\\1\\2", text)

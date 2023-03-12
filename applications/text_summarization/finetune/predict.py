@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import os
 import random
 import time
 from functools import partial
@@ -42,7 +43,7 @@ def parse_args():
         help="Path to pre-trained model. ",
     )
     parser.add_argument(
-        "--prefict_file", type=str, required=False, default="data/valid.json", help="Predict data path."
+        "--predict_file", type=str, required=False, default="data/valid.json", help="Predict data path."
     )
     parser.add_argument(
         "--output_path", type=str, default="generate.txt", help="The file path where the infer result will be saved."
@@ -69,7 +70,7 @@ def parse_args():
         "during ``evaluate`` and ``predict``.",
     )
     parser.add_argument(
-        "--decode_strategy", default="greedy_search", type=str, help="The decode strategy in generation."
+        "--decode_strategy", default="beam_search", type=str, help="The decode strategy in generation."
     )
     parser.add_argument(
         "--top_k",
@@ -78,7 +79,7 @@ def parse_args():
         help="The number of highest probability vocabulary tokens to keep for top-k sampling.",
     )
     parser.add_argument("--top_p", default=1.0, type=float, help="The cumulative probability for top-p sampling.")
-    parser.add_argument("--num_beams", default=1, type=int, help="The number of beams for beam search.")
+    parser.add_argument("--num_beams", default=4, type=int, help="The number of beams for beam search.")
     parser.add_argument(
         "--length_penalty",
         default=0.6,
@@ -106,10 +107,12 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.",
     )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
+    parser.add_argument("--remove_columns", default=["content", "title"], type=str, nargs='*', help="Remove attributes to input tensor")
+    parser.add_argument("--text_column", default="content", type=str, help="column name of input source")
+    parser.add_argument("--summary_column", default="title", type=str, help="column name of summary")
     args = parser.parse_args()
     return args
 
@@ -130,12 +133,12 @@ def generate(args):
     set_seed(args)
     tokenizer = PegasusChineseTokenizer.from_pretrained(args.init_checkpoint_dir)
     model = PegasusForConditionalGeneration.from_pretrained(args.init_checkpoint_dir)
-    dataset = load_dataset("json", data_files=args.prefict_file, split="train")
-    remove_columns = ["content", "title"]
+    dataset = load_dataset("json", data_files=args.predict_file, split="train")
+    remove_columns = args.remove_columns
     trans_func = partial(
         convert_example,
-        text_column="content",
-        summary_column="title",
+        text_column=args.text_column,
+        summary_column=args.summary_column,
         tokenizer=tokenizer,
         max_source_length=args.max_source_length,
         max_target_length=args.max_target_length,
@@ -179,11 +182,11 @@ def generate(args):
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
         start_time = time.time()
+        with open(args.output_path, "w", encoding="utf-8") as fout:
+            for decoded_pred in all_preds:
+                fout.write(decoded_pred + "\n")
 
     compute_metrics(all_preds, all_labels)
-    with open(args.output_path, "w", encoding="utf-8") as fout:
-        for decoded_pred in all_preds:
-            fout.write(decoded_pred + "\n")
     print("Save generated result into: %s" % args.output_path)
 
 

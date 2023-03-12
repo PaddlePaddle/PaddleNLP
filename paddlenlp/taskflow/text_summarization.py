@@ -52,6 +52,7 @@ class TextSummarizationTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+        self._max_seq_len = kwargs.get("max_seq_len", 512)
         self._batch_size = kwargs.get("batch_size", 1)
         self._output_scores = kwargs.get("output_scores", False)
         self._model_type = None
@@ -112,7 +113,7 @@ class TextSummarizationTask(Task):
         pad_right = False
         if self._model_type != "unimo-text":
             pad_right = True
-        examples = [self._convert_example(i) for i in data]
+        examples = [self._convert_example(i, self._max_seq_len) for i in data]
         # Separates data into some batches.
         one_batch = []
         for example in examples:
