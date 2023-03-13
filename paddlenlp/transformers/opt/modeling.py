@@ -259,25 +259,10 @@ class OPTModel(OPTPretrainedModel):
             type_vocab_size=config.type_vocab_size,
             initializer_range=config.initializer_range,
         )
-
+        config.fuse_attention_qkv = False
         decoder_layers = nn.LayerList()
         for i in range(config.num_hidden_layers):
-            decoder_layers.append(
-                TransformerDecoderLayer(
-                    d_model=config.hidden_size,
-                    nhead=config.num_attention_heads,
-                    dim_feedforward=config.intermediate_size,
-                    dropout=config.hidden_dropout_prob,
-                    activation=config.hidden_act,
-                    attn_dropout=config.attention_probs_dropout_prob,
-                    act_dropout=config.hidden_dropout_prob,
-                    weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
-                    ),
-                    bias_attr=None,
-                    normalize_before=config.normalize_before,
-                )
-            )
+            decoder_layers.append(TransformerDecoderLayer(config))
 
         self.decoder = TransformerDecoder(
             decoder_layers,
