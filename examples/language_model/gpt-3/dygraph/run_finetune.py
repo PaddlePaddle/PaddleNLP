@@ -575,5 +575,6 @@ def do_export(args):
 if __name__ == "__main__":
     args = parse_args(MODEL_CLASSES)
     args.do_export = True
+    os.environ["softmax_mask_fuse_upper_triangle"] = "False"
     do_train(args)
     do_export(args)
