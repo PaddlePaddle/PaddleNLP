@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-import paddle.nn as nn
 from data import cnn_dm_convert_example
 from utils import GLMTrainer, generate
 
@@ -98,7 +97,6 @@ def main():
     dev_ds = dev_ds.map(trans_func)
     test_ds = test_ds.map(trans_func)
 
-    criterion = nn.loss.CrossEntropyLoss(reduction="none")
     collate_fn = DefaultDataCollator()
 
     def compute_metrics(eval_preds):
@@ -121,7 +119,6 @@ def main():
     trainer = GLMTrainer(
         model=model,
         args=training_args,
-        criterion=criterion,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,

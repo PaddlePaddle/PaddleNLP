@@ -76,7 +76,7 @@ class GLMAttention(nn.Layer):
         where b means batch_size, s means sequence_length, n means num_attention_heads,
         h means hidden_size and p means number of partitions.
         """
-        new_shape = [*inputs.shape[:2], self.num_attention_heads, self.attention_head_size]
+        new_shape = [*inputs.shape[:-1], self.num_attention_heads, self.attention_head_size]
         outputs = inputs.reshape(new_shape)
         outputs = paddle.transpose(outputs, [0, 2, 1, 3])
         return outputs
@@ -148,7 +148,7 @@ class GLMBlock(nn.Layer):
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool = False, cache: Tensor = None):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
-        if use_cache and cache:
+        if use_cache and cache is not None:
             cache = self.input_layernorm(cache)
         else:
             cache = None
@@ -166,7 +166,6 @@ class GLMBlock(nn.Layer):
         output = layernorm_input + mlp_output
 
         output = tuple(v for v in [output, cache] if v is not None)
-
         return output[0] if len(output) == 1 else output
 
 
@@ -306,6 +305,9 @@ class GLMStack(nn.Layer):
                 hidden_states = self.recompute_training(layer, hidden_states, attention_mask, use_cache, cache=mem_i)
             else:
                 hidden_states = layer(hidden_states, attention_mask, use_cache, cache=mem_i)
+
+            if isinstance(hidden_states, tuple):
+                hidden_states = hidden_states[0]
 
             if use_cache:
                 new_caches.append(hidden_states.detach())
@@ -621,6 +623,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
                 smooth_loss = (-F.log_softmax(lm_logits, axis=-1) / lm_logits.shape[2]).sum(axis=-1)
                 loss = (1 - label_smoothing) * loss + label_smoothing * smooth_loss
             if loss_mask is not None:
+                loss_mask = loss_mask.reshape([-1])
                 loss = paddle.sum(loss.reshape([-1]) * loss_mask) / paddle.sum(loss_mask)
 
         if not return_dict:
