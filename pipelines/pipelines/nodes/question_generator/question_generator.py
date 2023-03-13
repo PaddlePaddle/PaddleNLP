@@ -127,6 +127,7 @@ class QuestionGenerator(BaseComponent):
                 top_p=top_p,
                 temperature=temperature,
                 template=1,
+                device_id=0 if device == "gpu" else -1,
             )
         else:
             self.question_generation = Taskflow(
@@ -146,6 +147,7 @@ class QuestionGenerator(BaseComponent):
                 top_p=top_p,
                 temperature=temperature,
                 template=1,
+                device_id=0 if device == "gpu" else -1,
             )
 
     def _check_task_files(self):

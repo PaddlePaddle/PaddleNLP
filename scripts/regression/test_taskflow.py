@@ -245,18 +245,13 @@ def test_uiex():
     print(ie({"doc": "./cases/203457817-76fe638a-3277-4619-9066-d1dffd52c5d4.jpg"}))
 
 
-if __name__ == "__main__":
-    test_knowledge_mining()
-    test_name_entity_recognition()
-    test_word_segmetation()
-    test_pos_tagging()
-    test_corrector()
-    test_dependency_parsing()
-    test_sentiment_analysis()
-    test_text_similarity()
-    test_question_answering()
-    test_poetry()
-    test_dialogue()
-    test_uie()
-    test_uiex()
-    test_summarizer()
+def test_codegen():
+    """ """
+    prompt = "def lengthOfLongestSubstring(self, s: str) -> int:"
+    codegen = Taskflow(
+        "code_generation",
+        model="Salesforce/codegen-350M-mono",
+        decode_strategy="greedy_search",
+        repetition_penalty=1.0,
+    )
+    print(codegen(prompt))
