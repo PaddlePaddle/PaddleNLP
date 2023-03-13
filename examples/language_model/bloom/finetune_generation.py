@@ -61,34 +61,36 @@ def convert_example(
     max_target_length,
     is_train=True,
 ):
-    """
-    Convert an example into necessary features.
-    """
-    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-    # in one example possible giving several features when a context is long, each of those features having a
-    # context that overlaps a bit the context of the previous feature.
-    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
-    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    context = example["context"]
-    question = example["question"]
-    try:
-        answer = example["answers"][0]
-    except Exception:
-        raise "The data format had error, please check it!"
-
-    input_seq = f"answer: {answer} context: {context} </s>"
-    output_seq = f"question: {question} </s>"
-
+    """Convert all examples into necessary features."""
+    source = None
+    title = None
+    target = None
+    if "source" in example and "title" in example:
+        source = example["source"]
+        if "title" in example.keys():
+            title = example["title"]
+    elif "context" in example and "answer" in example:
+        source = example["context"]
+        if "answer" in example.keys():
+            title = example["answer"]
+    else:
+        assert False, "Source and title are not in the input dictionary, nor are context and answer."
+    if "target" in example.keys():
+        target = example["target"]
+    elif "question" in example.keys():
+        target = example["question"]
+    source = "答案：" + title + "</s>" + "上下文：" + source + "</s>"
+    if target:
+        target = "在已知答案的前提下，问题：" + target + "</s>"
     outputs = tokenizer(
-        output_seq,
+        target,
         max_length=max_target_length,
-        # pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
         return_attention_mask=True,
         return_token_type_ids=False,
     )
     inputs = tokenizer(
-        input_seq,
+        source,
         max_length=max_source_length,
         truncation_strategy="longest_first",
         return_attention_mask=True,
@@ -156,14 +158,13 @@ def do_train(args):
         "sharding_degree": args.sharding_degree,
     }
 
-    # set control in tensor parallel
+    # Set control in tensor parallel
     strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
     fleet.init(is_collective=True, strategy=strategy)
 
-    # obtain rank message of hybrid parallel
+    # Obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
-    # global_rank = hcg.get_global_rank()
     mp_rank = hcg.get_model_parallel_rank()
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
@@ -172,7 +173,7 @@ def do_train(args):
     data_world_rank = dp_rank * sharding_size + sharding_rank
     data_world_size = args.dp_degree * args.sharding_degree
 
-    # seed control in hybrid parallel
+    # Seed control in hybrid parallel
     set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_length
@@ -318,12 +319,11 @@ def do_train(args):
         max_target_length=args.max_target_length,
     )
 
-    train_set, dev_set = load_dataset(args.dataset_name, splits=["train_v1", "dev_v1"])
-    logger.info("Loaded train and dev dataset: %s" % args.dataset_name)
-    train_set = train_set.map(trans_func, lazy=True)
+    train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
+    train_ds = train_ds.map(trans_func, lazy=True)
 
     train_batch_sampler = DistributedBatchSampler(
-        train_set,
+        train_ds,
         batch_size=args.micro_batch_size,
         shuffle=True,
         drop_last=True,
@@ -332,7 +332,7 @@ def do_train(args):
     )
 
     train_data_loader = paddle.io.DataLoader(
-        dataset=train_set,
+        dataset=train_ds,
         batch_sampler=train_batch_sampler,
         num_workers=0,
         collate_fn=DataCollatorForSeq2Seq(
@@ -344,10 +344,10 @@ def do_train(args):
         ),
         return_list=True,
     )
-    dev_set = dev_set.map(trans_func, lazy=True)
-    valid_batch_sampler = paddle.io.BatchSampler(dev_set, batch_size=args.micro_batch_size, shuffle=False)
+    dev_ds = dev_ds.map(trans_func, lazy=True)
+    valid_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.micro_batch_size, shuffle=False)
     valid_data_loader = paddle.io.DataLoader(
-        dataset=dev_set,
+        dataset=dev_ds,
         batch_sampler=valid_batch_sampler,
         num_workers=0,
         collate_fn=DataCollatorForSeq2Seq(

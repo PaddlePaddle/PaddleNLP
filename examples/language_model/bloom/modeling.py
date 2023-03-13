@@ -978,6 +978,45 @@ class BloomPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
+class BloomForPretraining(BloomPreTrainedModel):
+    """
+    The pretraining model of Bloom.
+    It returns some logits and cached_kvs.
+    """
+
+    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.bloom = BloomModel(config)
+        self.apply(self.init_weights)
+        self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
+
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+        use_cache=False,
+        cache=None,
+    ):
+        outputs = self.bloom(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+        )
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+
+        logits = paddle.matmul(encoder_outputs, self.bloom.embeddings.word_embeddings.weight, True)
+
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
+
+
 class BloomForCausalLM(BloomPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 

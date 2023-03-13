@@ -21,31 +21,6 @@ from transformers import AutoTokenizer
 # from utils import left_padding
 
 
-def left_padding(inputs, pad_id, padding="longest"):
-    assert "input_ids" in inputs, "input_ids should be in inputs!"
-    max_length = 0
-    for ids in inputs["input_ids"]:
-        max_length = max(max_length, len(ids))
-
-    def extend_max_lenth(value, max_length, to_pad_id):
-        return [to_pad_id] * (max_length - len(value)) + value
-
-    def extend_filed(name, max_length, to_pad_id):
-        values = inputs[name]
-        res = []
-        for index, value in enumerate(values):
-            res.append(extend_max_lenth(value, max_length, to_pad_id))
-        inputs[name] = res
-
-    extend_filed("input_ids", max_length, pad_id)
-    if "attention_mask" in inputs:
-        extend_filed("attention_mask", max_length, 0)
-    if "position_ids" in inputs:
-        extend_filed("position_ids", max_length, 0)
-
-    return inputs
-
-
 def parse_arguments():
     import argparse
 
@@ -80,6 +55,31 @@ def parse_arguments():
         help="Whether to use fast_tokenizer to accelarate the tokenization.",
     )
     return parser.parse_args()
+
+
+def left_padding(inputs, pad_id, padding="longest"):
+    assert "input_ids" in inputs, "input_ids should be in inputs!"
+    max_length = 0
+    for ids in inputs["input_ids"]:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(name, max_length, to_pad_id):
+        values = inputs[name]
+        res = []
+        for index, value in enumerate(values):
+            res.append(extend_max_lenth(value, max_length, to_pad_id))
+        inputs[name] = res
+
+    extend_filed("input_ids", max_length, pad_id)
+    if "attention_mask" in inputs:
+        extend_filed("attention_mask", max_length, 0)
+    if "position_ids" in inputs:
+        extend_filed("position_ids", max_length, 0)
+
+    return inputs
 
 
 def batchfy_text(texts, batch_size):
@@ -163,10 +163,10 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        'answer: Carolina Panthers context: Super Bowl 50 was an American football game to determine the champion of the National Football League (NFL) for the 2015 season. The American Football Conference (AFC) champion Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers 24–10 to earn their third Super Bowl title. The game was played on February 7, 2016, at Levi\'s Stadium in the San Francisco Bay Area at Santa Clara, California. As this was the 50th Super Bowl, the league emphasized the "golden anniversary" with various gold-themed initiatives, as well as temporarily suspending the tradition of naming each Super Bowl game with Roman numerals (under which the game would have been known as "Super Bowl L"), so that the logo could prominently feature the Arabic numerals 50. </s>'
+        "答案：年基准利率4.35%</s>上下文：年基准利率4.35%。 从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。</s>在已知答案的前提下，问题："
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
-            print("{} \n question:{}".format(text, result))
+            print("{} \n {}".format(text, result))
