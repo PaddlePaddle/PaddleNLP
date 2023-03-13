@@ -198,6 +198,9 @@ from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .glm.configuration import *
+from .glm.modeling import *
+from .glm.tokenizer import *
 from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
@@ -211,3 +214,4 @@ if is_fast_tokenizer_available():
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
     from .ernie_m.fast_tokenizer import *
+    from .nystromformer.fast_tokenizer import *
