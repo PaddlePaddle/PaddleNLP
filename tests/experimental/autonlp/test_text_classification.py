@@ -26,28 +26,18 @@ from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
 from tests.testing_utils import get_tests_dir, slow
 
 finetune_model_candidate = {
-    "trainer_type": "Trainer",
     "max_steps": 2,
     "per_device_train_batch_size": 2,
     "per_device_eval_batch_size": 2,
     "model_name_or_path": hp.choice("finetune_models", ["__internal_testing__/tiny-random-ernie"]),
     "report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
 }
-prompt_model_candidate = {
-    "trainer_type": "PromptTrainer",
-    "prompt": "“{'text': 'sentence'}”这句话是关于{'mask'}的",
-    "max_steps": 2,
-    "per_device_train_batch_size": 2,
-    "per_device_eval_batch_size": 2,
-    "model_name_or_path": hp.choice("prompt_models", ["__internal_testing__/tiny-random-ernie"]),
-    "report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
-}
+
 utc_model_candidate = {
-    "trainer_type": "PromptTrainer",
     "max_steps": 2,
     "per_device_train_batch_size": 2,
     "per_device_eval_batch_size": 2,
-    "model_name_or_path": hp.choice("prompt_models", ["__internal_testing__/tiny-random-utc"]),
+    "model_name_or_path": hp.choice("utc_models", ["__internal_testing__/tiny-random-utc"]),
     "report_to": ["visualdl"],  # report_to autonlp is functional but is problematic in unit tests
 }
 
@@ -105,7 +95,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
     @parameterized.expand(
         [
             ([finetune_model_candidate], {"max_steps": 3}),
-            ([prompt_model_candidate], None),
             ([utc_model_candidate], None),
             ([utc_model_candidate, finetune_model_candidate], None),
         ]
@@ -150,14 +139,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
-            model_name_or_path = model_result.metrics["config"]["candidates"]["model_name_or_path"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
             self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
 
             # test visualdl
             self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
@@ -194,18 +178,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
 
             # test export compress model
             auto_trainer.export(export_path=temp_export_path, compress=True)
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
 
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
@@ -236,7 +214,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
     @parameterized.expand(
         [
             ([finetune_model_candidate], {"max_steps": 3}),
-            ([prompt_model_candidate], None),
             ([utc_model_candidate], None),
             ([utc_model_candidate, finetune_model_candidate], None),
         ]
@@ -281,14 +258,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
-            model_name_or_path = model_result.metrics["config"]["candidates"]["model_name_or_path"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
             self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
 
             # test visualdl
             self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
@@ -392,14 +364,9 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     self.assertEqual(model_result.metrics["config"]["candidates"][hp_key], hp_value)
 
             # test save
-            trainer_type = model_result.metrics["config"]["candidates"]["trainer_type"]
-            model_name_or_path = model_result.metrics["config"]["candidates"]["model_name_or_path"]
             save_path = os.path.join(model_result.log_dir, auto_trainer.save_path)
             self.assertTrue(os.path.exists(os.path.join(save_path, "model_state.pdparams")))
             self.assertTrue(os.path.exists(os.path.join(save_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(save_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(save_path, "verbalizer_config.json")))
 
             # test visualdl
             self.assertTrue(os.path.isdir(auto_trainer.visualdl()))
@@ -436,18 +403,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
 
             # test export compress model
             auto_trainer.export(export_path=temp_export_path, compress=True)
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
-            if trainer_type == "PromptTrainer" and "utc" not in model_name_or_path:
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
-                self.assertTrue(os.path.exists(os.path.join(temp_export_path, "verbalizer_config.json")))
 
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
