@@ -310,11 +310,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
                 text += token
             elif len(token) == 1 and _is_punctuation(token):
                 text += token
-            elif len(token) == 1 and len(text) > 0 and _is_chinese_char(ord(text[-1])):
-                text += token
-            elif len(token) == 1 and len(text) > 0 and _is_punctuation(text[-1]):
-                text += token
-            elif i > 0 and _is_chinese_char(ord(text[-1])):
+            elif i > 0 and (_is_chinese_char(ord(text[-1])) or _is_punctuation(text[-1])):
                 text += token
             elif tokens == "</s>":
                 continue
