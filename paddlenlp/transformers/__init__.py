@@ -167,6 +167,7 @@ from .gau_alpha.configuration import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
+from .opt.configuration import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
