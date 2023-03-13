@@ -234,15 +234,15 @@ class ZeroShotTextClassificationTask(Task):
         "__internal_testing__/tiny-random-utc": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/model_state.pdparams",
-                "5ca864e9cc07b54e66f5caa184ddfffb",
+                "d303b59447be690530c35c73f8fd03cd",
             ],
             "config": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/config.json",
-                "1e8b508d0fbefca16f94c96ef72b3dd3",
+                "3420a6638a7c73c6239eb1d7ca1bc5fe",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/vocab.txt",
-                "fd630e130f707f860b0edd148f0445d9",
+                "97eb0ec5a5890c8190e10e251af2e133",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/special_tokens_map.json",
@@ -250,7 +250,7 @@ class ZeroShotTextClassificationTask(Task):
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/tokenizer_config.json",
-                "dcb0f3257830c0eb1f2de47f2d86f89a",
+                "258fc552c15cec90046066ca122899e2",
             ],
         },
     }
