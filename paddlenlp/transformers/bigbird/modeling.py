@@ -1172,7 +1172,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForQuestionAnswering.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1314,7 +1314,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1435,7 +1435,7 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
