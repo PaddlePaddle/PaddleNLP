@@ -241,9 +241,10 @@ class BigBirdEmbeddings(Layer):
         inputs_embeds: Optional[Tensor] = None,
     ):
         if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
             inputs_embeds = self.word_embeddings(input_ids)
-
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")
@@ -1171,7 +1172,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForQuestionAnswering.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1313,7 +1314,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1434,7 +1435,7 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pt')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
