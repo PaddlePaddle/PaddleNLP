@@ -118,24 +118,22 @@ class OPTModelTester:
 
     def get_config(self):
         return OPTConfig(
-            **{
-                "vocab_size": self.vocab_size,
-                "hidden_size": self.hidden_size,
-                "num_hidden_layers": self.num_hidden_layers,
-                "num_attention_heads": self.num_attention_heads,
-                "intermediate_size": self.intermediate_size,
-                "hidden_act": self.hidden_act,
-                "hidden_dropout_prob": self.hidden_dropout_prob,
-                "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-                "max_position_embeddings": self.max_position_embeddings,
-                "type_vocab_size": self.type_vocab_size,
-                "initializer_range": self.initializer_range,
-                "bos_token_id": self.bos_token_id,
-                "eos_token_id": self.eos_token_id,
-                "pad_token_id": self.pad_token_id,
-                "normalize_before": self.normalize_before,
-                "word_embed_proj_dim": self.word_embed_proj_dim,
-            }
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            pad_token_id=self.pad_token_id,
+            normalize_before=self.normalize_before,
+            word_embed_proj_dim=self.word_embed_proj_dim,
         )
 
     def prepare_config_and_inputs_for_decoder(self):
@@ -173,7 +171,7 @@ class OPTModelTester:
         result = model(input_ids, use_cache=True)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
+        self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
 
     def create_and_check_opt_model_past(self, config, input_ids, input_mask, *args):
         model = OPTModel(config)
@@ -189,7 +187,7 @@ class OPTModelTester:
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -218,11 +216,11 @@ class OPTModelTester:
         output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # change a random masked slice from input_ids
         random_seq_idx_to_change = ids_tensor((1,), half_seq_length, dtype="int64").item() + 1
-        random_other_next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64").squeeze(-1)
+        random_other_next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64").squeeze(-1)
         input_ids[:, -random_seq_idx_to_change] = random_other_next_tokens
 
         # append to next input_ids and attn_mask
@@ -254,7 +252,7 @@ class OPTModelTester:
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_mask = ids_tensor((self.batch_size, 3), vocab_size=2, dtype="int64")
 
         # append to next input_ids
@@ -291,7 +289,7 @@ class OPTModelTester:
 
     def create_and_check_opt_weight_initialization(self, config, *args):
         model = OPTModel(config)
-        model_std = model.config["initializer_range"] / math.sqrt(2 * model.config["num_hidden_layers"])
+        model_std = model.config.initializer_range / math.sqrt(2 * model.config.num_hidden_layers)
         for key in model.state_dict().keys():
             if "out_proj" in key and "weight" in key:
                 self.parent.assertLessEqual(abs((paddle.std(model.state_dict()[key]) - model_std).numpy()), 0.02)
@@ -316,12 +314,10 @@ class OPTModelTester:
 
 
 @parameterized_class(
-    ("return_dict", "use_labels"),
+    ("return_dict",),
     [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
+        [False],
+        [True],
     ],
 )
 class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
@@ -379,13 +375,6 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         tokenizer = GPTTokenizer.from_pretrained("facebook/opt-1.3b")
 
         tokenizer.padding_side = "left"
-
-        # Define PAD Token = EOS Token = 50256
-        tokenizer.pad_token = tokenizer.eos_token
-        model.pad_token_id = model.eos_token_id
-        getattr(model, model.base_model_prefix).config["pad_token_id"] = getattr(
-            model, model.base_model_prefix
-        ).config["eos_token_id"]
 
         # use different length sentences to test batching
         sentences = [
