@@ -330,7 +330,7 @@ class TransformerDecoderLayer(nn.Layer):
         activation = config.hidden_act
         attn_dropout = config.attention_probs_dropout_prob
         act_dropout = config.hidden_dropout_prob
-        normalize_before = config.normalize_before if config.normalize_before else True
+        normalize_before = getattr(config, "normalize_before", True)
 
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range))
         bias_attr = None
