@@ -508,6 +508,10 @@ class PretrainedConfig:
             "tie_word_embeddings", True
         )  # Whether input and output word embeddings should be tied for all MLM, LM and Seq2Seq models.
 
+        # Parameters for tensor parallel
+        self.mp_degree = kwargs.pop("mp_degree", 1)
+        self.mp_rank = kwargs.pop("mp_rank", 0)
+
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
         self.is_decoder = kwargs.pop("is_decoder", False)

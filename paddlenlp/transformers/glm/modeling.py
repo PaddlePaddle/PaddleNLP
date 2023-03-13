@@ -447,7 +447,7 @@ class GLMModel(GLMPretrainedModel):
         attention_mask: Tensor = None,
         cache: Tensor = None,
         use_cache: bool = None,
-        return_dict: bool = None,
+        return_dict: bool = True,
     ):
         batch_size = input_ids.shape[0]
         word_embeddings = self.word_embeddings(input_ids)

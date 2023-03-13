@@ -17,6 +17,8 @@ import unittest
 
 import numpy as np
 import paddle
+import torch
+from test_parallel_dygraph_dataparallel import TestMultipleGpus
 
 
 class TestCkptShard(unittest.TestCase):
@@ -31,21 +33,27 @@ class TestCkptShard(unittest.TestCase):
 
         print(inspect.getfile(paddlenlp))
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def testTorch(self):
         from transformers import AutoModel
 
-        model = AutoModel.from_pretrained("THUDM/glm-large-chinese")
+        model = AutoModel.from_pretrained("THUDM/glm-large-chinese", trust_remote_code=True)
         model.eval()
+        ret = model(input_ids=torch.arange(100, 110, dtype=torch.long).reshape(1, -1))
+        # print(ret)
+        print("torch", ret.logits.abs().mean().item())
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def testPaddle(self):
-        from transformers import AutoModel
+        from paddlenlp.transformers import AutoModel
 
-        model = AutoModel.from_pretrained("THUDM/glm-large-chinese")
+        model = AutoModel.from_pretrained("glm-large-chinese")
         model.eval()
+        ret = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        print("paddle", ret.logits.abs().mean().item())
 
     def test_qkv_convertor(self):
+        """test_qkv_convertor"""
         hidden_size = 8
         mp_degree = 4
         num_attention_heads = 4
@@ -74,10 +82,11 @@ class TestCkptShard(unittest.TestCase):
         np.testing.assert_equal(new_tensor_parallel_qkv, tensor_parallel_qkv)
         np.testing.assert_equal(mp_qkv_splited[0][0], [0, 1, 8, 9, 16, 17])
 
-        raise ValueError()
+        # raise ValueError()
 
-    @unittest.skip("")
+    @unittest.skip("Skip for reuqired multi-gpus!")
     def testGlmMP(self):
+        """_summary_"""
         from modeling import GLMModel as AutoModel
 
         mp_degree = paddle.distributed.get_world_size()
@@ -90,8 +99,13 @@ class TestCkptShard(unittest.TestCase):
             "sharding_degree": 1,
         }
         paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
-
-        model = AutoModel.from_pretrained("THUDM/glm-large-chinese", from_hf=True, mp_degree=2, mp_rank=mp_rank)
-
+        model = AutoModel.from_pretrained(
+            "THUDM/glm-large-chinese", from_hf=True, mp_degree=mp_degree, mp_rank=mp_rank
+        )
         model.eval()
         model()
+
+
+class TestGLM(TestMultipleGpus):
+    def testGlmMP(self):
+        self.run_2gpu("glm_mp.py")
