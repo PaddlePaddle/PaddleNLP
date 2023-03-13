@@ -11,13 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import pickle
-import shutil
-import json
 
-from paddlenlp.utils.env import MODEL_HOME
-from .. import PretrainedTokenizer, BPETokenizer
+from .. import BPETokenizer
 from ..ernie.tokenizer import ErnieTokenizer
 
 __all__ = ["ErnieDocTokenizer", "ErnieDocBPETokenizer"]
@@ -75,6 +70,8 @@ class ErnieDocTokenizer(ErnieTokenizer):
         "ernie-doc-base-zh": {"do_lower_case": True},
     }
 
+    # max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+
     def __init__(
         self,
         vocab_file,
@@ -94,6 +91,7 @@ class ErnieDocTokenizer(ErnieTokenizer):
             pad_token=pad_token,
             cls_token=cls_token,
             mask_token=mask_token,
+            **kwargs,
         )
 
 
@@ -179,6 +177,7 @@ class ErnieDocBPETokenizer(BPETokenizer):
             pad_token=pad_token,
             cls_token=cls_token,
             mask_token=mask_token,
+            **kwargs,
         )
 
     @property
