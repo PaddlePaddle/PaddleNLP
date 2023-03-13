@@ -591,7 +591,7 @@ def do_train(args):
                 else:
                     tr_loss_step.backward()
 
-            tr_loss += tr_loss_step
+            tr_loss += tr_loss_step.detach()
 
             loss_global["loss"] += loss.detach()
             if args.binary_head:
