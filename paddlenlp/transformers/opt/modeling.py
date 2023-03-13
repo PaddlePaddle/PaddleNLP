@@ -249,9 +249,6 @@ class OPTModel(OPTPretrainedModel):
         self.initializer_range = config.initializer_range
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
-        self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
-        )
         self.embeddings = OPTEmbeddings(
             vocab_size=config.vocab_size,
             hidden_size=config.hidden_size,
@@ -259,7 +256,7 @@ class OPTModel(OPTPretrainedModel):
             padding_idx=config.pad_token_id,
             hidden_dropout_prob=config.hidden_dropout_prob,
             max_position_embeddings=config.max_position_embeddings,
-            type_vocab_size=config.type_vocab_size,  # TODO Check this.
+            type_vocab_size=config.type_vocab_size,
             initializer_range=config.initializer_range,
         )
 
