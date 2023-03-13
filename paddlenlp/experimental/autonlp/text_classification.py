@@ -77,7 +77,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         label_column: str,
         train_dataset: Dataset,
         eval_dataset: Dataset,
-        metric_for_best_model: str = "eval_accuracy",
+        metric_for_best_model: Optional[str] = None,
         greater_is_better: bool = True,
         problem_type: str = "multi_class",
         **kwargs
@@ -100,6 +100,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
+        if self.metric_for_best_model is None:
+            if self.problem_type == "multi_class":
+                self.metric_for_best_model = "eval_accuracy"
+            else:
+                self.metric_for_best_model = "eval_macro_f1"
+
         self._data_checks_and_inference([self.train_dataset, self.eval_dataset])
 
     @property
@@ -114,7 +120,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return TrainingArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
-            metric_for_best_model="accuracy" if self.problem_type == "multi_class" else "macro_f1",
+            metric_for_best_model=self.metric_for_best_model,
             greater_is_better=True,
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
@@ -129,7 +135,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return PromptTuningArguments(
             output_dir=self.training_path,
             disable_tqdm=True,
-            metric_for_best_model="accuracy" if self.problem_type == "multi_class" else "macro_f1",
+            metric_for_best_model=self.metric_for_best_model,
             greater_is_better=True,
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
