@@ -1,27 +1,26 @@
-# 端到端文图跨模态检索系统
+# 端到端图搜文跨模态检索系统
 
 ## 1. 场景概述
 
-文图跨模态检索系统目的是通过文字找到最符合描述的图片。传统的方案是用标签和图片的关键字进行匹配，而跨模态检索真正的实现了文本语义和图片语义内容的匹配，这种检索方式更符合人类的逻辑判断，是一种真正意义上的端到端人工智能。文图应用目前可以广泛应用于电商搜索，安防视频，图像检索，抖音等小视频，旅游app应用搜索。有助于提升效率和搜索体验。另外还有一些潜在的领域，比如司法的互联网调查取证，侵权检测，数据增强，文案匹配，各种互联网logo，肖像，风景，海报等图片网站的检索，医药等专业领域的文图搜索等。
+图搜文跨模态检索系统目的是通过图片找到最符合该图片描述的文本，是文搜图应用的互补形式，可以广泛应用到图文匹配的场景。
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端文图跨模态检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的文图跨模态检索系统模型快速搭建一个针对自己业务数据的跨模态检索系统，并可以提供 Web 化产品服务。
+本项目提供了低成本搭建端到端图搜文跨模态检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的图搜文跨模态检索系统模型快速搭建一个针对自己业务数据的跨模态检索系统，并可以提供 Web 化产品服务。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/216578818-f194cf9f-3d7f-4139-a173-dc9366e52e97.png" width="500px">
+    <img src="https://user-images.githubusercontent.com/12107462/224908556-00a6e084-e6eb-45e2-a8e4-c2a524bf58b6.png" width="800px">
 </div>
 
-以下是文搜图的系统搭建流程，如果用户需要图搜文的应用，请参考[图搜文系统搭建流程](./IMAGE_TO_TEXT_SEARCH.md)
 
 ### 2.1 系统特色
 
 + 端到端
-    + 提供包括数据建库、模型服务部署、WebUI 可视化一整套端到端文图跨模态检索系统能力
+    + 提供包括数据建库、模型服务部署、WebUI 可视化一整套端到端图搜文跨模态检索系统能力
     + 依托百度领先的NLP技术，包括[ERNIE](https://github.com/PaddlePaddle/ERNIE)语义理解技术，[ERNIE-ViL 2.0](https://arxiv.org/abs/2209.15270)跨模态检索能力
     + 预置领先的深度学习模型
 
-## 3. 快速开始: 快速搭建文图跨模态检索系统
+## 3. 快速开始: 快速搭建图搜文跨模态检索系统
 
 
 ### 3.1 运行环境和安装说明
@@ -60,29 +59,29 @@ cd PaddleNLP/pipelines
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 3.2 数据说明
-文图跨模态检索数据库的数据来自于[Noah-Wukong数据集](https://wukong-dataset.github.io/wukong-dataset/index.html)，并选取了测试集中3056张图片来搭建文图跨模态检索系统。
+图搜文跨模态检索数据库的数据来自于[Noah-Wukong数据集](https://wukong-dataset.github.io/wukong-dataset/index.html)，并选取了测试集中3056张图片来搭建图搜文跨模态检索系统。
 
-### 3.3 一键体验文图跨模态检索系统
+### 3.3 一键体验图搜文跨模态检索系统
 
 #### 3.3.1 快速一键启动
 
-我们预置了基于[Noah-Wukong数据集](https://wukong-dataset.github.io/wukong-dataset/index.html)搭建文图跨模态检索系统的代码示例，您可以通过如下命令快速体验文图跨模态检索系统的效果
+我们预置了基于[Noah-Wukong数据集](https://wukong-dataset.github.io/wukong-dataset/index.html)搭建图搜文跨模态检索系统的代码示例，您可以通过如下命令快速体验图搜文跨模态检索系统的效果
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/image_text_retrieval/text_to_image_retrieval_example.py --device gpu \
+python examples/image_text_retrieval/image_to_text_retrieval_example.py --device gpu \
                                                           --search_engine faiss
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/image_text_retrieval/text_to_image_retrieval_example.py --device cpu \
+python examples/image_text_retrieval/image_to_text_retrieval_example.py --device cpu \
                                                           --search_engine faiss
 ```
 
 
-### 3.4 构建 Web 可视化文图跨模态检索系统
+### 3.4 构建 Web 可视化图搜文跨模态检索系统
 
-整个 Web 可视化文图跨模态检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的文图跨模态检索系统。
+整个 Web 可视化图搜文跨模态检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的图搜文跨模态检索系统。
 
 #### 3.4.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
@@ -104,8 +103,9 @@ curl http://localhost:9200/_aliases?pretty=true
 #### 3.4.2 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann_mm.py --index_name wukong_test \
-                            --doc_dir data/wukong_test \
+python utils/offline_ann_mm.py --index_name wukong_text \
+                            --doc_dir data/wukong_text \
+                            --embedding_type text \
                             --search_engine elastic \
                             --delete_index
 ```
@@ -113,7 +113,7 @@ python utils/offline_ann_mm.py --index_name wukong_test \
 
 ```
 # 打印几条数据
-curl http://localhost:9200/wukong_test/_search
+curl http://localhost:9200/wukong_text/_search
 ```
 
 参数含义说明
@@ -132,20 +132,21 @@ curl -XDELETE http://localhost:9200/wukong_test
 
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
-# 指定文图跨模态检索系统的Yaml配置文件
-export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_retrieval.yaml
+# 指定图搜文跨模态检索系统的Yaml配置文件
+export PIPELINE_YAML_PATH=rest_api/pipeline/image_to_text_retrieval.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
 
-```bash
-sh examples/image_text_retrieval/run_search_server.sh
-```
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "云南普者黑现纯白色⒌蒂莲","params": {"Retriever": {"top_k": 5}}}'
+curl -X 'POST' \
+  'http://10.9.189.4:8891/query_images' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'files=@微信图片_20201216132259.jpg;type=image/jpeg' \
+  -F 'meta={"Retriever": {"top_k": 2, "query_type":"image"}}'
 ```
 
 更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
@@ -155,24 +156,20 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
-python ui/webapp_text_to_image_retrieval.py --server.port 8502
-```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
-
-```bash
-sh examples/image_text_retrieval/run_search_web.sh
+python ui/webapp_image_to_text_retrieval.py --server.port 8502
 ```
 
-到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验文图跨模态检索系统服务了。
+到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验图搜文跨模态检索系统服务了。
 
 #### 3.4.5 数据更新
 
 数据更新使用前面的 `utils/offline_ann_mm.py`进行数据更新，把图片放在特定目录，然后传入该目录即可：
 
 ```
-python utils/offline_ann_mm.py --index_name wukong_test \
-                            --doc_dir data/wukong_test \
+python utils/offline_ann_mm.py --index_name wukong_text \
+                            --doc_dir data/wukong_text \
                             --port 9200 \
+                            --embedding_type text \
                             --search_engine elastic \
                             --delete_index
 ```
