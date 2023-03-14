@@ -357,7 +357,6 @@ class BigBirdModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase)
                 ]
             ]
         )
-        print(output[:, 1:4, 1:4])
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
@@ -380,7 +379,6 @@ class BigBirdModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase)
                 ]
             ]
         )
-        print(output[:, 1:4, 1:4])
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
