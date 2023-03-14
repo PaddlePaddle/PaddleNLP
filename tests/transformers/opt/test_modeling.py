@@ -166,9 +166,9 @@ class OPTModelTester:
         model = OPTModel(config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
@@ -178,9 +178,9 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, use_cache=True)
-        model(input_ids, use_cache=False)
+        outputs = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        model(input_ids, use_cache=False, return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
 
@@ -192,8 +192,10 @@ class OPTModelTester:
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens, use_cache=True, cache=past)[0]
+        output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -213,7 +215,9 @@ class OPTModelTester:
         attn_mask[:, half_seq_length:] = -10000
 
         # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)[:2]
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
+            :2
+        ]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
@@ -231,8 +235,12 @@ class OPTModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
-        output_from_past = model(next_tokens, cache=past, use_cache=True, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(
+            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
@@ -247,8 +255,7 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
-
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
@@ -259,12 +266,17 @@ class OPTModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids, attention_mask=next_attention_mask)
+        output_from_no_past = model(
+            next_input_ids, attention_mask=next_attention_mask, return_dict=self.parent.return_dict
+        )
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(
             next_tokens,
             attention_mask=next_attention_mask,
             cache=past,
             use_cache=True,
+            return_dict=self.parent.return_dict,
         )[0]
         self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -283,9 +295,24 @@ class OPTModelTester:
         result = model(
             input_ids,
             use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
         )
 
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
+        model = OPTForCausalLM(config)
+
+        if self.parent.use_labels:
+            loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
+            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            loss.backward()
 
     def create_and_check_opt_weight_initialization(self, config, *args):
         model = OPTModel(config)
@@ -314,10 +341,12 @@ class OPTModelTester:
 
 
 @parameterized_class(
-    ("return_dict",),
+    ("return_dict", "use_labels"),
     [
-        [False],
-        [True],
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
     ],
 )
 class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):

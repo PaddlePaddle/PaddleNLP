@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import paddle
 import paddle.nn as nn
@@ -23,6 +23,10 @@ from paddle.nn import Layer
 from paddlenlp.transformers.gpt.modeling import TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+)
 from .configuration import (
     OPT_PRETRAINED_INIT_CONFIGURATION,
     OPT_PRETRAINED_RESOURCE_FILES_MAP,
@@ -41,53 +45,65 @@ class TransformerDecoder(Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(
-        self,
-        decoder_layers: List[Layer],
-        num_layers: int,
-        hidden_size: int,
-        word_embed_proj_dim: int,
-        norm: Optional[Layer] = None,
-        normalize_before: bool = False,
-    ):
+    def __init__(self, config: OPTConfig, decoder_layers: List[Layer]):
         super(TransformerDecoder, self).__init__()
 
-        if word_embed_proj_dim != hidden_size:
-            self.project_out = nn.Linear(hidden_size, word_embed_proj_dim, bias_attr=False)
+        if config.word_embed_proj_dim != config.hidden_size:
+            self.project_out = nn.Linear(config.hidden_size, config.word_embed_proj_dim, bias_attr=False)
         else:
             self.project_out = None
 
-        self.num_layers = num_layers
+        self.num_layers = config.num_hidden_layers
         self.layers = decoder_layers
 
-        if normalize_before:
-            self.final_layer_norm = nn.LayerNorm(hidden_size)
+        if config.normalize_before:
+            self.final_layer_norm = nn.LayerNorm(config.hidden_size)
         else:
             self.final_layer_norm = None
 
         self.checkpoints = []
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, use_cache: bool = False, cache=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        use_cache: bool = False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
         layer.
         """
         output = tgt
-        new_caches = []
+        new_caches = [] if use_cache else None
         self.checkpoints = []
+        all_self_attentions = () if output_attentions else None
+        all_hidden_states = () if output_hidden_states else None
 
         for i, mod in enumerate(self.layers):
-            if cache is None:
-                if use_cache:
-                    output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
-                    new_caches.append(new_cache)
-                else:
-                    output = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
-
-            else:
-                output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
-                new_caches.append(new_cache)
+            outputs = mod(
+                output,
+                memory,
+                tgt_mask=tgt_mask,
+                use_cache=use_cache,
+                cache=cache[i] if cache is not None else cache,
+                output_attentions=output_attentions,
+            )
+            # outputs = hidden_states if both use_cache and output_attentions are False
+            # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
+            output = outputs[0] if (use_cache or output_attentions) else outputs
+            if output_attentions:
+                all_self_attentions = all_self_attentions + (outputs[1],)
+            if use_cache:
+                new_caches.append(outputs[-1])
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (output,)
             self.checkpoints.append(output.name)
 
         if self.final_layer_norm:
@@ -96,7 +112,21 @@ class TransformerDecoder(Layer):
         if self.project_out:
             output = self.project_out(output)
 
-        return output if use_cache is False else (output, new_caches)
+        if not return_dict:
+            temp_list = [output, new_caches, all_hidden_states, all_self_attentions]
+
+            if not (use_cache or output_attentions or output_hidden_states):
+                return output
+
+            return tuple(v for v in temp_list if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=output,
+            past_key_values=new_caches,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+            cross_attentions=None,
+        )
 
     def gen_cache(self, memory, do_zip=False):
         r"""
@@ -116,8 +146,8 @@ class OPTLearnedPositionEmbedding(nn.Embedding):
     """this module learns postional embeddings up to a fixed maximum size"""
 
     def __init__(self, num_embeddings: int, embedding_dim: int, initializer_range: float):
-        """OPT is set up so taht if padding_idx is specified then offset the embedding ids by 2
-        and adjust num_embeddings appropriately. Other models don't have this hack
+        """OPT is set up so that if padding_idx is specified then offset the embedding ids by 2
+        and adjust num_embeddings appropriately. Other models don't have this hack.
 
         Args:
             num_embeddings (int): the number of embedding size
@@ -146,35 +176,27 @@ class OPTEmbeddings(Layer):
     Include embeddings from word and position embeddings.
     """
 
-    def __init__(
-        self,
-        vocab_size: int,
-        hidden_size: int = 768,
-        word_embed_proj_dim: int = 768,
-        padding_idx: int = 1,
-        hidden_dropout_prob: float = 0.1,
-        max_position_embeddings: int = 512,
-        type_vocab_size: Optional[int] = None,
-        initializer_range=0.02,
-    ):
+    def __init__(self, config: OPTConfig):
         super(OPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
-            vocab_size,
-            word_embed_proj_dim,
-            # padding_idx=padding_idx,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+            config.vocab_size,
+            config.word_embed_proj_dim,
+            # padding_idx=config.pad_token_id,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)),
         )
 
-        if word_embed_proj_dim != hidden_size:
-            self.project_in = nn.Linear(word_embed_proj_dim, hidden_size, bias_attr=False)
+        if config.word_embed_proj_dim != config.hidden_size:
+            self.project_in = nn.Linear(config.word_embed_proj_dim, config.hidden_size, bias_attr=False)
         else:
             self.project_in = None
 
         self.position_embeddings = OPTLearnedPositionEmbedding(
-            num_embeddings=max_position_embeddings, embedding_dim=hidden_size, initializer_range=initializer_range
+            num_embeddings=config.max_position_embeddings,
+            embedding_dim=config.hidden_size,
+            initializer_range=config.initializer_range,
         )
 
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, position_ids=None):
         if position_ids is None:
@@ -249,34 +271,28 @@ class OPTModel(OPTPretrainedModel):
         self.initializer_range = config.initializer_range
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
-        self.embeddings = OPTEmbeddings(
-            vocab_size=config.vocab_size,
-            hidden_size=config.hidden_size,
-            word_embed_proj_dim=config.word_embed_proj_dim,
-            padding_idx=config.pad_token_id,
-            hidden_dropout_prob=config.hidden_dropout_prob,
-            max_position_embeddings=config.max_position_embeddings,
-            type_vocab_size=config.type_vocab_size,
-            initializer_range=config.initializer_range,
-        )
+        self.embeddings = OPTEmbeddings(config)
+
         config.fuse_attention_qkv = False
         decoder_layers = nn.LayerList()
         for i in range(config.num_hidden_layers):
             decoder_layers.append(TransformerDecoderLayer(config))
-
-        self.decoder = TransformerDecoder(
-            decoder_layers,
-            config.num_hidden_layers,
-            norm="LayerNorm",
-            hidden_size=config.hidden_size,
-            normalize_before=config.normalize_before,
-            word_embed_proj_dim=config.word_embed_proj_dim,
-        )
+        self.decoder = TransformerDecoder(config, decoder_layers)
 
         self.apply(self.init_weights)
         self.checkpoints = []
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
         r"""
         The OPTModel forward method, overrides the `__call__()` special method.
 
@@ -306,6 +322,16 @@ class OPTModel(OPTPretrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `None`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `None`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `None`.
+
 
         Returns:
             Tensor: Returns tensor `encoder_output`, which is the output at the last layer of the model.
@@ -325,6 +351,12 @@ class OPTModel(OPTPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         self.checkpoints = []
         past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
@@ -360,12 +392,28 @@ class OPTModel(OPTPretrainedModel):
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
-        decoder_outputs = self.decoder(
-            embedding_output, memory=None, tgt_mask=attention_mask, use_cache=use_cache, cache=cache
+        outputs = self.decoder(
+            embedding_output,
+            memory=None,
+            tgt_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
 
+        if output_hidden_states:
+            if return_dict:
+                outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+            else:
+                # [last_hidden_state, caches, all_hidden_states, all_self_attentions]
+                idx = 2 if use_cache else 1
+                all_hidden_states = ((embedding_output,) + outputs[idx],)
+                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
+
         self.checkpoints.extend(self.decoder.checkpoints)
-        return decoder_outputs
+        return outputs
 
     def get_input_embeddings(self):
         """get opt input word embedding
@@ -415,7 +463,18 @@ class OPTForCausalLM(OPTPretrainedModel):
             embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        labels=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
         r"""
 
         Args:
@@ -429,7 +488,18 @@ class OPTForCausalLM(OPTPretrainedModel):
                 See :class:`OPTModel`.
             cache (Tensor, optional):
                 See :class:`OPTModel`.
-
+            labels (paddle.Tensor, optional):
+                A Tensor of shape `(batch_size, sequence_length)`.
+                Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
+                `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
+                are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
+                Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
         Returns:
             Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
             tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
@@ -451,8 +521,21 @@ class OPTForCausalLM(OPTPretrainedModel):
                 print(tokenizer.batch_decode(output_ids[0]))
         """
 
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         outputs = self.opt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
 
         if use_cache:
@@ -462,10 +545,30 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         logits = self.lm_head(encoder_outputs)
 
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits[:, :-1, :]
+            shift_labels = labels[:, 1:]
+            # Flatten the tokens
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+
+        if not return_dict:
+            if not use_cache:
+                return (loss, logits) if loss is not None else logits
+
+            outputs = (logits,) + outputs[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_fast_entry(self, kwargs: Dict[str, Any]):
         # import FasterOPT at here to avoid cycling import
