@@ -72,9 +72,8 @@ class BigBirdEncoderLayerOutput(ModelOutput):
 
 class TransformerEncoderLayer(Layer):
     def __init__(self, config: BigBirdConfig):
-        self.config = config
-
         super(TransformerEncoderLayer, self).__init__()
+        self.config = config
         attn_dropout = config.dropout if config.attn_dropout is None else config.attn_dropout
         act_dropout = config.dropout if config.act_dropout is None else config.act_dropout
         self.normalize_before = config.normalize_before
