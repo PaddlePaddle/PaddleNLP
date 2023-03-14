@@ -357,9 +357,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         if eval_dataset is not None:
             self._data_checks_and_inference([eval_dataset])
-            is_utc = False
-            if "utc" in model_config["model_name_or_path"]:
-                is_utc = True
+            is_utc = "utc" in model_config["model_name_or_path"]
+            if is_utc:
                 max_length = model_config.get("max_length", trainer.pretrained_model.config.max_position_embeddings)
             else:
                 max_length = model_config.get("max_length", trainer.model.config.max_position_embeddings)
