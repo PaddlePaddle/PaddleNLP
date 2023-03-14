@@ -169,6 +169,7 @@ from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .roformerv2.configuration import *
 from .optimization import *
+from .opt.configuration import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
