@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The OpenAI Team Authors and HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -22,6 +22,12 @@ from paddle.nn import Layer
 
 from paddlenlp.transformers.gpt.modeling import TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
+from .configuration import (
+    OPT_PRETRAINED_INIT_CONFIGURATION,
+    OPT_PRETRAINED_RESOURCE_FILES_MAP,
+    OPTConfig,
+)
 
 __all__ = [
     "OPTModel",
@@ -197,9 +203,11 @@ class OPTPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {}
-    pretrained_resource_files_map = {"model_state": {}}
+    config_class = OPTConfig
     base_model_prefix = "opt"
+
+    pretrained_init_configuration = OPT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = OPT_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -231,117 +239,38 @@ class OPTModel(OPTPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `OPTModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `OPTModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer and decoder layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer decoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer decoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the decoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"relu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and decoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all decoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids`. Defaults to `16`.
-
-            .. note::
-                Please NOT using `type_vocab_size`, for it will be obsolete in the future..
-
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer. Default to `0.02`.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`OPTPretrainedModel._init_weights()` for how weights are initialized in `OPTModel`.
-
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-             to `0`.
-
+        config (:class:`OPTConfig`):
+            An instance of OPTConfig used to construct OPTModel.
     """
 
-    def __init__(
-        self,
-        vocab_size: int,
-        hidden_size: int = 768,
-        word_embed_proj_dim: int = 768,
-        num_hidden_layers: int = 12,
-        num_attention_heads: int = 12,
-        intermediate_size: int = 3072,
-        hidden_act: str = "relu",
-        hidden_dropout_prob: float = 0.1,
-        attention_probs_dropout_prob: float = 0.1,
-        max_position_embeddings: int = 512,
-        type_vocab_size: int = 16,
-        initializer_range: float = 0.02,
-        pad_token_id: int = 0,
-        eos_token_id: int = 7,
-        bos_token_id: int = 0,
-        eol_token_id: int = 3,
-        normalize_before: bool = True,
-        **kwargs
-    ):
-        super(OPTModel, self).__init__()
-
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.hidden_size = hidden_size
-        self.vocab_size = vocab_size
+    def __init__(self, config: OPTConfig):
+        super(OPTModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.hidden_size = config.hidden_size
+        self.vocab_size = config.vocab_size
         self.embeddings = OPTEmbeddings(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            word_embed_proj_dim=word_embed_proj_dim,
-            padding_idx=pad_token_id,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            initializer_range=initializer_range,
+            vocab_size=config.vocab_size,
+            hidden_size=config.hidden_size,
+            word_embed_proj_dim=config.word_embed_proj_dim,
+            padding_idx=config.pad_token_id,
+            hidden_dropout_prob=config.hidden_dropout_prob,
+            max_position_embeddings=config.max_position_embeddings,
+            type_vocab_size=config.type_vocab_size,
+            initializer_range=config.initializer_range,
         )
-
+        config.fuse_attention_qkv = False
         decoder_layers = nn.LayerList()
-        for i in range(num_hidden_layers):
-            decoder_layers.append(
-                TransformerDecoderLayer(
-                    d_model=hidden_size,
-                    nhead=num_attention_heads,
-                    dim_feedforward=intermediate_size,
-                    dropout=hidden_dropout_prob,
-                    activation=hidden_act,
-                    attn_dropout=attention_probs_dropout_prob,
-                    act_dropout=hidden_dropout_prob,
-                    weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(mean=0.0, std=self.initializer_range)
-                    ),
-                    bias_attr=None,
-                    normalize_before=normalize_before,
-                )
-            )
+        for i in range(config.num_hidden_layers):
+            decoder_layers.append(TransformerDecoderLayer(config))
 
         self.decoder = TransformerDecoder(
             decoder_layers,
-            num_hidden_layers,
+            config.num_hidden_layers,
             norm="LayerNorm",
-            hidden_size=hidden_size,
-            normalize_before=normalize_before,
-            word_embed_proj_dim=word_embed_proj_dim,
+            hidden_size=config.hidden_size,
+            normalize_before=config.normalize_before,
+            word_embed_proj_dim=config.word_embed_proj_dim,
         )
 
         self.apply(self.init_weights)
@@ -364,11 +293,10 @@ class OPTModel(OPTPretrainedModel):
                 Mask used in self attention to avoid performing attention to some unwanted positions,
                 usually the subsequent positions.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Its data type should be float32.
-                The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
+                The `masked` tokens have `-1e9` values, and the `unmasked` tokens have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
@@ -399,13 +327,13 @@ class OPTModel(OPTPretrainedModel):
         """
 
         self.checkpoints = []
-        if position_ids is None:
-            past_length = 0
-            if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
-            position_ids = position_ids.unsqueeze(0)
+        past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
 
+        if position_ids is None:
+            position_ids = paddle.arange(
+                past_key_values_length, input_ids.shape[-1] + past_key_values_length, dtype=input_ids.dtype
+            )
+            position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
@@ -413,6 +341,14 @@ class OPTModel(OPTPretrainedModel):
         causal_mask = paddle.tensor.triu(
             paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
         )
+        if past_key_values_length > 0:
+            causal_mask = paddle.concat(
+                [
+                    paddle.zeros([paddle.shape(input_ids)[-1], past_key_values_length], dtype=causal_mask.dtype),
+                    causal_mask,
+                ],
+                axis=-1,
+            )
 
         if attention_mask is not None:
             if len(attention_mask.shape) == 2:
@@ -420,6 +356,7 @@ class OPTModel(OPTPretrainedModel):
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
+
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -429,6 +366,20 @@ class OPTModel(OPTPretrainedModel):
 
         self.checkpoints.extend(self.decoder.checkpoints)
         return decoder_outputs
+
+    def get_input_embeddings(self):
+        """get opt input word embedding
+        Returns:
+            nn.Embedding: the input word embedding of opt mdoel
+        """
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        """set opt input embedding
+        Returns:
+            nn.Embedding: the instance of new word embedding
+        """
+        self.embeddings.word_embeddings = embedding
 
 
 class OPTLMHead(Layer):
@@ -450,17 +401,17 @@ class OPTForCausalLM(OPTPretrainedModel):
     The OPT Model with a `language modeling` head on top.
 
     Args:
-        opt (:class:`OPTModel`):
-            An instance of :class:`OPTModel`.
+        config (:class:`OPTConfig`):
+            An instance of OPTConfig used to construct OPTModel.
 
     """
 
-    def __init__(self, opt: OPTModel):
-        super(OPTForCausalLM, self).__init__()
-        self.opt = opt
+    def __init__(self, config: OPTConfig):
+        super(OPTForCausalLM, self).__init__(config)
+        self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
-            hidden_size=self.opt.config["hidden_size"],
-            vocab_size=self.opt.config["vocab_size"],
+            hidden_size=self.opt.config.hidden_size,
+            vocab_size=self.opt.config.vocab_size,
             embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
@@ -534,7 +485,7 @@ class OPTForCausalLM(OPTPretrainedModel):
                 "'size_per_head = %d' is not supported yet in the fast version of OPT" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the fast version
+            # not support for forced_bos_token_id yet in the fast version
             raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
         if kwargs["min_length"] != 0:
             # not support for min_length yet in the fast version
