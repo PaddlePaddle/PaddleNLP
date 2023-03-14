@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import paddle
-from modeling import GLMModel
 
-# from paddlenlp.transformers import GLMConfig
+from paddlenlp.transformers import GLMModel
+
+# from modeling import GLMModel
+
 
 mp_degree = paddle.distributed.get_world_size()
 mp_rank = paddle.distributed.get_rank()

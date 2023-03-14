@@ -995,6 +995,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             str: the model weight file path
         """
+        # -1. when it's from HF
+        if from_hf_hub:
+            return resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path,
+                cache_dir=cache_dir,
+                support_conversion=support_conversion,
+                subfolder=subfolder,
+            )
 
         # 0. when it is local file
         if os.path.isfile(pretrained_model_name_or_path):
@@ -1050,16 +1058,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
 
-        # 4. when it's from HF
-        if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                support_conversion=support_conversion,
-                subfolder=subfolder,
-            )
-
-        # 5. download from community or hf-hub
+        # 4. download from community or hf-hub
         else:
             # assume that the community-based models, name format: community/model-name
             community_model_file_path = "/".join(
@@ -1071,6 +1070,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if url_file_exists(community_model_file_path):
                 return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
+            # 5. Final ERROR
             logger.warning(
                 f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."

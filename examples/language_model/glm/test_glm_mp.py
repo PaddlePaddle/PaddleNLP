@@ -54,7 +54,7 @@ class TestCkptShard(unittest.TestCase):
     def testPaddle(self):
         from paddlenlp.transformers import AutoModel
 
-        model = AutoModel.from_pretrained("glm-large-chinese")
+        model = AutoModel.from_pretrained("THUDM/glm-large-chinese")
         model.eval()
         loss = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
         ret = loss.logits.abs().mean().item()

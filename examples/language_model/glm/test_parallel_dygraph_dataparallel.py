@@ -155,7 +155,26 @@ def start_local_trainers(
 
 
 class TestMultipleGpus(unittest.TestCase):
-    def run_2gpu(
+    def setUp(self):
+        self.selected_gpus = get_gpus("0,1")
+
+    def run_1gpu(self, *args, **kwargs):
+        self.selected_gpus = get_gpus("0")
+        self.run_n_gpu(*args, **kwargs)
+
+    def run_2gpu(self, *args, **kwargs):
+        self.selected_gpus = get_gpus("0,1")
+        self.run_n_gpu(*args, **kwargs)
+
+    def run_4gpu(self, *args, **kwargs):
+        self.selected_gpus = get_gpus("0,1,2,3")
+        self.run_n_gpu(*args, **kwargs)
+
+    def run_8gpu(self, *args, **kwargs):
+        self.selected_gpus = get_gpus("0,1,2,3,4,5,6,7")
+        self.run_n_gpu(*args, **kwargs)
+
+    def run_n_gpu(
         self,
         target_file_name,
         eager_mode=True,
@@ -164,11 +183,11 @@ class TestMultipleGpus(unittest.TestCase):
         if not fluid.core.is_compiled_with_cuda() or fluid.core.get_cuda_device_count() == 0:
             return
 
-        selected_gpus = get_gpus("0,1")
+        # selected_gpus = get_gpus("0,1")
         cluster = None
         pod = None
 
-        cluster, pod = get_cluster_from_args(selected_gpus)
+        cluster, pod = get_cluster_from_args(self.selected_gpus)
 
         procs = start_local_trainers(
             cluster,

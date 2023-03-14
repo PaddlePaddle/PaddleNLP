@@ -15,12 +15,14 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
 from ...utils.converter import StateDictNameMapping
@@ -60,14 +62,25 @@ class GLMAttention(nn.Layer):
                 f"heads ({config.num_attention_heads})"
             )
 
+        self.config = config
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+        if config.mp_degree > 1:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, 3 * config.hidden_size, has_bias=True, gather_output=False
+            )
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+            self.num_attention_heads = config.num_attention_heads // config.mp_degree
+        else:
+            self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+
         self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.output_dropout = nn.Dropout(config.output_dropout_prob)
 
     def _transpose_for_scores(self, inputs: Tensor):
@@ -81,20 +94,64 @@ class GLMAttention(nn.Layer):
         outputs = paddle.transpose(outputs, [0, 2, 1, 3])
         return outputs
 
-    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
+    def _core_attention(self, hidden_states: Tensor, cache: Tensor = None):
+        # [bs, seq_len, num_head * head_dim]
         query_length = hidden_states.shape[1]
         if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
         else:
+            # [bs, cache_len + seq_len, num_head * head_dim]
+            concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
+            # [bs, cache_len + seq_len, num_head * head_dim * 3]
+            mixed_layer = self.query_key_value(concat_hidden_states)
+            # [bs, cache_len + seq_len, num_head * head_dim]
+            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
+            # [bs, cache_len + seq_len, num_head * head_dim]
+            mixed_q_layer = mixed_q_layer[:, -query_length:]
+            # [bs, seq_len, num_head * head_dim]
+
+        # [bs, num_head, seq_len, head_dim]
+        q_layer = self._transpose_for_scores(mixed_q_layer)
+        # [bs, num_head, cache_len + seq_len, head_dim]
+        k_layer = self._transpose_for_scores(mixed_k_layer)
+        # [bs, num_head, cache_len + seq_len, head_dim]
+        v_layer = self._transpose_for_scores(mixed_v_layer)
+
+        return q_layer, k_layer, v_layer
+
+    def _core_parallel_attention(self, hidden_states: Tensor, cache: Tensor = None):
+        query_length = hidden_states.shape[1]
+        if cache is None:
+            mixed_layer = self.query_key_value(hidden_states)
+            # [bs, seq_len, num_head, 3* head_dim]
+            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_attention_heads, 3 * self.attention_head_size])
+            # [bs,  num_head, seq_len, 3* head_dim]
+            mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
+            # [bs,  num_head, seq_len, head_dim]
+            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
+
+        else:
+            # [bs, seq_len(+cache_len), num_head * head_dim]
             concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
             mixed_layer = self.query_key_value(concat_hidden_states)
-            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
+            # [bs. seq_len(+cache_len), num_heads, 3* head_dim]
+            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+            # [bs, num_heads, seq_len(+cache_len),  3* head_dim]
+            mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
+            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
+            # [bs, num_heads, seq_len, head_dim]
             mixed_q_layer = mixed_q_layer[:, -query_length:]
 
-        q_layer = self._transpose_for_scores(mixed_q_layer)
-        k_layer = self._transpose_for_scores(mixed_k_layer)
-        v_layer = self._transpose_for_scores(mixed_v_layer)
+        return mixed_q_layer, mixed_k_layer, mixed_v_layer
+
+    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
+        # [bs, seq_len, num_head * head_dim]
+        if self.config.mp_degree > 1:
+            q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
+        else:
+            # [bs,  num_head, seq_len, head_dim]
+            q_layer, k_layer, v_layer = self._core_attention(hidden_states, cache)
 
         if self.attention_scale > 1.0:
             attention_scores = paddle.matmul(
@@ -102,11 +159,14 @@ class GLMAttention(nn.Layer):
                 k_layer.transpose([0, 1, 3, 2]) / math.sqrt(self.attention_head_size * self.attention_scale),
             )
         else:
+            # [bs,  num_head, seq_len, head_dim] * [bs,  num_head,  head_dim, seq_len]
+            # [bs,  num_head, seq_len, seq_len] / [bs,  num_head, seq_len, cache_len + seq_len]
             attention_scores = paddle.matmul(
                 q_layer, k_layer.transpose([0, 1, 3, 2]) / math.sqrt(self.attention_head_size)
             )
 
         ltor_mask = ltor_mask.astype(attention_scores.dtype)
+        # [bs,  num_head, seq_len, seq_len(+cache_len)]
         attention_scores = paddle.multiply(attention_scores, ltor_mask)
         if self.attention_scale > 1.0:
             max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
@@ -117,15 +177,16 @@ class GLMAttention(nn.Layer):
         attention_probs = F.softmax(attention_scores, axis=-1)
         attention_probs = self.attention_dropout(attention_probs)
 
+        # [bs,  num_head, seq_len, seq_len(+cache_len)] * [bs,  num_head, seq_len(+cache_len), head_dim]
+        # [bs,  num_head, seq_len, head_dim]
         context_layer = paddle.matmul(attention_probs, v_layer)
+        # [bs, seq_len, num_head, head_dim]
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_shape = context_layer.shape[:-2] + [self.hidden_size]
+        # [bs, seq_len, num_head * head_dim]
+        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
         context_layer = context_layer.reshape(new_context_shape)
-
         output = self.dense(context_layer)
         output = self.output_dropout(output)
-
-        output = (output, cache)
 
         return output
 
@@ -146,12 +207,9 @@ class GLMBlock(nn.Layer):
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
-        if cache is not None:
-            cache = self.input_layernorm(cache)
-        else:
-            cache = None
+        cache = self.input_layernorm(cache) if cache is not None else None
         # Self attention
-        attention_output, cache = self.attention(layernorm_output, ltor_mask, cache)
+        attention_output = self.attention(layernorm_output, ltor_mask, cache)
         # Residual connection
         layernorm_input = hidden_states + attention_output
         # Layernorm after attention
@@ -160,8 +218,7 @@ class GLMBlock(nn.Layer):
         mlp_output = self.mlp(layernorm_output)
         # Second residual connection
         output = layernorm_input + mlp_output
-
-        return (output, cache)
+        return output
 
 
 class GPT2MLP(nn.Layer):
@@ -173,8 +230,16 @@ class GPT2MLP(nn.Layer):
 
     def __init__(self, config: GLMConfig):
         super(GPT2MLP, self).__init__()
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.hidden_size * 4)
-        self.dense_4h_to_h = nn.Linear(config.hidden_size * 4, config.hidden_size)
+        if config.mp_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, config.hidden_size * 4, has_bias=True, gather_output=False
+            )
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size * 4, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+        else:
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.hidden_size * 4)
+            self.dense_4h_to_h = nn.Linear(config.hidden_size * 4, config.hidden_size)
         self.dropout = nn.Dropout(config.output_dropout_prob)
 
     def forward(self, hidden_states):
@@ -387,6 +452,67 @@ class GLMPretrainedModel(PretrainedModel):
 
             model_mappings.extend(layer_mappings)
 
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, transpose=True, is_column=True, is_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
+            return split_tensor_parallel_weight(
+                x, mp_degree=config.mp_degree, mp_rank=config.mp_rank, is_column=is_column
+            )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(
+                    fn, transpose=False, is_column=True, is_qkv=False
+                ),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(
+                    fn, transpose=True, is_column=True, is_qkv=False
+                ),
+                "transformer.layers.0.attention.query_key_value.bias": partial(
+                    fn, transpose=False, is_column=True, is_qkv=True
+                ),
+                "transformer.layers.0.attention.query_key_value.weight": partial(
+                    fn, transpose=True, is_column=True, is_qkv=True
+                ),
+                # Row Linear
+                "word_embeddings.weight": partial(fn, transpose=False, is_column=False, is_qkv=False),
+                # 'transformer.layers.0.attention.dense.bias',
+                "transformer.layers.0.attention.dense.weight": partial(
+                    fn, transpose=True, is_column=False, is_qkv=False
+                ),
+                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(
+                    fn, transpose=True, is_column=False, is_qkv=False
+                ),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        if config.mp_degree > 1:
+            tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+            for mapping in model_mappings:
+                if mapping[1] in tp_split_mappings:
+                    if len(mapping) == 3:
+                        mapping[2] = tp_split_mappings[mapping[1]]
+                    else:
+                        mapping.append(tp_split_mappings[mapping[1]])
+
         if cls.__name__ != "GLMModel":
             for mapping in model_mappings:
                 mapping[1] = "glm." + mapping[1]
@@ -411,6 +537,28 @@ class GLMPretrainedModel(PretrainedModel):
             zeros_(layer.bias)
 
 
+def parallel_matmul(lm_output, logit_weights, parallel_output):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    world_size = hcg.get_model_parallel_world_size()
+    # rank = hcg.get_model_parallel_rank()
+
+    if world_size > 1:
+        # _c_identity is backwards is reduce
+        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+
+        if parallel_output:
+            return logits
+
+        # _c_concat has not grad backwards
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        return logits
+
+
 @register_base_model
 class GLMModel(GLMPretrainedModel):
     r"""
@@ -429,11 +577,19 @@ class GLMModel(GLMPretrainedModel):
         super(GLMModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        self.word_embeddings = nn.Embedding(
-            config.vocab_size,
-            config.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-        )
+        if self.config.mp_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+
         self.transformer = GLMStack(config)
         self.apply(self.init_weights)
 
@@ -470,7 +626,11 @@ class GLMModel(GLMPretrainedModel):
             logits = output[0] if isinstance(output, tuple) else output
 
         if self.output_predict:
-            logits = F.linear(logits, self.word_embeddings.weight.T)
+            if self.config.mp_degree > 1:
+                # FIXME: @ZHUI fix for jit_to_static
+                logits = parallel_matmul(logits, self.word_embeddings.weight, self.config.tensor_parallel_output)
+            else:
+                logits = F.linear(logits, self.word_embeddings.weight.T)
 
         if not return_dict:
             if isinstance(output, tuple):
@@ -478,7 +638,8 @@ class GLMModel(GLMPretrainedModel):
             else:
                 return logits
 
-        output.last_hidden_state = logits
+        output.logits = logits
+        # output.last_hidden_state = logits
 
         return output
 
@@ -515,6 +676,11 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         log_probs = paddle.stack(log_probs).squeeze(2)
         loss = None
         if labels is not None:
+            if self.glm.config.mp_degree > 1:
+                assert (
+                    self.glm.config.tensor_parallel_output is False
+                ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
+
             loss = F.cross_entropy(log_probs, labels)
 
         if not return_dict:
@@ -594,11 +760,17 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
 
         loss = None
         if labels is not None:
-            loss = F.cross_entropy(
-                lm_logits.reshape([-1, lm_logits.shape[-1]]),
-                labels.reshape([-1]),
-                reduction="none",
-            )
+            # Since ParallelCrossEntropy not support -100 ingore index.
+            # we use pad_token_id
+            if self.glm.config.mp_degree > 1 and self.glm.config.tensor_parallel_output:
+                self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+                loss = self.parallel_loss_fun(lm_logits, labels)
+                loss = loss[labels != self.glm.config.pad_token_id]
+                loss = loss.mean()
+            else:
+                loss = F.cross_entropy(
+                    lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
+                )
             label_smoothing = getattr(self.config, "label_smoothing", 0)
             if label_smoothing > 0:
                 smooth_loss = (-F.log_softmax(lm_logits, axis=-1) / lm_logits.shape[2]).sum(axis=-1)
