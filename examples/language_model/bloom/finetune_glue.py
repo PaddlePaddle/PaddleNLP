@@ -512,8 +512,6 @@ def do_train(args):
                 else:
                     output_dir = os.path.join(args.output_dir, str(global_step), model_path)
                 os.makedirs(output_dir, exist_ok=True)
-                os.makedirs(output_dir, exist_ok=True)
-
                 logger.info("Save model to %s" % output_dir)
 
                 # tokenizer only need to save on one node

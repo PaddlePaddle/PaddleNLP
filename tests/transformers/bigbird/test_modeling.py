@@ -15,6 +15,7 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     BigBirdForMultipleChoice,
@@ -28,7 +29,12 @@ from paddlenlp.transformers import (
 from paddlenlp.transformers.bigbird.configuration import BigBirdConfig
 
 from ...testing_utils import slow
-from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class BigBirdModelTester:
@@ -83,6 +89,7 @@ class BigBirdModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.key_length = self.hidden_size // self.num_attention_heads
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -139,9 +146,11 @@ class BigBirdModelTester:
     ):
         model = BigBirdModel(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
@@ -163,8 +172,12 @@ class BigBirdModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             rand_mask_idx_list=None,
+            labels=choice_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if choice_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
@@ -185,8 +198,14 @@ class BigBirdModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.parent.return_dict,
         )
-        start_logits, end_logits = result[0], result[1]
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
 
         self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
@@ -203,8 +222,17 @@ class BigBirdModelTester:
     ):
         model = BigBirdForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, rand_mask_idx_list=None)
-        if paddle.is_tensor(result):
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            rand_mask_idx_list=None,
+            labels=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
@@ -225,8 +253,12 @@ class BigBirdModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
         )
-        if paddle.is_tensor(result):
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
@@ -246,11 +278,20 @@ class BigBirdModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BigBirdModel
     return_dict: bool = False
     use_labels: bool = False
-    test_resize_embeddings: bool = False
+    use_test_inputs_embeds: bool = True
 
     all_model_classes = (
         BigBirdModel,
@@ -289,6 +330,56 @@ class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
         for model_name in list(BigBirdPretrainedModel.pretrained_init_configuration)[:1]:
             model = BigBirdModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class BigBirdModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
+    base_model_class = BigBirdModel
+    hf_remote_test_model_path = "PaddleCI/tiny-random-bigbird"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-bigbird"
+
+    @slow
+    def test_inference_no_attention(self):
+        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [-0.07543463, -0.12640929, 0.04644738],
+                    [0.13448411, -0.08428665, -0.04799746],
+                    [0.00980866, -0.08991019, 0.17119916],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_attention(self):
+        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [-0.00835392, -0.06217613, -0.17532486],
+                    [0.07107036, -0.04628750, 0.47526565],
+                    [-0.03114043, -0.15154681, 0.92528886],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

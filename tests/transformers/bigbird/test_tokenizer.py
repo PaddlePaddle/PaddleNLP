@@ -50,11 +50,10 @@ class BigBirdTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_get_vocab(self):
         vocab_keys = list(self.get_tokenizer().get_vocab().keys())
-
         self.assertEqual(vocab_keys[0], "<unk>")
         self.assertEqual(vocab_keys[1], "<s>")
-        self.assertEqual(vocab_keys[-1], "<pad>")
-        self.assertEqual(len(vocab_keys), 1_101)
+        self.assertEqual(vocab_keys[-1], "[MASK]")
+        self.assertEqual(len(vocab_keys), 1_104)
 
     def test_vocab_size(self):
         self.assertEqual(self.get_tokenizer().vocab_size, 1_100)

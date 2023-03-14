@@ -201,7 +201,10 @@ def _transformer_decoder_fwd(
 
     for i, mod in enumerate(self.layers):
         if cache is None:
-            if self.enable_recompute:
+            # if output has no gradient, recompute is unnecessary
+            memory_stop_gradient = memory is not None and memory.stop_gradient
+            has_gradient = (not tgt.stop_gradient) or (not memory_stop_gradient)
+            if self.enable_recompute and has_gradient:
                 outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask, None, output_attentions)
             else:
                 outputs = mod(
@@ -278,7 +281,9 @@ def _transformer_encoder_fwd(
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        if self.enable_recompute:
+        # if output has no gradient, recompute is unnecessary
+        has_gradient = not output.stop_gradient
+        if self.enable_recompute and has_gradient:
             # Note: recompute do not support pass as **kwargs yet.
             layer_outputs = recompute(
                 mod,
