@@ -500,7 +500,10 @@ def do_train(args):
                     else:
                         model_to_save = model_to_save._layer
 
-                output_dir = os.path.join(args.output_dir, "{}_{}".format(model_path, global_step))
+                if config.mp_degree == 1 and config.pp_degree == 1:
+                    output_dir = os.path.join(args.output_dir, str(global_step))
+                else:
+                    output_dir = os.path.join(args.output_dir, str(global_step), model_path)
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Save model to %s" % output_dir)
 

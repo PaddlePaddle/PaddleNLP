@@ -30,8 +30,9 @@ from visualdl import LogWriter
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
+    PretrainedModel,
 )
-from paddlenlp.utils import profiler
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 # to import data_tools
@@ -53,29 +54,45 @@ from utils import (  # noqa e402
 
 
 @paddle.no_grad()
-def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, global_step, epoch, task_name="valid"):
+def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, global_step, task_name="valid"):
     model.eval()
     all_loss = []
     local_time = time.time()
+    iter_step = 0
     for eval_step, batch in enumerate(data_loader):
-        tokens, loss_mask, position_ids, labels = batch
-        if args.pp_degree < 2:
+        with paddle.amp.auto_cast(
+            args.use_pure_fp16,
+            custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
+            custom_white_list=["fused_attention", "fused_feedforward"],
+            level="O2",
+        ):
+            tokens, loss_mask, position_ids, labels = batch
             preds = model(tokens, position_ids)
             loss = criterion(preds, labels, loss_mask)
-        else:
-            data = [(tokens, position_ids), (labels, loss_mask)]
-            loss = model.eval_batch(data, compute_loss=True)
 
         all_loss.append(float(loss))
-        if eval_step >= iter_steps - 1:
+
+        if (eval_step + 1) % args.accumulate_steps == 0:
+            iter_step += 1
+        else:
+            continue
+
+        if iter_step >= iter_steps:
             break
 
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info(
-        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-        % (task_name, global_step, epoch, eval_step, average_loss, iter_steps / (time.time() - local_time))
-    )
-    log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+    v = paddle.to_tensor(average_loss).detach()
+    average_loss = all_gather(v)
+
+    if log_writer is not None:
+        logger.info("--" * 30)
+        logger.info(
+            "%s step %d, batch: %d, loss: %f, speed: %.2f step/s"
+            % (task_name, global_step, iter_steps, average_loss, iter_steps / (time.time() - local_time))
+        )
+        logger.info("--" * 30)
+        log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+
     model.train()
 
 
@@ -165,6 +182,7 @@ def do_train(args):
     log_writer = LogWriter(log_writer_path)
 
     WEIGHTS_NAME = "model_state.pdparams"
+    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         BloomForPretraining.resource_files_names = {"model_state": WEIGHTS_NAME}
@@ -177,6 +195,7 @@ def do_train(args):
     config["hidden_dropout_prob"] = args.hidden_dropout_prob
     config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     config["use_recompute"] = args.use_recompute
+    config["pp_degree"] = args.pp_degree
     config["use_cache"] = False
     config["enable_fuse_transformer"] = False
     model = BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)
@@ -280,219 +299,184 @@ def do_train(args):
         optimizer = fleet.distributed_optimizer(optimizer)
 
     global_step = 0
-    # tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        files = get_train_data_file(args)
-        files.sort()
-        num_files = len(files)
-        for f_id in range(num_files):
-            data_file = files[f_id]
-            train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                [data_file],
-                local_rank=local_rank,
-                data_world_size=data_world_size,
-                data_world_rank=data_world_rank,
-                max_seq_len=args.max_seq_length,
-                eos_id=tokenizer.eos_token_id,
-                old_version_accumulate_compatible=True,
-            )
-            # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
-            # many times. and start a new random dataloader.
-            valid_data_loader = valid_data_loader()
-            test_data_loader = test_data_loader()
+    train_reader_cost = 0.0
+    train_run_cost = 0.0
+    reader_start = time.time()
 
-            # time count
+    files = get_train_data_file(args)
+    train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
+        args,
+        files,
+        local_rank=local_rank,
+        data_world_size=data_world_size,
+        data_world_rank=data_world_rank,
+        max_seq_len=args.max_seq_length,
+        eos_id=tokenizer.eos_token_id,
+        current_step=global_step,
+    )
+    # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+    # many times. and start a new random dataloader.
+    valid_data_loader = valid_data_loader()
+    test_data_loader = test_data_loader()
+    _globalstep_last_logged = global_step
+    if isinstance(train_data_loader.batch_sampler, DistributedBatchSampler):
+        _globalstep_last_logged = 0
+
+    model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
+    tr_loss = paddle.to_tensor(0.0)
+    loss_global = paddle.to_tensor(0.0)
+    for step, batch in enumerate(train_data_loader()):
+        train_reader_cost += time.time() - reader_start
+        train_start = time.time()
+
+        if _globalstep_last_logged > 0:
+            _globalstep_last_logged -= 1
+            continue
+
+        tokens, loss_mask, position_ids, labels = batch
+
+        # In ParallelMode of DataParallel, 'no_sync' can be used for improving
+        # performance of model by gradient accumulation.
+
+        with paddle.amp.auto_cast(
+            args.use_pure_fp16,
+            custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
+            custom_white_list=["fused_attention", "fused_feedforward"],
+            level="O2",
+        ):
+            preds = model(tokens, position_ids)
+            loss = criterion(preds, labels, loss_mask)
+
+        if args.accumulate_steps > 1:
+            tr_loss_step = loss / args.accumulate_steps
+        else:
+            tr_loss_step = loss
+
+        if args.use_pure_fp16:
+            scaler.scale(tr_loss_step).backward()
+        else:
+            tr_loss_step.backward()
+
+        tr_loss_step = tr_loss_step.detach()
+
+        tr_loss += tr_loss_step
+        loss_global += loss.detach()
+
+        # Skip for accumulate_steps in global step
+        if (step + 1) % args.accumulate_steps != 0:
+            continue
+
+        if args.sharding_degree > 1 and args.sharding_stage in [2, 3]:
+            if args.dp_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
+                fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
+
+        if args.use_pure_fp16:
+            # scaler.minimize(optimizer, tr_loss)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
+
+        optimizer.clear_grad()
+        tr_loss.subtract_(tr_loss)
+
+        global_step += 1
+
+        # Sync for profile time, delete it may be a little faster
+        # paddle.device.cuda.synchronize()
+        train_run_cost += time.time() - train_start
+
+        if global_step % args.logging_freq == 0:
+            avg_loss = all_gather(loss_global) / args.logging_freq / args.accumulate_steps
+            loss_global.subtract_(loss_global)
+            speed = args.logging_freq / (train_reader_cost + train_run_cost)
+            avg_reader_cost = train_reader_cost / args.logging_freq
+
+            logger.info(
+                "global step %d,  loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
+                % (
+                    global_step,
+                    avg_loss,
+                    avg_reader_cost,
+                    1.0 / speed,
+                    speed,
+                    speed * default_global_tokens_num,
+                    speed * default_global_tokens_num / nranks,
+                    optimizer.get_lr(),
+                )
+            )
+            if log_writer is not None:
+                log_writer.add_scalar("loss", float(loss), global_step)
+                log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
+
+            # tic_train = time.time()
             train_reader_cost = 0.0
             train_run_cost = 0.0
-            reader_start = time.time()
-            for step, batch in enumerate(train_data_loader()):
-                train_reader_cost += time.time() - reader_start
-                train_start = time.time()
 
-                global_step += 1
-                tokens, loss_mask, position_ids, labels = batch
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
-                loss_mask.stop_gradient = True
-                labels.stop_gradient = True
-                position_ids.stop_gradient = True
+        if global_step % args.eval_freq == 0:
+            # Since the valid data broardcast to all devices, we do evaluate on all device.
+            run_evaluate(args, valid_data_loader, model, criterion, args.eval_iters, log_writer, global_step, "valid")
 
-                if args.pp_degree == 1:
-                    # In ParallelMode of DataParallel, 'no_sync' can be used for improving
-                    # performance of model by gradient accumulation.
-                    loss = 0.0
-                    for i in range(accumulate_steps):
-                        start_index = i * args.micro_batch_size
-                        end_index = start_index + args.micro_batch_size
-                        with paddle.amp.auto_cast(
-                            args.use_pure_fp16,
-                            custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
-                            custom_white_list=["fused_attention", "fused_feedforward"],
-                            level="O2",
-                        ):
-                            preds = model(tokens[start_index:end_index, :], position_ids[start_index:end_index, :])
-                            loss_mbs = criterion(
-                                preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
-                            )
-                        loss_mbs = loss_mbs / accumulate_steps
-                        if args.use_pure_fp16:
-                            scaler.scale(loss_mbs).backward()
-                        else:
-                            loss_mbs.backward()
-                        loss = loss + loss_mbs
+        # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
+        # only dp_rank = 0 save model
+        if (global_step % args.save_steps == 0 or global_step >= args.max_steps) and dp_rank == 0:
 
-                    if args.sharding_stage in [2, 3] and args.dp_degree > 1:
-                        fused_allreduce_gradients(model.parameters(), hcg)
-                        if args.sharding_stage == 3:
-                            for p in model.parameters():
-                                if hasattr(p, "bw_storage"):
-                                    assert p.grad is None, "This case shouldn't happen."
-                                    p.bw_storage.scale_(1.0 / dp_group.nranks)
-                                    paddle.distributed.all_reduce(p.bw_storage, group=dp_group)
+            model_to_save = (
+                model._layers
+                if paddle.distributed.get_world_size() > 1 and args.sharding_stage not in [2, 3]
+                else model
+            )
 
-                    if args.use_pure_fp16:
-                        if args.sharding_stage in [2, 3]:
-                            scaler.step(optimizer)
-                            scaler.update()
-                        else:
-                            scaler.minimize(optimizer, loss)
-                    else:
-                        optimizer.step()
+            if args.sharding_stage == 3:
+                # If parameter need to convert to cpu, please add convert2cpu=True
+                model_to_save.get_all_parameters(convert2cpu=True)
 
-                    if lr_scheduler is not None:
-                        lr_scheduler.step()
-
-                    optimizer.clear_grad()
-
+            while hasattr(model_to_save, "_layers") or hasattr(model_to_save, "_layer"):
+                if hasattr(model_to_save, "_layers"):
+                    model_to_save = model_to_save._layers
                 else:
-                    data = [(tokens, position_ids), (labels, loss_mask)]
-                    with paddle.amp.auto_cast(
-                        args.use_pure_fp16,
-                        custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
-                        custom_white_list=["fused_attention", "fused_feedforward"],
-                        level="O2",
-                    ):
-                        loss = model.train_batch(
-                            data,
-                            optimizer=optimizer,
-                            lr_scheduler=lr_scheduler,
-                            scaler=scaler if args.use_pure_fp16 else None,
-                        )
+                    model_to_save = model_to_save._layer
 
-                # Sync for profile time, delete it may be a little faster
-                paddle.device.cuda.synchronize()
-                train_run_cost += time.time() - train_start
-                # Profile for model benchmark
-                profiler.add_profiler_step(args.profiler_options)
+            if config.mp_degree == 1 and config.pp_degree == 1:
+                output_dir = os.path.join(args.output_dir, str(global_step))
+            else:
+                output_dir = os.path.join(args.output_dir, str(global_step), model_path)
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info("Save model to %s" % output_dir)
 
-                if global_step % args.logging_freq == 0:
-                    avg_loss = loss.numpy()
-                    speed = args.logging_freq / (train_reader_cost + train_run_cost)
-                    avg_reader_cost = train_reader_cost / args.logging_freq
+            # tokenizer only need to save on one node
+            if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
+                tokenizer.save_pretrained(output_dir)
 
-                    logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (
-                            global_step,
-                            epoch,
-                            step,
-                            avg_loss,
-                            avg_reader_cost,
-                            1.0 / speed,
-                            speed,
-                            speed * default_global_tokens_num,
-                            speed * default_global_tokens_num / nranks,
-                            optimizer.get_lr(),
-                        )
-                    )
-                    log_writer.add_scalar("loss", float(loss), global_step)
-                    log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
+            # paramerters is the same in sharding group
+            if sharding_rank == 0 and dp_rank == 0:
+                if isinstance(model_to_save, PretrainedModel):
+                    model_to_save.save_pretrained(output_dir)
+                else:
+                    logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
+                    state_dict = model_to_save.state_dict()
+                    paddle.save(state_dict, os.path.join(output_dir, WEIGHTS_NAME))
 
-                    # tic_train = time.time()
-                    train_reader_cost = 0.0
-                    train_run_cost = 0.0
+            # ckpt optimizer weight should save on echo sharding rank
+            if dp_rank == 0:
+                paddle.save(
+                    optimizer.state_dict(),
+                    os.path.join(
+                        output_dir,
+                        OPTIMIZER_NAME,
+                    ),
+                )
 
-                if args.check_accuracy:
-                    if global_step >= args.max_steps:
-                        return
-                    else:
-                        continue
+            if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
+                _rotate_checkpoints(args.save_total_limit, output_dir=args.output_dir)
 
-                if global_step % args.eval_freq == 0:
-                    # Since the valid data broardcast to all devices, we do evaluate on all device.
-                    run_evaluate(
-                        args,
-                        valid_data_loader,
-                        model,
-                        criterion,
-                        args.eval_iters,
-                        log_writer,
-                        global_step,
-                        epoch,
-                        "valid",
-                    )
+        if global_step >= args.max_steps:
+            return
 
-                # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
-                # only dp_rank = 0 save model
-                if (global_step % args.save_steps == 0 or global_step >= args.max_steps) and dp_rank == 0:
-
-                    model_to_save = (
-                        model._layers
-                        if paddle.distributed.get_world_size() > 1 and args.sharding_stage not in [2, 3]
-                        else model
-                    )
-                    output_dir = os.path.join(args.output_dir, "step_%d" % global_step)
-                    os.makedirs(output_dir, exist_ok=True)
-
-                    logger.info("Save model to %s" % output_dir)
-
-                    if args.pp_degree > 1:
-                        if mp_rank == 0 and sharding_rank == 0 and pp_rank == 0:
-                            tokenizer.save_pretrained(output_dir)
-                        model_to_save.save_state_dict(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(
-                                output_dir,
-                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".format(
-                                    mp_rank, sharding_rank, pp_rank
-                                ),
-                            ),
-                        )
-                    else:
-                        if args.sharding_stage == 3:
-                            # If parameter need to convert to cpu, please add convert2cpu=True
-                            model_to_save.get_all_parameters(convert2cpu=False)
-                        if mp_rank == 0 and sharding_rank == 0:
-                            tokenizer.save_pretrained(output_dir)
-                        model_to_save.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(
-                                output_dir,
-                                "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank),
-                            ),
-                        )
-
-                if global_step >= args.max_steps:
-                    run_evaluate(
-                        args,
-                        test_data_loader,
-                        model,
-                        criterion,
-                        args.test_iters,
-                        log_writer,
-                        global_step,
-                        epoch,
-                        "test",
-                    )
-                    logger.info("The training process is complete.")
-                    del train_data_loader
-                    return
-
-                reader_start = time.time()
-
-            del train_data_loader
+        reader_start = time.time()
 
 
 if __name__ == "__main__":
