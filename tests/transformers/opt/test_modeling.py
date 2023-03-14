@@ -14,16 +14,24 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
+import datetime
 import math
 import random
+import tempfile
 import unittest
 
 import numpy as np
 import paddle
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
-from paddlenlp.transformers import GPTTokenizer, OPTConfig, OPTForCausalLM, OPTModel
-from tests.testing_utils import PaddleNLPModelTest, slow
+from paddlenlp.transformers import (
+    OPTConfig,
+    OPTModel,
+    OPTForCausalLM,
+    GPTTokenizer,
+)
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -166,9 +174,9 @@ class OPTModelTester:
         model = OPTModel(config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
@@ -178,9 +186,9 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, use_cache=True)
-        model(input_ids, use_cache=False)
+        outputs = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        model(input_ids, use_cache=False, return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
 
@@ -192,8 +200,10 @@ class OPTModelTester:
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens, use_cache=True, cache=past)[0]
+        output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -213,7 +223,9 @@ class OPTModelTester:
         attn_mask[:, half_seq_length:] = -10000
 
         # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)[:2]
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
+            :2
+        ]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
@@ -231,8 +243,12 @@ class OPTModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
-        output_from_past = model(next_tokens, cache=past, use_cache=True, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(
+            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
@@ -247,8 +263,7 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
-
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
@@ -259,12 +274,17 @@ class OPTModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids, attention_mask=next_attention_mask)
+        output_from_no_past = model(
+            next_input_ids, attention_mask=next_attention_mask, return_dict=self.parent.return_dict
+        )
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(
             next_tokens,
             attention_mask=next_attention_mask,
             cache=past,
             use_cache=True,
+            return_dict=self.parent.return_dict,
         )[0]
         self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -283,9 +303,24 @@ class OPTModelTester:
         result = model(
             input_ids,
             use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
         )
 
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
+        model = OPTForCausalLM(config)
+
+        if self.parent.use_labels:
+            loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
+            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            loss.backward()
 
     def create_and_check_opt_weight_initialization(self, config, *args):
         model = OPTModel(config)
@@ -314,20 +349,21 @@ class OPTModelTester:
 
 
 @parameterized_class(
-    ("return_dict",),
+    ("return_dict", "use_labels"),
     [
-        [False],
-        [True],
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
     ],
 )
+
 class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     base_model_class = OPTModel
     use_labels = False
     return_dict = False
 
-    all_model_classes = [
-        OPTModel,
-    ]
+    all_model_classes = [OPTModel, ]
     all_generative_model_classes = {OPTForCausalLM: (OPTModel, "opt")}
     test_missing_keys = False
     test_model_parallel = True
@@ -395,6 +431,7 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
             use_cache=True,
         )
         batch_out_sentence = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        print("XXXXXXXZ: ", batch_out_sentence)
 
         inputs_non_padded = tokenizer(sentences[0], return_tensors="pd")["input_ids"]
         output_non_padded, _ = model.generate(
@@ -408,10 +445,7 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         padded_sentence = tokenizer.decode(output_padded[0], skip_special_tokens=True)
         print("padded_sentence: ", padded_sentence)
 
-        expected_output_sentence = [
-            " a rescue and she's the best dog ever. she's a little bitch but she's the best",
-            " am going to share with you a few of my favorite recipes.\nI have been cooking for a",
-        ]
+        expected_output_sentence =  [" a rescue and she's the best dog ever. she's a little bitch but she's the best", ' am going to share with you a few of my favorite recipes.\nI have been cooking for a']
         self.assertListEqual(expected_output_sentence, batch_out_sentence)
         self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
 
@@ -420,6 +454,7 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in OPT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = OPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
 
 
 class OPTModelIntegrationTest(unittest.TestCase):
@@ -437,9 +472,9 @@ class OPTModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [0.81907797, -1.08688772, 1.26071370],
-                    [0.96454084, -0.42267877, 1.70609033],
-                    [0.78616256, -0.27438506, 0.74083930],
+                    [ 0.81907797, -1.08688772,  1.26071370],
+                    [ 0.96454084, -0.42267877,  1.70609033],
+                    [ 0.78616256, -0.27438506,  0.74083930],
                 ]
             ]
         )
@@ -459,10 +494,11 @@ class OPTModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [1.79993951, 0.50285941, -0.86480486],
-                    [1.08661187, 0.09854298, -0.98229992],
-                    [1.53367269, -0.67371541, -1.04433393],
+                    [ 1.79993951,  0.50285941, -0.86480486],
+                    [ 1.08661187,  0.09854298, -0.98229992],
+                    [ 1.53367269, -0.67371541, -1.04433393],
                 ]
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
