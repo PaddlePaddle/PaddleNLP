@@ -14,24 +14,16 @@
 # limitations under the License.
 from __future__ import annotations
 
-import copy
-import datetime
 import math
 import random
-import tempfile
 import unittest
 
 import numpy as np
 import paddle
-from parameterized import parameterized, parameterized_class
+from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
-    OPTConfig,
-    OPTModel,
-    OPTForCausalLM,
-    GPTTokenizer,
-)
-from tests.testing_utils import PaddleNLPModelTest, require_package, slow
+from paddlenlp.transformers import GPTTokenizer, OPTConfig, OPTForCausalLM, OPTModel
+from tests.testing_utils import PaddleNLPModelTest, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -357,13 +349,14 @@ class OPTModelTester:
         [True, True],
     ],
 )
-
 class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     base_model_class = OPTModel
     use_labels = False
     return_dict = False
 
-    all_model_classes = [OPTModel, ]
+    all_model_classes = [
+        OPTModel,
+    ]
     all_generative_model_classes = {OPTForCausalLM: (OPTModel, "opt")}
     test_missing_keys = False
     test_model_parallel = True
@@ -444,7 +437,10 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         padded_sentence = tokenizer.decode(output_padded[0], skip_special_tokens=True)
         print("padded_sentence: ", padded_sentence)
 
-        expected_output_sentence =  [" a rescue and she's the best dog ever. she's a little bitch but she's the best", ' am going to share with you a few of my favorite recipes.\nI have been cooking for a']
+        expected_output_sentence = [
+            " a rescue and she's the best dog ever. she's a little bitch but she's the best",
+            " am going to share with you a few of my favorite recipes.\nI have been cooking for a",
+        ]
         self.assertListEqual(expected_output_sentence, batch_out_sentence)
         self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
 
@@ -453,7 +449,6 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in OPT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = OPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
-
 
 
 class OPTModelIntegrationTest(unittest.TestCase):
@@ -471,9 +466,9 @@ class OPTModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [ 0.81907797, -1.08688772,  1.26071370],
-                    [ 0.96454084, -0.42267877,  1.70609033],
-                    [ 0.78616256, -0.27438506,  0.74083930],
+                    [0.81907797, -1.08688772, 1.26071370],
+                    [0.96454084, -0.42267877, 1.70609033],
+                    [0.78616256, -0.27438506, 0.74083930],
                 ]
             ]
         )
@@ -493,11 +488,10 @@ class OPTModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [ 1.79993951,  0.50285941, -0.86480486],
-                    [ 1.08661187,  0.09854298, -0.98229992],
-                    [ 1.53367269, -0.67371541, -1.04433393],
+                    [1.79993951, 0.50285941, -0.86480486],
+                    [1.08661187, 0.09854298, -0.98229992],
+                    [1.53367269, -0.67371541, -1.04433393],
                 ]
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
