@@ -464,7 +464,7 @@ class GLMPretrainedModel(PretrainedModel):
                     fn, transpose=True, is_column=True, is_qkv=True
                 ),
                 # Row Linear
-                # "word_embeddings.weight": partial(fn, transpose=False, is_column=False, is_qkv=False),
+                "word_embeddings.weight": partial(fn, transpose=False, is_column=False, is_qkv=False),
                 # 'transformer.layers.0.attention.dense.bias',
                 "transformer.layers.0.attention.dense.weight": partial(
                     fn, transpose=True, is_column=False, is_qkv=False
@@ -536,6 +536,7 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
     # rank = hcg.get_model_parallel_rank()
 
     if world_size > 1:
+        # _c_identity is backwards is reduce
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
 
         logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
@@ -543,6 +544,7 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
         if parallel_output:
             return logits
 
+        # _c_concat has not grad backwards
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
         logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
@@ -566,11 +568,19 @@ class GLMModel(GLMPretrainedModel):
         super(GLMModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        self.word_embeddings = nn.Embedding(
-            config.vocab_size,
-            config.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-        )
+        if self.config.mp_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+
         self.transformer = GLMStack(config)
         self.apply(self.init_weights)
 
@@ -603,11 +613,12 @@ class GLMModel(GLMPretrainedModel):
 
         logits, hidden_layers = self.transformer(word_embeddings, position_ids, attention_mask, cache)
         if self.output_predict:
-            # if self.config.mp_degree > 1:
-            #     # logits = parallel_matmul(logits, self.word_embeddings.weight.T, True)
-            #     logits = parallel_matmul(logits, self.word_embeddings.weight.T, False)
-            # else:
-            logits = F.linear(logits, self.word_embeddings.weight.T)
+            if self.config.mp_degree > 1:
+                # FIXME: @ZHUI for not gather logits togather.
+                # logits = parallel_matmul(logits, self.word_embeddings.weight, True)
+                logits = parallel_matmul(logits, self.word_embeddings.weight, self.config.tensor_parallel_output)
+            else:
+                logits = F.linear(logits, self.word_embeddings.weight.T)
 
         if not return_dict:
             return (logits, hidden_layers)
@@ -646,13 +657,13 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         log_probs = paddle.stack(log_probs).squeeze(2)
         loss = None
         if labels is not None:
+            # FIXME: @ZHUI for not gather logits togather.
             if self.glm.config.mp_degree > 1:
-                self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-                loss = self.parallel_loss_fun(log_probs, labels)
-                loss = loss[labels != self.glm.config.pad_token_id]
-                loss = loss.mean()
-            else:
-                loss = F.cross_entropy(log_probs, labels)
+                assert (
+                    self.glm.config.tensor_parallel_output is False
+                ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
+
+            loss = F.cross_entropy(log_probs, labels)
 
         if not return_dict:
             output = (log_probs, lm_logits)
@@ -732,9 +743,16 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
 
         loss = None
         if labels is not None:
-            loss = F.cross_entropy(
-                lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
-            )
+            # FIXME: @ZHUI for not gather logits togather.
+            if self.glm.config.mp_degree > 1 and self.glm.config.tensor_parallel_output:
+                self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+                loss = self.parallel_loss_fun(lm_logits, labels)
+                loss = loss[labels != self.glm.config.pad_token_id]
+                loss = loss.mean()
+            else:
+                loss = F.cross_entropy(
+                    lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
+                )
 
         if not return_dict:
             output = (lm_logits, cache)

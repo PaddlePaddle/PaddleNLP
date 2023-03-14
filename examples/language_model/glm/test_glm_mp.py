@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+# import sys
 import unittest
 
 import numpy as np
@@ -21,11 +21,16 @@ import torch
 from test_parallel_dygraph_dataparallel import TestMultipleGpus
 
 
-class TestCkptShard(unittest.TestCase):
-    def setUp(self):
-        sys.path.insert(0, ".")
-        print("xxxxxx")
+class TestGLM(TestMultipleGpus):
+    # @unittest.skip("")
+    def testGlmMP(self):
+        self.run_2gpu("glm_mp.py")
 
+
+class TestCkptShard(unittest.TestCase):
+    # def setUp(self):
+    #     sys.path.insert(0, ".")
+    #     print("xxxxxx")
     def test_import(self):
         import inspect
 
@@ -39,18 +44,22 @@ class TestCkptShard(unittest.TestCase):
 
         model = AutoModel.from_pretrained("THUDM/glm-large-chinese", trust_remote_code=True)
         model.eval()
-        ret = model(input_ids=torch.arange(100, 110, dtype=torch.long).reshape(1, -1))
+        loss = model(input_ids=torch.arange(100, 110, dtype=torch.long).reshape(1, -1))
         # print(ret)
-        print("torch", ret.logits.abs().mean().item())
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.1089835166931152, rtol=1e-7)
+        print("torch", ret)
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def testPaddle(self):
         from paddlenlp.transformers import AutoModel
 
         model = AutoModel.from_pretrained("glm-large-chinese")
         model.eval()
-        ret = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
-        print("paddle", ret.logits.abs().mean().item())
+        loss = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.1089835166931152, rtol=1e-7)
+        print("paddle", ret)
 
     def test_qkv_convertor(self):
         """test_qkv_convertor"""
@@ -104,8 +113,3 @@ class TestCkptShard(unittest.TestCase):
         )
         model.eval()
         model()
-
-
-class TestGLM(TestMultipleGpus):
-    def testGlmMP(self):
-        self.run_2gpu("glm_mp.py")
