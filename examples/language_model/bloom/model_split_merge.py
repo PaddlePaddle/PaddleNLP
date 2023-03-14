@@ -58,6 +58,7 @@ def MergedKeys(num_layers):
 
     Row = [
         # "h.0.self_attention.dense.bias",
+        "word_embeddings.weight",
         "h.0.self_attention.dense.weight",
         "h.0.mlp.dense_4h_to_h.weight",
         # "h.0.mlp.dense_4h_to_h.bias"
@@ -75,7 +76,6 @@ def MergedKeys(num_layers):
                 res[v.replace("h.0.", f"h.{i}.")] = "row"
         else:
             res[v] = "row"
-
     return res
 
 
