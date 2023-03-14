@@ -47,6 +47,7 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
         "unk_token_id": 0,
         "vocab_size": 250880,
         "mp_degree": 1,
+        "pp_degree": 1,
         "mp_rank": -1,
         "use_recompute": False,
     }
@@ -118,6 +119,7 @@ class BloomConfig(PretrainedConfig):
         dtype="bfloat16",
         slow_but_exact=False,
         mp_degree=1,
+        pp_degree=1,
         mp_rank=0,
         use_recompute=False,
         **kwargs,
@@ -141,6 +143,7 @@ class BloomConfig(PretrainedConfig):
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
         self.mp_degree = mp_degree
+        self.pp_degree = mp_degree
         self.mp_rank = mp_rank
         self.use_recompute = use_recompute
 

@@ -58,6 +58,7 @@ def MergedKeys(num_layers):
 
     Row = [
         # "h.0.self_attention.dense.bias",
+        "word_embeddings.weight",
         "h.0.self_attention.dense.weight",
         "h.0.mlp.dense_4h_to_h.weight",
         # "h.0.mlp.dense_4h_to_h.bias"
@@ -75,7 +76,6 @@ def MergedKeys(num_layers):
                 res[v.replace("h.0.", f"h.{i}.")] = "row"
         else:
             res[v] = "row"
-
     return res
 
 
@@ -179,7 +179,6 @@ def merge_model_parallel(model_name_or_path, config, as_float32=False):
     # Merge the state_dict
     final_weight = copy.deepcopy(state_dict_list[0])
     merged_keys = MergedKeys(config.n_layer)
-    print(state_dict_list[0].keys())
     for k, func_name in merged_keys.items():
         func = merge_columns if "col" == func_name else merge_rows
         k = "{}.{}".format(config.model_type, k)
