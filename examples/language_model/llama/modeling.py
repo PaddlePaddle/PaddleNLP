@@ -22,11 +22,12 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.nn import CrossEntropyLoss
 
-from ..model_outputs import (
+from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from ..model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
 from .configuration import LLaMAConfig
 
 __all__ = [
@@ -44,12 +45,15 @@ class RMSNorm(nn.Layer):
         )
         self.variance_epsilon = eps
 
-    def _norm(self, x):
-        return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.variance_epsilon)
-
     def forward(self, hidden_states):
-        output = self._norm(hidden_states).astype(dtype=hidden_states.dtype)
-        return output * self.weight
+        variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
+
+        output = self.weight * hidden_states
+        default_type = paddle.get_default_dtype()
+        if default_type != "float32":
+            output = output.astype(default_type)
+        return output
 
 
 class RotaryEmbedding(nn.Layer):
@@ -78,8 +82,8 @@ class RotaryEmbedding(nn.Layer):
             self.cos_cached = emb.cos()[None, None, :, :]
             self.sin_cached = emb.sin()[None, None, :, :]
         return (
-            self.cos_cached[:seq_len, ...],
-            self.sin_cached[:seq_len, ...],
+            self.cos_cached[:, :, :seq_len, ...],
+            self.sin_cached[:, :, :seq_len, ...],
         )
 
 
@@ -214,7 +218,9 @@ class LLaMAAttention(nn.Layer):
                 )
             attn_weights = attn_weights + attention_mask
 
-        attn_weights = F.softmax(attn_weights, axis=-1, dtype=query_states.dtype)
+        # Upcast attention to fp32
+        attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+
         attn_output = paddle.matmul(attn_weights, value_states)
 
         if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
@@ -311,15 +317,16 @@ class LLaMAPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.config.initializer_range
-                        if hasattr(self.config, "initializer_range")
-                        else self.llama.config.initializer_range,
-                        shape=layer.weight.shape,
-                    )
+                paddle.set_default_dtype("float32")
+                x = paddle.tensor.normal(
+                    mean=0.0,
+                    std=self.config.initializer_range
+                    if hasattr(self.config, "initializer_range")
+                    else self.llama.config.initializer_range,
+                    shape=layer.weight.shape,
                 )
+                layer.weight.set_value(x.astype("float16"))
+                paddle.set_default_dtype("float16")
 
 
 @register_base_model
@@ -344,7 +351,7 @@ class LLaMAModel(LLaMAPretrainedModel):
         self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
         # Initialize weights and apply final processing
-        self.apply(self.init_weights)
+        # self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -440,7 +447,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
 
         # Initialize weights and apply final processing
-        self.apply(self.init_weights)
+        # self.apply(self.init_weights)
 
     def forward(
         self,
@@ -451,7 +458,6 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         inputs_embeds=None,
         labels=None,
         use_cache=None,
-        cache=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
@@ -468,7 +474,6 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
-            cache=cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

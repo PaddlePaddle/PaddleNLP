@@ -14,7 +14,7 @@
 # limitations under the License.
 """ MBart model configuration"""
 
-from ..configuration_utils import PretrainedConfig
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
     "LLAMA_PRETRAINED_INIT_CONFIGURATION",
@@ -24,17 +24,18 @@ __all__ = [
 
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
     "llama-7b": {
-        "vocab_size": 32000,
         "hidden_size": 4096,
-        "n_layer": 32,
-        "n_head": 32,
-        "multiple_of": 256,
-        "layer_norm_epsilon": 1e-6,
         "initializer_range": 0.02,
-        "hidden_dropout": 0.1,
-        "attention_dropout": 0.1,
-        "max_seq_len": 512,
-        "max_batch_size": 32,
+        "intermediate_size": 11008,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 32,
+        "num_hidden_layers": 32,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 0,
+        "eos_token_id": 1,
+        "pad_token_id": -1,
     },
 }
 
@@ -120,4 +121,9 @@ class LLaMAConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
 
-        super().__init__(**kwargs)
+        super().__init__(
+            pad_token_id=pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            **kwargs,
+        )

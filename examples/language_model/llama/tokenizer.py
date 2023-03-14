@@ -19,8 +19,8 @@ from typing import Optional, Tuple
 
 import sentencepiece as spm
 
-from ...utils.log import logger
-from .. import PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.utils.log import logger
 
 __all__ = ["LLaMATokenizer"]
 
@@ -42,10 +42,10 @@ class LLaMATokenizer(PretrainedTokenizer):
     def __init__(
         self,
         vocab_file,
-        bos_token="<s>",
-        eos_token="</s>",
-        cls_token="<s>",
-        unk_token="<unk>",
+        bos_token="",
+        eos_token="",
+        cls_token="",
+        unk_token="",
         add_bos_token=True,
         add_eos_token=False,
         sp_model_kwargs=None,
