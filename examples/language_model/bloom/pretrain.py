@@ -67,8 +67,7 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
             level="O2",
         ):
             tokens, loss_mask, position_ids, labels = batch
-            preds = model(tokens, position_ids)
-            loss = criterion(preds, labels, loss_mask)
+            loss = model(tokens, position_ids, labels, loss_mask)
 
         all_loss.append(float(loss))
 
@@ -199,9 +198,6 @@ def do_train(args):
     config["use_cache"] = False
     config["enable_fuse_transformer"] = False
     model = BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)
-
-    # Create the critrion for the gpt model
-    criterion = BloomPretrainingCriterion()
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
@@ -344,8 +340,7 @@ def do_train(args):
             custom_white_list=["fused_attention", "fused_feedforward"],
             level="O2",
         ):
-            preds = model(tokens, position_ids)
-            loss = criterion(preds, labels, loss_mask)
+            loss = model(tokens, position_ids, labels, loss_mask)
 
         if args.accumulate_steps > 1:
             tr_loss_step = loss / args.accumulate_steps
@@ -418,7 +413,7 @@ def do_train(args):
 
         if global_step % args.eval_freq == 0:
             # Since the valid data broardcast to all devices, we do evaluate on all device.
-            run_evaluate(args, valid_data_loader, model, criterion, args.eval_iters, log_writer, global_step, "valid")
+            run_evaluate(args, valid_data_loader, model, args.eval_iters, log_writer, global_step, "valid")
 
         # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
         # only dp_rank = 0 save model
