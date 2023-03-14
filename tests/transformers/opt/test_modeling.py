@@ -431,7 +431,6 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
             use_cache=True,
         )
         batch_out_sentence = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        print("XXXXXXXZ: ", batch_out_sentence)
 
         inputs_non_padded = tokenizer(sentences[0], return_tensors="pd")["input_ids"]
         output_non_padded, _ = model.generate(
