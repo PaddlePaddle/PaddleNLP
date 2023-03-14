@@ -15,7 +15,7 @@
 
 ```
 python -m paddle.distributed.launch --gpus "0,1,2,3" run_train.py \
---model_name_or_path glm-2b \
+--model_name_or_path THUDM/glm-2b \
 --num_train_epochs 4 \
 --learning_rate 3e-5 \
 --warmup_ratio 0.06 \
@@ -44,7 +44,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_train.py \
 
 其中参数释义如下：
 
-- `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`glm-2b`。
+- `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`THUDM/glm-2b`。
 - `src_length`: 上下文的最大输入长度，默认为608.
 - `tgt_length`: 生成文本的最大长度，默认为160.
 - `min_tgt_length`: 生成文本的最小长度，默认为55.
