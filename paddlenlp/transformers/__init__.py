@@ -86,6 +86,7 @@ from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
 from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
+from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *

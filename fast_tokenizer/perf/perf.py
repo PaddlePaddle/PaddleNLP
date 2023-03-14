@@ -17,14 +17,10 @@ import time
 
 import tensorflow as tf
 import tensorflow_text as tf_text
-
-import paddle
-import paddlenlp
-from paddlenlp.transformers import BertTokenizer
-from paddlenlp.experimental import FastTokenizer
-from paddlenlp.experimental import to_tensor
-
 from transformers import AutoTokenizer
+
+from paddlenlp.experimental import FastTokenizer, to_tensor
+from paddlenlp.transformers import BertTokenizer
 
 parser = argparse.ArgumentParser()
 
