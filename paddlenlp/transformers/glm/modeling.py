@@ -81,9 +81,9 @@ class GLMAttention(nn.Layer):
         outputs = paddle.transpose(outputs, [0, 2, 1, 3])
         return outputs
 
-    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool = False, cache: Tensor = None):
+    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         query_length = hidden_states.shape[1]
-        if use_cache is False or cache is None:
+        if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
         else:
@@ -125,11 +125,9 @@ class GLMAttention(nn.Layer):
         output = self.dense(context_layer)
         output = self.output_dropout(output)
 
-        output = [output]
-        if use_cache:
-            output.append(cache)
+        output = (output, cache)
 
-        return output[0] if len(output) == 1 else tuple(output)
+        return output
 
 
 class GLMBlock(nn.Layer):
@@ -145,17 +143,15 @@ class GLMBlock(nn.Layer):
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.mlp = GPT2MLP(config)
 
-    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool = False, cache: Tensor = None):
+    def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
-        if use_cache and cache is not None:
+        if cache is not None:
             cache = self.input_layernorm(cache)
         else:
             cache = None
         # Self attention
-        attention_output = self.attention(layernorm_output, ltor_mask, use_cache, cache)
-        if use_cache:
-            attention_output, cache = attention_output
+        attention_output, cache = self.attention(layernorm_output, ltor_mask, cache)
         # Residual connection
         layernorm_input = hidden_states + attention_output
         # Layernorm after attention
@@ -165,8 +161,7 @@ class GLMBlock(nn.Layer):
         # Second residual connection
         output = layernorm_input + mlp_output
 
-        output = tuple(v for v in [output, cache] if v is not None)
-        return output[0] if len(output) == 1 else output
+        return (output, cache)
 
 
 class GPT2MLP(nn.Layer):
@@ -232,16 +227,14 @@ class GLMStack(nn.Layer):
         self.final_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
 
     @paddle.jit.not_to_static
-    def recompute_training(
-        self, layer_module: nn.Layer, hidden_states: Tensor, ltor_mask: Tensor, use_cache: bool, cache: Tensor
-    ):
+    def recompute_training(self, layer_module: nn.Layer, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor):
         def create_custom_forward(module):
             def custom_forward(*inputs):
                 return module(*inputs)
 
             return custom_forward
 
-        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, ltor_mask, use_cache, cache)
+        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, ltor_mask, cache)
         return hidden_states
 
     def forward(
@@ -249,7 +242,6 @@ class GLMStack(nn.Layer):
         hidden_states: Tensor,
         position_ids: Tensor,
         attention_mask: Tensor,
-        use_cache: bool = False,
         cache: Optional[Tensor] = None,
         return_dict: bool = False,
     ):
@@ -297,28 +289,25 @@ class GLMStack(nn.Layer):
             hidden_states = hidden_states + block_position_embeddings
         hidden_states = self.embedding_dropout(hidden_states)
 
-        new_caches = [hidden_states.detach()] if use_cache else None
+        new_caches = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
-            mem_i = cache[i] if use_cache and cache else None
+            mem_i = cache[i] if cache is not None else None
 
             if self.enable_recompute:
-                hidden_states = self.recompute_training(layer, hidden_states, attention_mask, use_cache, cache=mem_i)
+                hidden_states = self.recompute_training(layer, hidden_states, attention_mask, cache=mem_i)
             else:
-                hidden_states = layer(hidden_states, attention_mask, use_cache, cache=mem_i)
+                hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
 
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
 
-            if use_cache:
-                new_caches.append(hidden_states.detach())
+            new_caches.append(hidden_states.detach())
 
         output = self.final_layernorm(hidden_states)
-        if use_cache:
-            new_caches = self.update_memories(new_caches, cache)
+        new_caches = self.update_memories(new_caches, cache)
 
         if not return_dict:
-            output = tuple(v for v in [output, new_caches] if v is not None)
-            return output[0] if len(output) == 1 else output
+            return (output, new_caches)
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
@@ -459,7 +448,6 @@ class GLMModel(GLMPretrainedModel):
         input_ids: Tensor = None,
         position_ids: Tensor = None,
         attention_mask: Tensor = None,
-        use_cache: bool = False,
         cache: Tensor = None,
         return_dict: bool = None,
     ):
@@ -475,7 +463,7 @@ class GLMModel(GLMPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.zeros([batch_size])
 
-        output = self.transformer(word_embeddings, position_ids, attention_mask, use_cache, cache, return_dict)
+        output = self.transformer(word_embeddings, position_ids, attention_mask, cache, return_dict)
         if return_dict:
             logits = output.last_hidden_state
         else:
@@ -567,7 +555,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         position_ids: Tensor = None,
         attention_mask: Tensor = None,
         cache: Tensor = None,
-        use_cache: bool = None,
         **kwargs
     ):
         seq_length = input_ids.shape[1]
@@ -596,20 +583,14 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         attention_mask: Tensor = None,
         labels: Tensor = None,
         cache: Tensor = None,
-        use_cache: bool = False,
         return_dict: bool = None,
         loss_mask: Tensor = None,
     ):
-        model_output = self.glm(
-            input_ids, position_ids, attention_mask, use_cache=use_cache, cache=cache, return_dict=return_dict
-        )
+        model_output = self.glm(input_ids, position_ids, attention_mask, cache=cache, return_dict=return_dict)
         if return_dict:
             lm_logits, cache = model_output.last_hidden_state, model_output.past_key_values
         else:
-            if isinstance(model_output, tuple):
-                lm_logits, cache = model_output
-            else:
-                lm_logits, cache = model_output, None
+            lm_logits, cache = model_output
 
         loss = None
         if labels is not None:
