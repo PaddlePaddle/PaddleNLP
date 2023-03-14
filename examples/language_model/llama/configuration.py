@@ -33,9 +33,9 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 32,
         "rms_norm_eps": 1e-06,
         "vocab_size": 32000,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "pad_token_id": -1,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
     },
 }
 

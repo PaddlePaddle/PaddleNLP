@@ -19,6 +19,7 @@ from typing import Optional, Tuple
 
 import paddle
 import paddle.nn.functional as F
+from configuration import LLaMAConfig
 from paddle import nn
 from paddle.nn import CrossEntropyLoss
 
@@ -27,8 +28,6 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
-
-from .configuration import LLaMAConfig
 
 __all__ = [
     "LLaMAModel",
@@ -317,16 +316,17 @@ class LLaMAPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                paddle.set_default_dtype("float32")
-                x = paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range
-                    if hasattr(self.config, "initializer_range")
-                    else self.llama.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-                layer.weight.set_value(x.astype("float16"))
-                paddle.set_default_dtype("float16")
+                # TODO(linjieccc): enable after normal support fp16
+                if paddle.get_default_dtype() not in ["float16"]:
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range
+                            if hasattr(self.config, "initializer_range")
+                            else self.llama.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
+                    )
 
 
 @register_base_model
@@ -351,7 +351,7 @@ class LLaMAModel(LLaMAPretrainedModel):
         self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
         # Initialize weights and apply final processing
-        # self.apply(self.init_weights)
+        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -447,7 +447,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
 
         # Initialize weights and apply final processing
-        # self.apply(self.init_weights)
+        self.apply(self.init_weights)
 
     def forward(
         self,

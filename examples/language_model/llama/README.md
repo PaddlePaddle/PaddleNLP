@@ -1,12 +1,54 @@
 # LLaMA inplementation
 
-## 权重转换
+**目录**
+- [1. 模型下载及权重转换](#1)
+- [2. 微调](#2)
+- [3. 动转静](#3)
+- [4. 推理](#4)
+
+<a name="1"></a>
+
+## 模型下载及权重转换
+
+[LLaMA](https://ai.facebook.com/blog/large-language-model-llama-meta-ai/) ([arXiv](https://arxiv.org/abs/2302.13971v1)) Paddle实现，填写 [google form](https://forms.gle/jk851eBVbX1m5TAv5) 申请获得模型下载权限。
+
+通过以下方式获得paddle模型权重：
 
 ```shell
-python paddlenlp/transformers/llama/convert_llama_weights_to_pd.py \
+python convert_llama_weights_to_pd.py \
     --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir /output/path
 ```
 
-## Infer generation
+模型加载：
 
-## Finetune
+```python
+from tokenizer import LLaMATokenizer
+from modeling import LLaMAForCausalLM
+
+tokenizer = LLaMATokenizer.from_pretrained("./llama-7b/")
+model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
+```
+
+<a name="2"></a>
+
+## 微调
+
+```shell
+python infer_generation.py
+```
+
+<a name="3"></a>
+
+## 动转静
+
+```shell
+python export_generation_model.py
+```
+
+<a name="4"></a>
+
+## 推理
+
+```shell
+python finetune_glue.py
+```

@@ -73,6 +73,7 @@ def write_model(model_path, input_base_path, model_size):
     os.makedirs(model_path, exist_ok=True)
 
     params = read_json(os.path.join(input_base_path, "params.json"))
+    num_shards = NUM_SHARDS[model_size]
     n_layers = params["n_layers"]
     n_heads = params["n_heads"]
     dim = params["dim"]
@@ -86,6 +87,18 @@ def write_model(model_path, input_base_path, model_size):
 
     # Load weights
     loaded = load_torch(os.path.join(input_base_path, "consolidated.00.pth"))
+
+    # Load weights
+    if model_size == "7B":
+        # Not shared
+        # (The sharded implementation would also work, but this is simpler.)
+        loaded = load_torch(os.path.join(input_base_path, "consolidated.00.pth"))
+    else:
+        # Sharded
+        loaded = [
+            load_torch(os.path.join(input_base_path, f"consolidated.{i:02d}.pth"), map_location="cpu")
+            for i in range(num_shards)
+        ]
 
     for k, v in loaded.items():
         loaded[k] = paddle.to_tensor(v)
@@ -132,8 +145,9 @@ def write_model(model_path, input_base_path, model_size):
 
     config_out = {
         "architectures": ["LLaMAForCausalLM"],
-        "bos_token_id": 0,
-        "eos_token_id": 1,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
         "hidden_size": params["dim"],
         "intermediate_size": INTERMEDIATE_SIZE_MAP[model_size],
         "initializer_range": 0.02,
@@ -141,7 +155,6 @@ def write_model(model_path, input_base_path, model_size):
         "model_type": "llama",
         "num_attention_heads": params["n_heads"],
         "num_hidden_layers": params["n_layers"],
-        "pad_token_id": -1,
         "rms_norm_eps": params["norm_eps"],
         "use_cache": True,
         "vocab_size": 32000,
@@ -161,6 +174,7 @@ def write_tokenizer(tokenizer_path, input_tokenizer_path):
             "eos_token": "</s>",
             "cls_token": "<s>",
             "unk_token": "<unk>",
+            "pad_token": "<unk>",
             "add_bos_token": True,
             "add_eos_token": False,
             "tokenizer_class": "LLaMATokenizer",
