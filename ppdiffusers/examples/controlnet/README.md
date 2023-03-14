@@ -25,6 +25,13 @@ python gradio_canny2image.py
 ```
 ![image](https://user-images.githubusercontent.com/20476674/222131385-0dfaa370-fb11-4b2b-9ef5-36143557578b.png)
 
+## Hed to Image
+采用Hed边缘检测图片作为控制条件。
+```
+python gradio_hed2image.py
+```
+![image](https://user-images.githubusercontent.com/20476674/223642261-d5bdbd83-06f9-459b-8224-486f2235f7a6.png)
+
 
 ## Pose to Image
 采用OpenPose姿态图片作为控制条件。

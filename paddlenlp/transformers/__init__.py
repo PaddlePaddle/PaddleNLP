@@ -45,6 +45,7 @@ from .roberta.tokenizer import *
 from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
+from .electra.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -180,6 +181,7 @@ from .artist.tokenizer import *
 from .artist.configuration import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .dallebart.configuration import *
 from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *
@@ -197,6 +199,9 @@ from .gptj.tokenizer import *
 from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .glm.configuration import *
+from .glm.modeling import *
+from .glm.tokenizer import *
 from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
@@ -210,3 +215,4 @@ if is_fast_tokenizer_available():
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
     from .ernie_m.fast_tokenizer import *
+    from .nystromformer.fast_tokenizer import *
