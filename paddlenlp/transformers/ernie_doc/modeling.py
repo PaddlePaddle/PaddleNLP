@@ -50,7 +50,7 @@ class MultiHeadAttention(nn.Layer):
         self,
         d_key,
         d_value,
-        hidden_size,
+        d_model,
         n_head=1,
         r_w_bias=None,
         r_r_bias=None,
@@ -62,17 +62,17 @@ class MultiHeadAttention(nn.Layer):
         super(MultiHeadAttention, self).__init__()
         self.d_key = d_key
         self.d_value = d_value
-        self.hidden_size = hidden_size
+        self.d_model = d_model
         self.n_head = n_head
 
-        assert d_key * n_head == hidden_size, "hidden_size must be divisible by n_head"
+        assert d_key * n_head == d_model, "d_model must be divisible by n_head"
 
-        self.q_proj = nn.Linear(hidden_size, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.k_proj = nn.Linear(hidden_size, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.v_proj = nn.Linear(hidden_size, d_value * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.r_proj = nn.Linear(hidden_size, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.t_proj = nn.Linear(hidden_size, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.out_proj = nn.Linear(hidden_size, hidden_size, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.q_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.k_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.v_proj = nn.Linear(d_model, d_value * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.r_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.t_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.out_proj = nn.Linear(d_model, d_model, weight_attr=weight_attr, bias_attr=bias_attr)
         self.r_w_bias = r_w_bias
         self.r_r_bias = r_r_bias
         self.r_t_bias = r_t_bias
@@ -88,9 +88,9 @@ class MultiHeadAttention(nn.Layer):
 
         return q, k, v, r, t
 
-    def __split_heads(self, x, hidden_size, n_head):
+    def __split_heads(self, x, d_model, n_head):
         # x shape: [B, T, H]
-        x = x.reshape(shape=[0, 0, n_head, hidden_size // n_head])
+        x = x.reshape(shape=[0, 0, n_head, d_model // n_head])
         # shape: [B, N, T, HH]
         return paddle.transpose(x=x, perm=[0, 2, 1, 3])
 
@@ -157,8 +157,8 @@ class MultiHeadAttention(nn.Layer):
         q, k, v, r, t = self.__compute_qkv(queries, keys, values, rel_pos, rel_task)
 
         q_w, q_r, q_t = list(map(lambda x: q + x.unsqueeze([0, 1]), [self.r_w_bias, self.r_r_bias, self.r_t_bias]))
-        q_w, q_r, q_t = list(map(lambda x: self.__split_heads(x, self.hidden_size, self.n_head), [q_w, q_r, q_t]))
-        k, v, r, t = list(map(lambda x: self.__split_heads(x, self.hidden_size, self.n_head), [k, v, r, t]))
+        q_w, q_r, q_t = list(map(lambda x: self.__split_heads(x, self.d_model, self.n_head), [q_w, q_r, q_t]))
+        k, v, r, t = list(map(lambda x: self.__split_heads(x, self.d_model, self.n_head), [k, v, r, t]))
 
         ctx_multiheads = self.__scaled_dot_product_attention([q_w, q_r, q_t], k, v, r, t, attn_mask)
 
@@ -173,7 +173,7 @@ class ErnieDocEncoderLayer(nn.Layer):
         n_head,
         d_key,
         d_value,
-        hidden_size,
+        d_model,
         d_inner_hid,
         prepostprocess_dropout,
         attention_dropout,
@@ -205,7 +205,7 @@ class ErnieDocEncoderLayer(nn.Layer):
         self.attn = MultiHeadAttention(
             d_key,
             d_value,
-            hidden_size,
+            d_model,
             n_head,
             r_w_bias,
             r_r_bias,
@@ -215,13 +215,13 @@ class ErnieDocEncoderLayer(nn.Layer):
             bias_attr=bias_attrs[0],
         )
         self.ffn = PointwiseFFN(
-            d_inner_hid, hidden_size, relu_dropout, hidden_act, weight_attr=weight_attrs[1], bias_attr=bias_attrs[1]
+            d_inner_hid, d_model, relu_dropout, hidden_act, weight_attr=weight_attrs[1], bias_attr=bias_attrs[1]
         )
-        self.norm1 = nn.LayerNorm(hidden_size, epsilon=epsilon)
-        self.norm2 = nn.LayerNorm(hidden_size, epsilon=epsilon)
+        self.norm1 = nn.LayerNorm(d_model, epsilon=epsilon)
+        self.norm2 = nn.LayerNorm(d_model, epsilon=epsilon)
         self.dropout1 = nn.Dropout(prepostprocess_dropout, mode="upscale_in_train")
         self.dropout2 = nn.Dropout(prepostprocess_dropout, mode="upscale_in_train")
-        self.hidden_size = hidden_size
+        self.d_model = d_model
         self.epsilon = epsilon
         self.normalize_before = normalize_before
 

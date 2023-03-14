@@ -28,7 +28,6 @@ from ...transformers.test_tokenizer_common import (
 class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieDocTokenizer
-    # fast_tokenizer_class = ErnieFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True

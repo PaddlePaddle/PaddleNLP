@@ -70,7 +70,9 @@ class ErnieDocTokenizer(ErnieTokenizer):
         "ernie-doc-base-zh": {"do_lower_case": True},
     }
 
-    # max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = {
+        "ernie-doc-base-zh": 512,
+    }
 
     def __init__(
         self,
