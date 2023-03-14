@@ -16,6 +16,14 @@ from __future__ import annotations
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
+__all__ = [
+    "ERNIE_CTM_CONFIG",
+    "ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION",
+    "ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP",
+    "ErnieCtmConfig",
+]
+
+
 ERNIE_CTM_CONFIG = {
     "vocab_size": 23000,
     "embedding_size": 128,

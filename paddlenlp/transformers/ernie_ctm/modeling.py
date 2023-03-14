@@ -94,7 +94,7 @@ class ErnieCtmEmbeddings(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.cls_num = config.cls_num
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, inputs_embeds=None):
         if position_ids is None:
 
             content_len = paddle.shape(input_ids)[1] - self.cls_num
@@ -105,14 +105,17 @@ class ErnieCtmEmbeddings(Layer):
                 ]
             )
             position_ids.stop_gradient = True
+
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + token_type_embeddings + position_embeddings
+        embeddings = inputs_embeds + token_type_embeddings + position_embeddings
 
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -282,6 +285,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         token_type_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         content_clone=False,
         output_hidden_states=None,
         output_attentions=None,
@@ -325,6 +329,11 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value.
                 For example, "使用" as a word, "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
             content_clone (bool, optional):
                 Whether the `content_output` is clone from `sequence_output`. If set to `True`, the content_output is
                 clone from sequence_output, which may cause the classification task impact on the sequence labeling
@@ -378,6 +387,12 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         )
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
+        # check the variable of `input_ids` and `inputs_embeds`
+        if input_ids is None and inputs_embeds is None:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
@@ -389,7 +404,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids
+            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
         )
         embedding_output = self.embedding_hidden_mapping_in(embedding_output)
 
@@ -480,6 +495,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         lengths=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         tag_labels=None,
         output_hidden_states=None,
         output_attentions=None,
@@ -494,6 +510,8 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieCtmModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ErnieCtmModel`.
             lengths (Tensor, optional):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
@@ -547,6 +565,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=True,
@@ -620,6 +639,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
         token_type_ids=None,
         attention_mask=None,
         position_ids=None,
+        inputs_embeds=None,
         labels=None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -634,6 +654,8 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             attention_mask (Tensor, optional):
                 See :class:`ErnieCtmModel`.
             position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ErnieCtmModel`.
             output_hidden_states (bool, optional):
                 See :class:`ErnieCtmModel`.
@@ -674,6 +696,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
@@ -721,7 +744,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -731,6 +754,8 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieCtmModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ErnieCtmModel`.
 
         Returns:
@@ -753,7 +778,11 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
         """
 
         output = self.ernie_ctm(
-            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
         )
 
         sequence_output = output[0]
