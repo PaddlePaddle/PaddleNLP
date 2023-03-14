@@ -302,7 +302,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range")
-                        else self.ernie_doc.initializer_range,
+                        else self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
