@@ -15,10 +15,8 @@
 
 import argparse
 import os
-import random
-import datasets
+
 from datasets import load_dataset
-from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
 parser = argparse.ArgumentParser()
