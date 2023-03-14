@@ -81,7 +81,6 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         text_encoder: FastDeployRuntimeModel,
         tokenizer: CLIPTokenizer,
         unet: FastDeployRuntimeModel,
-        controlnet: FastDeployRuntimeModel,
         scheduler: Union[
             DDIMScheduler,
             PNDMScheduler,
@@ -120,7 +119,6 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
-            controlnet=controlnet,
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
@@ -133,8 +131,8 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         num_images_per_prompt,
         do_classifier_free_guidance,
         negative_prompt=None,
-        prompt_embeds: Optional[paddle.Tensor] = None,
-        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+        prompt_embeds: Optional[np.ndarray] = None,
+        negative_prompt_embeds: Optional[np.ndarray] = None,
     ):
         r"""
         Encodes the prompt into text encoder hidden states.
@@ -149,10 +147,10 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
                 `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
                 Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
-            prompt_embeds (`paddle.Tensor`, *optional*):
+            prompt_embeds (`np.ndarray`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
-            negative_prompt_embeds (`paddle.Tensor`, *optional*):
+            negative_prompt_embeds (`np.ndarray`, *optional*):
                 Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
                 weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
                 argument.
@@ -257,7 +255,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             has_nsfw_concept = None
         return image, has_nsfw_concept
 
-    def decode_latents_zero_copy(self, latents):
+    def decode_latents(self, latents):
         latents = 1 / 0.18215 * latents
         latents_shape = latents.shape
         vae_output_shape = [latents_shape[0], 3, latents_shape[2] * 8, latents_shape[3] * 8]
@@ -275,15 +273,6 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         images_vae = paddle.clip(images_vae / 2 + 0.5, 0, 1)
         images = images_vae.transpose([0, 2, 3, 1])
         return images.numpy()
-
-    def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
-        )
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose([0, 2, 3, 1])
-        return image
 
     def prepare_extra_step_kwargs(self, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
@@ -460,9 +449,9 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
         generator: Optional[np.random.RandomState] = None,
-        latents: Optional[paddle.Tensor] = None,
-        prompt_embeds: Optional[paddle.Tensor] = None,
-        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+        latents: Optional[np.ndarray] = None,
+        prompt_embeds: Optional[np.ndarray] = None,
+        negative_prompt_embeds: Optional[np.ndarray] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -480,9 +469,9 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
                 the type is is specified as `paddle.Tensor`, it is passed to ControlNet as is. PIL.Image.Image` can
                 also be accepted as an image. The control image is automatically resized to fit the output image.
-            height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+            height (`int`, *optional*, defaults to 512):
                 The height in pixels of the generated image.
-            width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+            width (`int`, *optional*, defaults to 512):
                 The width in pixels of the generated image.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
@@ -502,17 +491,16 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`torch.Generator` or `List[torch.Generator]`, *optional*):
-                One or a list of [torch generator(s)](https://pytorch.org/docs/stable/generated/torch.Generator.html)
-                to make generation deterministic.
-            latents (`paddle.Tensor`, *optional*):
+            generator (`np.random.RandomState`, *optional*):
+                A np.random.RandomState to make generation deterministic.
+            latents (`np.ndarray`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
                 tensor will ge generated by sampling using the supplied random `generator`.
-            prompt_embeds (`paddle.Tensor`, *optional*):
+            prompt_embeds (`np.ndarray`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
-            negative_prompt_embeds (`paddle.Tensor`, *optional*):
+            negative_prompt_embeds (`np.ndarray`, *optional*):
                 Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
                 weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
                 argument.
@@ -543,6 +531,17 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
+        if isinstance(controlnet_conditioning_scale, (float, int)):
+            controlnet_conditioning_scale = paddle.to_tensor([controlnet_conditioning_scale] * 13).cast(paddle.float32)
+        elif isinstance(controlnet_conditioning_scale, (list, tuple)):
+            controlnet_conditioning_scale = paddle.to_tensor(controlnet_conditioning_scale).cast(paddle.float32)
+        else:
+            raise ValueError(
+                f"`controlnet_conditioning_scale` has to be of type `float` or `int` or `list` or `tuple` but is {type(controlnet_conditioning_scale)}"
+            )
+
+        assert controlnet_conditioning_scale.shape[0] == 13
+
         # 0. Default height and width to image
         height, width = self._default_height_width(height, width, image)
 
@@ -585,10 +584,13 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
 
         if do_classifier_free_guidance:
             image = paddle.concat([image] * 2)
+            noise_pred_unet_batch_size = 2 * batch_size * num_images_per_prompt
+        else:
+            noise_pred_unet_batch_size = batch_size * num_images_per_prompt
 
         # 5. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        timesteps = self.scheduler.timesteps.cast(paddle.float32)
 
         # 6. Prepare latent variables
         num_channels_latents = 4
@@ -614,8 +616,15 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         )
         scheduler_support_kwagrs_step = self.check_var_kwargs_of_scheduler_func(self.scheduler.step)
 
+        unet_output_name = self.unet.model.get_output_info(0).name
+        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
+
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)
             for i, t in enumerate(timesteps):
+                noise_pred_unet = paddle.zeros(
+                    [noise_pred_unet_batch_size, 4, height // 8, width // 8], dtype=paddle.float32
+                )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 if scheduler_support_kwagrs_scale_input:
@@ -623,41 +632,19 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                out_controlnet = self.controlnet(
-                    sample=latent_model_input.numpy(),
-                    timestep=t.cast("float32").numpy(),
-                    encoder_hidden_states=prompt_embeds,
-                    controlnet_cond=image.numpy(),
-                )
-                down_block_res_samples, mid_block_res_sample = out_controlnet[:-1], out_controlnet[-1]
-
-                if isinstance(controlnet_conditioning_scale, (list, tuple)):
-                    down_block_res_samples = [
-                        down_block_res_sample * ccs
-                        for down_block_res_sample, ccs in zip(
-                            down_block_res_samples, controlnet_conditioning_scale[:-1]
-                        )
-                    ]
-                    mid_block_res_sample *= controlnet_conditioning_scale[-1]
-                else:
-                    down_block_res_samples = [
-                        down_block_res_sample * controlnet_conditioning_scale
-                        for down_block_res_sample in down_block_res_samples
-                    ]
-                    mid_block_res_sample *= controlnet_conditioning_scale
-
-                controlnet_residual_inputs = {"mid_block_additional_residual": mid_block_res_sample}
-                for i, down_block in enumerate(down_block_res_samples):
-                    controlnet_residual_inputs[self.unet.model.get_input_info(i + 3).name] = down_block
-
                 # predict the noise residual
-                noise_pred_unet = self.unet(
-                    sample=latent_model_input.numpy(),
-                    timestep=t.cast("float32").numpy(),
-                    encoder_hidden_states=prompt_embeds,
-                    **controlnet_residual_inputs,
-                )[0]
-                noise_pred_unet = paddle.to_tensor(noise_pred_unet)
+                self.unet.zero_copy_infer(
+                    prebinded_inputs={
+                        unet_input_names[0]: latent_model_input,
+                        unet_input_names[1]: t,
+                        unet_input_names[2]: prompt_embeds,
+                        unet_input_names[3]: image,
+                        unet_input_names[4]: controlnet_conditioning_scale,
+                    },
+                    prebinded_outputs={unet_output_name: noise_pred_unet},
+                    share_with_raw_ptr=True,
+                )
+
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
@@ -670,6 +657,9 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 else:
                     scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
                 latents = scheduler_output.prev_sample
+                if i == num_inference_steps - 1:
+                    # sync for accuracy it/s measure
+                    paddle.device.cuda.synchronize()
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
@@ -681,7 +671,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             has_nsfw_concept = None
         elif output_type == "pil":
             # 8. Post-processing
-            image = self.decode_latents(latents.numpy())
+            image = self.decode_latents(latents)
 
             # 9. Run safety checker
             image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
@@ -690,7 +680,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
         else:
             # 8. Post-processing
-            image = self.decode_latents(latents.numpy())
+            image = self.decode_latents(latents)
 
             # 9. Run safety checker
             image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)

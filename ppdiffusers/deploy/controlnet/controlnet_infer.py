@@ -15,20 +15,24 @@
 import os
 import time
 
+# isort: split
+import paddle
+
+# isort: split
+
 import cv2
 import fastdeploy as fd
 import numpy as np
-import paddle
 from fastdeploy import ModelFormat
 from PIL import Image
 
 from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
-    EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
     FastDeployStableDiffusionControlNetPipeline,
     PNDMScheduler,
+    PreconfigEulerAncestralDiscreteScheduler,
 )
 from ppdiffusers.utils import load_image
 
@@ -51,7 +55,6 @@ def parse_arguments():
     parser.add_argument(
         "--text_encoder_model_prefix", default="text_encoder", help="The file prefix of text_encoder model."
     )
-    parser.add_argument("--controlnet_model_prefix", default="controlnet", help="The file prefix of controlnet model.")
     parser.add_argument("--inference_steps", type=int, default=50, help="The number of unet inference steps.")
     parser.add_argument("--benchmark_steps", type=int, default=1, help="The number of performance benchmark steps.")
     parser.add_argument(
@@ -75,7 +78,7 @@ def parse_arguments():
         ],
         help="The inference runtime device of models.",
     )
-    parser.add_argument("--image_path", default="controlnet.png", help="The model directory of diffusion_model.")
+    parser.add_argument("--image_path", default="controlnet_bird.png", help="The output image path.")
     parser.add_argument("--use_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
@@ -214,7 +217,9 @@ def get_scheduler(args):
             steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
-        scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+        scheduler = PreconfigEulerAncestralDiscreteScheduler(
+            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", preconfig=True
+        )
     else:
         raise ValueError(f"Scheduler '{args.scheduler}' is not supportted right now.")
     return scheduler
@@ -230,7 +235,7 @@ if __name__ == "__main__":
         paddle_stream = None
     else:
         paddle.set_device(f"gpu:{device_id}")
-        paddle_stream = None  # paddle.device.cuda.current_stream(device_id).cuda_stream
+        paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
 
     # 1. Init scheduler
     scheduler = get_scheduler(args)
@@ -257,26 +262,6 @@ if __name__ == "__main__":
         }
     }
 
-    # ['sample',
-    # 'timestep',
-    # 'encoder_hidden_states',
-    # 'down_block_additional_residuals_0_0', [2, 320, sample_size, sample_size]
-    # 'down_block_additional_residuals_0_1', [2, 320, sample_size, sample_size]
-    # 'down_block_additional_residuals_0_2', [2, 320, sample_size, sample_size]
-
-    # 'down_block_additional_residuals_1_0', [2, 320, sample_size // 2, sample_size // 2]
-    # 'down_block_additional_residuals_1_1', [2, 640, sample_size // 2, sample_size // 2]
-    # 'down_block_additional_residuals_1_2', [2, 640, sample_size // 2, sample_size // 2]
-
-    # 'down_block_additional_residuals_2_0', [2, 640, sample_size // 4, sample_size // 4]
-    # 'down_block_additional_residuals_2_1', [2, 1280, sample_size // 4, sample_size // 4]
-    # 'down_block_additional_residuals_2_2', [2, 1280, sample_size // 4, sample_size // 4]
-
-    # 'down_block_additional_residuals_3_0', [2, 1280, sample_size // 8, sample_size // 8]
-    # 'down_block_additional_residuals_3_1', [2, 1280, sample_size // 8, sample_size // 8]
-    # 'down_block_additional_residuals_3_2', [2, 1280, sample_size // 8, sample_size // 8]
-
-    # 'mid_block_additional_residual']) [2, 1280, sample_size // 8, sample_size // 8]
     unet_dynamic_shape = {
         "sample": {
             "min_shape": [1, 4, sample_size, sample_size],
@@ -293,97 +278,15 @@ if __name__ == "__main__":
             "max_shape": [2, 77, 768],
             "opt_shape": [2, 77, 768],
         },
-        "mid_block_additional_residual": {
-            "min_shape": [1, 1280, sample_size // 8, sample_size // 8],
-            "max_shape": [2, 1280, sample_size // 8, sample_size // 8],
-            "opt_shape": [2, 1280, sample_size // 8, sample_size // 8],
-        },
-        # 0
-        "down_block_additional_residuals_0_0": {
-            "min_shape": [1, 320, sample_size, sample_size],
-            "max_shape": [2, 320, sample_size, sample_size],
-            "opt_shape": [2, 320, sample_size, sample_size],
-        },
-        "down_block_additional_residuals_0_1": {
-            "min_shape": [1, 320, sample_size, sample_size],
-            "max_shape": [2, 320, sample_size, sample_size],
-            "opt_shape": [2, 320, sample_size, sample_size],
-        },
-        "down_block_additional_residuals_0_2": {
-            "min_shape": [1, 320, sample_size, sample_size],
-            "max_shape": [2, 320, sample_size, sample_size],
-            "opt_shape": [2, 320, sample_size, sample_size],
-        },
-        # 1
-        "down_block_additional_residuals_1_0": {
-            "min_shape": [1, 320, sample_size // 2, sample_size // 2],
-            "max_shape": [2, 320, sample_size // 2, sample_size // 2],
-            "opt_shape": [2, 320, sample_size // 2, sample_size // 2],
-        },
-        "down_block_additional_residuals_1_1": {
-            "min_shape": [1, 640, sample_size // 2, sample_size // 2],
-            "max_shape": [2, 640, sample_size // 2, sample_size // 2],
-            "opt_shape": [2, 640, sample_size // 2, sample_size // 2],
-        },
-        "down_block_additional_residuals_1_2": {
-            "min_shape": [1, 640, sample_size // 2, sample_size // 2],
-            "max_shape": [2, 640, sample_size // 2, sample_size // 2],
-            "opt_shape": [2, 640, sample_size // 2, sample_size // 2],
-        },
-        # 2
-        "down_block_additional_residuals_2_0": {
-            "min_shape": [1, 640, sample_size // 4, sample_size // 4],
-            "max_shape": [2, 640, sample_size // 4, sample_size // 4],
-            "opt_shape": [2, 640, sample_size // 4, sample_size // 4],
-        },
-        "down_block_additional_residuals_2_1": {
-            "min_shape": [1, 1280, sample_size // 4, sample_size // 4],
-            "max_shape": [2, 1280, sample_size // 4, sample_size // 4],
-            "opt_shape": [2, 1280, sample_size // 4, sample_size // 4],
-        },
-        "down_block_additional_residuals_2_2": {
-            "min_shape": [1, 1280, sample_size // 4, sample_size // 4],
-            "max_shape": [2, 1280, sample_size // 4, sample_size // 4],
-            "opt_shape": [2, 1280, sample_size // 4, sample_size // 4],
-        },
-        # 3
-        "down_block_additional_residuals_3_0": {
-            "min_shape": [1, 1280, sample_size // 8, sample_size // 8],
-            "max_shape": [2, 1280, sample_size // 8, sample_size // 8],
-            "opt_shape": [2, 1280, sample_size // 8, sample_size // 8],
-        },
-        "down_block_additional_residuals_3_1": {
-            "min_shape": [1, 1280, sample_size // 8, sample_size // 8],
-            "max_shape": [2, 1280, sample_size // 8, sample_size // 8],
-            "opt_shape": [2, 1280, sample_size // 8, sample_size // 8],
-        },
-        "down_block_additional_residuals_3_2": {
-            "min_shape": [1, 1280, sample_size // 8, sample_size // 8],
-            "max_shape": [2, 1280, sample_size // 8, sample_size // 8],
-            "opt_shape": [2, 1280, sample_size // 8, sample_size // 8],
-        },
-    }
-    # ['sample', 'timestep', 'encoder_hidden_states', 'controlnet_cond'])
-    controlnet_dynamic_shape = {
-        "sample": {
-            "min_shape": [1, 4, sample_size, sample_size],
-            "max_shape": [2, 4, sample_size, sample_size],
-            "opt_shape": [2, 4, sample_size, sample_size],
-        },
-        "timestep": {
-            "min_shape": [1],
-            "max_shape": [1],
-            "opt_shape": [1],
-        },
-        "encoder_hidden_states": {
-            "min_shape": [1, 77, 768],
-            "max_shape": [2, 77, 768],
-            "opt_shape": [2, 77, 768],
-        },
         "controlnet_cond": {
-            "min_shape": [1, 3, sample_size * 8, sample_size * 8],
-            "max_shape": [2, 3, sample_size * 8, sample_size * 8],
-            "opt_shape": [2, 3, sample_size * 8, sample_size * 8],
+            "min_shape": [1, 3, resolution, resolution],
+            "max_shape": [2, 3, resolution, resolution],
+            "opt_shape": [2, 3, resolution, resolution],
+        },
+        "controlnet_conditioning_scale": {
+            "min_shape": [13],
+            "max_shape": [13],
+            "opt_shape": [13],
         },
     }
 
@@ -403,11 +306,7 @@ if __name__ == "__main__":
             args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-        start = time.time()
-        controlnet_runtime = create_ort_runtime(
-            args.model_dir, args.controlnet_model_prefix, args.model_format, device_id=device_id
-        )
-        print(f"Spend {time.time() - start : .2f} s to load controlnet model.")
+
     elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
         use_trt = True if args.backend == "paddle-tensorrt" else False
         # unet
@@ -419,19 +318,6 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id,
-            paddle_stream=paddle_stream,
-        )
-        print(f"Spend {time.time() - start : .2f} s to load unet model.")
-
-        # controlnet
-        start = time.time()
-        controlnet_runtime = create_paddle_inference_runtime(
-            args.model_dir,
-            args.controlnet_model_prefix,
-            use_trt,
-            controlnet_dynamic_shape,
-            use_fp16=args.use_fp16,
-            device_id=device_id,
             paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
@@ -477,15 +363,7 @@ if __name__ == "__main__":
             device_id=device_id,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-        start = time.time()
-        controlnet_runtime = create_trt_runtime(
-            args.model_dir,
-            args.controlnet_model_prefix,
-            args.model_format,
-            dynamic_shape=controlnet_dynamic_shape,
-            device_id=device_id,
-        )
-        print(f"Spend {time.time() - start : .2f} s to load controlnet model.")
+
     elif args.backend == "paddlelite":
         text_encoder_runtime = create_paddle_lite_runtime(
             args.model_dir, args.text_encoder_model_prefix, device=args.device, device_id=device_id
@@ -498,11 +376,6 @@ if __name__ == "__main__":
             args.model_dir, args.unet_model_prefix, device=args.device, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-        start = time.time()
-        controlnet_runtime = create_paddle_lite_runtime(
-            args.model_dir, args.controlnet_model_prefix, device=args.device, device_id=device_id
-        )
-        print(f"Spend {time.time() - start : .2f} s to load controlnet model.")
 
     pipe = FastDeployStableDiffusionControlNetPipeline(
         vae_encoder=None,
@@ -510,14 +383,13 @@ if __name__ == "__main__":
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
         tokenizer=tokenizer,
         unet=FastDeployRuntimeModel(model=unet_runtime),
-        controlnet=FastDeployRuntimeModel(model=controlnet_runtime),
         scheduler=scheduler,
         safety_checker=None,
         feature_extractor=None,
     )
-    image = load_image("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny.png")
-    image = np.array(image)
-
+    image = np.array(
+        load_image("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny.png")
+    )
     low_threshold = 100
     high_threshold = 200
 
@@ -528,13 +400,14 @@ if __name__ == "__main__":
     canny_image = canny_image.resize((resolution, resolution))
 
     prompt = "bird"
-
+    # warmup
     pipe(
         prompt=prompt,
         image=canny_image,
         num_inference_steps=10,
         height=resolution,
         width=resolution,
+        controlnet_conditioning_scale=1.0,
     )
 
     time_costs = []
@@ -548,6 +421,7 @@ if __name__ == "__main__":
             num_inference_steps=args.inference_steps,
             height=resolution,
             width=resolution,
+            controlnet_conditioning_scale=1.0,
         ).images
         latency = time.time() - start
         time_costs += [latency]

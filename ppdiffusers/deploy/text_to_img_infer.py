@@ -15,9 +15,12 @@
 import os
 import time
 
+# isort: split
+import paddle
+
+# isort: split
 import fastdeploy as fd
 import numpy as np
-import paddle
 from fastdeploy import ModelFormat
 
 from paddlenlp.trainer.argparser import strtobool

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# pip install fastdeploy-gpu-python==0.0.0 -f https://www.paddlepaddle.org.cn/whl/fastdeploy_nightly_build.html
 import argparse
 import os
 from pathlib import Path
@@ -20,17 +19,66 @@ from types import MethodType
 import paddle
 
 from ppdiffusers import (
+    ControlNetModel,
     FastDeployStableDiffusionControlNetPipeline,
     StableDiffusionControlNetPipeline,
+    UNet2DConditionModel,
 )
 from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
+
+
+class ControlNetWithUnetModel(paddle.nn.Layer):
+    def __init__(
+        self,
+        unet,
+        controlnet,
+    ):
+        super().__init__()
+        self.unet = unet
+        self.controlnet = controlnet
+
+    def forward(
+        self, sample, timestep, encoder_hidden_states, controlnet_cond, controlnet_conditioning_scale, return_dict=True
+    ):
+        down_block_res_samples, mid_block_res_sample = self.controlnet(
+            sample,
+            timestep,
+            encoder_hidden_states=encoder_hidden_states,
+            controlnet_cond=controlnet_cond,
+            return_dict=False,
+        )
+        down_block_res_samples = [
+            down_block_res_sample * ccs
+            for down_block_res_sample, ccs in zip(down_block_res_samples, controlnet_conditioning_scale[:-1])
+        ]
+        mid_block_res_sample *= controlnet_conditioning_scale[-1]
+
+        noise_pred = self.unet(
+            sample,
+            timestep,
+            encoder_hidden_states=encoder_hidden_states,
+            down_block_additional_residuals=down_block_res_samples,
+            mid_block_additional_residual=mid_block_res_sample,
+            return_dict=return_dict,
+        )
+        return noise_pred
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     model_path: str, output_path: str, sample: bool = False, height: int = None, width: int = None
 ):
+    unet_tmp = UNet2DConditionModel.from_pretrained(model_path, resnet_pre_temb_non_linearity=True, subfolder="unet")
+    controlnet_tmp = ControlNetModel.from_pretrained(
+        model_path, resnet_pre_temb_non_linearity=True, subfolder="controlnet"
+    )
+
     pipeline = StableDiffusionControlNetPipeline.from_pretrained(
-        model_path, safety_checker=None, feature_extractor=None, requires_safety_checker=False
+        model_path,
+        unet=unet_tmp,
+        controlnet=controlnet_tmp,
+        safety_checker=None,
+        feature_extractor=None,
+        requires_safety_checker=False,
     )
     output_path = Path(output_path)
     # calculate latent's H and W
@@ -57,60 +105,12 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     print(f"Save text_encoder model in {save_path} successfully.")
     del pipeline.text_encoder
 
-    # [2, 320, 64, 64]
-    # [2, 320, 64, 64]
-    # [2, 320, 64, 64]
-    # [2, 320, 32, 32]
-    # [2, 640, 32, 32]
-    # [2, 640, 32, 32]
-    # [2, 640, 16, 16]
-    # [2, 1280, 16, 16]
-    # [2, 1280, 16, 16]
-    # [2, 1280, 8, 8]
-    # [2, 1280, 8, 8]
-    # [2, 1280, 8, 8]
-    down_block_additional_residuals = []
-    sample_size = 64
-    for i, boc in enumerate(pipeline.unet.config.block_out_channels):
-        for j in range(3):
-            inputs = paddle.static.InputSpec(
-                shape=[None, None, sample_size, sample_size],
-                dtype="float32",
-                name=f"down_block_additional_residuals_{i}_{j}",
-            )
-            down_block_additional_residuals.append(inputs)
-        sample_size = sample_size // 2
+    # wrap unet + controlnet
+    new_unet = ControlNetWithUnetModel(unet=pipeline.unet, controlnet=pipeline.controlnet)
 
     # 2. Convert unet
     unet = paddle.jit.to_static(
-        pipeline.unet,
-        input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, unet_channels, latent_height, latent_width], dtype="float32", name="sample"
-            ),  # sample
-            paddle.static.InputSpec(shape=[1], dtype="float32", name="timestep"),  # timestep
-            paddle.static.InputSpec(
-                shape=[None, None, cross_attention_dim], dtype="float32", name="encoder_hidden_states"
-            ),  # encoder_hidden_states
-            None,  # class_labels
-            None,  # attention_mask
-            None,  # cross_attention_kwargs
-            down_block_additional_residuals,  # down_block_additional_residuals
-            paddle.static.InputSpec(
-                shape=[None, None, sample_size * 2, sample_size * 2],
-                dtype="float32",
-                name="mid_block_additional_residual",
-            ),  # mid_block_additional_residual
-        ],
-    )
-    save_path = os.path.join(args.output_path, "unet", "inference")
-    paddle.jit.save(unet, save_path)
-    print(f"Save unet model in {save_path} successfully.")
-    del pipeline.unet
-
-    # 2. Convert control net
-    controlnet = paddle.jit.to_static(
-        pipeline.controlnet,
+        new_unet,
         input_spec=[
             paddle.static.InputSpec(
                 shape=[None, unet_channels, latent_height, latent_width], dtype="float32", name="sample"
@@ -122,17 +122,19 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
             paddle.static.InputSpec(
                 shape=[None, vae_in_channels, height, width], dtype="float32", name="controlnet_cond"
             ),  # controlnet_cond
-            None,  # class_labels
-            None,  # attention_mask
-            None,  # cross_attention_kwargs
-            None,  # mid_block_additional_residual
-            False,  # return_dict
+            paddle.static.InputSpec(
+                shape=[len(pipeline.unet.config.block_out_channels) * 3 + 1],
+                dtype="float32",
+                name="controlnet_conditioning_scale",
+            ),  # controlnet_conditioning_scale
         ],
     )
-    save_path = os.path.join(args.output_path, "controlnet", "inference")
-    paddle.jit.save(controlnet, save_path)
-    print(f"Save controlnet model in {save_path} successfully.")
-    del pipeline.controlnet
+
+    save_path = os.path.join(args.output_path, "unet", "inference")
+    paddle.jit.save(unet, save_path)
+    print(f"Save unet model in {save_path} successfully.")
+    del pipeline.unet
+    del new_unet
 
     def forward_vae_encoder_mode(self, z):
         return self.encode(z, True).latent_dist.mode()
@@ -188,7 +190,6 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         vae_decoder=FastDeployRuntimeModel.from_pretrained(output_path / "vae_decoder"),
         text_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "text_encoder"),
         unet=FastDeployRuntimeModel.from_pretrained(output_path / "unet"),
-        controlnet=FastDeployRuntimeModel.from_pretrained(output_path / "controlnet"),
         tokenizer=pipeline.tokenizer,
         scheduler=pipeline.scheduler,
         safety_checker=None,
@@ -205,7 +206,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        required=True,
+        default="takuma104/control_sd15_canny",
         help="Path to the `ppdiffusers` checkpoint to convert (either a local directory or on the bos).",
     )
     parser.add_argument("--output_path", type=str, required=True, help="Path to the output model.")
@@ -219,37 +220,3 @@ if __name__ == "__main__":
     convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         args.pretrained_model_name_or_path, args.output_path, args.sample, args.height, args.width
     )
-    # # test_output
-    # import paddle
-    # import os
-    # import fastdeploy as fd
-    # def create_fd_runtime( model_dir="/root/bench/cutlass/ct/unet", model_prefix="inference"):
-    #     option = fd.RuntimeOption()
-    #     model_path = os.path.join(model_dir, model_prefix + ".pdmodel")
-    #     params_path = os.path.join(model_dir, model_prefix + ".pdiparams")
-    #     option.set_model_path(model_path, params_path)
-    #     option.use_gpu(7)
-    #     option.use_paddle_backend()
-    #     return fd.Runtime(option)
-    # controlnet = create_fd_runtime(model_dir="/root/bench/cutlass/ct/controlnet", model_prefix="inference")
-    # unet = create_fd_runtime(model_dir="/root/bench/cutlass/ct/unet", model_prefix="inference")
-    # input_map_controlnet = {
-    #     "sample": paddle.randn((2, 4, 64, 64)).numpy(),
-    #     "timestep": paddle.to_tensor([100.]).numpy(),
-    #     "encoder_hidden_states": paddle.randn((2, 77, 768)).numpy(),
-    #     "controlnet_cond":  paddle.randn((2, 3, 512, 512)).numpy(),
-    # }
-    # out_controlnet = controlnet.infer(input_map_controlnet)
-    # down_block_additional_residual = out_controlnet[:-1]
-    # mid_block_additional_residual = out_controlnet[-1]
-
-    # input_map = {
-    #     "sample": paddle.randn((2, 4, 64, 64)).numpy(),
-    #     "timestep": paddle.to_tensor([100.]).numpy(),
-    #     "encoder_hidden_states": paddle.randn((2, 77, 768)).numpy(),
-    #     "mid_block_additional_residual":  mid_block_additional_residual,
-    # }
-    # for i, down_block in enumerate(down_block_additional_residual):
-    #     input_map[unet.get_input_info(i+3).name] = down_block
-    # unet_out = unet.infer(input_map)[0]
-    # print(unet_out.shape)
