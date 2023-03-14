@@ -20,6 +20,11 @@ from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
+from .configuration import (
+    GPTJ_PRETRAINED_INIT_CONFIGURATION,
+    GPTJ_PRETRAINED_RESOURCE_FILES_MAP,
+    GPTJConfig,
+)
 
 __all__ = [
     "GPTJModel",
@@ -58,9 +63,10 @@ def apply_rotary_pos_emb(x, sincos, offset=0):
 
 
 class GPTJAttention(Layer):
-    def __init__(self, embed_dim, rotary_dim, num_attention_heads, max_positions, attn_pdrop, resid_pdrop):
+    def __init__(self, config: GPTJConfig):
         super().__init__()
 
+        max_positions = config.max_position_embeddings
         self.register_buffer(
             "causal_mask",
             paddle.tril(paddle.ones((max_positions, max_positions), dtype=paddle.get_default_dtype())).reshape(
@@ -68,11 +74,11 @@ class GPTJAttention(Layer):
             ),
         )
 
-        self.attn_dropout = nn.Dropout(attn_pdrop)
-        self.resid_dropout = nn.Dropout(resid_pdrop)
+        self.attn_dropout = nn.Dropout(config.attn_pdrop)
+        self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
-        self.embed_dim = embed_dim
-        self.num_attention_heads = num_attention_heads
+        self.embed_dim = config.embed_dim
+        self.num_attention_heads = config.num_attention_heads
         self.head_dim = self.embed_dim // self.num_attention_heads
         if self.head_dim * self.num_attention_heads != self.embed_dim:
             raise ValueError(
@@ -85,7 +91,9 @@ class GPTJAttention(Layer):
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias_attr=False)
 
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias_attr=False)
-        self.rotary_dim = rotary_dim
+        self.rotary_dim = None
+        if config.rotary_dim is not None:
+            self.rotary_dim = config.rotary_dim
 
     def _split_heads(self, tensor, num_attention_heads, attn_head_size, rotary):
         new_shape = tensor.shape[:-1] + [num_attention_heads, attn_head_size]
@@ -206,14 +214,15 @@ class GPTJAttention(Layer):
 
 
 class GPTJMLP(Layer):
-    def __init__(self, embed_dim, inner_dim, activation_function, resid_pdrop):
+    def __init__(self, inner_dim, config: GPTJConfig):
         super().__init__()
+        embed_dim = config.n_embd
 
         self.fc_in = nn.Linear(embed_dim, inner_dim)
         self.fc_out = nn.Linear(inner_dim, embed_dim)
 
-        self.act = ACT2FN[activation_function]
-        self.dropout = nn.Dropout(resid_pdrop)
+        self.act = ACT2FN[config.activation_function]
+        self.dropout = nn.Dropout(config.resid_pdrop)
 
     def forward(self, hidden_states):
         hidden_states = self.fc_in(hidden_states)
@@ -224,22 +233,12 @@ class GPTJMLP(Layer):
 
 
 class GPTJBlock(Layer):
-    def __init__(
-        self,
-        embed_dim,
-        rotary_dim,
-        n_head,
-        n_positions,
-        attn_pdrop,
-        resid_pdrop,
-        activation_function,
-        layer_norm_epsilon,
-    ):
+    def __init__(self, config: GPTJConfig):
         super().__init__()
-        inner_dim = 4 * embed_dim
-        self.ln_1 = nn.LayerNorm(embed_dim, epsilon=layer_norm_epsilon)
-        self.attn = GPTJAttention(embed_dim, rotary_dim, n_head, n_positions, attn_pdrop, resid_pdrop)
-        self.mlp = GPTJMLP(embed_dim, inner_dim, activation_function, resid_pdrop)
+        inner_dim = 4 * config.n_embd
+        self.ln_1 = nn.LayerNorm(config.n_embd, epsilon=config.layer_norm_epsilon)
+        self.attn = GPTJAttention(config)
+        self.mlp = GPTJMLP(inner_dim, config)
 
     def forward(
         self,
@@ -271,8 +270,9 @@ class GPTJPretrainedModel(PretrainedModel):
     models.
     """
 
-    pretrained_init_configuration = {}
-    pretrained_resource_files_map = {"model_state": {}}
+    config_class = GPTJConfig
+    pretrained_init_configuration = GPTJ_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = GPTJ_PRETRAINED_RESOURCE_FILES_MAP
 
     base_model_prefix = "transformer"
 
@@ -353,50 +353,33 @@ class GPTJModel(GPTJPretrainedModel):
             Default to `0.02`.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        bos_token_id=50256,
-        pad_token_id=50256,
-        eos_token_id=50256,
-        n_embd=4096,
-        n_layer=28,
-        n_head=16,
-        n_positions=2048,
-        attn_pdrop=0.0,
-        resid_pdrop=0.0,
-        embd_pdrop=0.0,
-        rotary_dim=64,
-        activation_function="gelu_new",
-        layer_norm_epsilon=1e-05,
-        initializer_range=0.02,
-    ):
+    def __init__(self, config: GPTJConfig):
         super().__init__()
 
-        self.vocab_size = vocab_size
-        self.bos_token_id = bos_token_id
-        self.pad_token_id = pad_token_id
-        self.eos_token_id = eos_token_id
-        self.embed_dim = n_embd
-        self.initializer_range = initializer_range
-        self.wte = nn.Embedding(vocab_size, self.embed_dim)
-        self.drop = nn.Dropout(embd_pdrop)
+        self.vocab_size = config.vocab_size
+        self.bos_token_id = config.bos_token_id
+        self.pad_token_id = config.pad_token_id
+        self.eos_token_id = config.eos_token_id
+        self.embed_dim = config.n_embd
+        self.initializer_range = config.initializer_range
+        self.wte = nn.Embedding(config.vocab_size, self.embed_dim)
+        self.drop = nn.Dropout(config.embd_pdrop)
         self.h = nn.LayerList(
             [
                 GPTJBlock(
-                    n_embd,
-                    rotary_dim,
-                    n_head,
-                    n_positions,
-                    attn_pdrop,
-                    resid_pdrop,
-                    activation_function,
-                    layer_norm_epsilon,
+                    config.n_embd,
+                    config.rotary_dim,
+                    config.n_head,
+                    config.n_positions,
+                    config.attn_pdrop,
+                    config.resid_pdrop,
+                    config.activation_function,
+                    config.layer_norm_epsilon,
                 )
-                for _ in range(n_layer)
+                for _ in range(config.n_layer)
             ]
         )
-        self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=layer_norm_epsilon)
+        self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -505,9 +488,9 @@ class GPTJForCausalLM(GPTJPretrainedModel):
             An instance of GPTJModel.
     """
 
-    def __init__(self, transformer):
+    def __init__(self, config):
         super().__init__()
-        self.transformer = transformer
+        self.transformer = GPTJModel(config)
         self.lm_head = nn.Linear(self.transformer.config["n_embd"], self.transformer.config["vocab_size"])
 
         # Initialize weights and apply final processing
@@ -634,9 +617,9 @@ class GPTJForSequenceClassification(GPTJPretrainedModel):
             instance `GPTJ`. Defaults to None.
     """
 
-    def __init__(self, transformer, num_labels=2):
+    def __init__(self, config, num_labels=2):
         super().__init__()
-        self.transformer = transformer
+        self.transformer = GPTJModel(config)
         self.classifier = nn.Linear(self.transformer.config["n_embd"], num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
@@ -706,9 +689,9 @@ class GPTJForQuestionAnswering(GPTJPretrainedModel):
             An instance of GPTJModel.
     """
 
-    def __init__(self, transformer):
+    def __init__(self, config):
         super().__init__()
-        self.transformer = transformer
+        self.transformer = GPTJModel(config)
         self.classifier = nn.Linear(self.transformer.config["n_embd"], 2)
         self.apply(self.init_weights)
 
