@@ -13,29 +13,28 @@
 # limitations under the License.
 
 import os
-import random
 import sys
 import time
 from functools import partial
 
-import numpy as np
 import paddle
 from args import parse_args
-from modeling import GPTLMHeadModel, GPTModel
+from configuration import BloomConfig
+from model_split_merge import split_model_parallel
+from modeling import BloomForCausalLM
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
+from transformers import AutoTokenizer
 from utils import (
     _rotate_checkpoints,
     all_gather,
-    convert_example,
     is_dp_group_support_in_group_sharded_parallel,
-    left_padding,
+    set_hyrbid_parallel_seed,
     wrap_sharding_2_3,
 )
 from visualdl import LogWriter
@@ -47,33 +46,63 @@ from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
-    GPTChineseTokenizer,
-    GPTTokenizer,
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {
-    "gpt": (GPTLMHeadModel, GPTTokenizer),
-    "gpt-cn": (GPTLMHeadModel, GPTChineseTokenizer),
-}
 
+def convert_example(
+    example,
+    tokenizer,
+    decoder_start_token_id,
+    max_source_length,
+    max_target_length,
+    is_train=True,
+):
+    """Convert all examples into necessary features."""
+    source = None
+    title = None
+    target = None
+    if "source" in example and "title" in example:
+        source = example["source"]
+        if "title" in example.keys():
+            title = example["title"]
+    elif "context" in example and "answer" in example:
+        source = example["context"]
+        if "answer" in example.keys():
+            title = example["answer"]
+    else:
+        assert False, "Source and title are not in the input dictionary, nor are context and answer."
+    if "target" in example.keys():
+        target = example["target"]
+    elif "question" in example.keys():
+        target = example["question"]
+    source = "答案：" + title + "</s>" + "上下文：" + source + "</s>"
+    if target:
+        target = "在已知答案的前提下，问题：" + target + "</s>"
+    outputs = tokenizer(
+        target,
+        max_length=max_target_length,
+        truncation_strategy="longest_first",
+        return_attention_mask=True,
+        return_token_type_ids=False,
+    )
+    inputs = tokenizer(
+        source,
+        max_length=max_source_length,
+        truncation_strategy="longest_first",
+        return_attention_mask=True,
+        return_length=False,
+    )
 
-def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
-    assert args.device != "cpu"
-
-    random.seed(basic_seed + data_world_rank)
-    np.random.seed(basic_seed + data_world_rank)
-    paddle.seed(basic_seed + data_world_rank)
-
-    # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + data_world_rank
-    tracker = get_rng_state_tracker()
-    tracker.add("global_seed", global_seed)
-    tracker.add("local_seed", local_seed)
+    final = {}
+    for k in outputs.keys():
+        final[k] = inputs[k] + outputs[k]
+        if k == "input_ids":
+            final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+    return final
 
 
 @paddle.no_grad()
@@ -90,7 +119,7 @@ def run_evaluate(args, data_loader, model, iter_steps, log_writer, global_step, 
             custom_white_list=["fused_attention", "fused_feedforward"],
             level="O2",
         ):
-            loss = model(**batch)
+            loss, _ = model(**batch)
 
         all_loss.append(float(loss))
 
@@ -129,14 +158,13 @@ def do_train(args):
         "sharding_degree": args.sharding_degree,
     }
 
-    # set control in tensor parallel
+    # Set control in tensor parallel
     strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
     fleet.init(is_collective=True, strategy=strategy)
 
-    # obtain rank message of hybrid parallel
+    # Obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
-    # global_rank = hcg.get_global_rank()
     mp_rank = hcg.get_model_parallel_rank()
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
@@ -144,15 +172,14 @@ def do_train(args):
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
     data_world_size = args.dp_degree * args.sharding_degree
-    # local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
-    # seed control in hybrid parallel
+    # Seed control in hybrid parallel
     set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
 
-    default_global_tokens_num = args.global_batch_size * args.max_seq_len
+    default_global_tokens_num = args.global_batch_size * args.max_seq_length
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    config = BloomConfig.from_pretrained(args.model_name_or_path)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -185,16 +212,18 @@ def do_train(args):
     OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        GPTLMHeadModel.resource_files_names = {"model_state": WEIGHTS_NAME}
+        BloomForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
+        args.model_name_or_path = split_model_parallel(
+            args.model_name_or_path, None, args.mp_degree, args.sharding_degree
+        )
+    config.mp_rank = mp_rank
+    config.mp_degree = args.mp_degree
 
-    model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
-    model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
-    model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-    model_config["num_partitions"] = args.mp_degree
-    model_config["use_recompute"] = args.use_recompute
-    model_config["enable_fuse_transformer"] = False
-    model = GPTLMHeadModel(GPTModel(**model_config), pad_token_id=tokenizer.pad_token_id)
-    # Create the critrion for the gpt model
+    config["hidden_dropout_prob"] = args.hidden_dropout_prob
+    config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+    config["use_recompute"] = args.use_recompute
+    config["enable_fuse_transformer"] = False
+    model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
@@ -288,19 +317,13 @@ def do_train(args):
         decoder_start_token_id=tokenizer.bos_token_id,
         max_source_length=args.max_source_length,
         max_target_length=args.max_target_length,
-        ignore_pad_token_for_loss=args.ignore_pad_token_for_loss,
     )
 
-    logger.info("Loading train and dev dataset: %s" % args.dataset_name)
-    train_set, dev_set = load_dataset(args.dataset_name, splits=["train_v1", "dev_v1"])
-    logger.info("Loaded train and dev dataset: %s" % args.dataset_name)
-    train_set = train_set.map(trans_func, lazy=True)
-
-    # print(train_set[0])
-    # exit()
+    train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
+    train_ds = train_ds.map(trans_func, lazy=True)
 
     train_batch_sampler = DistributedBatchSampler(
-        train_set,
+        train_ds,
         batch_size=args.micro_batch_size,
         shuffle=True,
         drop_last=True,
@@ -309,7 +332,7 @@ def do_train(args):
     )
 
     train_data_loader = paddle.io.DataLoader(
-        dataset=train_set,
+        dataset=train_ds,
         batch_sampler=train_batch_sampler,
         num_workers=0,
         collate_fn=DataCollatorForSeq2Seq(
@@ -317,13 +340,14 @@ def do_train(args):
             padding=True,
             max_length=args.max_seq_length,
             label_pad_token_id=tokenizer.pad_token_id,
+            return_tensors="np",
         ),
         return_list=True,
     )
-    dev_set = dev_set.map(trans_func, lazy=True)
-    valid_batch_sampler = paddle.io.BatchSampler(dev_set, batch_size=args.micro_batch_size, shuffle=False)
+    dev_ds = dev_ds.map(trans_func, lazy=True)
+    valid_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.micro_batch_size, shuffle=False)
     valid_data_loader = paddle.io.DataLoader(
-        dataset=dev_set,
+        dataset=dev_ds,
         batch_sampler=valid_batch_sampler,
         num_workers=0,
         collate_fn=DataCollatorForSeq2Seq(
@@ -331,6 +355,7 @@ def do_train(args):
             padding=True,
             max_length=args.max_seq_length,
             label_pad_token_id=tokenizer.pad_token_id,
+            return_tensors="np",
         ),
         return_list=True,
     )
@@ -357,6 +382,7 @@ def do_train(args):
     tr_loss = paddle.to_tensor(0.0)
     loss_global = paddle.to_tensor(0.0)
 
+    model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
     for epoch in range(sys.maxsize):
         for step, batch in enumerate(train_data_loader()):
             train_reader_cost += time.time() - reader_start
@@ -378,8 +404,7 @@ def do_train(args):
                 custom_white_list=["fused_attention", "fused_feedforward"],
                 level="O2",
             ):
-                loss = model(**batch)
-                # loss = criterion(preds, labels, loss_mask)
+                loss, _ = model(**batch)
 
             if args.accumulate_steps > 1:
                 tr_loss_step = loss / args.accumulate_steps
@@ -475,7 +500,7 @@ def do_train(args):
                     else:
                         model_to_save = model_to_save._layer
 
-                output_dir = os.path.join(args.output_dir, "checkpoint-%d" % global_step)
+                output_dir = os.path.join(args.output_dir, "{}_{}".format(model_path, global_step))
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Save model to %s" % output_dir)
 
@@ -511,70 +536,6 @@ def do_train(args):
             reader_start = time.time()
 
 
-def do_export(args):
-
-    if args.do_export:
-        from utils import merge_model_parallel
-
-        last_checkpoint = get_last_checkpoint(args.output_dir)
-        from modeling import GPTForGeneration
-
-        from paddlenlp.transformers import GPTConfig
-
-        _, tokenizer_class = MODEL_CLASSES[args.model_type]
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-
-        config = GPTConfig.from_pretrained(last_checkpoint)
-        config.fuse_attention_qkv = True
-        # config.max_predict_len = 8
-        config.max_dec_len = 20
-        config.eos_token_id = tokenizer.eos_token_id
-        config.eol_token_id = tokenizer.eol_token_id
-        config.pad_token_id = tokenizer.eos_token_id
-        config.use_cache = True
-        config.top_k = 1
-
-        model = GPTForGeneration(config)
-        missing_keys, unexpected_keys = model.set_state_dict(merge_model_parallel(last_checkpoint, config))
-        print("missing_keys", missing_keys)
-        print("unexpected_keys", unexpected_keys)
-
-        # Switch to eval model
-        model.eval()
-        # Convert to static graph with specific input description
-        input_text = ["Nice to meet", "Hello "]
-        inputs = tokenizer(input_text)
-
-        # input_ids = tokenizer.encode(input_text)['input_ids']
-        inputs = tokenizer(input_text)
-        inputs = left_padding(inputs, tokenizer.bos_token_id)
-        input_ids = inputs["input_ids"]
-
-        input_ids = paddle.to_tensor(input_ids, dtype="int64")
-        ret = model(input_ids=input_ids)
-
-        # ret =  model.generate(input_ids = data["input_ids"])
-        for out_ids, in_txt in zip(ret[0].tolist(), input_text):
-            print("==" * 30)
-            print(input_text + tokenizer.convert_ids_to_string(out_ids))
-
-        model = paddle.jit.to_static(
-            model,
-            input_spec=[
-                paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            ],
-        )
-        infer_path = os.path.join(args.output_dir, "infer", f"{args.dataset_name}")
-
-        # Save converted static graph model
-        paddle.jit.save(model, infer_path)
-        # Also save tokenizer for inference usage
-        tokenizer.save_pretrained(os.path.dirname(infer_path))
-
-
 if __name__ == "__main__":
-    args = parse_args(MODEL_CLASSES)
-    args.do_export = True
-    os.environ["softmax_mask_fuse_upper_triangle"] = "False"
+    args = parse_args()
     do_train(args)
-    do_export(args)

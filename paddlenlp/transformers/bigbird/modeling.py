@@ -233,20 +233,31 @@ class BigBirdEmbeddings(Layer):
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            inputs_embeds = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
         if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids = paddle.zeros(input_shape, dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -369,9 +380,14 @@ class BigBirdModel(BigBirdPretrainedModel):
         self.num_layers = config.num_layers
         self.config = config
 
-    def _process_mask(self, input_ids, attention_mask=None):
+    def _process_mask(self, input_ids, inputs_embeds, attention_mask=None):
         # [B, T]
-        attention_mask = (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype)
+        if input_ids is not None:
+            attention_mask = (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype)
+        else:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+            attention_mask = paddle.zeros(input_shape, dtype=self.pooler.dense.weight.dtype)
+
         # [B, 1, T, 1]
         query_mask = paddle.unsqueeze(attention_mask, axis=[1, 3])
         # [B, 1, 1, T]
@@ -386,6 +402,7 @@ class BigBirdModel(BigBirdPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -406,6 +423,9 @@ class BigBirdModel(BigBirdPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             attention_mask (Tensor, optional):
                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
@@ -465,12 +485,16 @@ class BigBirdModel(BigBirdPretrainedModel):
                 ]
                 output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
+
         output_attentions = output_attentions if output_attentions is not None else False
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
         return_dict = return_dict if return_dict is not None else False
-        embedding_output = self.embeddings(input_ids, token_type_ids)
-        attention_mask, query_mask, key_mask = self._process_mask(input_ids, attention_mask)
-        seq_len = len(input_ids[1])
+
+        embedding_output = self.embeddings(input_ids, token_type_ids, inputs_embeds=inputs_embeds)
+        attention_mask, query_mask, key_mask = self._process_mask(input_ids, inputs_embeds, attention_mask)
+        seq_len = len(input_ids[1]) if input_ids is not None else inputs_embeds.shape[1]
         rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
             self.config["num_layers"],
             seq_len,
@@ -497,7 +521,7 @@ class BigBirdModel(BigBirdPretrainedModel):
         attentions = encoder_outputs.all_attentions if output_attentions else None
         pooled_output = self.pooler(encoder_outputs.hidden_states)
         if not return_dict:
-            return encoder_outputs.hidden_states, pooled_output
+            return sequence_output, pooled_output
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
@@ -539,6 +563,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -555,6 +580,8 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
             attention_mask (Tensor):
                 See :class:`BigBirdModel`.
             rand_mask_idx_list (list):
+                See :class:`BigBirdModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`BigBirdModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
@@ -615,6 +642,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
             token_type_ids,
             attention_mask=attention_mask,
             rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
@@ -796,6 +824,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
         masked_positions: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         next_sentence_label: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
@@ -819,6 +848,8 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 Its data type should be int64 and its shape is [batch_size, mask_token_num].
                 `mask_token_num` is the number of masked tokens. It should be no bigger than `sequence_length`.
                 Defaults to `None`, which means we output hidden-states of all tokens in masked token prediction.
+            inputs_embeds(Tensor, optional):
+                See :class:`BigBirdModel`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `None`.
@@ -872,6 +903,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
             token_type_ids=token_type_ids,
             attention_mask=None,
             rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1096,6 +1128,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
         start_positions: Optional[Tensor] = None,
         end_positions: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -1111,6 +1144,8 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
             attention_mask (Tensor):
                 See :class:`BigBirdModel`.
             rand_mask_idx_list (`List`):
+                See :class:`BigBirdModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`BigBirdModel`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -1137,7 +1172,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForQuestionAnswering.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1153,6 +1188,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
             rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1231,6 +1267,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1250,6 +1287,8 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
                 See :class:`BigBirdModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
+            inputs_embeds(Tensor, optional):
+                See :class:`BigBirdModel`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `None`.
@@ -1275,7 +1314,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1290,6 +1329,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
             rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1348,6 +1388,7 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
         rand_mask_idx_list: Optional[List] = None,
         token_type_ids: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -1366,6 +1407,8 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
                 num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
                 `input_ids` above)
+            inputs_embeds(Tensor, optional):
+                See :class:`BigBirdModel`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `None`.
@@ -1392,7 +1435,7 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
                 tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
                 model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors='pd')
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1403,7 +1446,8 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
         return_dict = return_dict if return_dict is not None else False
 
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        if input_ids is not None:
+            input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(shape=(-1, *attention_mask.shape[2:]))
@@ -1411,10 +1455,14 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
         if rand_mask_idx_list is not None:
             rand_mask_idx_list = rand_mask_idx_list.reshape(shape=(-1, *rand_mask_idx_list.shape[2:]))
 
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+
         outputs = self.bigbird(
             input_ids,
             attention_mask=attention_mask,
             rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1464,6 +1512,7 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
         input_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1477,6 +1526,8 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
             attention_mask (Tensor):
                 See :class:`BigBirdModel`.
             rand_mask_idx_list (`List`):
+                See :class:`BigBirdModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`BigBirdModel`.
             labels (Tensor, optional):
                 The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
@@ -1510,7 +1561,12 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
         return_dict = return_dict if return_dict is not None else False
 
-        outputs = self.bigbird(input_ids, attention_mask=attention_mask, rand_mask_idx_list=rand_mask_idx_list)
+        outputs = self.bigbird(
+            input_ids,
+            attention_mask=attention_mask,
+            rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
+        )
         sequence_output = outputs[0]
         prediction_scores = self.lm_head(sequence_output)
 
@@ -1559,6 +1615,7 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
         input_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         rand_mask_idx_list: Optional[List] = None,
+        inputs_embeds: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1573,8 +1630,19 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
                 See :class:`BigBirdModel`.
             rand_mask_idx_list (`List`):
                 See :class:`BigBirdModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`BigBirdModel`.
             labels (Tensor, optional):
                 The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
@@ -1596,7 +1664,12 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
         return_dict = return_dict if return_dict is not None else False
 
-        outputs = self.bigbird(input_ids, attention_mask=attention_mask, rand_mask_idx_list=rand_mask_idx_list)
+        outputs = self.bigbird(
+            input_ids,
+            attention_mask=attention_mask,
+            rand_mask_idx_list=rand_mask_idx_list,
+            inputs_embeds=inputs_embeds,
+        )
         sequence_output = outputs[0]
         prediction_scores = self.lm_head(sequence_output)
 

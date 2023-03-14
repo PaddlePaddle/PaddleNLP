@@ -70,7 +70,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         verbosity: int = 1,
         **kwargs,
     ):
-        if not metric_for_best_model.startswith("eval_"):
+        if metric_for_best_model is not None and not metric_for_best_model.startswith("eval_"):
             self.metric_for_best_model = f"eval_{metric_for_best_model}"
         else:
             self.metric_for_best_model = metric_for_best_model
