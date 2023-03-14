@@ -802,7 +802,7 @@ class GPTModel(GPTPretrainedModel):
             else:  # outputs is a tuple
                 idx = 2 if use_cache else 1
                 all_hidden_states = (embedding_output,) + outputs[idx]
-                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
+                outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
 
         self.checkpoints.extend(self.decoder.checkpoints)
 
