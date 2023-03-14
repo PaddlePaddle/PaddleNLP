@@ -44,7 +44,7 @@ def image_text_retrieval_tutorial():
         )
     else:
         doc_dir = "data/wukong_text"
-        wukong_data = "https://paddlenlp.bj.bcebos.com/applications/wukong_test_demo.zip"
+        wukong_data = "https://paddlenlp.bj.bcebos.com/applications/wukong_text.zip"
         fetch_archive_from_http(url=wukong_data, output_dir=doc_dir)
         dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
         if os.path.exists(args.index_name):

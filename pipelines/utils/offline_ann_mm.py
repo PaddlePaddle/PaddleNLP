@@ -22,6 +22,7 @@ from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, lau
 
 data_dict = {
     "data/wukong_test": "https://paddlenlp.bj.bcebos.com/applications/wukong_test_demo.zip",
+    "data/wukong_text": "https://paddlenlp.bj.bcebos.com/applications/wukong_text.zip",
 }
 
 # yapf: disable
