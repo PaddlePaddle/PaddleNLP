@@ -57,7 +57,6 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("LayoutXLMTokenizer", "layoutxlm"),
         ("LayoutLMv2Tokenizer", "layoutlmv2"),
         ("LayoutLMTokenizer", "layoutlm"),
-        ("LLaMATokenizer", "llama"),
         ("LukeTokenizer", "luke"),
         ("MBartTokenizer", "mbart"),
         ("MBart50Tokenizer", "mbart"),
