@@ -733,7 +733,12 @@ class BloomModel(BloomPreTrainedModel):
         self.n_head = config.n_head
 
         # Embedding + LN Embedding
-        self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
+        # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
+        self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+            self.vocab_size,
+            self.hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)),
+        )
 
         self.word_embeddings_layernorm = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
@@ -983,13 +988,16 @@ class BloomForPretraining(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomModel(config)
+        self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
         self.apply(self.init_weights)
         self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
         self,
         input_ids,
-        position_ids=None,
+        position_ids,
+        labels,
+        loss_mask,
         attention_mask=None,
         masked_positions=None,
         use_cache=False,
@@ -1003,11 +1011,8 @@ class BloomForPretraining(BloomPreTrainedModel):
         else:
             encoder_outputs = outputs
         logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight)
-
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
+        loss = self.criterion(logits, labels, loss_mask)
+        return loss
 
 
 class BloomForCausalLM(BloomPreTrainedModel):
