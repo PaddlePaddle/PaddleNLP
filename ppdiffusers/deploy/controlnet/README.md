@@ -44,7 +44,7 @@ python controlnet_infer.py --model_dir ./control_sd15_canny --scheduler "pndm" -
 
 脚本的输入提示语句为 **"bird"**， 得到的图像文件为 `controlnet_bird.png`。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
-![controlnet_bird.png](https://user-images.githubusercontent.com/10826371/200261112-68e53389-e0a0-42d1-8c3a-f35faa6627d7.png)
+![controlnet_bird](https://user-images.githubusercontent.com/50394665/224997460-81b82457-d9ee-485f-9bc7-d703a716a2de.png)
 
 如果使用 `paddle-tensorrt` 推理引擎后端及开启`半精度推理`，则可执行以下命令完成推理：
 
@@ -52,7 +52,7 @@ python controlnet_infer.py --model_dir ./control_sd15_canny --scheduler "pndm" -
 python controlnet_infer.py --model_dir control_sd15_canny --scheduler "euler_ancestral" --backend paddle-tensorrt --device gpu --benchmark_steps 10 --use_fp16 True
 ```
 
-经测试，使用上述命令，在 Aistudio 的 A100 机器上能够跑出 `xxxxx` 的成绩。
+经测试，使用上述命令，在 80G A100 机器上能够跑出 `1.111716 s` 的成绩。
 
 #### 参数说明
 
