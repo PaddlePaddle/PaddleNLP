@@ -288,7 +288,7 @@ def do_train(args):
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         BloomForSequenceClassification.resource_files_names = {"model_state": WEIGHTS_NAME}
         args.model_name_or_path = split_model_parallel(
-            args.model_name_or_path, None, args.mp_degree, args.sharding_degree
+            args.model_name_or_path, config, args.mp_degree, args.sharding_degree
         )
     config.num_labels = num_classes
     config.mp_rank = mp_rank
@@ -400,10 +400,10 @@ def do_train(args):
     loss_global = paddle.to_tensor(0.0)
 
     # The model output path
-    model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
 
     if _globalstep_last_logged > args.max_steps:
         return
+    model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
     for epoch in range(sys.maxsize):
         train_data_loader.batch_sampler.set_epoch(epoch)
         for step, batch in enumerate(train_data_loader):
@@ -507,9 +507,11 @@ def do_train(args):
                     else:
                         model_to_save = model_to_save._layer
 
-                output_dir = os.path.join(args.output_dir, "{}_{}".format(model_path, global_step))
+                if config.mp_degree == 1 and config.pp_degree == 1:
+                    output_dir = os.path.join(args.output_dir, str(global_step))
+                else:
+                    output_dir = os.path.join(args.output_dir, str(global_step), model_path)
                 os.makedirs(output_dir, exist_ok=True)
-
                 logger.info("Save model to %s" % output_dir)
 
                 # tokenizer only need to save on one node

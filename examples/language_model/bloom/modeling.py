@@ -49,24 +49,20 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-# def parallel_matmul(lm_output, logit_weights, parallel_output):
-#    hcg = fleet.get_hybrid_communicate_group()
-#    model_parallel_group = hcg.get_model_parallel_group()
-#    world_size = hcg.get_model_parallel_world_size()
-#    # rank = hcg.get_model_parallel_rank()
-#
-#    if world_size > 1:
-#        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-#
-#        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
-#
-#        if parallel_output:
-#            return logits
-#
-#        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
-#    else:
-#        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
-#        return logits
+def parallel_matmul(lm_output, logit_weights, parallel_output=True):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    # rank = hcg.get_model_parallel_rank()
+    if mp_degree > 1:
+        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+        if parallel_output:
+            return logits
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        return logits
 
 
 def finfo(dtype):
@@ -339,7 +335,6 @@ class BloomAttention(nn.Layer):
             self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias_attr=True)
 
         if config.mp_degree > 1:
-            # TODO(wawltor) The weight_attr
             self.dense = fleet.meta_parallel.RowParallelLinear(
                 self.hidden_size, self.hidden_size, has_bias=True, input_is_parallel=True
             )
@@ -860,9 +855,6 @@ class BloomModel(BloomPreTrainedModel):
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
-            logger.warning(
-                "Input_ids should be specified when generating attention_mask, otherwise no attention_mask."
-            )
             if input_ids is not None:
                 attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
 
@@ -945,8 +937,8 @@ class BloomLMHead(nn.Layer):
         )
 
     def forward(self, hidden_states):
-        # logits = parallel_matmul(hidden_states, self.decoder_weight, transpose_y=True)
-        logits = paddle.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = parallel_matmul(hidden_states, self.decoder_weight)
+        # logits = paddle.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
@@ -958,8 +950,10 @@ class BloomPretrainingCriterion(paddle.nn.Layer):
 
     def __init__(self, pad_token_id=None, mp_degree=1):
         super(BloomPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-        self.mp_degree = mp_degree
+        if mp_degree > 1:
+            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
         self.pad_token_id = pad_token_id
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
@@ -990,7 +984,7 @@ class BloomForPretraining(BloomPreTrainedModel):
         super().__init__(config)
         self.bloom = BloomModel(config)
         self.apply(self.init_weights)
-        self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
+        self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
         self,
@@ -1008,8 +1002,7 @@ class BloomForPretraining(BloomPreTrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-
-        logits = paddle.matmul(encoder_outputs, self.bloom.embeddings.word_embeddings.weight, True)
+        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight)
 
         if use_cache:
             return logits, cached_kvs
