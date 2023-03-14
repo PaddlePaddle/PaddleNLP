@@ -16,21 +16,24 @@ import argparse
 import os
 import random
 import time
-from math import ceil
 from functools import partial
+from math import ceil
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
-from paddlenlp.utils import profiler
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.xlnet.modeling import XLNetPretrainedModel, XLNetForSequenceClassification
-from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers.xlnet.modeling import (
+    XLNetForSequenceClassification,
+    XLNetPretrainedModel,
+)
+from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+from paddlenlp.utils import profiler
 
 final_res = "Not evaluated yet!"
 
@@ -233,7 +236,7 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
+    tokenizer_class = XLNetTokenizer
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
