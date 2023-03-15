@@ -198,13 +198,17 @@ class OPTEmbeddings(Layer):
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self, input_ids=None, position_ids=None, input_embeddings=None):
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(input_embeddings)[:-1]
+
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
-
-        input_embeddings = self.word_embeddings(input_ids)
 
         if self.project_in:
             input_embeddings = self.project_in(input_embeddings)
@@ -284,9 +288,10 @@ class OPTModel(OPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         use_cache=False,
         cache=None,
         output_attentions=None,
@@ -314,6 +319,11 @@ class OPTModel(OPTPretrainedModel):
                 Its data type should be float32.
                 The `masked` tokens have `-1e9` values, and the `unmasked` tokens have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
@@ -358,25 +368,35 @@ class OPTModel(OPTPretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_ids = input_ids.reshape((-1, input_shape[-1]))
+        elif inputs_embeds is not None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
         self.checkpoints = []
         past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
 
         if position_ids is None:
             position_ids = paddle.arange(
-                past_key_values_length, input_ids.shape[-1] + past_key_values_length, dtype=input_ids.dtype
+                past_key_values_length, input_shape[-1] + past_key_values_length, dtype="int64"
             )
             position_ids = position_ids.unsqueeze(0)
-            position_ids = paddle.expand_as(position_ids, input_ids)
-        embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
+            position_ids = paddle.expand(position_ids, input_shape)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids, input_embeddings=inputs_embeds
+        )
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(
-            paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
-        )
+        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
         if past_key_values_length > 0:
             causal_mask = paddle.concat(
                 [
-                    paddle.zeros([paddle.shape(input_ids)[-1], past_key_values_length], dtype=causal_mask.dtype),
+                    paddle.zeros([input_shape[-1], past_key_values_length], dtype=causal_mask.dtype),
                     causal_mask,
                 ],
                 axis=-1,
@@ -468,6 +488,7 @@ class OPTForCausalLM(OPTPretrainedModel):
         input_ids,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         labels=None,
         use_cache=False,
         cache=None,
@@ -484,6 +505,8 @@ class OPTForCausalLM(OPTPretrainedModel):
                 See :class:`OPTModel`.
             attention_mask (Tensor, optional):
                 See :class:`OPTModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`GPTModel`.
             use_cache (bool, optional):
                 See :class:`OPTModel`.
             cache (Tensor, optional):
@@ -531,6 +554,7 @@ class OPTForCausalLM(OPTPretrainedModel):
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             cache=cache,
             output_attentions=output_attentions,
