@@ -560,6 +560,9 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         )
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
+        if lengths is None:
+            lengths = paddle.sum(paddle.where(input_ids == self.config.pad_token_id, 0, 1), axis=-1)
+
         outputs = self.ernie_ctm(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -744,48 +747,56 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, inputs_embeds=None):
-        r"""
-        Args:
-            input_ids (Tensor):
-                See :class:`ErnieCtmModel`.
-            token_type_ids (Tensor, optional):
-                See :class:`ErnieCtmModel`.
-            position_ids (Tensor, optional):
-                See :class:`ErnieCtmModel`.
-            attention_mask (Tensor, optional):
-                See :class:`ErnieCtmModel`.
-            inputs_embeds (Tensor, optional):
-                See :class:`ErnieCtmModel`.
+    # def forward(self,
+    #         input_ids: Tensor,
+    #         token_type_ids: Optional[Tensor] = None,
+    #         position_ids: Optional[Tensor] = None,
+    #         attention_mask: Optional[Tensor] = None,
+    #         labels: Optional[Tensor] = None,
+    #             input_ids, token_type_ids=None, position_ids=None, attention_mask=None, inputs_embeds=None, labels=None,
+    #                     return_dict: Optional[bool] = None,):
+    #     r"""
+    #     Args:
+    #         input_ids (Tensor):
+    #             See :class:`ErnieCtmModel`.
+    #         token_type_ids (Tensor, optional):
+    #             See :class:`ErnieCtmModel`.
+    #         position_ids (Tensor, optional):
+    #             See :class:`ErnieCtmModel`.
+    #         attention_mask (Tensor, optional):
+    #             See :class:`ErnieCtmModel`.
+    #         inputs_embeds (Tensor, optional):
+    #             See :class:`ErnieCtmModel`.
 
-        Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[sequence_length, num_tag]` and dtype as `float32`.
+    #     Returns:
+    #         Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+    #         Shape as `[sequence_length, num_tag]` and dtype as `float32`.
 
-        Example:
-            .. code-block::
+    #     Example:
+    #         .. code-block::
 
-                import paddle
-                from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
+    #             import paddle
+    #             from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 
-                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
-                model = ErnieCtmForTokenClassification.from_pretrained('ernie-ctm')
+    #             tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+    #             model = ErnieCtmForTokenClassification.from_pretrained('ernie-ctm')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                logits = model(**inputs)
+    #             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+    #             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+    #             logits = model(**inputs)
 
-        """
+    #     """
 
-        output = self.ernie_ctm(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
-        )
+    #     output = self.ernie_ctm(
+    #         input_ids,
+    #         token_type_ids=token_type_ids,
+    #         position_ids=position_ids,
+    #         attention_mask=attention_mask,
+    #         inputs_embeds=inputs_embeds,
+    #     )
 
-        sequence_output = output[0]
-        sequence_output = self.dropout(sequence_output)
-        logits = self.classifier(sequence_output)
-        return logits
+    #     sequence_output = output[0]
+    #     sequence_output = self.dropout(sequence_output)
+    #     logits = self.classifier(sequence_output)
+    #     if labels is not None:
+    #         return logits
