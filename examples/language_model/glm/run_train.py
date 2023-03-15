@@ -22,7 +22,7 @@ from utils import GLMTrainer, generate
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import get_lora_model
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
@@ -75,13 +75,15 @@ def main():
         model_args.model_name_or_path, output_predict=True, parallel_output=True, load_state_as_np=True
     )
     if model_args.lora:
-        # freeze all parameters first
-        for param in model.parameters():
-            param.stop_gradient = True
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
-        lora_config = {"target_modules": [".*query_key_value.*"], "r": 4, "lora_alpha": 8}
-        # get LoRA model with only LoRA weights trainable
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
         model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model.generate = partial(
