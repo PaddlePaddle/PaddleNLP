@@ -715,6 +715,7 @@ def _build_train_valid_test_datasets(
     def build_dataset(index, name):
         # from megatron.data.bert_dataset import BertDataset
         # from megatron.data.t5_dataset import T5Dataset
+        from .bert_dataset import BertDataset
         from .ernie_dataset import ErnieDataset
         from .t5_dataset import T5Dataset
 
@@ -748,15 +749,15 @@ def _build_train_valid_test_datasets(
                     short_seq_prob=short_seq_prob,
                     **kwargs,
                 )
-            # elif dataset_type == DSET_TYPE_BERT:
-            #     dataset = BertDataset(
-            #         indexed_dataset=indexed_dataset,
-            #         tokenizer=tokenizer,
-            #         masked_lm_prob=masked_lm_prob,
-            #         short_seq_prob=short_seq_prob,
-            #         binary_head=binary_head,
-            #         **kwargs,
-            #     )
+            elif dataset_type == DSET_TYPE_BERT:
+                dataset = BertDataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    short_seq_prob=short_seq_prob,
+                    binary_head=binary_head,
+                    **kwargs,
+                )
             elif dataset_type == DSET_TYPE_ERNIE:
                 dataset = ErnieDataset(
                     indexed_dataset=indexed_dataset,
