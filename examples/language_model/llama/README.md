@@ -34,7 +34,7 @@ model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
 ## 微调
 
 ```shell
-python infer_generation.py
+python finetune_generation.py
 ```
 
 <a name="3"></a>
@@ -50,5 +50,5 @@ python export_generation_model.py
 ## 推理
 
 ```shell
-python finetune_glue.py
+python infer_generation.py
 ```

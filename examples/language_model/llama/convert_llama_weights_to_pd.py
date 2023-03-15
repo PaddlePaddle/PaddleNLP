@@ -27,7 +27,7 @@ from paddlenlp.utils import load_torch
 Convert weights to paddle, will output `model_state.pdparams`:
 
     ```
-    python paddlenlp/transformers/llama/convert_llama_weights_to_pd.py \
+    python ./convert_llama_weights_to_pd.py \
         --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir /output/path
     ```
 

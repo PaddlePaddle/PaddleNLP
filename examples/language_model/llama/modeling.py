@@ -21,6 +21,7 @@ import paddle
 import paddle.nn.functional as F
 from configuration import LLaMAConfig
 from paddle import nn
+from paddle.distributed import fleet
 from paddle.nn import CrossEntropyLoss
 
 from paddlenlp.transformers.model_outputs import (
@@ -37,21 +38,29 @@ __all__ = [
 
 
 class RMSNorm(nn.Layer):
-    def __init__(self, hidden_size, eps=1e-6):
+    def __init__(self, config):
         super().__init__()
+        self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
-            shape=[hidden_size], dtype="float32", default_initializer=nn.initializer.Constant(1.0)
+            shape=[self.hidden_size], dtype="float32", default_initializer=nn.initializer.Constant(1.0)
         )
-        self.variance_epsilon = eps
+        self.variance_epsilon = config.rms_norm_eps
+        self.config = config
 
     def forward(self, hidden_states):
-        variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
+        if self.config.use_pure_fp16:
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
 
-        output = self.weight * hidden_states
-        default_type = paddle.get_default_dtype()
-        if default_type != "float32":
-            output = output.astype(default_type)
+                output = self.weight * hidden_states
+                output = output.astype("float16")
+        else:
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
+
+            output = self.weight * hidden_states
+            output = output.astype(paddle.get_default_dtype())
         return output
 
 
@@ -59,7 +68,8 @@ class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
-        self.register_buffer("inv_freq", inv_freq)
+        # self.register_buffer("inv_freq", inv_freq)
+        self.inv_freq = inv_freq
 
         self.max_seq_len_cached = max_position_embeddings
         t = paddle.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
@@ -102,15 +112,37 @@ def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
 
 
 class LLaMAMLP(nn.Layer):
-    def __init__(
-        self,
-        hidden_size: int,
-        intermediate_size: int,
-    ):
+    def __init__(self, config):
         super().__init__()
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias_attr=False)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias_attr=False)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias_attr=False)
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+
+        if config.mp_degree > 1:
+            self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+            self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+        else:
+            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+
+        if config.mp_degree > 1:
+            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
+        else:
+            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -119,43 +151,72 @@ class LLaMAMLP(nn.Layer):
 class LLaMAAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(
-        self,
-        hidden_size: int,
-        num_heads: int,
-    ):
+    def __init__(self, config):
         super().__init__()
-        self.hidden_size = hidden_size
-        self.num_heads = num_heads
-        self.head_dim = hidden_size // num_heads
+        self.hidden_size = config.hidden_size
+        self.num_heads = config.num_attention_heads
 
-        if (self.head_dim * num_heads) != self.hidden_size:
-            raise ValueError(
-                f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
-                f" and `num_heads`: {num_heads})."
+        # if (self.head_dim * self.num_heads) != self.hidden_size:
+        #     raise ValueError(
+        #         f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
+        #         f" and `num_heads`: {self.num_heads})."
+        #     )
+
+        assert self.num_heads % config.mp_degree == 0
+        self.num_heads = self.num_heads // config.mp_degree
+        self.head_dim = self.hidden_size // self.num_heads
+
+        if config.mp_degree > 1:
+            self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_heads * self.head_dim * config.mp_degree,
+                has_bias=False,
+                gather_output=False,
+            )
+            self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_heads * self.head_dim * config.mp_degree,
+                has_bias=False,
+                gather_output=False,
+            )
+            self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_heads * self.head_dim * config.mp_degree,
+                has_bias=False,
+                gather_output=False,
+            )
+        else:
+            self.q_proj = nn.Linear(
+                self.hidden_size,
+                self.num_heads * self.head_dim,
+                bias_attr=False,
+            )
+            self.k_proj = nn.Linear(
+                self.hidden_size,
+                self.num_heads * self.head_dim,
+                bias_attr=False,
+            )
+            self.v_proj = nn.Linear(
+                self.hidden_size,
+                self.num_heads * self.head_dim,
+                bias_attr=False,
             )
 
-        self.q_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias_attr=False,
-        )
-        self.k_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias_attr=False,
-        )
-        self.v_proj = nn.Linear(
-            hidden_size,
-            num_heads * self.head_dim,
-            bias_attr=False,
-        )
-        self.o_proj = nn.Linear(
-            num_heads * self.head_dim,
-            hidden_size,
-            bias_attr=False,
-        )
+        if config.mp_degree > 1:
+            self.o_proj = fleet.meta_parallel.RowParallelLinear(
+                self.num_heads * self.head_dim * config.mp_degree,
+                self.hidden_size,
+                has_bias=False,
+                input_is_parallel=True,
+            )
+        else:
+            self.o_proj = nn.Linear(
+                self.num_heads * self.head_dim * config.mp_degree,
+                self.hidden_size,
+                bias_attr=False,
+            )
         self.rotary_emb = RotaryEmbedding(self.head_dim)
+        self.config = config
 
     def forward(
         self,
@@ -218,7 +279,11 @@ class LLaMAAttention(nn.Layer):
             attn_weights = attn_weights + attention_mask
 
         # Upcast attention to fp32
-        attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        if self.config.use_pure_fp16:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
 
@@ -243,16 +308,10 @@ class LLaMADecoderLayer(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = LLaMAAttention(
-            hidden_size=self.hidden_size,
-            num_heads=config.num_attention_heads,
-        )
-        self.mlp = LLaMAMLP(
-            hidden_size=self.hidden_size,
-            intermediate_size=config.intermediate_size,
-        )
-        self.input_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.self_attn = LLaMAAttention(config)
+        self.mlp = LLaMAMLP(config)
+        self.input_layernorm = RMSNorm(config)
+        self.post_attention_layernorm = RMSNorm(config)
 
     def forward(
         self,
@@ -341,14 +400,24 @@ class LLaMAModel(LLaMAPretrainedModel):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        if config.mp_degree > 1:
+            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
+                ),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size, self.padding_idx)
 
         self.layers = nn.LayerList([LLaMADecoderLayer(config) for _ in range(config.num_hidden_layers)])
-        self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = RMSNorm(config)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -489,7 +558,14 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
             shift_labels = labels[..., 1:]
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, self.config.vocab_size), shift_labels.reshape((-1,)))
+            loss = loss_fct(
+                shift_logits.reshape([-1, self.config.vocab_size]),
+                shift_labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
+            )
 
         if not return_dict:
             output = (logits,) + outputs[1:]
