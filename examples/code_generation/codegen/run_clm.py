@@ -153,6 +153,10 @@ def do_train():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+
 
 if __name__ == "__main__":
     do_train()
