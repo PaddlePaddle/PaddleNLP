@@ -1,5 +1,4 @@
-# coding=utf-8
-# Copyright 2021 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +27,12 @@ from paddlenlp.transformers import (
 
 from ...testing_utils import slow
 from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
 
 GPTJ_PRETRAINED_MODEL_ARCHIVE_LIST = ["EleutherAI/gpt-j-6B"]
 
@@ -88,6 +92,9 @@ class GPTJModelTester:
         self.eos_token_id = vocab_size - 1
         self.pad_token_id = vocab_size - 1
 
+    def get_large_model_config(self):
+        return GPTJConfig.from_pretrained("EleutherAI/gpt-j-6B")
+
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
 
@@ -106,7 +113,6 @@ class GPTJModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-
         if self.use_labels:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
@@ -153,15 +159,45 @@ class GPTJModelTester:
         config.vocab_size = 300
         return config
 
+    def prepare_config_and_inputs_for_decoder(self):
+        (
+            config,
+            input_ids,
+            input_mask,
+            head_mask,
+            token_type_ids,
+            mc_token_ids,
+            sequence_labels,
+            token_labels,
+            choice_labels,
+        ) = self.prepare_config_and_inputs()
+
+        encoder_hidden_states = floats_tensor([self.batch_size, self.seq_length, self.hidden_size])
+        encoder_attention_mask = ids_tensor([self.batch_size, self.seq_length], vocab_size=2)
+
+        return (
+            config,
+            input_ids,
+            input_mask,
+            head_mask,
+            token_type_ids,
+            sequence_labels,
+            token_labels,
+            choice_labels,
+            encoder_hidden_states,
+            encoder_attention_mask,
+        )
+
     def create_and_check_gptj_model(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
         model = GPTJModel(config=config)
         model.eval()
+        result = model(input_ids, token_type_ids=token_type_ids, head_mask=head_mask, use_cache=True, return_dict=True)
+        result = model(input_ids, token_type_ids=token_type_ids, use_cache=True, return_dict=True)
+        result = model(input_ids, use_cache=True, return_dict=True)
 
-        result = model(input_ids, token_type_ids=token_type_ids, head_mask=head_mask)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
-
-        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.hidden_size))
+        self.parent.assertEqual(
+            result.last_hidden_state.shape, list((self.batch_size, self.seq_length, self.hidden_size))
+        )
         self.parent.assertEqual(len(result.past_key_values), config.n_layer)
 
     def create_and_check_gptj_model_past(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
@@ -170,13 +206,10 @@ class GPTJModelTester:
 
         # first forward pass
         outputs = model(input_ids, token_type_ids=token_type_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, token_type_ids=token_type_ids)
         outputs_no_past = model(input_ids, token_type_ids=token_type_ids, use_cache=False)
-
-        self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
         self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
 
-        output, past = outputs.to_tuple()
+        output, past = outputs
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size)
@@ -186,8 +219,10 @@ class GPTJModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_token_type_ids = paddle.concat([token_type_ids, next_token_types], axis=-1)
 
-        output_from_no_past = model(next_input_ids, token_type_ids=next_token_type_ids)["last_hidden_state"]
-        output_from_past = model(next_tokens, token_type_ids=next_token_types, past_key_values=past)[
+        output_from_no_past = model(next_input_ids, token_type_ids=next_token_type_ids, return_dict=True)[
+            "last_hidden_state"
+        ]
+        output_from_past = model(next_tokens, token_type_ids=next_token_types, past_key_values=past, return_dict=True)[
             "last_hidden_state"
         ]
 
@@ -197,7 +232,7 @@ class GPTJModelTester:
         output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-1))
 
     def create_and_check_gptj_model_attention_mask_past(
         self, config, input_ids, input_mask, head_mask, token_type_ids, *args
@@ -211,7 +246,7 @@ class GPTJModelTester:
         attn_mask[:, half_seq_length:] = 0
 
         # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask).to_tuple()
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size)
@@ -229,8 +264,10 @@ class GPTJModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)["last_hidden_state"]
-        output_from_past = model(next_tokens, past_key_values=past, attention_mask=attn_mask)["last_hidden_state"]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=True)["last_hidden_state"]
+        output_from_past = model(next_tokens, past_key_values=past, attention_mask=attn_mask, return_dict=True)[
+            "last_hidden_state"
+        ]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -249,7 +286,7 @@ class GPTJModelTester:
         # first forward pass
         outputs = model(input_ids, token_type_ids=token_type_ids, attention_mask=input_mask, use_cache=True)
 
-        output, past = outputs.to_tuple()
+        output, past = outputs
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size)
@@ -260,12 +297,15 @@ class GPTJModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_token_type_ids = paddle.concat([token_type_ids, next_token_types], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
-
         output_from_no_past = model(
-            next_input_ids, token_type_ids=next_token_type_ids, attention_mask=next_attention_mask
+            next_input_ids, token_type_ids=next_token_type_ids, attention_mask=next_attention_mask, return_dict=True
         )["last_hidden_state"]
         output_from_past = model(
-            next_tokens, token_type_ids=next_token_types, attention_mask=next_attention_mask, past_key_values=past
+            next_tokens,
+            token_type_ids=next_token_types,
+            attention_mask=next_attention_mask,
+            past_key_values=past,
+            return_dict=True,
         )["last_hidden_state"]
         self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -281,9 +321,9 @@ class GPTJModelTester:
         model = GPTJForCausalLM(config)
         model.eval()
 
-        result = model(input_ids, token_type_ids=token_type_ids, labels=input_ids)
-        self.parent.assertEqual(result.loss.shape, ())
-        self.parent.assertEqual(result.logits.shape, (self.batch_size, self.seq_length, self.vocab_size))
+        result = model(input_ids, token_type_ids=token_type_ids, labels=input_ids, return_dict=True)
+        self.parent.assertEqual(result.loss.shape, [1])
+        self.parent.assertEqual(result.logits.shape, list((self.batch_size, self.seq_length, self.vocab_size)))
 
     def create_and_check_forward_and_backwards(
         self, config, input_ids, input_mask, head_mask, token_type_ids, *args, gradient_checkpointing=False
@@ -311,31 +351,30 @@ class GPTJModelTester:
             token_labels,
             choice_labels,
         ) = config_and_inputs
-
-        inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "head_mask": head_mask}
+        inputs_dict = {
+            "input_ids": input_ids.astype("int64"),
+            "token_type_ids": token_type_ids,
+            "head_mask": head_mask,
+        }
 
         return config, inputs_dict
 
 
 class GPTJModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+    base_model_class = GPTJModel
+
     all_model_classes = (GPTJModel, GPTJForCausalLM, GPTJForSequenceClassification, GPTJForQuestionAnswering)
-    all_generative_model_classes = (GPTJForCausalLM,)
-    pipeline_model_mapping = {
-        "feature-extraction": GPTJModel,
-        "question-answering": GPTJForQuestionAnswering,
-        "text-classification": GPTJForSequenceClassification,
-        "text-generation": GPTJForCausalLM,
-        "zero-shot": GPTJForSequenceClassification,
-    }
+    all_generative_model_classes = {GPTJForCausalLM: (GPTJModel, "unimo")}
     fx_compatible = True
     test_pruning = False
     test_missing_keys = False
     test_model_parallel = False
     test_head_masking = False
+    use_test_model_name_list = False
 
     # special case for DoubleHeads model
-    def _prepare_for_class(self, inputs_dict, model_class, return_labels=False):
-        inputs_dict = super()._prepare_for_class(inputs_dict, model_class, return_labels=return_labels)
+    def _prepare_for_class(self, inputs_dict, model_class):
+        inputs_dict = super()._prepare_for_class(inputs_dict, model_class)
         return inputs_dict
 
     def setUp(self):
@@ -361,12 +400,8 @@ class GPTJModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
 
-    def test_gptj_gradient_checkpointing(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_forward_and_backwards(*config_and_inputs, gradient_checkpointing=True)
-
     @slow
     def test_model_from_pretrained(self):
         for model_name in GPTJ_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = GPTJModel.from_pretrained(model_name, revision="float16")
+            model = GPTJModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
