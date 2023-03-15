@@ -208,7 +208,7 @@ class BM25Retriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
-        query_type: ContentTypes = "text",
+        queries_type: ContentTypes = "text",
         filters: Optional[
             Union[
                 Dict[str, Union[Dict, List, str, int, float, bool]],
