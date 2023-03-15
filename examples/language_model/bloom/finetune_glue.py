@@ -293,6 +293,8 @@ def do_train(args):
     config.num_labels = num_classes
     config.mp_rank = mp_rank
     config.mp_degree = args.mp_degree
+    config.use_pure_fp16 = args.use_pure_fp16
+    config.use_recompute = args.use_recompute
     model = BloomForSequenceClassification.from_pretrained(args.model_name_or_path, config=config)
 
     metric = metric_class()
