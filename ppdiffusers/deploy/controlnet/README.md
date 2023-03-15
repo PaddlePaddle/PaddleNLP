@@ -7,7 +7,7 @@
        * [Canny to Image](#Canny-to-Image)
 
 
-⚡️[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。本示例展现如何通过 FastDeploy 将我们 PPDiffusers 训练好的 Stable Diffusion 模型进行多硬件、多推理引擎后端高性能部署。
+⚡️[FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。本示例展现如何通过 FastDeploy 将我们 PPDiffusers 训练好的 Stable Diffusion 模型进行多硬件、多推理引擎后端高性能部署。
 
 <a name="部署模型准备"></a>
 
@@ -29,12 +29,17 @@ pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdep
 
 ## 快速体验
 
-我们经过部署模型准备，可以开始进行测试。本目录提供 StableDiffusion 模型支持的三种任务，分别是文图生成、文本引导的图像变换以及文本引导的图像编辑。
+我们经过部署模型准备，可以开始进行测试。本目录提供采用Canny边缘检测图片作为控制条件生成图片的教程 。
 
 <a name="Canny to Image"></a>
 
 ### Canny to Image
+下面左图是我们提供的初始图片，右图是经过OpenCV中的Canny算法处理后得到的边缘检测图片。
 
+![bird](https://user-images.githubusercontent.com/50394665/225192117-3ec7a61c-227b-4056-a076-d37759f8411b.png)
+![control_bird_canny](https://user-images.githubusercontent.com/50394665/225192606-47ba975f-f6cc-4555-8d85-870dc1327b45.png)
+
+> Tips：为了能够跑出最快的推理速度，如果是使用`A卡GPU`的用户，请保证`低于8.5版本的TRT`不在`LD_LIBRARY_PATH`路径上。
 
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `controlnet_infer.py` 脚本，完成 `Canny to Image` 任务。
 
@@ -68,8 +73,12 @@ python controlnet_infer.py --model_dir control_sd15_canny --scheduler "euler_anc
 | --device | 运行设备。默认为 `cpu`，可选列表：`['cpu', 'gpu', 'huawei_ascend_npu', 'kunlunxin_xpu']`。 |
 | --scheduler | ControlNet 模型的 scheduler。默认为 `'euler_ancestral'`。可选列表：`['pndm', 'euler_ancestral']`。|
 | --unet_model_prefix | UNet 模型前缀。默认为 `unet`。 |
-| --vae_model_prefix | VAE 模型前缀。默认为 `vae_decoder`。 |
-| --text_encoder_model_prefix | TextEncoder 模型前缀。默认为 `text_encoder`。 |
+| --vae_decoder_model_prefix | VAE Decoder 模型前缀。默认为 `vae_decoder`。 |
+| --vae_encoder_model_prefix | VAE Encoder 模型前缀。默认为 `vae_encoder`。 |
+| --text_encoder_model_prefix | Text Encoder 模型前缀。默认为 `text_encoder`。 |
+| --low_threshold | Canny算法最后一步中，小于该阈值的像素直接置为0，默认为 100。 |
+| --high_threshold | Canny算法最后一步中，大于该阈值的像素直接置为255，默认为 200。 |
+| --resolution | 想要生成的图片分辨率，默认为 512。 |
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `controlnet_bird.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |

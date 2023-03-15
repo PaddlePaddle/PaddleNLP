@@ -55,6 +55,9 @@ def parse_arguments():
     parser.add_argument(
         "--text_encoder_model_prefix", default="text_encoder", help="The file prefix of text_encoder model."
     )
+    parser.add_argument("--low_threshold", type=int, default=100, help="The value of Canny low threshold.")
+    parser.add_argument("--high_threshold", type=int, default=200, help="The value of Canny high threshold.")
+    parser.add_argument("--resolution", type=int, default=512, help="The resolution of images.")
     parser.add_argument("--inference_steps", type=int, default=50, help="The number of unet inference steps.")
     parser.add_argument("--benchmark_steps", type=int, default=1, help="The number of performance benchmark steps.")
     parser.add_argument(
@@ -243,7 +246,7 @@ if __name__ == "__main__":
     # 2. Init tokenizer
     tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
-    resolution = 512
+    resolution = args.resolution
     sample_size = resolution // 8  # 64
     # 3. Set dynamic shape for trt backend
     vae_decoder_dynamic_shape = {
@@ -388,12 +391,9 @@ if __name__ == "__main__":
         feature_extractor=None,
     )
     image = np.array(
-        load_image("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny.png")
+        load_image("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png")
     )
-    low_threshold = 100
-    high_threshold = 200
-
-    image = cv2.Canny(image, low_threshold, high_threshold)
+    image = cv2.Canny(image, args.low_threshold, args.high_threshold)
     image = image[:, :, None]
     image = np.concatenate([image, image, image], axis=2)
     canny_image = Image.fromarray(image)

@@ -584,9 +584,6 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
 
         if do_classifier_free_guidance:
             image = paddle.concat([image] * 2)
-            noise_pred_unet_batch_size = 2 * batch_size * num_images_per_prompt
-        else:
-            noise_pred_unet_batch_size = batch_size * num_images_per_prompt
 
         # 5. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -618,6 +615,11 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
 
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
+
+        if do_classifier_free_guidance:
+            noise_pred_unet_batch_size = 2 * batch_size * num_images_per_prompt
+        else:
+            noise_pred_unet_batch_size = batch_size * num_images_per_prompt
 
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)

@@ -50,3 +50,5 @@ control_sd15_canny/
 | <span style="display:inline-block;width: 230pt"> --pretrained_model_name_or_path </span> | ppdiffuers提供的diffusion预训练模型。默认为："takuma104/control_sd15_canny"。更多 StableDiffusion 预训练模型可参考 [ppdiffusers 模型列表](../README.md#ppdiffusers模型支持的权重)。|
 | --output_path | 导出的模型目录。 |
 | --sample | vae encoder 的输出是否调整为 sample 模式，注意：sample模式会引入随机因素，默认是 False。|
+| --height | 如果指定，则会固定导出模型的高度，即，在推理生成图片时只能生成该大小的图片，默认值为None。|
+| --width | 如果指定，则会固定导出模型的宽度，即，在推理生成图片时只能生成该大小的图片，默认值为None。|
