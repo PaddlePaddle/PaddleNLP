@@ -66,14 +66,14 @@ class GLMAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, 3 * config.hidden_size, has_bias=True, gather_output=False
             )
             self.dense = fleet.meta_parallel.RowParallelLinear(
                 config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
             )
-            self.num_attention_heads = config.num_attention_heads // config.mp_degree
+            self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
         else:
             self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
             self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -135,7 +135,7 @@ class GLMAttention(nn.Layer):
 
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         # [bs, seq_len, num_head * head_dim]
-        if self.config.mp_degree > 1:
+        if self.config.tensor_parallel_degree > 1:
             q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
         else:
             # [bs,  num_head, seq_len, head_dim]
@@ -218,7 +218,7 @@ class GPT2MLP(nn.Layer):
 
     def __init__(self, config: GLMConfig):
         super(GPT2MLP, self).__init__()
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, config.hidden_size * 4, has_bias=True, gather_output=False
             )
@@ -444,7 +444,10 @@ class GLMPretrainedModel(PretrainedModel):
                 assert is_column, "QKV vectors should be column parallel linear."
                 x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
             return split_tensor_parallel_weight(
-                x, mp_degree=config.mp_degree, mp_rank=config.mp_rank, is_column=is_column
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
             )
 
         def get_tensor_parallel_split_mappings(num_layers):
@@ -482,7 +485,7 @@ class GLMPretrainedModel(PretrainedModel):
 
             return final_actions
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
             for mapping in model_mappings:
                 if mapping[1] in tp_split_mappings:
@@ -568,7 +571,7 @@ class GLMModel(GLMPretrainedModel):
         super(GLMModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        if self.config.mp_degree > 1:
+        if self.config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.hidden_size,
@@ -613,7 +616,7 @@ class GLMModel(GLMPretrainedModel):
 
         logits, hidden_layers = self.transformer(word_embeddings, position_ids, attention_mask, cache)
         if self.output_predict:
-            if self.config.mp_degree > 1:
+            if self.config.tensor_parallel_degree > 1:
                 # FIXME: @ZHUI for not gather logits togather.
                 # logits = parallel_matmul(logits, self.word_embeddings.weight, True)
                 logits = parallel_matmul(logits, self.word_embeddings.weight, self.config.tensor_parallel_output)
@@ -658,7 +661,7 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         loss = None
         if labels is not None:
             # FIXME: @ZHUI for not gather logits togather.
-            if self.glm.config.mp_degree > 1:
+            if self.glm.config.tensor_parallel_degree > 1:
                 assert (
                     self.glm.config.tensor_parallel_output is False
                 ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
@@ -744,7 +747,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         loss = None
         if labels is not None:
             # FIXME: @ZHUI for not gather logits togather.
-            if self.glm.config.mp_degree > 1 and self.glm.config.tensor_parallel_output:
+            if self.glm.config.tensor_parallel_degree > 1 and self.glm.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
                 loss = self.parallel_loss_fun(lm_logits, labels)
                 loss = loss[labels != self.glm.config.pad_token_id]

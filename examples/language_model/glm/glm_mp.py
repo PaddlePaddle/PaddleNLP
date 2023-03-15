@@ -19,12 +19,12 @@ from paddlenlp.transformers import GLMModel
 # from modeling import GLMModel
 
 
-mp_degree = paddle.distributed.get_world_size()
-mp_rank = paddle.distributed.get_rank()
+tensor_parallel_degree = paddle.distributed.get_world_size()
+tensor_parallel_rank = paddle.distributed.get_rank()
 strategy = paddle.distributed.fleet.DistributedStrategy()
 strategy.hybrid_configs = {
     "dp_degree": 1,
-    "mp_degree": mp_degree,
+    "mp_degree": tensor_parallel_degree,
     "pp_degree": 1,
     "sharding_degree": 1,
 }
@@ -33,15 +33,27 @@ paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
 # model = AutoModel.from_pretrained("THUDM/glm-large-chinese",
 # config=GLMConfig.from_pretrained("glm-large-chinese")
 # config.mp_degree=mp_degree
-# config.mp_rank=mp_rank
+# config.tensor_parallel_rank=tensor_parallel_rank
 
 # from modeling import GLMModel;
 
+
+def distributed_independent_guard():
+    world_size = paddle.distributed.get_world_size()
+    index = paddle.distributed.get_rank()
+    for i in range(world_size):
+        if i == index:
+            pass
+            paddle.barrier()
+        else:
+            paddle.barrier()
+
+
 model = GLMModel.from_pretrained(
     "THUDM/glm-large-chinese",
-    from_hf_hub=True,
-    mp_degree=mp_degree,
-    mp_rank=mp_rank,
+    # from_hf_hub=True,
+    tensor_parallel_degree=tensor_parallel_degree,
+    tensor_parallel_rank=tensor_parallel_rank,
 )
 
 model.eval()

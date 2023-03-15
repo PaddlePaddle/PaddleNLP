@@ -77,7 +77,13 @@ __all__ = [
 
 
 def unwrap_model(model, *args, **kwargs):
-    raw_model = model._layers if isinstance(model, paddle.DataParallel) else model
+    raw_model = model
+    while hasattr(raw_model, "_layers") or hasattr(raw_model, "_layer"):
+        if hasattr(raw_model, "_layers"):
+            raw_model = raw_model._layers
+        else:
+            raw_model = raw_model._layer
+
     return raw_model
 
 
@@ -1355,7 +1361,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
         else:
             # 4. loading the state dict
-            model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+            if config.tensor_parallel_degree > 1:
+                model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
+            else:
+                model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
         # 3. init the model
         init_args = config["init_args"] or ()

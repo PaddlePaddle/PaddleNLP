@@ -242,7 +242,7 @@ class Trainer:
 
         # init parallel env
         if paddle.distributed.get_world_size() > 1:
-            if self.sharding:
+            if self.sharding or self.args.tensor_parallel_degree > 1:
                 self.hcg = fleet.get_hybrid_communicate_group()
                 self.dp_group = self.hcg.get_data_parallel_group()
                 self.sharding_group = self.hcg.get_sharding_parallel_group()
@@ -293,7 +293,7 @@ class Trainer:
         self.do_grad_scaling = False
         if args.fp16 or args.bf16:
             logger.info("Using half precision")
-            self.do_grad_scaling = True
+            self.do_grad_scaling = True if args.fp16 else False
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
             # fix for load saved fp16 or bf16 ckpt, decorate model first.
             if self.args.fp16_opt_level == "O2":
@@ -645,7 +645,7 @@ class Trainer:
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
-                dp_enabled = self.args.dp_degree > 1 if self.sharding else args.local_rank != -1
+                dp_enabled = self.args.data_parallel_degree > 1 if self.sharding else args.local_rank != -1
                 forbidden_no_sync = False
                 if self.sharding and (ShardingOption.SHARD_OP not in self.args.sharding):
                     # stage2 and stage3 should no_sync, because the is no DDP wrapper and  no_sync API
@@ -680,7 +680,7 @@ class Trainer:
                     # Case 2: Use recompute and dp
                     # local_rank != -1 don't means dp in networks.
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.dp_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
+                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
                             fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
@@ -792,8 +792,8 @@ class Trainer:
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
             shuffle=True,
-            num_replicas=self.args.world_size,
-            rank=self.args.process_index,
+            num_replicas=self.args.dataset_world_size,
+            rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
         )
 
@@ -907,8 +907,8 @@ class Trainer:
         else:
             return DistributedBatchSampler(
                 eval_dataset,
-                num_replicas=self.args.world_size,
-                rank=self.args.process_index,
+                num_replicas=self.args.dataset_world_size,
+                rank=self.args.dataset_rank,
                 batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
@@ -1202,7 +1202,7 @@ class Trainer:
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
                 # sync params (broadcast) buffers in dp group
-                if not is_dp_group_support_in_group_sharded_parallel() and self.args.dp_degree > 1:
+                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
                     try:
                         from paddle.fluid.dygraph.parallel import sync_params_buffers
                     except ImportError:

@@ -254,27 +254,27 @@ def merge_tensor_parallel_weight(weight_list, is_column=True):
         return np.concatenate(weight_list, axis=0)
 
 
-def split_tensor_parallel_weight(weight, mp_degree, mp_rank=None, is_column=True):
+def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
     """
 
     [A1, A2]  =>  [A1],[A2]
 
     Args:
         weight (_type_): _description_
-        mp_degree (_type_): _description_
-        mp_rank (_type_): _description_
+        tensor_parallel_degree (_type_): _description_
+        tensor_parallel_rank (_type_): _description_
         is_column (bool, optional): _description_. Defaults to True.
 
     Returns:
         _type_: _description_
     """
     if is_column:
-        splited_weights = np.split(weight, mp_degree, axis=-1)
+        splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
     else:
-        splited_weights = np.split(weight, mp_degree, axis=0)
+        splited_weights = np.split(weight, tensor_parallel_degree, axis=0)
 
-    if mp_rank is not None:
-        return splited_weights[mp_rank]
+    if tensor_parallel_rank is not None:
+        return splited_weights[tensor_parallel_rank]
 
     return splited_weights
 
@@ -853,6 +853,44 @@ class ConversionMixin:
 
         Returns:
             List[StateDictNameMapping]: the name-mappings of pretrained model
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+        """the entry of converting config and converting model file
+
+        Args:
+            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            config (PretrainedConfig): the PretrainedConfig instance of model
+        """
+        # FIXME(wj-Mcat): add compatibility with downstream models
+        name_mappings = cls._get_tensor_parallel_mappings(config)
+
+        state_dict = paddle.load(weight_file, return_numpy=True)
+
+        # 3. convert state_dict
+        for name_mapping in name_mappings:
+            if name_mapping.source_name not in state_dict:
+                logger.warning(f"key<{name_mapping.source_name}> not in the model state weight file.")
+                continue
+
+            state_dict[name_mapping.target_name] = name_mapping.run(state_dict, name_mapping.source_name)
+
+        return state_dict
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config: PretrainedConfig) -> List[StateDictNameMapping]:
+        """get name mapping of PretrainedModel
+
+        Args:
+            config (PretrainedConfig): the configuration of name-mapping
+
+        Raises:
+            NotImplementedError:
+
+        Returns:
+            List[StateDictNameMapping]: the name-mappings for tensor_parallel
         """
         raise NotImplementedError
 

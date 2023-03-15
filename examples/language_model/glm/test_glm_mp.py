@@ -64,7 +64,7 @@ class TestCkptShard(unittest.TestCase):
     def test_qkv_convertor(self):
         """test_qkv_convertor"""
         hidden_size = 8
-        mp_degree = 4
+        tensor_parallel_degree = 4
         num_attention_heads = 4
         # head_dim = hidden_size // num_attention_heads
 
@@ -85,7 +85,7 @@ class TestCkptShard(unittest.TestCase):
             [0, 1, 8, 9, 16, 17, 2, 3, 10, 11, 18, 19, 4, 5, 12, 13, 20, 21, 6, 7, 14, 15, 22, 23],
         )
 
-        mp_qkv_splited = split_tensor_parallel_weight(tensor_parallel_qkv, mp_degree)
+        mp_qkv_splited = split_tensor_parallel_weight(tensor_parallel_qkv, tensor_parallel_degree)
         new_tensor_parallel_qkv = merge_tensor_parallel_weight(mp_qkv_splited)
         # print("mp_qkv_splited", mp_qkv_splited[0])
         np.testing.assert_equal(new_tensor_parallel_qkv, tensor_parallel_qkv)
@@ -98,18 +98,21 @@ class TestCkptShard(unittest.TestCase):
         """_summary_"""
         from modeling import GLMModel as AutoModel
 
-        mp_degree = paddle.distributed.get_world_size()
-        mp_rank = paddle.distributed.get_rank()
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        tensor_parallel_rank = paddle.distributed.get_rank()
         strategy = paddle.distributed.fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
-            "mp_degree": mp_degree,
+            "mp_degree": tensor_parallel_degree,
             "pp_degree": 1,
             "sharding_degree": 1,
         }
         paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
         model = AutoModel.from_pretrained(
-            "THUDM/glm-large-chinese", from_hf=True, mp_degree=mp_degree, mp_rank=mp_rank
+            "THUDM/glm-large-chinese",
+            from_hf=True,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
         )
         model.eval()
         model()

@@ -68,14 +68,14 @@ class GLMAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, 3 * config.hidden_size, has_bias=True, gather_output=False
             )
             self.dense = fleet.meta_parallel.RowParallelLinear(
                 config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
             )
-            self.num_attention_heads = config.num_attention_heads // config.mp_degree
+            self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
         else:
             self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
             self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -147,7 +147,7 @@ class GLMAttention(nn.Layer):
 
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         # [bs, seq_len, num_head * head_dim]
-        if self.config.mp_degree > 1:
+        if self.config.tensor_parallel_degree > 1:
             q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
         else:
             # [bs,  num_head, seq_len, head_dim]
@@ -230,7 +230,7 @@ class GPT2MLP(nn.Layer):
 
     def __init__(self, config: GLMConfig):
         super(GPT2MLP, self).__init__()
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, config.hidden_size * 4, has_bias=True, gather_output=False
             )
@@ -410,6 +410,59 @@ class GLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = GLM_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
+    def _get_tensor_parallel_mappings(cls, config):
+
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_old_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
+            return split_tensor_parallel_weight(
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
+            )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True, is_old_qkv=True),
+                "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True, is_old_qkv=True),
+                # Row Linear
+                "word_embeddings.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.attention.dense.bias',
+                "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        # prefix = ""
+        prefix = "glm."
+
+        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+
+    @classmethod
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -459,14 +512,17 @@ class GLMPretrainedModel(PretrainedModel):
             split_tensor_parallel_weight,
         )
 
-        def fn(x, transpose=True, is_column=True, is_qkv=False):
+        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
             if transpose:
                 x = np.transpose(x, [1, 0])
-            if is_qkv:
+            if is_old_qkv:
                 assert is_column, "QKV vectors should be column parallel linear."
                 x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
             return split_tensor_parallel_weight(
-                x, mp_degree=config.mp_degree, mp_rank=config.mp_rank, is_column=is_column
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
             )
 
         def get_tensor_parallel_split_mappings(num_layers):
@@ -474,26 +530,26 @@ class GLMPretrainedModel(PretrainedModel):
             base_actions = {
                 # Column Linear
                 "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(
-                    fn, transpose=False, is_column=True, is_qkv=False
+                    fn, is_column=True, transpose=False, is_old_qkv=False
                 ),
                 "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(
-                    fn, transpose=True, is_column=True, is_qkv=False
+                    fn, is_column=True, transpose=True, is_old_qkv=False
                 ),
                 "transformer.layers.0.attention.query_key_value.bias": partial(
-                    fn, transpose=False, is_column=True, is_qkv=True
+                    fn, is_column=True, transpose=False, is_old_qkv=True
                 ),
                 "transformer.layers.0.attention.query_key_value.weight": partial(
-                    fn, transpose=True, is_column=True, is_qkv=True
+                    fn, is_column=True, transpose=True, is_old_qkv=True
                 ),
                 # Row Linear
-                "word_embeddings.weight": partial(fn, transpose=False, is_column=False, is_qkv=False),
+                "word_embeddings.weight": partial(fn, is_column=False, transpose=False, is_old_qkv=False),
                 # 'transformer.layers.0.attention.dense.bias',
                 "transformer.layers.0.attention.dense.weight": partial(
-                    fn, transpose=True, is_column=False, is_qkv=False
+                    fn, is_column=False, transpose=True, is_old_qkv=False
                 ),
                 # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
                 "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(
-                    fn, transpose=True, is_column=False, is_qkv=False
+                    fn, is_column=False, transpose=True, is_old_qkv=False
                 ),
             }
             for key, action in base_actions.items():
@@ -504,7 +560,7 @@ class GLMPretrainedModel(PretrainedModel):
 
             return final_actions
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
             for mapping in model_mappings:
                 if mapping[1] in tp_split_mappings:
@@ -522,6 +578,7 @@ class GLMPretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """Initialization hook"""
+        return
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
             # TODO: initialization for glm-515m
@@ -577,7 +634,7 @@ class GLMModel(GLMPretrainedModel):
         super(GLMModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        if self.config.mp_degree > 1:
+        if self.config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.hidden_size,
@@ -626,7 +683,7 @@ class GLMModel(GLMPretrainedModel):
             logits = output[0] if isinstance(output, tuple) else output
 
         if self.output_predict:
-            if self.config.mp_degree > 1:
+            if self.config.tensor_parallel_degree > 1:
                 # FIXME: @ZHUI fix for jit_to_static
                 logits = parallel_matmul(logits, self.word_embeddings.weight, self.config.tensor_parallel_output)
             else:
@@ -676,7 +733,7 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         log_probs = paddle.stack(log_probs).squeeze(2)
         loss = None
         if labels is not None:
-            if self.glm.config.mp_degree > 1:
+            if self.glm.config.tensor_parallel_degree > 1:
                 assert (
                     self.glm.config.tensor_parallel_output is False
                 ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
@@ -762,7 +819,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         if labels is not None:
             # Since ParallelCrossEntropy not support -100 ingore index.
             # we use pad_token_id
-            if self.glm.config.mp_degree > 1 and self.glm.config.tensor_parallel_output:
+            if self.glm.config.tensor_parallel_degree > 1 and self.glm.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
                 loss = self.parallel_loss_fun(lm_logits, labels)
                 loss = loss[labels != self.glm.config.pad_token_id]

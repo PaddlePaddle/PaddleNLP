@@ -70,8 +70,13 @@ def main():
 
     # Load the pretrained language model.
     model = AutoModelForConditionalGeneration.from_pretrained(
-        model_args.model_name_or_path, output_predict=True, parallel_output=True
+        model_args.model_name_or_path,
+        output_predict=True,
+        parallel_output=True,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model.generate = partial(
         generate,
