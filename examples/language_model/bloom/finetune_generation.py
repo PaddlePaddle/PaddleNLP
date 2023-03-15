@@ -222,6 +222,7 @@ def do_train(args):
     config["hidden_dropout_prob"] = args.hidden_dropout_prob
     config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     config["use_recompute"] = args.use_recompute
+    config["use_pure_fp16"] = args.use_pure_fp16
     config["enable_fuse_transformer"] = False
     model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
 
