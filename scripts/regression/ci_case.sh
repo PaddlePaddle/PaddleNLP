@@ -136,7 +136,7 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
     --input_dir data/ \
-    --output_dir pretrained_models/.pad \
+    --output_dir pretrained_models/ \
     --logging_steps 1 \
     --save_steps 1 \
     --max_steps 1 \
@@ -158,9 +158,7 @@ time (python -m paddle.distributed.launch run_glue_trainer.py \
     --device gpu \
     --fp16 False\
     --do_train \
-    --do_eval \
-    --do_predict \
-     >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
+    --do_eval >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
 print_info $? bert_fintune
 time (python -u ./export_model.py \
     --model_type bert \
