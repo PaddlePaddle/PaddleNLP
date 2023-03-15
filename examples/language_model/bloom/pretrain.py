@@ -195,6 +195,7 @@ def do_train(args):
     config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     config["use_recompute"] = args.use_recompute
     config["pp_degree"] = args.pp_degree
+    config["use_pure_fp16"] = args.use_pure_fp16
     config["use_cache"] = False
     config["enable_fuse_transformer"] = False
     model = BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)

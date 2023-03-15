@@ -437,7 +437,6 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = attention_scores.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        print("The pure fp16:{}".format(self.config.use_pure_fp16))
         if self.config.use_pure_fp16:
             with paddle.amp.auto_cast(False):
                 if input_dtype == paddle.float16:
