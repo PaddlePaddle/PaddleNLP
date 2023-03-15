@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 import re
+from dataclasses import asdict, dataclass, field
+from typing import List, Optional, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
+from ..utils.env import LORA_CONFIG_NAME
 
 
 class LoRALinear(nn.Linear):
@@ -93,7 +99,7 @@ class LoRALinear(nn.Linear):
 
 
 # TODO (this is tmp API. will formalize before release)
-def _find_and_replace_module(model, module_name, r, lora_alpha):
+def _find_and_replace_module(model, module_name, lora_config):
     parent_module = model
     attribute_chain = module_name.split(".")
     for name in attribute_chain[:-1]:
@@ -102,18 +108,112 @@ def _find_and_replace_module(model, module_name, r, lora_alpha):
     lora_module = LoRALinear(
         in_features=module.weight.shape[0],
         out_features=module.weight.shape[1],
-        r=r,
-        lora_alpha=lora_alpha,
+        r=lora_config.r,
+        lora_alpha=lora_config.lora_alpha,
+        lora_dropout=lora_config.lora_dropout,
+        merge_weights=lora_config.merge_weights,
     )
     setattr(parent_module, attribute_chain[-1], lora_module)
 
 
+@dataclass
+class LoRAConfig:
+    """
+    This is the configuration class to store the configuration of a [`LoRAModel`].
+    Args:
+        r (`int`): Lora attention dimension
+        target_modules (`Union[List[str],str]`): The names of the modules to apply Lora to.
+        lora_alpha (`float`): The alpha parameter for Lora scaling.
+        lora_dropout (`float`): The dropout probability for Lora layers.
+        merge_weights (`bool`):
+            Whether to merge the weights of the Lora layers with the base transformer model in `eval` mode.
+    """
+
+    r: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    target_modules: Optional[Union[List[str], str]] = field(
+        default=None,
+        metadata={
+            "help": "List of module names or regex expression of the module names to replace with Lora."
+            "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
+        },
+    )
+    lora_alpha: int = field(default=8, metadata={"help": "Lora alpha"})
+    lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+
+    @property
+    def __dict__(self):
+        return asdict(self)
+
+    def to_dict(self):
+        return self.__dict__
+
+    def save_pretrained(self, save_directory):
+        r"""
+        This method saves the configuration of your adapter model in a directory.
+        Args:
+            save_directory (`str`):
+                The directory where the configuration will be saved.
+        """
+        if os.path.isfile(save_directory):
+            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
+
+        os.makedirs(save_directory, exist_ok=True)
+
+        output_dict = self.__dict__
+        output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
+
+        # save it
+        with open(output_path, "w") as writer:
+            writer.write(json.dumps(output_dict, indent=2, sort_keys=True))
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
+        r"""
+        This method loads the configuration of your adapter model from a directory.
+        Args:
+            pretrained_model_name_or_path (`str`):
+                The directory or the hub-id where the configuration is saved.
+            **kwargs:
+                Additional keyword arguments passed along to the child class initialization.
+        """
+        if os.path.isfile(os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)):
+            config_file = os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)
+        else:
+            raise ValueError(f"Can't find config.json at '{pretrained_model_name_or_path}'")
+
+        loaded_attributes = cls.from_json_file(config_file)
+
+        config = cls(**kwargs)
+
+        for key, value in loaded_attributes.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+
+        return config
+
+    @classmethod
+    def from_json_file(cls, path_json_file):
+        r"""
+        Loads a configuration file from a json file.
+        Args:
+            path_json_file (`str`):
+                The path to the json file.
+        """
+        with open(path_json_file, "r") as file:
+            json_object = json.load(file)
+
+        return json_object
+
+
 # TODO (this is tmp API. will formalize before release)
-def get_lora_model(model, lora_config):
-    target_modules = lora_config["target_modules"]
+def get_lora_model(model, lora_config: LoRAConfig):
+    target_modules = lora_config.target_modules
     for target_module in target_modules:
         for i in model.named_sublayers():
             module_name = i[0]
             if re.fullmatch(target_module, module_name):
-                _find_and_replace_module(model, module_name, lora_config["r"], lora_config["lora_alpha"])
+                _find_and_replace_module(model, module_name, lora_config)
     return model
