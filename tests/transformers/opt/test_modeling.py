@@ -93,6 +93,7 @@ class OPTModelTester:
 
         input_mask = None
         if self.use_input_mask:
+            # contruct input_mask filling with 0 and -1e4
             input_mask_cond = paddle.randn([self.batch_size, self.seq_length])
             input_mask = paddle.where(
                 input_mask_cond > input_mask_cond.mean(),
