@@ -33,42 +33,6 @@ class GLMTrainer(Trainer):
         super().__init__(**kwargs)
         self.do_generation = do_generation
 
-    def compute_loss(
-        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], return_outputs: bool = False
-    ):
-        if self.criterion is not None:
-            if "labels" in inputs:
-                labels = inputs.pop("labels")
-            elif self.args.label_names is not None:
-                labels = []
-                for label in self.label_names:
-                    labels.append(inputs.pop(label))
-                labels = tuple(labels)
-            elif "generator_labels" in inputs:
-                labels = inputs["generator_labels"]
-        else:
-            labels = None
-        if "loss_mask" in inputs and inputs["loss_mask"] is not None:
-            loss_mask = inputs.pop("loss_mask").reshape([-1])
-        else:
-            loss_mask = None
-        inputs.pop("target_attention_mask", None)
-
-        logits, _ = model(**inputs)
-
-        if self.criterion is not None:
-            loss = self.criterion(logits, labels)
-            if self.args.label_smoothing > 0:
-                smooth_loss = (-nn.functional.log_softmax(logits, axis=-1) / logits.shape[2]).sum(axis=-1)
-                loss = (1 - self.args.label_smoothing) * loss + self.args.label_smoothing * smooth_loss
-            if loss_mask is not None:
-                loss = paddle.sum(loss.reshape([-1]) * loss_mask) / paddle.sum(loss_mask)
-            outputs = (loss, logits)
-
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-
-        return (loss, outputs) if return_outputs else loss
-
     def prediction_step(
         self,
         model: nn.Layer,
@@ -125,7 +89,6 @@ def generate(
     input_ids=None,
     position_ids=None,
     attention_mask=None,
-    max_length=None,
     tgt_length=256,
     min_tgt_length=5,
     num_beams=1,
@@ -151,7 +114,7 @@ def generate(
     batch_size = input_ids.shape[0]
     beam_scorer = BeamSearchScorer(
         batch_size=batch_size,
-        max_length=max_length,
+        max_length=tgt_length,
         num_beams=num_beams,
         length_penalty=length_penalty,
         do_early_stopping=False,
@@ -167,6 +130,8 @@ def generate(
                 input_ids=input_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
+                cache=None,
+                use_cache=True,
             )
             seq_length = next_token_logits.shape[1]
             next_token_logits = next_token_logits[:, -1]
