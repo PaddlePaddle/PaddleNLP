@@ -12,6 +12,7 @@
     <img src="https://user-images.githubusercontent.com/12107462/216578818-f194cf9f-3d7f-4139-a173-dc9366e52e97.png" width="500px">
 </div>
 
+以下是文搜图的系统搭建流程，如果用户需要图搜文的应用，请参考[图搜文系统搭建流程](./IMAGE_TO_TEXT_SEARCH.md)
 
 ### 2.1 系统特色
 
@@ -28,7 +29,7 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
+- python >= 3.7.3
 - paddlenlp >= 2.5.0
 - paddlepaddle-gpu >=2.4.1
 - CUDA Version: 11.2
@@ -70,11 +71,11 @@ cd PaddleNLP/pipelines
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/image_text_retrieval/image_text_retrieval_example.py --device gpu \
+python examples/image_text_retrieval/text_to_image_retrieval_example.py --device gpu \
                                                           --search_engine faiss
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/image_text_retrieval/image_text_retrieval_example.py --device cpu \
+python examples/image_text_retrieval/text_to_image_retrieval_example.py --device cpu \
                                                           --search_engine faiss
 ```
 
@@ -132,7 +133,7 @@ curl -XDELETE http://localhost:9200/wukong_test
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定文图跨模态检索系统的Yaml配置文件
-export PIPELINE_YAML_PATH=rest_api/pipeline/image_text_retrieval.yaml
+export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_retrieval.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
@@ -154,7 +155,7 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
-python ui/webapp_image_text_retrieval.py --server.port 8502
+python ui/webapp_text_to_image_retrieval.py --server.port 8502
 ```
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 

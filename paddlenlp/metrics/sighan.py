@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-import math
-from functools import partial
 
 import numpy as np
-import paddle
 from paddle.metric import Metric
 
 __all__ = ["DetectionF1", "CorrectionF1"]

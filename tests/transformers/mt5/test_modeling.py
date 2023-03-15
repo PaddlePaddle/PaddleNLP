@@ -489,6 +489,7 @@ class MT5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     test_model_parallel = True
     use_test_inputs_embeds = True
     is_encoder_decoder = True
+    use_test_model_name_list = False
     # The small MT5 model needs higher percentages for CPU/MP tests
     model_split_percents = [0.8, 0.9]
 

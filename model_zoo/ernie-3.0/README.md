@@ -1584,7 +1584,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 </div>
 
-目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
+目前 ERNIE 3.0 模型已提供基于 FastDeploy 的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及 Graphcore IPU）以及推理引擎后端进行部署。具体的适配的硬件以及推理引擎请参考：[FastDeploy 部署指南](./deploy/README.md)
 
 <a name="Python部署"></a>
 

@@ -12,30 +12,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-
 import argparse
-import numpy as np
 from functools import partial
 
 import paddle
-from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.transformers import ErnieTokenizer
-
 from utils import convert_example, parse_decode
 
-# yapf: disable
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
+from paddlenlp.transformers import ErnieTokenizer
+
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
-parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
+parser.add_argument(
+    "--model_file",
+    type=str,
+    required=True,
+    default="./static_graph_params.pdmodel",
+    help="The path to model info in static graph.",
+)
+parser.add_argument(
+    "--params_file",
+    type=str,
+    required=True,
+    default="./static_graph_params.pdiparams",
+    help="The path to parameters in static graph.",
+)
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument(
+    "--device",
+    default="gpu",
+    type=str,
+    choices=["cpu", "gpu"],
+    help="The device to select to train the model, is must be cpu/gpu.",
+)
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 
 args = parser.parse_args()
-# yapf: enable
 
 
 class Predictor(object):
@@ -51,6 +63,7 @@ class Predictor(object):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         config.switch_use_feed_fetch_ops(False)
+        config.delete_pass("fused_multi_transformer_encoder_pass")
         self.predictor = paddle.inference.create_predictor(config)
 
         self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]

@@ -131,6 +131,12 @@ class Task(metaclass=abc.ABCMeta):
         Check files required by the task.
         """
         for file_id, file_name in self.resource_files_names.items():
+            if self.task in ["information_extraction"]:
+                dygraph_file = ["model_state.pdparams"]
+            else:
+                dygraph_file = ["model_state.pdparams", "config.json"]
+            if self.is_static_model and file_name in dygraph_file:
+                continue
             path = os.path.join(self._task_path, file_name)
             url = self.resource_files_urls[self.model][file_id][0]
             md5 = self.resource_files_urls[self.model][file_id][1]

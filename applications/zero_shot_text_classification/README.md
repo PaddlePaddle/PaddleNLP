@@ -153,6 +153,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
 可配置参数说明：
+* `single_label`: 每条样本是否只预测一个标签。默认为`False`，表示多标签分类。
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 * `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认10。
 * `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
@@ -199,6 +200,7 @@ python run_eval.py \
 - `test_path`: 进行评估的测试集文件。
 - `per_device_eval_batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `single_label`: 每条样本是否只预测一个标签。默认为`False`，表示多标签分类。
 
 <a name="定制模型一键预测"></a>
 

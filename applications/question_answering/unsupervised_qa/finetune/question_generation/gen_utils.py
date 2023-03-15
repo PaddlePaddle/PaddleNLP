@@ -257,7 +257,7 @@ def post_process_sum(token_ids, tokenizer):
 def remove_template(instr):
     """Remove template prefix of decoded sequence."""
     outstr = instr.strip("问题：")
-    outstr = instr.strip("在已知答案的前提下，问题：")
+    outstr = outstr.strip("在已知答案的前提下，问题：")
     return outstr
 
 
