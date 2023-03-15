@@ -6,7 +6,7 @@ components:    # define all the building-blocks for Pipeline
     params:
       host: localhost
       port: 9200
-      index: wukong
+      index: wukong_test
       embedding_dim: 768
   - name: Retriever
     type: MultiModalRetriever

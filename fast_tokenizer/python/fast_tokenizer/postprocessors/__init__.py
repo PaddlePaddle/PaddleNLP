@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Tuple, List, Dict
-
 from abc import ABC
+from typing import List, Tuple, Union
 
-from .. import C
-from .. import Encoding
+from .. import C, Encoding
 
 
 class PostProcessor(ABC):
