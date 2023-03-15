@@ -1106,8 +1106,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Tuple[List[str]]: _description_
         """
-
+        print("step 0", state_dict[list(state_dict.keys())[0]])
         model_state_dict = model.state_dict()
+
         expected_keys = list(model_state_dict.keys())
         prefix = model.base_model_prefix
 
@@ -1209,6 +1210,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for key in list(state_dict.keys()):
                 state_dict[start_prefix + key] = state_dict.pop(key)
 
+        print("step 1", state_dict[list(state_dict.keys())[0]])
         # convert the dtype of state dict
         if dtype is not None:
             if isinstance(dtype, paddle.dtype):
@@ -1217,7 +1219,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                if isinstance(state_dict[key], np.ndarray):
+                    state_dict[key] = state_dict[key].astype(dtype=dtype)
+                else:
+                    state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:
             dtype_prefix_len = len("paddle.")
             for k, v in model_to_load.state_dict().items():
@@ -1241,7 +1246,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # To avoid recursive import temporarily.
         import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
+        print("step 2", state_dict[list(state_dict.keys())[0]])
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+        print("step 3", state_to_load[list(state_to_load.keys())[0]])
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
 
@@ -1359,7 +1366,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # 3. init the model
         init_args = config["init_args"] or ()
-        model = cls(config, *init_args, **model_kwargs)
+        with paddle.LazyGuard():
+            model = cls(config, *init_args, **model_kwargs)
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
