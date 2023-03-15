@@ -32,7 +32,7 @@ from utils import (
 
 from paddlenlp.data import Dict, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.trainer.argparser import string_to_bool
 from paddlenlp.transformers import ElectraTokenizer
 
 # yapf: disable
@@ -51,7 +51,7 @@ parser.add_argument('--logging_steps', default=10, type=int, help='The interval 
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
 parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--use_amp', default=False, type=strtobool, help='Enable mixed precision training.')
+parser.add_argument('--use_amp', default=False, type=string_to_bool, help='Enable mixed precision training.')
 parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
 args = parser.parse_args()
