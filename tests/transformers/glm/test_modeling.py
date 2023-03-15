@@ -33,7 +33,7 @@ from tests.transformers.test_modeling_common import (
     random_attention_mask,
 )
 
-GLM_PRETRAINED_MODEL_ARCHIVE_LIST = ["glm-515m", "glm-2b"]
+GLM_PRETRAINED_MODEL_ARCHIVE_LIST = ["THUDM/glm-515m", "THUDM/glm-2b", "THUDM/glm-large-chinese"]
 
 
 class GLMModelTester:
@@ -168,10 +168,15 @@ class GLMModelTester:
     ):
         model = GLMModel(config)
         model.eval()
-        result = model(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask, return_dict=True)
+        result = model(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            return_dict=True,
+        )
 
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(result.cache), config["num_layers"] + 1)
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(len(result.past_key_values), config["num_layers"] + 1)
 
     def create_and_check_for_multiple_choice(
         self,

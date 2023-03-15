@@ -86,6 +86,7 @@ from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
 from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
+from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
@@ -169,6 +170,7 @@ from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .roformerv2.configuration import *
 from .optimization import *
+from .opt.configuration import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
