@@ -93,7 +93,6 @@ class OPTModelTester:
 
         input_mask = None
         if self.use_input_mask:
-            # input_mask = random_attention_mask([self.batch_size, self.seq_length], dtype="int64")
             input_mask_cond = paddle.randn([self.batch_size, self.seq_length])
             input_mask = paddle.where(
                 input_mask_cond > input_mask_cond.mean(),
@@ -265,7 +264,6 @@ class OPTModelTester:
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
-        # next_mask = ids_tensor((self.batch_size, 3), vocab_size=2, dtype="int64")
         next_mask_cond = paddle.randn((self.batch_size, 3))
         next_mask = paddle.where(
             next_mask_cond > next_mask_cond.mean(),
