@@ -319,6 +319,7 @@ class BloomAttention(nn.Layer):
         self.head_dim = self.hidden_size // self.num_heads
         self.split_size = self.hidden_size
         self.hidden_dropout = config.hidden_dropout
+        self.config = config
 
         assert self.num_heads % config.mp_degree == 0
         self.num_heads = self.num_heads // config.mp_degree
@@ -436,11 +437,19 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = attention_scores.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if input_dtype == paddle.float16:
-            attention_scores = paddle.cast(attention_scores, paddle.float32)
-        attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-        # attn_weights = masked_fill(attention_scores, attention_mask, -65504.0)
-        attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
+        if self.config.use_pure_fp16:
+            with paddle.amp.auto_cast(False):
+                if input_dtype == paddle.float16:
+                    attention_scores = paddle.cast(attention_scores, paddle.float32)
+                attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+                attention_probs = paddle.cast(
+                    F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype
+                )
+        else:
+            if input_dtype == paddle.float16:
+                attention_scores = paddle.cast(attention_scores, paddle.float32)
+            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
@@ -734,11 +743,16 @@ class BloomModel(BloomPreTrainedModel):
 
         # Embedding + LN Embedding
         # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
-        self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
-            self.vocab_size,
-            self.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)),
-        )
+        if config.mp_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
+                ),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
 
         self.word_embeddings_layernorm = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
