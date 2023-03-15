@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import os
 import unittest
 
-import fast_tokenizer
 from fast_tokenizer import ClipFastTokenizer, models
 from paddlenlp.utils.downloader import get_path_from_url
 

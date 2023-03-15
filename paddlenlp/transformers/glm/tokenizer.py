@@ -213,7 +213,7 @@ class GLMTokenizerMixin:
 
         batch = {"input_ids": input_ids, "position_ids": position_ids}
         if labels is None:
-            batch["attention_mask"] = attention_mask
+            batch["generation_attention_mask"] = attention_mask
         else:
             batch["attention_mask"] = attention_mask
             batch["loss_mask"] = loss_mask
@@ -226,22 +226,22 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
     resource_files_names = {"model_file": "cog-pretrain.model"}
     truncation_side: str = "left"
     pretrained_init_configuration = {
-        "glm-large-chinese": {"do_lower_case": True},
-        "glm-10b-chinese": {"do_lower_case": True},
+        "THUDM/glm-large-chinese": {"do_lower_case": True},
+        "THUDM/glm-10b-chinese": {"do_lower_case": True},
     }
-    cog_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/cog-pretrain.model"
-    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-chinese-added-tokens.json"
+    cog_model_link = "https://paddlenlp.bj.bcebos.com/models/community/THUDM/cog-pretrain.model"
+    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-chinese-added-tokens.json"
     pretrained_resource_files_map = {
         "model_file": {
-            "glm-large-chinese": cog_model_link,
-            "glm-10b-chinese": cog_model_link,
+            "THUDM/glm-large-chinese": cog_model_link,
+            "THUDM/glm-10b-chinese": cog_model_link,
         },
         "added_tokens_file": {
-            "glm-large-chinese": added_tokens_link,
-            "glm-10b-chinese": added_tokens_link,
+            "THUDM/glm-large-chinese": added_tokens_link,
+            "THUDM/glm-10b-chinese": added_tokens_link,
         },
     }
-    max_model_input_sizes = {"glm-10b-chinese": 1024, "glm-large-chinese": 1024}
+    max_model_input_sizes = {"THUDM/glm-10b-chinese": 1024, "THUDM/glm-large-chinese": 1024}
 
     def __init__(
         self,
@@ -355,27 +355,27 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
     model_input_names = ["input_ids", "position_ids", "attention_mask"]
     truncation_side: str = "left"
     pretrained_init_configuration = {
-        "glm-2b": {},
-        "glm-10b": {},
+        "THUDM/glm-2b": {},
+        "THUDM/glm-10b": {},
     }
-    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-added-tokens.json"
+    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-added-tokens.json"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-vocab.json",
-            "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-vocab.json",
+            "THUDM/glm-2b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-2b-vocab.json",
+            "THUDM/glm-10b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-10b-vocab.json",
         },
         "merges_file": {
-            "glm-2b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-2b-merges.txt",
-            "glm-10b": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-10b-merges.txt",
+            "THUDM/glm-2b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-2b-merges.txt",
+            "THUDM/glm-10b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-10b-merges.txt",
         },
         "added_tokens_file": {
-            "glm-2b": added_tokens_link,
-            "glm-10b": added_tokens_link,
+            "THUDM/glm-2b": added_tokens_link,
+            "THUDM/glm-10b": added_tokens_link,
         },
     }
     max_model_input_sizes = {
-        "glm-2b": 1024,
-        "glm-10b": 1024,
+        "THUDM/glm-2b": 1024,
+        "THUDM/glm-10b": 1024,
     }
 
     def __init__(
@@ -384,6 +384,7 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
         merges_file,
         cls_token="[CLS]",
         sep_token="[SEP]",
+        unk_token="[UNK]",
         mask_token="[MASK]",
         pad_token="<|endoftext|>",
         eos_token="<|endoftext|>",
@@ -396,6 +397,8 @@ class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):
             sep_token=sep_token,
             pad_token=pad_token,
             eos_token=eos_token,
+            unk_token=unk_token,
+            mask_token=mask_token,
             **kwargs,
         )
 
@@ -432,15 +435,15 @@ class GLMBertTokenizer(BertTokenizer, GLMTokenizerMixin):
     model_input_names = ["input_ids", "position_ids", "attention_mask"]
     truncation_side: str = "left"
     pretrained_init_configuration = {
-        "glm-515m": {"do_lower_case": True},
+        "THUDM/glm-515m": {"do_lower_case": True},
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "glm-515m": "https://paddlenlp.bj.bcebos.com/models/transformers/glm/glm-515m-vocab.txt",
+            "THUDM/glm-515m": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-515m-vocab.txt",
         },
     }
     max_model_input_sizes = {
-        "glm-515m": 512,
+        "THUDM/glm-515m": 512,
     }
 
 

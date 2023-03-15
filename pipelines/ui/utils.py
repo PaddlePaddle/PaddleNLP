@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import os
 import socket
@@ -30,6 +31,7 @@ API_ENDPOINT = os.getenv("API_ENDPOINT")
 STATUS = "initialized"
 HS_VERSION = "hs_version"
 DOC_REQUEST = "query"
+FILE_REQUEST = "query_images"
 DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
 DOC_PARSE = "files"
@@ -259,6 +261,22 @@ def image_text_search(query, filters={}, top_k_retriever=5) -> Tuple[List[Dict[s
             }
         )
     return results, response
+
+
+def image_to_text_search(file, filters={}, top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a query to the REST API and parse the answer.
+    Returns both a ready-to-use representation of the results and the raw JSON.
+    """
+
+    url = f"{API_ENDPOINT}/{FILE_REQUEST}"
+    # {"Retriever": {"top_k": 2, "query_type":"image"}}
+    params = {"filters": filters, "Retriever": {"top_k": top_k_retriever, "query_type": "image"}}
+    req = {"meta": json.dumps(params)}
+    files = [("files", file)]
+
+    response = requests.post(url, files=files, data=req, verify=False).json()
+    return response
 
 
 def text_to_qa_pair_search(query, is_filter=True) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:

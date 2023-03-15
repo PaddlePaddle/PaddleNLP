@@ -29,7 +29,6 @@ from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
-    random_attention_mask,
 )
 
 OPT_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -94,7 +93,13 @@ class OPTModelTester:
 
         input_mask = None
         if self.use_input_mask:
-            input_mask = random_attention_mask([self.batch_size, self.seq_length], dtype="int64")
+            # contruct input_mask filling with 0 and -1e4
+            input_mask_cond = paddle.randn([self.batch_size, self.seq_length])
+            input_mask = paddle.where(
+                input_mask_cond > input_mask_cond.mean(),
+                paddle.zeros_like(input_mask_cond, dtype="int64"),
+                paddle.full(input_mask_cond.shape, fill_value=-1e4, dtype="int64"),
+            )
 
         sequence_labels = None
         token_labels = None
@@ -166,9 +171,9 @@ class OPTModelTester:
         model = OPTModel(config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(len(result[1]), config.num_hidden_layers)
@@ -178,9 +183,9 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, use_cache=True)
-        model(input_ids, use_cache=False)
+        outputs = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        model(input_ids, use_cache=False, return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
 
@@ -192,8 +197,10 @@ class OPTModelTester:
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens, use_cache=True, cache=past)[0]
+        output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -213,7 +220,9 @@ class OPTModelTester:
         attn_mask[:, half_seq_length:] = -10000
 
         # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)[:2]
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
+            :2
+        ]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
@@ -231,8 +240,12 @@ class OPTModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
-        output_from_past = model(next_tokens, cache=past, use_cache=True, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(
+            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
@@ -247,24 +260,33 @@ class OPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
-
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
-        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2, dtype="int64")
+        next_mask_cond = paddle.randn((self.batch_size, 3))
+        next_mask = paddle.where(
+            next_mask_cond > next_mask_cond.mean(),
+            paddle.zeros_like(next_mask_cond, dtype="int64"),
+            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
+        )
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids, attention_mask=next_attention_mask)
+        output_from_no_past = model(
+            next_input_ids, attention_mask=next_attention_mask, return_dict=self.parent.return_dict
+        )
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(
             next_tokens,
             attention_mask=next_attention_mask,
             cache=past,
             use_cache=True,
+            return_dict=self.parent.return_dict,
         )[0]
         self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -283,9 +305,24 @@ class OPTModelTester:
         result = model(
             input_ids,
             use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
         )
 
-        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
+        model = OPTForCausalLM(config)
+
+        if self.parent.use_labels:
+            loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
+            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            loss.backward()
 
     def create_and_check_opt_weight_initialization(self, config, *args):
         model = OPTModel(config)
@@ -312,18 +349,71 @@ class OPTModelTester:
 
         return config, inputs_dict
 
+    def create_and_check_model_cache(self, config, input_ids, input_mask, *args):
+        model = OPTModel(config)
+        model.eval()
+
+        # first forward pass
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[1]
+
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size, dtype="int64")
+        next_mask_cond = paddle.randn((self.batch_size, 3))
+        next_mask = paddle.where(
+            next_mask_cond > next_mask_cond.mean(),
+            paddle.zeros_like(next_mask_cond, dtype="int64"),
+            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
+        )
+
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
+
+        outputs = model(
+            next_input_ids,
+            attention_mask=next_attention_mask,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
+
+        output_from_no_past = outputs[1][0]
+
+        outputs = model(
+            next_tokens,
+            attention_mask=next_attention_mask,
+            cache=past_key_values,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
+
+        output_from_past = outputs[1][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
+
+        self.parent.assertTrue(output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
+
 
 @parameterized_class(
-    ("return_dict",),
+    ("return_dict", "use_labels"),
     [
-        [False],
-        [True],
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
     ],
 )
 class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     base_model_class = OPTModel
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     all_model_classes = [
         OPTModel,
@@ -367,6 +457,10 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     def test_opt_weight_initialization(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_opt_weight_initialization(*config_and_inputs)
+
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
 
     @slow
     def test_batch_generation(self):
