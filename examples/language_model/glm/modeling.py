@@ -388,6 +388,59 @@ class GLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = GLM_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
+    def _get_tensor_parallel_mappings(cls, config):
+
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_old_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
+            return split_tensor_parallel_weight(
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
+            )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True, is_old_qkv=True),
+                "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True, is_old_qkv=True),
+                # Row Linear
+                "word_embeddings.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.attention.dense.bias',
+                "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        # prefix = ""
+        prefix = "glm."
+
+        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+
+    @classmethod
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
