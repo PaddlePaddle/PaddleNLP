@@ -23,6 +23,14 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.env import LORA_CONFIG_NAME
+from ..utils.log import logger
+
+__all__ = [
+    "LoRAConfig",
+    "LoRALinear",
+    "get_lora_model",
+    "mark_only_lora_as_trainable",
+]
 
 
 class LoRALinear(nn.Linear):
@@ -114,6 +122,17 @@ def _find_and_replace_module(model, module_name, lora_config):
         merge_weights=lora_config.merge_weights,
     )
     setattr(parent_module, attribute_chain[-1], lora_module)
+
+
+def mark_only_lora_as_trainable(model: nn.Layer) -> None:
+    freeze_numel, trainable_numel = 0, 0
+    for name, weight in model.state_dict().items():
+        if "lora" not in name:
+            weight.stop_gradient = True
+            freeze_numel += weight.numel().numpy()[0]
+        else:
+            trainable_numel += weight.numel().numpy()[0]
+    logger.info(f"{freeze_numel:.2e} parameters are frozen, {trainable_numel:.2e} LoRA parameters are trainable")
 
 
 @dataclass

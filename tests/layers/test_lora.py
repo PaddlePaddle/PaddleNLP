@@ -21,7 +21,12 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import paddle
 
-from paddlenlp.layers import LoRAConfig, LoRALinear, get_lora_model
+from paddlenlp.layers import (
+    LoRAConfig,
+    LoRALinear,
+    get_lora_model,
+    mark_only_lora_as_trainable,
+)
 from paddlenlp.transformers import AutoModel
 
 
@@ -88,14 +93,22 @@ class TestLoraModel(unittest.TestCase):
             "__internal_testing__/tiny-random-bert", hidden_dropout_prob=0, attention_probs_dropout_prob=0
         )
         lora_model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(lora_model)
         state_dict = lora_model.state_dict()
         for weight_name in state_dict:
+            is_target_module = False
             for target_module in lora_config.target_modules:
                 if re.fullmatch(target_module, weight_name):
-                    if "lora" in weight_name:
-                        self.assertFalse(state_dict[weight_name].stop_gradient)
-                    else:
-                        self.assertTrue(state_dict[weight_name].stop_gradient)
+                    is_target_module = True
+            # if this is a target module, lora weights are trainable, non-lora weights are not
+            if is_target_module:
+                if "lora" in weight_name:
+                    self.assertFalse(state_dict[weight_name].stop_gradient)
+                else:
+                    self.assertTrue(state_dict[weight_name].stop_gradient)
+            # if this is not a target module, all weights are not trainable
+            else:
+                self.assertTrue(state_dict[weight_name].stop_gradient)
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
         model.train()
         train_forward_results = model(input_ids)
