@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import tempfile
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
@@ -64,6 +65,7 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
+    ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
     fn_args_to_dict,
@@ -80,6 +82,26 @@ __all__ = [
 def unwrap_model(model, *args, **kwargs):
     raw_model = model._layers if isinstance(model, paddle.DataParallel) else model
     return raw_model
+
+
+_init_weights = True
+
+
+@contextmanager
+def no_init_weights(_enable=True):
+    """
+    Context manager to globally disable weight initialization to speed up loading large models.
+
+    TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
+    """
+    global _init_weights
+    old_init_weights = _init_weights
+    if _enable:
+        _init_weights = False
+    try:
+        yield
+    finally:
+        _init_weights = old_init_weights
 
 
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
@@ -1314,6 +1336,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", None)
+
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1363,10 +1394,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # 3. init the model
         init_args = config["init_args"] or ()
-        if is_paddle_support_lazy_init():
-            with paddle.LazyGuard():
-                model = cls(config, *init_args, **model_kwargs)
-        else:
+
+        with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
 
         loaded_state_dict_keys = list(model_state_dict.keys())
