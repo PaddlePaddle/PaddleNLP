@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import paddle
-from tqdm import tqdm
 from paddle.optimizer import AdamW
+from tqdm import tqdm
+
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 

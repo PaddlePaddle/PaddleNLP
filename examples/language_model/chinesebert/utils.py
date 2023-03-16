@@ -17,12 +17,13 @@ import json
 import pickle
 import random
 from collections import OrderedDict
-import numpy as np
 
-from paddlenlp.datasets import MapDataset
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
+from paddlenlp.datasets import MapDataset
 from paddlenlp.transformers import (
     CosineDecayWithWarmup,
     LinearDecayWithWarmup,
@@ -82,10 +83,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,
@@ -203,8 +204,6 @@ def load_ds(datafiles):
         MapDataset
     """
 
-    data = []
-
     def read(ds_file):
         with open(ds_file, "r", encoding="utf-8") as fp:
             next(fp)  # Skip header
@@ -222,8 +221,6 @@ def load_ds(datafiles):
 
 
 def load_ds_xnli(datafiles):
-    data = []
-
     def read(ds_file):
         with open(ds_file, "r", encoding="utf-8") as fp:
             # next(fp)  # Skip header

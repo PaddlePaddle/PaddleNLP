@@ -13,27 +13,26 @@
 # limitations under the License.
 
 import collections
-import math
 
-import numpy as np
 import paddle
+import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import (
+    LayerDesc,
+    PipelineLayer,
+    SharedLayerDesc,
+    get_rng_state_tracker,
+)
 from paddle.fluid import layers
+from paddle.incubate.distributed.models import moe
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
-import paddlenlp
-from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer, SharedLayerDesc
-import paddle.incubate as incubate
-from paddle.incubate.distributed.models import moe
-
 MoeLayer = moe.MoELayer
-from utils import get_timers
 
 __all__ = [
     "GPTModel",
@@ -77,7 +76,6 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
     hcg = fleet.get_hybrid_communicate_group()
     model_parallel_group = hcg.get_model_parallel_group()
     world_size = hcg.get_model_parallel_world_size()
-    rank = hcg.get_model_parallel_rank()
 
     if world_size > 1:
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
@@ -390,14 +388,11 @@ class TransformerDecoderLayer(nn.Layer):
         )
 
         if expert_mode:
-            import os
-
             experts_list = nn.LayerList()
             for expi in range(num_experts):
                 exp_layer = ExpertLayer(d_model, dim_feedforward // top_k, windex=expi, num_expert=num_experts)
                 experts_list.append(exp_layer)
 
-            moe_group_size = hcg.get_expert_parallel_world_size()
             moe_group = hcg.get_expert_parallel_group()
             mp_group = hcg.get_model_parallel_group()
             gate_config = {

@@ -14,8 +14,8 @@
 
 import os
 import pickle
+
 import paddle
-import numpy as np
 
 
 def match_embedding_param(convert_parameter_name_dict, static_para_prefix=""):
@@ -134,7 +134,7 @@ def convert_static_to_dygraph_params(
 
     for name in state_dict.keys():
         if name in params:
-            assert (state_dict[name] == params[name].numpy()).all() == True
+            assert (state_dict[name] == params[name].numpy()).all()
         else:
             print(name, "not in params")
 

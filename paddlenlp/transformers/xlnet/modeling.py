@@ -21,9 +21,15 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, Layer, MSELoss
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN, get_activation
 from ..model_outputs import ModelOutput, tuple_output
+from .configuration import (
+    XLNET_PRETRAINED_INIT_CONFIGURATION,
+    XLNET_PRETRAINED_RESOURCE_FILES_MAP,
+    XLNetConfig,
+)
 
 __all__ = [
     "XLNetPretrainedModel",
@@ -40,13 +46,13 @@ dtype_float = paddle.get_default_dtype()
 
 
 class XLNetRelativeAttention(Layer):
-    def __init__(self, n_head, d_head, d_model, layer_norm_eps, dropout):
+    def __init__(self, config: XLNetConfig):
         super(XLNetRelativeAttention, self).__init__()
 
-        self.n_head = n_head
-        self.d_head = d_head
-        self.d_model = d_model
-        self.scale = 1 / (d_head**0.5)
+        self.n_head = config.n_head
+        self.d_head = config.d_head
+        self.d_model = config.d_model
+        self.scale = 1 / (config.d_head**0.5)
 
         self.q = self.create_parameter([self.d_model, self.n_head * self.d_head])
         self.k = self.create_parameter([self.d_model, self.n_head * self.d_head])
@@ -59,8 +65,8 @@ class XLNetRelativeAttention(Layer):
         self.r_w_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
         self.seg_embed = self.create_parameter([2, self.n_head, self.d_head], is_bias=False)
 
-        self.layer_norm = nn.LayerNorm(d_model, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(dropout)
+        self.layer_norm = nn.LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.dropout)
 
     def prune_heads(self, heads):
         raise NotImplementedError
@@ -318,24 +324,17 @@ class XLNetRelativeAttention(Layer):
 
 
 class XLNetFeedForward(Layer):
-    def __init__(
-        self,
-        d_model,
-        d_inner,
-        layer_norm_eps,
-        dropout,
-        ff_activation,
-    ):
+    def __init__(self, config: XLNetConfig):
         super(XLNetFeedForward, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(d_model, epsilon=layer_norm_eps)
-        self.layer_1 = nn.Linear(d_model, d_inner)
-        self.layer_2 = nn.Linear(d_inner, d_model)
-        self.dropout = nn.Dropout(dropout)
-        if isinstance(ff_activation, str):
-            self.activation_function = ACT2FN[ff_activation]
+        self.layer_norm = nn.LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
+        self.layer_1 = nn.Linear(config.d_model, config.d_inner)
+        self.layer_2 = nn.Linear(config.d_inner, config.d_model)
+        self.dropout = nn.Dropout(config.dropout)
+        if isinstance(config.ff_activation, str):
+            self.activation_function = ACT2FN[config.ff_activation]
         else:
-            self.activation_function = ff_activation
+            self.activation_function = config.ff_activation
 
     def forward(self, inp):
         output = inp
@@ -349,20 +348,11 @@ class XLNetFeedForward(Layer):
 
 
 class XLNetLayer(Layer):
-    def __init__(
-        self,
-        n_head,
-        d_head,
-        d_model,
-        layer_norm_eps,
-        dropout,
-        d_inner,
-        ff_activation,
-    ):
+    def __init__(self, config: XLNetConfig):
         super(XLNetLayer, self).__init__()
 
-        self.rel_attn = XLNetRelativeAttention(n_head, d_head, d_model, layer_norm_eps, dropout)
-        self.ff = XLNetFeedForward(d_model, d_inner, layer_norm_eps, dropout, ff_activation)
+        self.rel_attn = XLNetRelativeAttention(config)
+        self.ff = XLNetFeedForward(config)
         self.seq_len_dim = 1
 
     def forward(
@@ -410,113 +400,11 @@ class XLNetPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "xlnet-base-cased": {
-            "attn_type": "bi",
-            "bi_data": False,
-            "clamp_len": -1,
-            "d_head": 64,
-            "d_inner": 3072,
-            "d_model": 768,
-            "dropout": 0.1,
-            "classifier_dropout": 0.1,
-            "ff_activation": "gelu",
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "mem_len": None,
-            "n_head": 12,
-            "n_layer": 12,
-            "reuse_len": None,
-            "same_length": False,
-            "vocab_size": 32000,
-        },
-        "xlnet-large-cased": {
-            "attn_type": "bi",
-            "bi_data": False,
-            "clamp_len": -1,
-            "d_head": 64,
-            "d_inner": 4096,
-            "d_model": 1024,
-            "dropout": 0.1,
-            "classifier_dropout": 0.1,
-            "ff_activation": "gelu",
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "mem_len": None,
-            "n_head": 16,
-            "n_layer": 24,
-            "reuse_len": None,
-            "same_length": False,
-            "vocab_size": 32000,
-        },
-        "chinese-xlnet-base": {
-            "attn_type": "bi",
-            "bi_data": False,
-            "clamp_len": -1,
-            "d_head": 64,
-            "d_inner": 3072,
-            "d_model": 768,
-            "dropout": 0.1,
-            "classifier_dropout": 0.1,
-            "ff_activation": "relu",
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "mem_len": None,
-            "n_head": 12,
-            "n_layer": 12,
-            "reuse_len": None,
-            "same_length": False,
-            "vocab_size": 32000,
-        },
-        "chinese-xlnet-mid": {
-            "attn_type": "bi",
-            "bi_data": False,
-            "clamp_len": -1,
-            "d_head": 64,
-            "d_inner": 3072,
-            "d_model": 768,
-            "dropout": 0.1,
-            "classifier_dropout": 0.1,
-            "ff_activation": "relu",
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "mem_len": None,
-            "n_head": 12,
-            "n_layer": 24,
-            "reuse_len": None,
-            "same_length": False,
-            "vocab_size": 32000,
-        },
-        "chinese-xlnet-large": {
-            "attn_type": "bi",
-            "bi_data": False,
-            "clamp_len": -1,
-            "d_head": 64,
-            "d_inner": 4096,
-            "d_model": 1024,
-            "dropout": 0.1,
-            "classifier_dropout": 0.1,
-            "ff_activation": "relu",
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "mem_len": None,
-            "n_head": 16,
-            "n_layer": 24,
-            "reuse_len": None,
-            "same_length": False,
-            "vocab_size": 32000,
-        },
-    }
-
-    pretrained_resource_files_map = {
-        "model_state": {
-            "xlnet-base-cased": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-base-cased.pdparams",
-            "xlnet-large-cased": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-large-cased.pdparams",
-            "chinese-xlnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-base.pdparams",
-            "chinese-xlnet-mid": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-mid.pdparams",
-            "chinese-xlnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-large.pdparams",
-        }
-    }
+    pretrained_init_configuration = XLNET_PRETRAINED_INIT_CONFIGURATION
+    resource_files_names = {"model_state": "model_state.pdparams"}
+    pretrained_resource_files_map = XLNET_PRETRAINED_RESOURCE_FILES_MAP
+    model_config_file = CONFIG_NAME
+    config_class = XLNetConfig
     base_model_prefix = "transformer"
 
     def init_weights(self):
@@ -847,120 +735,29 @@ class XLNetModel(XLNetPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `XLNetModel`.
-            Also is the vocab size of token embedding matrix.
-        mem_len (int or None, optional):
-            The number of tokens to cache. If not 0 or None, the last `mem_len` hidden states
-            in each layer will be cached into memory. Defaults to `None`.
-        reuse_len (int or None, optional):
-            The number of tokens in the current batch to be cached. If positive, then at most
-            `reuse_len` tokens can be cached in the current batch. Otherwise, there is
-            no limit to the number of tokens. Defaults to `None`.
-
-            .. note::
-                The difference between `mem_len` and `reuse_len` is that `mem_len` defines
-                **the total number** of tokens to cache while `reuse_len` defines the number of tokens
-                in **the current batch** to be cached.
-        d_model (int, optional):
-            Dimensionality of the embedding layers, encoder layers and pooler layer.
-            Defaults to 768.
-        same_length (bool, optional):
-            Whether or not to use the same attention length for each token.
-            Defaults to `False`.
-        attn_type (str, optional):
-            The attention type used in the attention layer. Set **"bi"** for ``XLNet``,
-            **"uni"** for ``Transformer-XL``. Defaults to **"bi"**.
-        bi_data (bool, optional):
-            Whether or not to use bidirectional input pipeline. Set to `True` during pretraining and
-            `False` during fine-tuning. Defaults to `False`.
-        clamp_len (int, optional):
-            Maximum relative distance supported. All relative distances larger than `clamp_len` will be clamped.
-            Setting this attribute to -1 means no clamping. Defaults to -1.
-        n_layer (int, optional):
-            The number of hidden layers in the encoder. Defaults to 12.
-        dropout (float, optional):
-            The dropout ratio for all fully connected layers in the embeddings and encoder.
-            Defaults to 0.1.
-        classifier_dropout (float, optional):
-            The dropout ratio for all fully connected layers in the pooler (classification head).
-            Defaults to 0.1.
-        n_head (int, optional):
-            Number of attention heads in each attention layer.
-            Defaults to 12.
-        d_head (int, optional):
-            Dimensionality of each attention head. Defaults to 64.
-
-            .. note::
-                `d_head` should be equal to `d_model` divided by `n_head`.
-        layer_norm_eps (float, optional):
-            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
-            initializing layer normalization layers. Defaults to 1e-12.
-        d_inner (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `d_inner`,
-            and then projected back to `d_model`. Typically `d_inner` is larger than `d_model`.
-            Defaults to 3072.
-        ff_activation (str, optional):
-            The non-linear activation function in the feed-forward layers in the encoder.
-            Choose from the following supported activation functions: `["relu", "gelu", "tanh",
-            "sigmoid", "mish", "swish"]`. Defaults to `"gelu"`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`XLNetPretrainedModel._init_weights()` for how weights are initialized in `XLNetModel`.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        mem_len=None,
-        reuse_len=None,
-        d_model=768,
-        same_length=False,
-        attn_type="bi",
-        bi_data=False,
-        clamp_len=-1,
-        n_layer=12,
-        dropout=0.1,
-        classifier_dropout=0.1,
-        n_head=12,
-        d_head=64,
-        layer_norm_eps=1e-12,
-        d_inner=3072,
-        ff_activation="gelu",
-        initializer_range=0.02,
-        **kwargs
-    ):
-        super(XLNetModel, self).__init__()
-        self.initializer_range = initializer_range
-        self.mem_len = mem_len
-        self.reuse_len = reuse_len
-        self.d_model = d_model
-        self.same_length = same_length
-        self.attn_type = attn_type
-        self.bi_data = bi_data
-        self.clamp_len = clamp_len
-        self.n_layer = n_layer
-        self.dropout = nn.Dropout(dropout)
-        self.word_embedding = nn.Embedding(vocab_size, d_model)
-        self.mask_emb = self.create_parameter([1, 1, d_model])
-        self.layer = nn.LayerList(
-            [
-                XLNetLayer(
-                    n_head,
-                    d_head,
-                    d_model,
-                    layer_norm_eps,
-                    dropout,
-                    d_inner,
-                    ff_activation,
-                )
-                for _ in range(n_layer)
-            ]
-        )
+    def __init__(self, config: XLNetConfig):
+        super(XLNetModel, self).__init__(config)
+        self.initializer_range = config.initializer_range
+        self.mem_len = config.mem_len
+        self.reuse_len = config.reuse_len
+        self.d_model = config.d_model
+        self.same_length = config.same_length
+        self.attn_type = config.attn_type
+        self.bi_data = config.bi_data
+        self.clamp_len = config.clamp_len
+        self.n_layer = config.n_layer
+        self.dropout = nn.Dropout(config.dropout)
+        self.word_embedding = nn.Embedding(config.vocab_size, config.d_model)
+        self.mask_emb = self.create_parameter([1, 1, config.d_model])
+        self.layer = nn.LayerList([XLNetLayer(config) for _ in range(config.n_layer)])
 
         self.init_weights()
 
@@ -1395,11 +1192,11 @@ class XLNetModel(XLNetPretrainedModel):
 class XLNetClassificationHead(Layer):
     """Head for sentence-level classification tasks."""
 
-    def __init__(self, hidden_size, dropout, num_classes):
+    def __init__(self, config: XLNetConfig):
         super(XLNetClassificationHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(dropout)
-        self.out_proj = nn.Linear(hidden_size, num_classes)
+        self.dense = nn.Linear(config.d_model, config.d_model)
+        self.dropout = nn.Dropout(config.classfier_dropout)
+        self.out_proj = nn.Linear(config.d_model, config.num_labels)
 
     def forward(self, features, **kwargs):
         x = features[:, -1, :]  # Take <cls> token
@@ -1417,19 +1214,15 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to 2.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
-    def __init__(self, xlnet, num_classes=2):
-        super(XLNetForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.transformer = xlnet
-        self.classifier = XLNetClassificationHead(
-            self.transformer.d_model, self.transformer.config["classifier_dropout"], num_classes
-        )
+    def __init__(self, config: XLNetConfig):
+        super(XLNetForSequenceClassification, self).__init__(config)
+        self.num_classes = config.num_classes
+        self.transformer = XLNetModel(config)
+        self.classifier = XLNetClassificationHead(config)
         self.init_weights()
 
     def forward(
@@ -1570,18 +1363,16 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to 2.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
-    def __init__(self, xlnet, num_classes=2):
-        super(XLNetForTokenClassification, self).__init__()
-        self.num_classes = num_classes
+    def __init__(self, config: XLNetConfig):
+        super(XLNetForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_classes
 
-        self.transformer = xlnet
-        self.classifier = nn.Linear(self.transformer.d_model, num_classes)
+        self.transformer = XLNetModel(config)
+        self.classifier = nn.Linear(self.transformer.d_model, config.num_classes)
 
         self.init_weights()
 
@@ -1709,16 +1500,16 @@ class XLNetLMHeadModel(XLNetPretrainedModel):
     XLNet Model with a language modeling head on top (linear layer with weights tied to the input embeddings).
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
-    def __init__(self, xlnet):
-        super(XLNetLMHeadModel, self).__init__()
-        self.transformer = xlnet
+    def __init__(self, config: XLNetConfig):
+        super(XLNetLMHeadModel, self).__init__(config)
+        self.transformer = XLNetModel(config)
         self.decoder_weight = self.transformer.word_embedding.weight
         self.decoder_bias = self.create_parameter(
-            shape=[self.transformer.config["vocab_size"]], dtype=self.decoder_weight.dtype, is_bias=True
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
         )
         self.init_weights()
 
@@ -1844,16 +1635,14 @@ class XLNetForMultipleChoice(XLNetPretrainedModel):
     softmax) e.g. for RACE/SWAG tasks.
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
-    def __init__(self, xlnet):
-        super(XLNetForMultipleChoice, self).__init__()
-        self.transformer = xlnet
-        self.classifier = XLNetClassificationHead(
-            self.transformer.d_model, self.transformer.config["classifier_dropout"], 1
-        )
+    def __init__(self, config: XLNetConfig):
+        super(XLNetForMultipleChoice, self).__init__(config)
+        self.transformer = XLNetModel(config)
+        self.classifier = XLNetClassificationHead(config)
         self.init_weights()
 
     def forward(
@@ -2024,14 +1813,14 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
       layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
 
     Args:
-        xlnet (:class:`XLNetModel`):
-            An instance of :class:`XLNetModel`.
+        config (:class:`XLNetConfig`):
+            An instance of :class:`XLNetConfig`.
     """
 
-    def __init__(self, xlnet):
-        super(XLNetForQuestionAnswering, self).__init__()
-        self.transformer = xlnet
-        self.qa_outputs = nn.Linear(self.transformer.d_model, 2)
+    def __init__(self, config: XLNetConfig):
+        super(XLNetForQuestionAnswering, self).__init__(config)
+        self.transformer = XLNetModel(config)
+        self.qa_outputs = nn.Linear(config.d_model, 2)
 
         self.init_weights()
 
