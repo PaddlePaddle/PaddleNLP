@@ -12,29 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import math
 import os
-from functools import partial
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Union, Any, List, Tuple
+from functools import partial
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from tqdm import tqdm
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
+from data import GLUE_1_1_PROCESSED, GLUE_PROCESSED
+from utils import GLUE_METRICS, load_pickle, save_pickle
+
+from paddlenlp.data import Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.data import DataCollatorWithPadding, Pad
 from paddlenlp.trainer import (
     PdArgumentParser,
-    TrainingArguments,
     Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
 )
+from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 from paddlenlp.utils.log import logger
-
-from utils import load_pickle, save_pickle, GLUE_METRICS
-from data import GLUE_PROCESSED, GLUE_1_1_PROCESSED
 
 label_length_map = {
     "cola": 4,
@@ -267,7 +264,7 @@ class T5GlueTrainer(Trainer):
                 label = float(label.replace(" ", ""))
                 try:
                     pred = float(pred.replace(" ", ""))
-                except Exception as e:
+                except Exception:
                     # set to zero if the generated text can not convert to float
                     pred = 0.0
 
@@ -325,7 +322,6 @@ def main():
     else:
         label2id = None
     metric_list = GLUE_METRICS[data_args.task_name]
-    generate_max_length = label_length_map[data_args.task_name]
 
     # get model and tokenizer
     model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
@@ -335,7 +331,6 @@ def main():
     train_dataset = get_train_dataset(tokenizer, data_args)
     if data_args.task_name == "mnli":
         eval_dataset = get_mnli_dev_dataset(tokenizer, data_args, matched=True)
-        eval_dataset_mismatch = get_mnli_dev_dataset(tokenizer, data_args, matched=False)
     else:
         eval_dataset = get_dev_dataset(tokenizer, data_args)
 

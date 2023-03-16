@@ -15,12 +15,11 @@
 
 __all__ = ["FunnelTokenizer"]
 
-from collections.abc import Iterable
 import os
-from ..bert.tokenizer import BertTokenizer
-from .. import BasicTokenizer, WordpieceTokenizer
-from .. import PretrainedTokenizer
 import unicodedata
+
+from .. import BasicTokenizer, WordpieceTokenizer
+from ..bert.tokenizer import BertTokenizer
 from ..tokenizer_utils import _is_control
 
 
