@@ -15,11 +15,12 @@
 
 import os
 import unicodedata
-import sentencepiece as spm
 from shutil import copyfile
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
+from typing import Any, Dict, List, Optional
+
+import sentencepiece as spm
+
+from .. import PretrainedTokenizer
 
 __all__ = ["FNetTokenizer"]
 
@@ -28,25 +29,7 @@ SPIECE_UNDERLINE = "▁"
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"fnet-base": 512, "fnet-large": 512}
 
 
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    Copied from transformers.tokenization_utils_base
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
-
-
-class FNetTokenizer(AlbertEnglishTokenizer):
+class FNetTokenizer(PretrainedTokenizer):
     """
     Construct a FNet tokenizer. Inherit from :class:`AlbertEnglishTokenizer`. Based on `SentencePiece
     <https://github.com/google/sentencepiece>`__.
@@ -129,23 +112,9 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         sp_model_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs
     ):
-        # Mask token behave like a normal word, i.e. include the space before it
-        # mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
-        super().__init__(
-            sentencepiece_model_file,
-            do_lower_case,
-            remove_space,
-            keep_accents,
-            unk_token,
-            sep_token,
-            pad_token,
-            cls_token,
-            mask_token,
-            **kwargs,
-        )
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
-
+        self.sentencepiece_model_file = sentencepiece_model_file
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
