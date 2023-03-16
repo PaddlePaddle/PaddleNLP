@@ -14,22 +14,24 @@
 # limitations under the License.
 
 import unittest
-from parameterized import parameterized_class
+
 import paddle
 from paddle import Tensor
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    AlbertPretrainedModel,
+    AlbertConfig,
     AlbertForMaskedLM,
     AlbertForMultipleChoice,
     AlbertForQuestionAnswering,
     AlbertForSequenceClassification,
     AlbertForTokenClassification,
     AlbertModel,
-    AlbertConfig
+    AlbertPretrainedModel,
 )
-from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
 class AlbertModelTester:
@@ -92,18 +94,18 @@ class AlbertModelTester:
 
     def get_config(self):
         return AlbertConfig(
-            vocab_size = self.vocab_size,
-            hidden_size = self.hidden_size,
-            num_hidden_layers = self.num_hidden_layers,
-            num_attention_heads =  self.num_attention_heads,
-            intermediate_size = self.intermediate_size,
-            hidden_act =  self.hidden_act,
-            hidden_dropout_prob = self.hidden_dropout_prob,
-            attention_probs_dropout_prob = self.attention_probs_dropout_prob,
-            max_position_embeddings =  self.max_position_embeddings,
-            type_vocab_size = self.type_vocab_size,
-            initializer_range = self.initializer_range,
-            num_hidden_groups = self.num_hidden_groups,
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            num_hidden_groups=self.num_hidden_groups,
             num_labels=self.num_labels,
             num_choices=self.num_choices,
         )
@@ -347,5 +349,4 @@ class AlbertModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [[[-0.6513, 1.5035, -0.2766], [-0.6515, 1.5046, -0.2780], [-0.6512, 1.5049, -0.2784]]]
         )
-
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))

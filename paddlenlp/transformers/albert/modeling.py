@@ -25,11 +25,6 @@ from paddle.nn import Layer
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
-from .configuration import (
-    ALBERT_PRETRAINED_INIT_CONFIGURATION,
-    ALBERT_PRETRAINED_RESOURCE_FILES_MAP,
-    AlbertConfig,
-)
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPooling,
@@ -40,6 +35,11 @@ from ..model_outputs import (
     SequenceClassifierOutput,
     TokenClassifierOutput,
     tuple_output,
+)
+from .configuration import (
+    ALBERT_PRETRAINED_INIT_CONFIGURATION,
+    ALBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    AlbertConfig,
 )
 
 __all__ = [
@@ -94,7 +94,7 @@ class AlbertEmbeddings(Layer):
     Constructs the embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertEmbeddings, self).__init__()
 
         self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
@@ -142,7 +142,7 @@ class AlbertEmbeddings(Layer):
 
 
 class AlbertAttention(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
@@ -217,7 +217,7 @@ class AlbertAttention(Layer):
 
 
 class AlbertLayer(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
         self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
@@ -251,7 +251,7 @@ class AlbertLayer(Layer):
 
 
 class AlbertLayerGroup(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertLayerGroup, self).__init__()
 
         self.albert_layers = nn.LayerList([AlbertLayer(config) for _ in range(config.inner_group_num)])
@@ -291,7 +291,7 @@ class AlbertLayerGroup(Layer):
 
 
 class AlbertTransformer(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertTransformer, self).__init__()
 
         self.num_hidden_layers = config.num_hidden_layers
@@ -349,8 +349,10 @@ class AlbertPretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. See `PretrainedModel` for more details.
     """
+
     model_config_file = CONFIG_NAME
     config_class = AlbertConfig
+
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "transformer"
 
@@ -405,7 +407,7 @@ class AlbertModel(AlbertPretrainedModel):
             An instance of AlbertConfig used to construct AlbertModel.
     """
 
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertModel, self).__init__(config)
         self.pad_token_id = config.pad_token_id
         self.bos_token_id = config.bos_token_id
@@ -618,7 +620,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertForPretraining, self).__init__(config)
 
         self.transformer = AlbertModel(config)
@@ -751,7 +753,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
 
 class AlbertMLMHead(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertMLMHead, self).__init__()
 
         self.layer_norm = nn.LayerNorm(config.embedding_size)
@@ -776,7 +778,7 @@ class AlbertMLMHead(Layer):
 
 
 class AlbertSOPHead(Layer):
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertSOPHead, self).__init__()
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
@@ -797,7 +799,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertForMaskedLM, self).__init__(config)
 
         self.transformer = AlbertModel(config)
@@ -924,10 +926,10 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, config:AlbertConfig):
+    def __init__(self, config: AlbertConfig):
         super(AlbertForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
-        self.config=config
+        self.config = config
 
         self.transformer = AlbertModel(config)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)

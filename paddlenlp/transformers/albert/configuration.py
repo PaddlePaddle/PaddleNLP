@@ -325,9 +325,9 @@ ALBERT_PRETRAINED_RESOURCE_FILES_MAP = {
 
 class AlbertConfig(PretrainedConfig):
     r"""
-    This is the configuration class to store the configuration of a [`AlbertModel`]. It is used to instantiate 
-    an ALBERT model according to the specified arguments, defining the model architecture. Instantiating a 
-    configuration with the defaults will yield a similar configuration to that of the ALBERT 
+    This is the configuration class to store the configuration of a [`AlbertModel`]. It is used to instantiate
+    an ALBERT model according to the specified arguments, defining the model architecture. Instantiating a
+    configuration with the defaults will yield a similar configuration to that of the ALBERT
     [albert-xxlarge-v2](https://huggingface.co/albert-xxlarge-v2) architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
@@ -444,5 +444,5 @@ class AlbertConfig(PretrainedConfig):
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
-        self.add_pooling_layer = add_pooling_layer
         self.classifier_dropout_prob = classifier_dropout_prob
+        self.add_pooling_layer = add_pooling_layer
