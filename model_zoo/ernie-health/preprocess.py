@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import io
-import re
 import argparse
-import json
+import io
 import multiprocessing
+import os
+import re
 import sys
 import time
 
