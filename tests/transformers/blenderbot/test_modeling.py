@@ -178,7 +178,7 @@ class BlenderbotModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BlenderbotModel
     return_dict: bool = False
     use_labels: bool = False
-    use_test_inputs_embeds: bool = True
+    use_test_inputs_embeds: bool = False
 
     all_model_classes = (
         BlenderbotModel,
@@ -200,10 +200,6 @@ class BlenderbotModelTest(ModelTesterMixin, unittest.TestCase):
     def test_causal_lm_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_causal_lm_model(*config_and_inputs)
-
-    def test_inputs_embeds(self):
-        # Direct input embedding tokens is currently not supported
-        self.skipTest("Direct input embedding tokens is currently not supported")
 
     @slow
     def test_model_from_pretrained(self):

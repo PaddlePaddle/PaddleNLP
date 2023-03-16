@@ -77,7 +77,7 @@ class BlenderbotPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.config.init_std,
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -162,10 +162,13 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
         hidden_states = inputs_embeds + inputs_embed_pos
         encoder_input = self.encoder_dropout(hidden_states)
 
-        if attention_mask is not None:
+        if attention_mask is None:
             attention_mask = (
                 paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
+        else:
+            attention_mask = attention_mask.unsqueeze([1, 2]) * -1e4
+
             attention_mask.stop_gradient = True
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         # Different from BlenderbotSmall, Blenderbot Encoder apply the final layer norm on encoder output
