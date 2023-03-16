@@ -379,7 +379,6 @@ class GLMPretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """Initialization hook"""
-        return
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(
                 paddle.tensor.normal(

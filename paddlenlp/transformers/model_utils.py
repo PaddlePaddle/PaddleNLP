@@ -67,6 +67,7 @@ from .utils import (
     InitTrackerMeta,
     adapt_stale_fwd_patch,
     fn_args_to_dict,
+    is_paddle_support_lazy_init,
     resolve_cache_dir,
 )
 
@@ -1106,7 +1107,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Tuple[List[str]]: _description_
         """
-        print("step 0", state_dict[list(state_dict.keys())[0]])
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
@@ -1210,7 +1210,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for key in list(state_dict.keys()):
                 state_dict[start_prefix + key] = state_dict.pop(key)
 
-        print("step 1", state_dict[list(state_dict.keys())[0]])
         # convert the dtype of state dict
         if dtype is not None:
             if isinstance(dtype, paddle.dtype):
@@ -1246,9 +1245,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # To avoid recursive import temporarily.
         import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
-        print("step 2", state_dict[list(state_dict.keys())[0]])
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
-        print("step 3", state_to_load[list(state_to_load.keys())[0]])
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
 
@@ -1366,7 +1363,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # 3. init the model
         init_args = config["init_args"] or ()
-        with paddle.LazyGuard():
+        if is_paddle_support_lazy_init():
+            with paddle.LazyGuard():
+                model = cls(config, *init_args, **model_kwargs)
+        else:
             model = cls(config, *init_args, **model_kwargs)
 
         loaded_state_dict_keys = list(model_state_dict.keys())

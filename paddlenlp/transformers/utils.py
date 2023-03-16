@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Optional, Type
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
+import paddle
 from paddle.nn import Layer
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
@@ -285,3 +286,7 @@ def find_transformer_model_class_by_name(model_name: str) -> Optional[Type[Pretr
             return obj
     logger.debug(f"can not find model_class<{model_name}>")
     return None
+
+
+def is_paddle_support_lazy_init():
+    return hasattr(paddle, "LazyGuard")
