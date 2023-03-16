@@ -39,8 +39,9 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "mp_degree": 1,
         "pp_degree": 1,
         "mp_rank": -1,
+        "use_cache": False,
         "use_recompute": False,
-        "use_pure_fp16": True,
+        "use_pure_fp16": False,
     },
 }
 

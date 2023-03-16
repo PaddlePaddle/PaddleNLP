@@ -38,7 +38,6 @@ from utils import (
     all_gather,
     convert_example,
     is_dp_group_support_in_group_sharded_parallel,
-    left_padding,
     wrap_sharding_2_3,
 )
 from visualdl import LogWriter
@@ -510,67 +509,6 @@ def do_train(args):
             reader_start = time.time()
 
 
-def do_export(args):
-
-    if args.do_export:
-        from configuration import LLaMAConfig
-        from model_split_merge import merge_model_parallel
-        from modeling import LLaMAForCausalLM
-        from tokenizer import LLaMATokenizer
-
-        tokenizer = LLaMATokenizer.from_pretrained(args.model_name_or_path)
-        config = LLaMAConfig.from_pretrained(args.model_name_or_path)
-
-        config.fuse_attention_qkv = True
-        # config.max_predict_len = 8
-        config.max_dec_len = 20
-        config.eos_token_id = tokenizer.eos_token_id
-        config.pad_token_id = tokenizer.eos_token_id
-        config.use_cache = True
-        config.top_k = 1
-
-        # Merge the model splits to a complete model
-        merge_model_path = merge_model_parallel(args.model_path, config)
-
-        # Load the model and parameter
-        config.mp_degree = 1
-        model = LLaMAForCausalLM.from_pretrained(merge_model_path, config=config)
-
-        # Switch to eval model
-        model.eval()
-        # Convert to static graph with specific input description
-        input_text = ["Nice to meet", "Hello "]
-        inputs = tokenizer(input_text)
-
-        inputs = left_padding(inputs, tokenizer.bos_token_id)
-        input_ids = inputs["input_ids"]
-
-        input_ids = paddle.to_tensor(input_ids, dtype="int64")
-        # ret = model(input_ids=input_ids)
-
-        ret = model.generate(input_ids=input_ids)
-
-        for out_ids, in_txt in zip(ret[0].tolist(), input_text):
-            print("==" * 30)
-            print(in_txt + tokenizer.decode(out_ids, skip_special_tokens=True))
-
-        model = paddle.jit.to_static(
-            model,
-            input_spec=[
-                paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            ],
-        )
-        infer_path = os.path.join(args.output_dir, "infer", f"{args.dataset_name}")
-
-        # Save converted static graph model
-        paddle.jit.save(model, infer_path)
-        # Also save tokenizer for inference usage
-        tokenizer.save_pretrained(os.path.dirname(infer_path))
-
-
 if __name__ == "__main__":
     args = parse_args()
-    args.do_export = True
-    os.environ["softmax_mask_fuse_upper_triangle"] = "False"
     do_train(args)
-    do_export(args)
