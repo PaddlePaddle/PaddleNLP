@@ -14,19 +14,24 @@
 
 import unittest
 
+import paddle
+
 from paddlenlp.metrics import ChunkEvaluator
 
 
 class TestChunk(unittest.TestCase):
     def test_metrics(self):
-        num_infer_chunks = 10
-        num_label_chunks = 9
-        num_correct_chunks = 8
-
-        label_list = [1, 1, 0, 0, 1, 0, 1]
+        label_list = ["O", "B-Person", "I-Person"]
         evaluator = ChunkEvaluator(label_list)
-        evaluator.update(num_infer_chunks, num_label_chunks, num_correct_chunks)
+        evaluator.reset()
+        lengths = paddle.to_tensor([5])
+        predictions = paddle.to_tensor([[0, 1, 2, 1, 2]])
+        labels = paddle.to_tensor([[0, 1, 2, 1, 1]])
+        num_infer_chunks, num_label_chunks, num_correct_chunks = evaluator.compute(
+            lengths=lengths, predictions=predictions, labels=labels
+        )
+        evaluator.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1 = evaluator.accumulate()
-        self.assertEqual(precision, 0.8)
-        self.assertEqual(recall, 0.8888888888888888)
-        self.assertEqual(f1, 0.8421052631578948)
+        self.assertEqual(precision, 0.5)
+        self.assertEqual(recall, 0.3333333333333333)
+        self.assertEqual(f1, 0.4)
