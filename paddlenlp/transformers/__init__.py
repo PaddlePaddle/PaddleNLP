@@ -25,7 +25,6 @@ from .tokenizer_utils import (
     tokenize_special_chars,
     convert_to_unicode,
 )
-from .tokenizer_utils_fast import PretrainedFastTokenizer
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
@@ -215,6 +214,7 @@ from .nystromformer.tokenizer import *
 from ..utils.import_utils import is_fast_tokenizer_available
 
 if is_fast_tokenizer_available():
+    from .tokenizer_utils_fast import PretrainedFastTokenizer
     from .bert.fast_tokenizer import *
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
