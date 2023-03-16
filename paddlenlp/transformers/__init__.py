@@ -46,6 +46,7 @@ from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
 from .electra.configuration import *
+from .albert.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
