@@ -85,13 +85,10 @@ class LoRALinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
+        result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and not self.merged:
-            result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-            if self.r > 0:
-                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
-            return result
-        else:
-            return F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+        return result
 
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
