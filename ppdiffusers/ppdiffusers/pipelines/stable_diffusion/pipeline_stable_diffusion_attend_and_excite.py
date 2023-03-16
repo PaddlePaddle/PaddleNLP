@@ -99,8 +99,6 @@ class AttendExciteCrossAttnProcessor:
 
     def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
         batch_size, sequence_length, _ = hidden_states.shape
-        # TODO(ouyanghongyu): If necessary to rewrite prepare_attention_mask
-        # attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length, batch_size)
         attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
 
         query = attn.to_q(hidden_states)
@@ -110,26 +108,21 @@ class AttendExciteCrossAttnProcessor:
         key = attn.to_k(encoder_hidden_states)
         value = attn.to_v(encoder_hidden_states)
 
-        query = self.head_to_batch_reshape(attn.head_to_batch_dim(query))
-        key = self.head_to_batch_reshape(attn.head_to_batch_dim(key))
-        value = self.head_to_batch_reshape(attn.head_to_batch_dim(value))
-        # head_to_batch_dim: shape [batch_size, head_size, seq_len, dim // head_size]
-        # reshape to [batch_size * head_size, seq_len, dim // head_size]
+        query = attn.head_to_batch_dim(query)
+        key = attn.head_to_batch_dim(key)
+        value = attn.head_to_batch_dim(value)
 
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
 
         # only need to store attention maps during the Attend and Excite process
         if not attention_probs.stop_gradient:
-            self.attnstore(attention_probs, is_cross, self.place_in_unet)
+            # attention_probs.shape [batch_size, head_size, seq_len, dim // head_size]
+            # flaten to shape [batch_size * head_size, seq_len, dim // head_size]
+            self.attnstore(attention_probs.flatten(0, 1), is_cross, self.place_in_unet)
 
-        hidden_states = paddle.bmm(attention_probs, value)
-        # hidden_states.shape [batch_size, seq_len, dim]
-        # reshape to [batch_size // head_size, head_size, seq_len, dim]
-        batch_size, seq_len, dim = hidden_states.shape
-        head_size = attn.num_heads
-        hidden_states = attn.batch_to_head_dim(
-            hidden_states.reshape([batch_size // head_size, head_size, seq_len, dim])
-        )
+        # [batch_size, head_size, seq_len, seq_len] * [batch_size, head_size, seq_len, dim // head_size]
+        hidden_states = paddle.matmul(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
 
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
@@ -138,9 +131,6 @@ class AttendExciteCrossAttnProcessor:
 
         return hidden_states
 
-    def head_to_batch_reshape(self, tensor):
-        batch_size, head_size, seq_len, dim = tensor.shape
-        return tensor.reshape([batch_size * head_size, seq_len, dim])
 
 
 class StableDiffusionAttendAndExcitePipeline(DiffusionPipeline):
