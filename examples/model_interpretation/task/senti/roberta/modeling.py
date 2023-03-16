@@ -13,14 +13,14 @@
 # limitations under the License.
 
 import sys
+
 import paddle
 import paddle.nn as nn
-import numpy as np
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 sys.path.append("../..")
-from task.transformer import TransformerEncoderLayer, TransformerEncoder
+from task.transformer import TransformerEncoder, TransformerEncoderLayer  # noqa: E402
 
 sys.path.remove("../..")
 

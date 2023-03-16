@@ -14,24 +14,26 @@
 
 import argparse
 import logging
-import os
-import sys
+import math
 import random
 import time
-import math
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
+from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer, BertModel
-from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    LinearDecayWithWarmup,
+    TinyBertForSequenceClassification,
+    TinyBertTokenizer,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -238,7 +240,7 @@ def do_train(args):
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

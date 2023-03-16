@@ -14,11 +14,8 @@
 """
  This script includes code to calculating F1 score for results form sentiment analysis task
 """
-import copy
-import json
-import time
-import math
 import argparse
+import json
 
 
 def get_args():
@@ -163,8 +160,6 @@ def calc_model_f1(golden_dict, pred_dict, golden_len):
             "f1": f1,
         }
 
-    macro_prec = (sum(score["prec"] for score in scores.values()) / golden_len) if golden_len else 0
-    macro_rec = (sum(score["rec"] for score in scores.values()) / golden_len) if golden_len else 0
     macro_f1 = (sum(score["f1"] for score in scores.values()) / golden_len) if golden_len else 0
 
     return macro_f1, scores
