@@ -95,10 +95,10 @@ class T5LayerNorm(nn.Layer):
             variance = paddle.pow(hidden_states.astype(paddle.float32), 2).mean(axis=-1, keepdim=True)
             hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
 
-            # convert into float16 if necessary
-            if amp_state() or self.weight.dtype == paddle.float16:
-                hidden_states = hidden_states.astype(paddle.float16)
-            return self.weight * hidden_states
+        # convert into float16 if necessary
+        if amp_state() or self.weight.dtype == paddle.float16:
+            hidden_states = hidden_states.astype(paddle.float16)
+        return self.weight * hidden_states
 
 
 class T5DenseReluDense(nn.Layer):
