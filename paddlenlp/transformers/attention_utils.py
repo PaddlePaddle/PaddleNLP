@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import copy
 import collections
+import copy
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
-from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
 from paddle import ParamAttr
-import paddlenlp
+from paddle.nn import Layer
 
 
 class Registry(object):
@@ -233,7 +231,6 @@ class BigBirdSparseAttention(Attention):
         GB = self.num_global_blocks_back
         GF = self.num_global_blocks_front
         G = self.num_global_blocks
-        R = self.num_rand_blocks
         W = self.window_size
         bs = self.block_size
         T = sequence_length
@@ -299,7 +296,6 @@ class BigBirdSparseAttention(Attention):
         GB = self.num_global_blocks_back
         GF = self.num_global_blocks_front
         G = self.num_global_blocks
-        R = self.num_rand_blocks
         W = self.window_size
         bs = self.block_size
         L = T // bs  # blocked length
@@ -362,7 +358,6 @@ class BigBirdSparseAttention(Attention):
         B = batch_size
         L = sequence_length // bs
         H = self.num_heads
-        G = self.num_global_blocks
         GB = self.num_global_blocks_back
         GF = self.num_global_blocks_front
         R = self.num_rand_blocks
@@ -438,12 +433,10 @@ class BigBirdSparseAttention(Attention):
         B = query_matrix.shape[0]  # batch_size
         H = self.num_heads
         T = query_matrix.shape[2]  # sequence_length
-        D = query_matrix.shape[3]  # size per head
         G = self.num_global_blocks
         GB = self.num_global_blocks_back
         GF = self.num_global_blocks_front
         R = self.num_rand_blocks
-        W = self.window_size
         bs = self.block_size
         L = T // bs  # blocked length
 

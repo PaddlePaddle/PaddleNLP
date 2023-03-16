@@ -14,26 +14,21 @@
 # limitations under the License.
 
 import argparse
-import json
-import time
 import os
-import numpy as np
-import random
-import sys
+import time
 from functools import partial
 
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+import numpy as np
 import paddle
-from paddle.nn import functional as F
-from paddle.nn.layer import CrossEntropyLoss
-from paddle.io import DataLoader
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ChineseBertForSequenceClassification
-from paddlenlp.transformers import ChineseBertTokenizer
-from paddlenlp.datasets import load_dataset
+import paddle.nn.functional as F
+from utils import create_dataloader, evaluate, load_ds_xnli, set_seed
 
-from utils import set_seed
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.transformers import (
+    ChineseBertForSequenceClassification,
+    ChineseBertTokenizer,
+    LinearDecayWithWarmup,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -70,8 +65,6 @@ args = parser.parse_args()
 
 paddle.set_device(args.device)
 set_seed(args.seed)
-
-from utils import load_ds_xnli
 
 data_dir = args.data_path
 train_path = os.path.join(data_dir, "train.tsv")
@@ -110,8 +103,6 @@ batchify_fn = lambda samples, fn=Tuple(
     Pad(axis=0, pad_val=tokenizer.pad_token_id), Pad(axis=0, pad_val=0), Stack()  # input_ids  # pinyin_ids  # labels
 ): [data for data in fn(samples)]
 
-from utils import create_dataloader
-
 train_data_loader = create_dataloader(
     train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
 )
@@ -123,8 +114,6 @@ dev_data_loader = create_dataloader(
 test_data_loader = create_dataloader(
     test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
 )
-
-from utils import evaluate
 
 num_training_steps = len(train_data_loader) * args.epochs
 

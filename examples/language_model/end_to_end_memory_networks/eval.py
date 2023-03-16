@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math, os
+import math
+import os
 from importlib import import_module
 
-import paddle
-from paddle import nn
 import numpy as np
-
-from model import MemN2N
-from data import load_data
+import paddle
 from config import Config
+from data import load_data
+from model import MemN2N
+from paddle import nn
 
 
 @paddle.no_grad()
