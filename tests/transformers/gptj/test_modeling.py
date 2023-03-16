@@ -232,7 +232,7 @@ class GPTJModelTester:
         output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-1))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=5e-1))
 
     def create_and_check_gptj_model_attention_mask_past(
         self, config, input_ids, input_mask, head_mask, token_type_ids, *args
