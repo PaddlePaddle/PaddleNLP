@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-import paddle.nn as nn
 from data import cnn_dm_convert_example
 from utils import GLMTrainer, generate
 
@@ -34,7 +33,6 @@ class DataArgument:
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
-    out_seq_length: int = field(default=256, metadata={"help": "The length of decoded prediction."})
     length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
     no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
@@ -54,7 +52,7 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="glm-2b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="THUDM/glm-2b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -78,7 +76,6 @@ def main():
     model.generate = partial(
         generate,
         self=model,
-        max_length=data_args.out_seq_length,
         tgt_length=data_args.tgt_length,
         min_tgt_length=data_args.min_tgt_length,
         num_beams=data_args.num_beams,
@@ -100,7 +97,6 @@ def main():
     dev_ds = dev_ds.map(trans_func)
     test_ds = test_ds.map(trans_func)
 
-    criterion = nn.loss.CrossEntropyLoss(reduction="none")
     collate_fn = DefaultDataCollator()
 
     def compute_metrics(eval_preds):
@@ -123,7 +119,6 @@ def main():
     trainer = GLMTrainer(
         model=model,
         args=training_args,
-        criterion=criterion,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
