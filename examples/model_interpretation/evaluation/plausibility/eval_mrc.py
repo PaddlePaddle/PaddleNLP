@@ -14,11 +14,8 @@
 """
  This script includes code to calculating F1 score for results form mrc task
 """
-import copy
-import json
-import time
-import math
 import argparse
+import json
 
 
 def get_args():

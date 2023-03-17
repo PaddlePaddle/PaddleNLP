@@ -15,17 +15,14 @@
 import collections
 import json
 import os
-from typing import Optional, List, Union, Dict
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import paddle
-from tqdm import tqdm
+from extract_chinese_and_punct import ChineseAndPunctuationExtractor
 
 from paddlenlp.transformers import AutoTokenizer, PretrainedTokenizer
-from paddlenlp.utils.log import logger
-
-from extract_chinese_and_punct import ChineseAndPunctuationExtractor
 
 InputFeature = collections.namedtuple(
     "InputFeature", ["input_ids", "seq_len", "tok_to_orig_start_index", "tok_to_orig_end_index", "labels"]

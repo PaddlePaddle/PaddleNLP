@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
-import sys
-import random
-import time
 import math
+import os
+import random
+import sys
+import time
 from functools import partial
 
 import numpy as np
@@ -26,19 +25,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import DataLoader
-
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import PPMiniLMModel
-
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
-from paddleslim.nas.ofa.utils import nlp_utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
+from paddleslim.nas.ofa.utils import nlp_utils
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import LinearDecayWithWarmup, PPMiniLMModel
+from paddlenlp.utils.log import logger
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from data import METRIC_CLASSES, MODEL_CLASSES, convert_example  # noqa: E402
 
 
 def parse_args():
@@ -162,7 +159,7 @@ def evaluate(model, metric, data_loader, width_mult, student=False):
     return res
 
 
-### monkey patch for ppminilm forward to accept [attention_mask, head_mask] as  attention_mask
+# monkey patch for ppminilm forward to accept [attention_mask, head_mask] as  attention_mask
 def ppminilm_forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=[None, None]):
     if self.use_faster_tokenizer:
         input_ids, token_type_ids = self.tokenizer(
@@ -181,7 +178,7 @@ def ppminilm_forward(self, input_ids, token_type_ids=None, position_ids=None, at
 PPMiniLMModel.forward = ppminilm_forward
 
 
-### reorder weights according head importance and neuron importance
+# reorder weights according head importance and neuron importance
 def reorder_neuron_head(model, head_importance, neuron_importance):
     # reorder heads and ffn neurons
     for layer, current_importance in enumerate(neuron_importance):
@@ -235,7 +232,7 @@ def do_train(args):
     dev_data_loader = DataLoader(
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
-    num_labels = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_labels = 1 if train_ds.label_list is None else len(train_ds.label_list)
 
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_labels)
 
@@ -274,8 +271,8 @@ def do_train(args):
 
     metric = metric_class()
 
-    #### Step6: Calculate the importance of neurons and head,
-    #### and then reorder them according to the importance.
+    # Step6: Calculate the importance of neurons and head,
+    # and then reorder them according to the importance.
     head_importance, neuron_importance = nlp_utils.compute_neuron_head_importance(
         args.task_name,
         ofa_model.model,
