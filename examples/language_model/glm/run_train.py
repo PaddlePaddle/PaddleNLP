@@ -22,6 +22,7 @@ from utils import GLMTrainer, generate
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
@@ -57,6 +58,7 @@ class ModelArgument:
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -95,9 +97,20 @@ def main():
         model_args.model_name_or_path,
         output_predict=True,
         parallel_output=True,
+        load_state_as_np=True,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
+    if model_args.lora:
+        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
+        model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model.generate = partial(

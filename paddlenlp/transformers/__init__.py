@@ -92,6 +92,7 @@ from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
+from .ernie_gram.configuration import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
 from .ernie_layout.configuration import *
