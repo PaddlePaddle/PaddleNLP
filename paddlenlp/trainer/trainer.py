@@ -1193,7 +1193,7 @@ class Trainer:
 
         # Multi-gpu training
         if self.args.world_size > 1 and self.sharding is None:
-            model = paddle.DataParallel(model, find_unused_parameters=True)
+            model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
         if self.sharding is not None:
             # Sharded DDP!
