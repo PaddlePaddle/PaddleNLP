@@ -12,35 +12,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import sys
-import re
-import time
-import logging
-import json
-import collections
-from random import random
-from tqdm import tqdm
-from functools import reduce, partial
-from pathlib import Path
-import numpy as np
-import logging
 import argparse
+import collections
+import json
+import logging
+import os
+import re
+import sys
+from functools import partial
+from pathlib import Path
 
+import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Dict, Pad, Stack
-from paddlenlp.datasets import DatasetBuilder
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-
-from roberta.modeling import RobertaForSequenceClassification
-from simnet.utils import CharTokenizer, preprocess_data
-from simnet.model import SimNet
 from LIME.lime_text import LimeTextExplainer
+from roberta.modeling import RobertaForSequenceClassification
+from simnet.model import SimNet
+from simnet.utils import CharTokenizer, preprocess_data
+from tqdm import tqdm
+
+from paddlenlp.data import Dict, Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+    match,
+)
 
 sys.path.remove("../../..")
 

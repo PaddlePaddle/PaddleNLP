@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # imitations under the License.
 """
-This module to calculate precision, recall and f1-value 
+This module to calculate precision, recall and f1-value
 of the predicated results.
 """
-import sys
+import argparse
 import json
 import os
+import sys
 import zipfile
-import traceback
-import argparse
 
 SUCCESS = 0
 FILE_ERROR = 1
