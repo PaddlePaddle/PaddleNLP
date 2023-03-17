@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 from utils import GLMTrainer, read_data
 
@@ -23,13 +24,37 @@ from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokeni
 
 def main():
     parser = PdArgumentParser((TrainingArguments))
-    training_args = parser.parse_args_into_dataclasses()
+    training_args = parser.parse_args_into_dataclasses()[0]
+    training_args.print_config()
 
-    train_ds = load_dataset(read_data, filenames=["26.json", "25.json"], lazy=False)
-    dev_ds = load_dataset(read_data, filenames=["1.json"], lazy=False)
+    filenames = os.listdir("/ssd2/hesijun/workspace/paddle_bot/answer")
+    train_files, dev_files = [], []
+    for filename in filenames:
+        filenum = int(filename.split(".")[0])
+        if filenum < 10:
+            train_files.append(filename)
+        elif filenum >= 10 and filenum < 12:
+            dev_files.append(filename)
 
     tokenizer = AutoTokenizer.from_pretrained("THUDM/glm-large-chinese")
-    model = AutoModelForConditionalGeneration.from_pretrained("THUDM/glm-large-chinese")
+    model = AutoModelForConditionalGeneration.from_pretrained(
+        "THUDM/glm-large-chinese", output_predict=True, parallel_output=True, load_state_as_np=True
+    )
+
+    def preprocess(example):
+        input_text = "问题：" + example["source"] + " 回答： [gMASK]"
+        result = tokenizer(text=input_text, max_length=32, truncation=True, padding="max_length", return_tensors="pd")
+        inputs = tokenizer.build_inputs_for_generation(
+            result, targets=example["target"], max_gen_length=256, padding=True
+        )
+        for input_name in inputs.keys():
+            inputs[input_name] = inputs[input_name].squeeze(0)
+        return inputs
+
+    train_ds = load_dataset(read_data, filenames=train_files, lazy=False)
+    dev_ds = load_dataset(read_data, filenames=dev_files, lazy=False)
+    processed_train = train_ds.map(preprocess, lazy=False)
+    processed_dev = dev_ds.map(preprocess, lazy=False)
 
     collate_fn = DefaultDataCollator()
 
@@ -53,12 +78,11 @@ def main():
     trainer = GLMTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
+        train_dataset=processed_train,
+        eval_dataset=processed_dev,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-        do_generation=True,
         data_collator=collate_fn,
+        do_generation=False,
     )
 
     if training_args.do_train:

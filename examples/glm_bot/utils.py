@@ -19,7 +19,6 @@ import paddle
 import paddle.nn as nn
 import pandas as pd
 from paddle import Tensor
-from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.generation_utils import (
@@ -79,21 +78,21 @@ class GLMTrainer(Trainer):
 
         return (None, paddle.to_tensor(all_preds), paddle.to_tensor(all_labels))
 
-    def create_scheduler(self, num_training_steps: int):
-        num_warmup_steps = (
-            self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio * num_training_steps
-        )
+    # def create_scheduler(self, num_training_steps: int):
+    #     num_warmup_steps = (
+    #         self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio * num_training_steps
+    #     )
 
-        def lr_lambda(current_step: int):
-            if current_step < num_warmup_steps:
-                return float(current_step) / float(max(1, num_warmup_steps))
-            else:
-                decay_step_ratio = (current_step - num_warmup_steps) / (num_training_steps - num_warmup_steps)
-                return 1.0 - (1.0 - self.args.lr_decay_ratio) * decay_step_ratio
+    #     def lr_lambda(current_step: int):
+    #         if current_step < num_warmup_steps:
+    #             return float(current_step) / float(max(1, num_warmup_steps))
+    #         else:
+    #             decay_step_ratio = (current_step - num_warmup_steps) / (num_training_steps - num_warmup_steps)
+    #             return 1.0 - (1.0 - self.args.lr_decay_ratio) * decay_step_ratio
 
-        if self.lr_scheduler is None:
-            self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
-        return self.lr_scheduler
+    #     if self.lr_scheduler is None:
+    #         self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
+    #     return self.lr_scheduler
 
 
 @paddle.no_grad()
