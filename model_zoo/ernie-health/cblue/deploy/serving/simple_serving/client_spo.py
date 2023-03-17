@@ -13,32 +13,33 @@
 # limitations under the License.
 
 import argparse
-import requests
 import json
 
-# yapf: disable
+import requests
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization.")
+parser.add_argument(
+    "--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization."
+)
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for predicting.")
 args = parser.parse_args()
-# yapf: disable
 
 url = "http://0.0.0.0:8189/models/cblue_spo"
 headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
-    texts = ['骶髂关节炎是明确诊断JAS的关键条件。若有肋椎关节病变会使胸部扩张度减小。', '稳定型缺血性心脏疾病@肥胖与缺乏活动也导致高血压增多。']
+    texts = ["骶髂关节炎是明确诊断JAS的关键条件。若有肋椎关节病变会使胸部扩张度减小。", "稳定型缺血性心脏疾病@肥胖与缺乏活动也导致高血压增多。"]
     texts = [[x.lower() for x in text] for text in texts]
     data = {
-        'data': {
-             'text': texts,
-         },
-        'parameters': {
-             'max_seq_len': args.max_seq_len,
-             'batch_size': args.batch_size,
-             'return_attention_mask': True,
-             'is_split_into_words': True
-        }
+        "data": {
+            "text": texts,
+        },
+        "parameters": {
+            "max_seq_len": args.max_seq_len,
+            "batch_size": args.batch_size,
+            "return_attention_mask": True,
+            "is_split_into_words": True,
+        },
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     print(r.text)

@@ -12,30 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+
 import psutil
-
-import paddle
-from paddlenlp.utils.log import logger
-from paddlenlp.datasets import load_dataset
-
 from predictor import SPOPredictor
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
-parser.add_argument("--model_name_or_path", default="ernie-health-chinese", type=str, help="The directory or name of model.")
-parser.add_argument("--dataset", default="CMeIE", type=str, help="Dataset for named entity recognition.")
-parser.add_argument("--data_file", default=None, type=str, help="The data to predict with one sample per line.")
-parser.add_argument("--max_seq_length", default=300, type=int, help="The maximum total input sequence length after tokenization.")
-parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
-parser.add_argument("--num_threads", default=psutil.cpu_count(logical=False), type=int, help="num_threads for cpu.")
-parser.add_argument("--batch_size", default=20, type=int, help="Batch size per GPU/CPU for predicting.")
-parser.add_argument("--device", choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--device_id", default=0, help="Select which gpu device to train model.")
-args = parser.parse_args()
-# yapf: enable
+from paddlenlp.utils.log import logger
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used."
+    )
+    parser.add_argument(
+        "--model_name_or_path", default="ernie-health-chinese", type=str, help="The directory or name of model."
+    )
+    parser.add_argument("--dataset", default="CMeIE", type=str, help="Dataset for named entity recognition.")
+    parser.add_argument("--data_file", default=None, type=str, help="The data to predict with one sample per line.")
+    parser.add_argument(
+        "--max_seq_length", default=300, type=int, help="The maximum total input sequence length after tokenization."
+    )
+    parser.add_argument(
+        "--use_fp16",
+        action="store_true",
+        help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
+    )
+    parser.add_argument(
+        "--num_threads", default=psutil.cpu_count(logical=False), type=int, help="num_threads for cpu."
+    )
+    parser.add_argument("--batch_size", default=20, type=int, help="Batch size per GPU/CPU for predicting.")
+    parser.add_argument(
+        "--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu."
+    )
+    parser.add_argument("--device_id", default=0, help="Select which gpu device to train model.")
+    args = parser.parse_args()
+    return args
+
 
 LABEL_LIST = {
     "cmeie": [
@@ -88,7 +101,10 @@ LABEL_LIST = {
 
 TEXT = {"cmeie": ["骶髂关节炎是明确诊断JAS的关键条件。若有肋椎关节病变会使胸部扩张度减小。", "稳定型缺血性心脏疾病@肥胖与缺乏活动也导致高血压增多。"]}
 
-if __name__ == "__main__":
+
+def main():
+    args = parse_args()
+
     for arg_name, arg_value in vars(args).items():
         logger.info("{:20}: {}".format(arg_name, arg_value))
 
@@ -102,3 +118,7 @@ if __name__ == "__main__":
 
     predictor = SPOPredictor(args, label_list)
     predictor.predict(input_data)
+
+
+if __name__ == "__main__":
+    main()

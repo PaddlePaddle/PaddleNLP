@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import logging
-import numpy as np
-import sys
 
-from paddle_serving_server.web_service import WebService, Op
+from paddle_serving_server.web_service import Op, WebService
 
 _LOGGER = logging.getLogger()
 

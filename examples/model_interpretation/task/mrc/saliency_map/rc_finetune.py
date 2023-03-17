@@ -12,27 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import logging
 import os
 import re
-import time
-import logging
-import json
 import sys
+import time
 from pathlib import Path
-from visualdl import LogWriter
-import argparse
 
-from paddle.io import DataLoader
-from paddlenlp.data import Pad, Stack, Dict
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 import paddle
-
-from squad import DuReaderChecklist
-from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+from paddle.io import DataLoader
 from roberta.modeling import RobertaForQuestionAnswering
+from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+from squad import DuReaderChecklist
+from visualdl import LogWriter
+
+from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+)
 
 sys.path.remove("../../..")
 

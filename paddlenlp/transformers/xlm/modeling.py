@@ -20,8 +20,14 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
+from .configuration import (
+    XLM_PRETRAINED_INIT_CONFIGURATION,
+    XLM_PRETRAINED_RESOURCE_FILES_MAP,
+    XLMConfig,
+)
 
 __all__ = [
     "XLMModel",
@@ -82,7 +88,7 @@ class MultiHeadAttention(nn.Layer):
 
     NEW_ID = itertools.count()
 
-    def __init__(self, n_heads, dim, attention_probs_dropout_prob):
+    def __init__(self, n_heads, dim, config: XLMConfig):
         super().__init__()
         self.layer_id = next(MultiHeadAttention.NEW_ID)
         self.dim = dim
@@ -92,7 +98,7 @@ class MultiHeadAttention(nn.Layer):
         self.k_lin = nn.Linear(dim, dim)
         self.v_lin = nn.Linear(dim, dim)
         self.out_lin = nn.Linear(dim, dim)
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.dim_per_head = self.dim // self.n_heads
 
     def shape(self, x):
@@ -157,12 +163,12 @@ class MultiHeadAttention(nn.Layer):
 
 
 class TransformerFFN(nn.Layer):
-    def __init__(self, in_dim, dim_hidden, out_dim, hidden_act, dropout_prob):
+    def __init__(self, in_dim, dim_hidden, out_dim, config: XLMConfig):
         super().__init__()
         self.lin1 = nn.Linear(in_dim, dim_hidden)
         self.lin2 = nn.Linear(dim_hidden, out_dim)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.act = ACT2FN[hidden_act]
+        self.dropout = nn.Dropout(config.dropout_prob)
+        self.act = ACT2FN[config.hidden_act]
 
     def forward(self, x):
         x = self.lin1(x)
@@ -181,384 +187,11 @@ class XLMPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "xlm-mlm-en-2048": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 1,
-            "use_lang_embeddings": True,
-            "vocab_size": 30145,
-            "pad_token_id": 2,
-            "hidden_size": 2048,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 12,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.015625,
-            "init_std": 0.02,
-            "lang_id": 0,
-            "lang2id": None,
-        },
-        "xlm-mlm-ende-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 2,
-            "use_lang_embeddings": True,
-            "vocab_size": 64699,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 6,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 1,
-            "lang2id": {"de": 0, "en": 1},
-        },
-        "xlm-mlm-enfr-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 2,
-            "use_lang_embeddings": True,
-            "vocab_size": 64139,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 6,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 0,
-            "lang2id": {"en": 0, "fr": 1},
-        },
-        "xlm-mlm-enro-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 2,
-            "use_lang_embeddings": True,
-            "vocab_size": 64592,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 6,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 0,
-            "lang2id": {"en": 0, "ro": 1},
-        },
-        "xlm-mlm-tlm-xnli15-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 15,
-            "use_lang_embeddings": True,
-            "vocab_size": 95000,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 12,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 4,
-            "lang2id": {
-                "ar": 0,
-                "bg": 1,
-                "de": 2,
-                "el": 3,
-                "en": 4,
-                "es": 5,
-                "fr": 6,
-                "hi": 7,
-                "ru": 8,
-                "sw": 9,
-                "th": 10,
-                "tr": 11,
-                "ur": 12,
-                "vi": 13,
-                "zh": 14,
-            },
-        },
-        "xlm-mlm-xnli15-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 15,
-            "use_lang_embeddings": True,
-            "vocab_size": 95000,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 12,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 4,
-            "lang2id": {
-                "ar": 0,
-                "bg": 1,
-                "de": 2,
-                "el": 3,
-                "en": 4,
-                "es": 5,
-                "fr": 6,
-                "hi": 7,
-                "ru": 8,
-                "sw": 9,
-                "th": 10,
-                "tr": 11,
-                "ur": 12,
-                "vi": 13,
-                "zh": 14,
-            },
-        },
-        "xlm-clm-enfr-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 2,
-            "use_lang_embeddings": True,
-            "vocab_size": 64139,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 6,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 0,
-            "lang2id": {"en": 0, "fr": 1},
-        },
-        "xlm-clm-ende-1024": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 2,
-            "use_lang_embeddings": True,
-            "vocab_size": 64699,
-            "pad_token_id": 2,
-            "hidden_size": 1024,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 6,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.02209708691207961,
-            "init_std": 0.02,
-            "lang_id": 1,
-            "lang2id": {"de": 0, "en": 1},
-        },
-        "xlm-mlm-17-1280": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 17,
-            "use_lang_embeddings": False,
-            "vocab_size": 200000,
-            "pad_token_id": 2,
-            "hidden_size": 1280,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 16,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.01976423537605237,
-            "init_std": 0.02,
-            "lang_id": 2,
-            "lang2id": {
-                "ar": 0,
-                "de": 1,
-                "en": 2,
-                "es": 3,
-                "fr": 4,
-                "hi": 5,
-                "it": 6,
-                "ja": 7,
-                "ko": 8,
-                "nl": 9,
-                "pl": 10,
-                "pt": 11,
-                "ru": 12,
-                "sv": 13,
-                "tr": 14,
-                "vi": 15,
-                "zh": 16,
-            },
-        },
-        "xlm-mlm-100-1280": {
-            "is_encoder": True,
-            "causal": False,
-            "n_langs": 100,
-            "use_lang_embeddings": False,
-            "vocab_size": 200000,
-            "pad_token_id": 2,
-            "hidden_size": 1280,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 16,
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "use_sinusoidal_embeddings": False,
-            "layer_norm_eps": 1e-12,
-            "hidden_act": "gelu",
-            "embed_init_std": 0.01976423537605237,
-            "init_std": 0.02,
-            "lang_id": 23,
-            "lang2id": {
-                "af": 0,
-                "als": 1,
-                "am": 2,
-                "an": 3,
-                "ang": 4,
-                "ar": 5,
-                "arz": 6,
-                "ast": 7,
-                "az": 8,
-                "bar": 9,
-                "be": 10,
-                "bg": 11,
-                "bn": 12,
-                "br": 13,
-                "bs": 14,
-                "ca": 15,
-                "ceb": 16,
-                "ckb": 17,
-                "cs": 18,
-                "cy": 19,
-                "da": 20,
-                "de": 21,
-                "el": 22,
-                "en": 23,
-                "eo": 24,
-                "es": 25,
-                "et": 26,
-                "eu": 27,
-                "fa": 28,
-                "fi": 29,
-                "fr": 30,
-                "fy": 31,
-                "ga": 32,
-                "gan": 33,
-                "gl": 34,
-                "gu": 35,
-                "he": 36,
-                "hi": 37,
-                "hr": 38,
-                "hu": 39,
-                "hy": 40,
-                "ia": 41,
-                "id": 42,
-                "is": 43,
-                "it": 44,
-                "ja": 45,
-                "jv": 46,
-                "ka": 47,
-                "kk": 48,
-                "kn": 49,
-                "ko": 50,
-                "ku": 51,
-                "la": 52,
-                "lb": 53,
-                "lt": 54,
-                "lv": 55,
-                "mk": 56,
-                "ml": 57,
-                "mn": 58,
-                "mr": 59,
-                "ms": 60,
-                "my": 61,
-                "nds": 62,
-                "ne": 63,
-                "nl": 64,
-                "nn": 65,
-                "no": 66,
-                "oc": 67,
-                "pl": 68,
-                "pt": 69,
-                "ro": 70,
-                "ru": 71,
-                "scn": 72,
-                "sco": 73,
-                "sh": 74,
-                "si": 75,
-                "simple": 76,
-                "sk": 77,
-                "sl": 78,
-                "sq": 79,
-                "sr": 80,
-                "sv": 81,
-                "sw": 82,
-                "ta": 83,
-                "te": 84,
-                "th": 85,
-                "tl": 86,
-                "tr": 87,
-                "tt": 88,
-                "uk": 89,
-                "ur": 90,
-                "uz": 91,
-                "vi": 92,
-                "war": 93,
-                "wuu": 94,
-                "yi": 95,
-                "zh": 96,
-                "zh_classical": 97,
-                "zh_min_nan": 98,
-                "zh_yue": 99,
-            },
-        },
-    }
-
-    pretrained_resource_files_map = {
-        "model_state": {
-            "xlm-mlm-en-2048": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-en-2048/model_state.pdparams",
-            "xlm-mlm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-ende-1024/model_state.pdparams",
-            "xlm-mlm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enfr-1024/model_state.pdparams",
-            "xlm-mlm-enro-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enro-1024/model_state.pdparams",
-            "xlm-mlm-tlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-tlm-xnli15-1024/model_state.pdparams",
-            "xlm-mlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-xnli15-1024/model_state.pdparams",
-            "xlm-clm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-enfr-1024/model_state.pdparams",
-            "xlm-clm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-ende-1024/model_state.pdparams",
-            "xlm-mlm-17-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-17-1280/model_state.pdparams",
-            "xlm-mlm-100-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-100-1280/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = XLM_PRETRAINED_INIT_CONFIGURATION
+    resource_files_names = {"model_state": "model_state.pdparams"}
+    pretrained_resource_files_map = XLM_PRETRAINED_RESOURCE_FILES_MAP
+    model_config_file = CONFIG_NAME
+    config_class = XLMConfig
     base_model_prefix = "xlm"
 
     def init_weights(self):
@@ -604,153 +237,61 @@ class XLMModel(XLMPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `XLMModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `XLMModel`.
-            Defaults to `95000`.
-        is_encoder(bool, optional):
-            Whether or not the initialized model should be a transformer encoder or decoder as seen in Vaswani et al.
-            Defaults to `True`.
-        causal (bool, optional):
-            Whether or not the model should behave in a causal manner. Causal models use a triangular attention mask in
-            order to only attend to the left-side context instead if a bidirectional context.
-            Defaults to `False`.
-        n_langs (int, optional):
-            The number of languages the model handles. Set to 1 for monolingual models.
-            Defaults to `15`.
-        use_lang_embeddings (bool, optional)
-            Whether to use language embeddings. Some models use additional language embeddings.
-            Defaults to `True`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer. Defaults to `1024`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `8`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        use_sinusoidal_embeddings (bool, optional):
-            Whether or not to use sinusoidal positional embeddings instead of absolute positional embeddings.
-            Defaults to `False`.
-        layer_norm_eps (float, optional):
-            The epsilon used by the layer normalization layers.
-            Defaults to 1e-12.
-        embed_init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing the embedding matrices.
-            Defaults to `(1024*2)^-0.5`.
-        init_std (int, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices except the
-            embedding matrices.
-            Defaults to `0.02`.
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `2`.
-        lang_id (int, optional):
-            The ID of the language used by the model. This parameter is used when generating text in a given language.
-            Defaults to 4.
-        lang2id (Dict[str, int], optional):
-            Dictionary mapping languages string identifiers to their IDs.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
-    def __init__(
-        self,
-        vocab_size=95000,
-        is_encoder=True,
-        causal=False,
-        n_langs=15,
-        use_lang_embeddings=True,
-        hidden_size=1024,
-        hidden_act="gelu",
-        num_attention_heads=8,
-        num_hidden_layers=12,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        use_sinusoidal_embeddings=False,
-        layer_norm_eps=1e-12,
-        embed_init_std=2048**-0.5,
-        init_std=0.02,
-        pad_token_id=2,
-        lang_id=4,
-        lang2id={
-            "ar": 0,
-            "bg": 1,
-            "de": 2,
-            "el": 3,
-            "en": 4,
-            "es": 5,
-            "fr": 6,
-            "hi": 7,
-            "ru": 8,
-            "sw": 9,
-            "th": 10,
-            "tr": 11,
-            "ur": 12,
-            "vi": 13,
-            "zh": 14,
-        },
-    ):
-        super().__init__()
-        self.causal = causal
-        self.num_hidden_layers = num_hidden_layers
-        self.pad_token_id = pad_token_id
-        self.hidden_size = hidden_size
-        self.embed_init_std = embed_init_std
-        self.init_std = init_std
-        self.use_lang_embeddings = use_lang_embeddings
-        self.n_langs = n_langs
-        if not is_encoder:
+    def __init__(self, config: XLMConfig):
+        super().__init__(config)
+        self.causal = config.causal
+        self.num_hidden_layers = config.num_hidden_layers
+        self.pad_token_id = config.pad_token_id
+        self.hidden_size = config.hidden_size
+        self.embed_init_std = config.embed_init_std
+        self.init_std = config.init_std
+        self.use_lang_embeddings = config.use_lang_embeddings
+        self.n_langs = config.n_langs
+        if not config.is_encoder:
             raise NotImplementedError("Currently XLM can only be used as an encoder")
         assert (
-            hidden_size % num_attention_heads == 0
+            config.hidden_size % config.num_attention_heads == 0
         ), "xlm model's hidden_size must be a multiple of num_attention_heads"
 
         # embeddings
-        if use_sinusoidal_embeddings:
-            self.position_embeddings = SinusoidalPositionalEmbedding(max_position_embeddings, hidden_size)
+        if config.use_sinusoidal_embeddings:
+            self.position_embeddings = SinusoidalPositionalEmbedding(
+                config.max_position_embeddings, config.hidden_size
+            )
         else:
-            self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        if n_langs > 1 and use_lang_embeddings:
-            self.lang_embeddings = nn.Embedding(n_langs, hidden_size)
-        self.embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.layer_norm_emb = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+            self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        if config.n_langs > 1 and config.use_lang_embeddings:
+            self.lang_embeddings = nn.Embedding(config.n_langs, config.hidden_size)
+        self.embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.layer_norm_emb = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
         self.attentions = nn.LayerList()
         self.layer_norm1 = nn.LayerList()
         self.ffns = nn.LayerList()
         self.layer_norm2 = nn.LayerList()
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         for _ in range(self.num_hidden_layers):
-            self.attentions.append(MultiHeadAttention(num_attention_heads, hidden_size, attention_probs_dropout_prob))
-            self.layer_norm1.append(nn.LayerNorm(hidden_size, epsilon=layer_norm_eps))
+            self.attentions.append(MultiHeadAttention(config.num_attention_heads, config.hidden_size, config))
+            self.layer_norm1.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
 
             self.ffns.append(
                 TransformerFFN(
-                    hidden_size,
-                    hidden_size * 4,
-                    hidden_size,
-                    hidden_act,
-                    hidden_dropout_prob,
+                    config.hidden_size,
+                    config.hidden_size * 4,
+                    config.hidden_size,
+                    config,
                 )
             )
-            self.layer_norm2.append(nn.LayerNorm(hidden_size, epsilon=layer_norm_eps))
+            self.layer_norm2.append(nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps))
 
         self.register_buffer(
             "position_ids",
-            paddle.arange(0, max_position_embeddings).reshape((1, -1)),
+            paddle.arange(0, config.max_position_embeddings).reshape((1, -1)),
             persistable=False,
         )
         self.init_weights()
@@ -916,6 +457,12 @@ class XLMModel(XLMPretrainedModel):
 
         return tuple(v for v in [tensor, hidden_states, attentions] if v is not None)
 
+    def get_input_embeddings(self):
+        return self.embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings = value
+
 
 class XLMPredLayer(nn.Layer):
     """
@@ -924,16 +471,15 @@ class XLMPredLayer(nn.Layer):
 
     def __init__(
         self,
-        vocab_size,
-        hidden_size,
+        config: XLMConfig,
         embedding_weights=None,
     ):
         super().__init__()
-        self.vocab_size = vocab_size
+        self.vocab_size = config.vocab_size
         if embedding_weights is None:
-            self.proj = nn.Linear(hidden_size, vocab_size)
+            self.proj = nn.Linear(config.hidden_size, config.vocab_size)
         else:
-            self.bias = self.create_parameter(shape=[vocab_size], is_bias=True)
+            self.bias = self.create_parameter(shape=[config.vocab_size], is_bias=True)
             self.proj = lambda x: paddle.matmul(x, embedding_weights, transpose_y=True) + self.bias
 
     def forward(self, x, y=None):
@@ -953,17 +499,16 @@ class XLMWithLMHeadModel(XLMPretrainedModel):
     layer with weights tied to the input embeddings).
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
 
     """
 
-    def __init__(self, xlm):
-        super().__init__()
-        self.xlm = xlm
+    def __init__(self, config: XLMConfig):
+        super().__init__(config)
+        self.xlm = XLMModel(config)
         self.pred_layer = XLMPredLayer(
-            xlm.config["vocab_size"],
-            xlm.config["hidden_size"],
+            config,
             embedding_weights=self.xlm.embeddings.weight,
         )
         self.init_weights()
@@ -1046,24 +591,18 @@ class XLMForSequenceClassification(XLMPretrainedModel):
     `XLMForSequenceClassification` uses the first token in order to do the classification.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
 
     """
 
-    def __init__(self, xlm, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.xlm = xlm
-        dropout_prob = dropout if dropout is not None else self.xlm.config["hidden_dropout_prob"]
+    def __init__(self, config: XLMConfig):
+        super().__init__(config)
+        self.num_classes = config.num_classes
+        self.xlm = XLMModel(config)
+        dropout_prob = config.dropout if config.dropout is not None else config.hidden_dropout_prob
         self.dropout = nn.Dropout(dropout_prob)
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], num_classes)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -1120,22 +659,16 @@ class XLMForTokenClassification(XLMPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of :class:`XLMModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
-    def __init__(self, xlm, num_classes=2, dropout=None):
-        super(XLMForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.xlm = xlm  # allow xlm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.xlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], num_classes)
+    def __init__(self, config: XLMConfig):
+        super(XLMForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_classes
+        self.xlm = XLMModel(config)  # allow xlm to be config
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -1191,14 +724,14 @@ class XLMForQuestionAnsweringSimple(XLMPretrainedModel):
     layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of XLMModel.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
-    def __init__(self, xlm):
-        super(XLMForQuestionAnsweringSimple, self).__init__()
-        self.xlm = xlm  # allow xlm to be config
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], 2)
+    def __init__(self, config: XLMConfig):
+        super(XLMForQuestionAnsweringSimple, self).__init__(config)
+        self.xlm = XLMModel(config)  # allow xlm to be config
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -1265,22 +798,16 @@ class XLMForMultipleChoice(XLMPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        xlm (:class:`XLMModel`):
-            An instance of XLMModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to None.
+        config (:class:`XLMConfig`):
+            An instance of :class:`XLMConfig`.
     """
 
-    def __init__(self, xlm, num_choices=2, dropout=None):
-        super(XLMForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.xlm = xlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.xlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.xlm.config["hidden_size"], 1)
+    def __init__(self, config: XLMConfig):
+        super(XLMForMultipleChoice, self).__init__(config)
+        # self.num_choices = num_choices
+        self.xlm = XLMModel(config)
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
@@ -1345,6 +872,7 @@ class XLMForMultipleChoice(XLMPretrainedModel):
                     langs=langs,
                 )
         """
+        num_choices = input_ids.shape[1]
         # input_ids: [bs, num_choice, seqlen]
         input_ids = input_ids.reshape(
             shape=(-1, paddle.shape(input_ids)[-1])
@@ -1369,6 +897,6 @@ class XLMForMultipleChoice(XLMPretrainedModel):
         pooled_output = sequence_output[:, 0]
 
         logits = self.classifier(pooled_output)  # logits: [bs*num_choice, 1]
-        reshaped_logits = logits.reshape(shape=(-1, self.num_choices))  # logits: [bs, num_choice]
+        reshaped_logits = logits.reshape(shape=(-1, num_choices))  # logits: [bs, num_choice]
 
         return reshaped_logits
