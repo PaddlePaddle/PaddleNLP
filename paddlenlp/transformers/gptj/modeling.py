@@ -132,7 +132,6 @@ class GPTJAttention(Layer):
         key,
         value,
         attention_mask=None,
-        head_mask=None,
     ):
         # compute causal mask from causal mask buffer
         query_length, key_length = query.shape[-2], key.shape[-2]
@@ -166,10 +165,6 @@ class GPTJAttention(Layer):
 
         attn_weights = self.attn_dropout(attn_weights)
 
-        # Mask heads if we want to
-        if head_mask is not None:
-            attn_weights = attn_weights * head_mask
-
         attn_output = paddle.matmul(attn_weights, value)
 
         return attn_output, attn_weights
@@ -179,7 +174,6 @@ class GPTJAttention(Layer):
         hidden_states: Optional[paddle.Tensor],
         attention_mask: Optional[paddle.Tensor] = None,
         layer_past: Optional[Tuple[paddle.Tensor]] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
     ) -> Union[
@@ -234,7 +228,7 @@ class GPTJAttention(Layer):
             present = None
 
         # compute self-attention: V x Softmax(QK^T)
-        attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
+        attn_output, attn_weights = self._attn(query, key, value, attention_mask)
 
         attn_output = self._merge_heads(attn_output, self.num_attention_heads, self.head_dim)
         attn_output = self.out_proj(attn_output)
@@ -279,7 +273,6 @@ class GPTJBlock(Layer):
         hidden_states: Optional[paddle.Tensor],
         layer_past: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
     ) -> Union[Tuple[paddle.Tensor], Optional[Tuple[paddle.Tensor, Tuple[paddle.Tensor, ...]]]]:
@@ -289,7 +282,6 @@ class GPTJBlock(Layer):
             hidden_states,
             layer_past=layer_past,
             attention_mask=attention_mask,
-            head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
         )
@@ -376,7 +368,6 @@ class GPTJModel(GPTJPretrainedModel):
         attention_mask: Optional[paddle.Tensor] = None,
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -427,7 +418,7 @@ class GPTJModel(GPTJPretrainedModel):
             attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
-        # TODO(zhangxu): Add head_mask if  PretrainedModel supports get_head_mask method
+        # TODO(zhangxu): Add head_mask if PretrainedModel supports get_head_mask method
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
@@ -552,7 +543,6 @@ class GPTJForCausalLM(GPTJPretrainedModel):
         attention_mask: Optional[paddle.Tensor] = None,
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         labels: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -580,7 +570,6 @@ class GPTJForCausalLM(GPTJPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
@@ -666,7 +655,6 @@ class GPTJForSequenceClassification(GPTJPretrainedModel):
         attention_mask: Optional[paddle.Tensor] = None,
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         labels: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -682,7 +670,6 @@ class GPTJForSequenceClassification(GPTJPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
@@ -765,7 +752,6 @@ class GPTJForQuestionAnswering(GPTJPretrainedModel):
         attention_mask: Optional[paddle.Tensor] = None,
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        head_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         start_positions: Optional[paddle.Tensor] = None,
         end_positions: Optional[paddle.Tensor] = None,
@@ -790,7 +776,6 @@ class GPTJForQuestionAnswering(GPTJPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,

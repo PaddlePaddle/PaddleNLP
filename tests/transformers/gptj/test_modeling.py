@@ -117,13 +117,10 @@ class GPTJModelTester:
 
         config = self.get_config()
 
-        head_mask = ids_tensor([self.num_hidden_layers, self.num_attention_heads], 2)
-
         return (
             config,
             input_ids,
             input_mask,
-            head_mask,
             token_type_ids,
             mc_token_ids,
             sequence_labels,
@@ -161,7 +158,6 @@ class GPTJModelTester:
             config,
             input_ids,
             input_mask,
-            head_mask,
             token_type_ids,
             mc_token_ids,
             sequence_labels,
@@ -176,7 +172,6 @@ class GPTJModelTester:
             config,
             input_ids,
             input_mask,
-            head_mask,
             token_type_ids,
             sequence_labels,
             token_labels,
@@ -185,10 +180,10 @@ class GPTJModelTester:
             encoder_attention_mask,
         )
 
-    def create_and_check_gptj_model(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
+    def create_and_check_gptj_model(self, config, input_ids, input_mask, token_type_ids, *args):
         model = GPTJModel(config=config)
         model.eval()
-        result = model(input_ids, token_type_ids=token_type_ids, head_mask=head_mask, use_cache=True, return_dict=True)
+        result = model(input_ids, token_type_ids=token_type_ids, use_cache=True, return_dict=True)
         result = model(input_ids, token_type_ids=token_type_ids, use_cache=True, return_dict=True)
         result = model(input_ids, use_cache=True, return_dict=True)
 
@@ -197,7 +192,7 @@ class GPTJModelTester:
         )
         self.parent.assertEqual(len(result.past_key_values), config.n_layer)
 
-    def create_and_check_gptj_model_past(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
+    def create_and_check_gptj_model_past(self, config, input_ids, input_mask, token_type_ids, *args):
         model = GPTJModel(config=config)
         model.eval()
 
@@ -231,9 +226,7 @@ class GPTJModelTester:
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=5e-1))
 
-    def create_and_check_gptj_model_attention_mask_past(
-        self, config, input_ids, input_mask, head_mask, token_type_ids, *args
-    ):
+    def create_and_check_gptj_model_attention_mask_past(self, config, input_ids, input_mask, token_type_ids, *args):
         model = GPTJModel(config=config)
         model.eval()
 
@@ -274,9 +267,7 @@ class GPTJModelTester:
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_gptj_model_past_large_inputs(
-        self, config, input_ids, input_mask, head_mask, token_type_ids, *args
-    ):
+    def create_and_check_gptj_model_past_large_inputs(self, config, input_ids, input_mask, token_type_ids, *args):
         model = GPTJModel(config=config)
         model.eval()
 
@@ -314,7 +305,7 @@ class GPTJModelTester:
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_lm_head_model(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
+    def create_and_check_lm_head_model(self, config, input_ids, input_mask, token_type_ids, *args):
         model = GPTJForCausalLM(config)
         model.eval()
 
@@ -323,7 +314,7 @@ class GPTJModelTester:
         self.parent.assertEqual(result.logits.shape, list((self.batch_size, self.seq_length, self.vocab_size)))
 
     def create_and_check_forward_and_backwards(
-        self, config, input_ids, input_mask, head_mask, token_type_ids, *args, gradient_checkpointing=False
+        self, config, input_ids, input_mask, token_type_ids, *args, gradient_checkpointing=False
     ):
         model = GPTJForCausalLM(config)
         if gradient_checkpointing:
@@ -341,7 +332,6 @@ class GPTJModelTester:
             config,
             input_ids,
             input_mask,
-            head_mask,
             token_type_ids,
             mc_token_ids,
             sequence_labels,
@@ -351,7 +341,6 @@ class GPTJModelTester:
         inputs_dict = {
             "input_ids": input_ids.astype("int64"),
             "token_type_ids": token_type_ids,
-            "head_mask": head_mask,
         }
 
         return config, inputs_dict
