@@ -61,6 +61,7 @@ from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
+from .blenderbot.configuration import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
 from .blip.modeling import *
