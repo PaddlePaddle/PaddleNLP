@@ -28,7 +28,7 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_softmax_in_fp32": True,
         "bias_dropout_fusion": True,
         "bos_token_id": 1,
-        "dtype": "float32",
+        "dtype": "float16",
         "eos_token_id": 2,
         "hidden_dropout": 0.0,
         "initializer_range": 0.02,

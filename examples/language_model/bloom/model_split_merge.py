@@ -110,7 +110,7 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
         model_name = model_name_or_path
         model_name_or_path = os.path.join(MODEL_HOME, model_name_or_path)
         if not os.path.exists(os.path.join(model_name_or_path, "model_state.pdparams")):
-            model = BloomModel.from_pretrained(model_name, load_state_as_np=True)
+            model = BloomModel.from_pretrained(model_name, low_cpu_mem_usage=True)
             state_dict = model.state_dict()
 
     # Check the model split files exists
