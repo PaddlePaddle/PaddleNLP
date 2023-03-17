@@ -579,7 +579,6 @@ class GLMPretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """Initialization hook"""
-        return
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
             # TODO: initialization for glm-515m
