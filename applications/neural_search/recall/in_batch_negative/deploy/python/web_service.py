@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import logging
-import numpy as np
-import sys
 
-from paddle_serving_server.web_service import WebService, Op
+from paddle_serving_server.web_service import Op, WebService
 
 _LOGGER = logging.getLogger()
 
@@ -38,7 +36,7 @@ class ErnieOp(Op):
         self.tokenizer = AutoTokenizer.from_pretrained("rocketqa-zh-base-query-encoder")
 
     def preprocess(self, input_dicts, data_id, log_id):
-        from paddlenlp.data import Stack, Tuple, Pad
+        from paddlenlp.data import Pad, Tuple
 
         ((_, input_dict),) = input_dicts.items()
         print("input dict", input_dict)
