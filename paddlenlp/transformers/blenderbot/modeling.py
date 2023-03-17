@@ -169,7 +169,7 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
         else:
             attention_mask = attention_mask.unsqueeze([1, 2]) * -1e4
 
-            attention_mask.stop_gradient = True
+        attention_mask.stop_gradient = True
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         # Different from BlenderbotSmall, Blenderbot Encoder apply the final layer norm on encoder output
         encoder_output = self.encoder_layernorm(encoder_output)
