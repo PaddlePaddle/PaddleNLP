@@ -242,11 +242,11 @@ def merge_tensor_parallel_weight(weight_list, is_column=True):
     [A1],[A2]  => [A1, A2]
 
     Args:
-        weight_list (_type_): _description_
-        is_column (bool, optional): _description_. Defaults to True. is column or row linear
+        weight_list (List[np.ndarray]): The splited tensor parallel weight list.
+        is_column (bool, optional): Is ColumnLinear or RowLinear. Defaults to True.
 
     Returns:
-        _type_: _description_
+        weight (np.ndarray): the merged weight.
     """
     if is_column:
         return np.concatenate(weight_list, axis=-1)
@@ -260,13 +260,13 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
     [A1, A2]  =>  [A1],[A2]
 
     Args:
-        weight (_type_): _description_
-        tensor_parallel_degree (_type_): _description_
-        tensor_parallel_rank (_type_): _description_
-        is_column (bool, optional): _description_. Defaults to True.
+        weight (numpy.ndarray): the tensor weight,
+        tensor_parallel_degree (int): tensor_parallel_degree
+        tensor_parallel_rank (int): tensor_parallel_rank
+        is_column (bool, optional): is ColumnLinear . Defaults to True.
 
     Returns:
-        _type_: _description_
+        tensor (numpy.ndarray): splited weight.
     """
     if is_column:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
