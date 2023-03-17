@@ -185,9 +185,11 @@ def write_model(model_path, input_base_path, model_size):
         }
     else:
         state_dict = {
-            "llama.embed_tokens.weight": loaded[0]["tok_embeddings.weight"],
             "llama.norm.weight": loaded[0]["norm.weight"],
-            "lm_head.weight": loaded[0]["output.weight"],
+            "llama.embed_tokens.weight": paddle.concat(
+                [loaded[i]["tok_embeddings.weight"] for i in range(num_shards)], axis=1
+            ),
+            "lm_head.weight": paddle.concat([loaded[i]["output.weight"] for i in range(num_shards)], axis=0),
         }
 
     all_state_dict.update(state_dict)
