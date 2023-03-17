@@ -202,6 +202,7 @@ from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
+from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 from .glm.configuration import *
