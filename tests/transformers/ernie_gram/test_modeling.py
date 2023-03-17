@@ -14,13 +14,13 @@
 # limitations under the License.
 
 import unittest
-from dataclasses import Field, dataclass, fields
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import paddle
 from paddle import Tensor
 
 from paddlenlp.transformers import (
+    ErnieGramConfig,
     ErnieGramForQuestionAnswering,
     ErnieGramForSequenceClassification,
     ErnieGramForTokenClassification,
@@ -32,70 +32,55 @@ from ...testing_utils import slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
-@dataclass
-class ErnieGramTestModelConfig:
-    """ernie-gram model config which keep consist with pretrained_init_configuration sub fields"""
-
-    attention_probs_dropout_prob: float = 0.1
-    emb_size: int = 8
-    hidden_act: str = "gelu"
-    hidden_dropout_prob: float = 0.1
-    hidden_size: int = 8
-    initializer_range: float = 0.02
-    max_position_embeddings: int = 512
-    num_attention_heads: int = 2
-    num_hidden_layers: int = 2
-    type_vocab_size: int = 2
-    vocab_size: int = 1801
-
-    @property
-    def model_kwargs(self) -> dict:
-        """get the model kwargs configuration to init the model"""
-        model_config_fields: Tuple[Field, ...] = fields(ErnieGramTestModelConfig)
-        return {field.name: getattr(self, field.name) for field in model_config_fields}
-
-
-@dataclass
-class ErnieGramTestConfig(ErnieGramTestModelConfig):
-    """all of ErnieGram Test configuration"""
-
-    batch_size: int = 2
-    seq_length: int = 7
-
-    is_training: bool = False
-    use_token_type_ids: bool = True
-    use_attention_mask: bool = True
-
-    # used for sequence classification
-    num_classes: int = 3
-
-    test_resize_embeddings: bool = False
-
-
 class ErnieGramModelTester:
     """Base ErnieGram Model tester which can test:"""
 
-    def __init__(self, parent, config: Optional[ErnieGramTestConfig] = None):
+    def __init__(self, parent):
         self.parent = parent
-        self.config: ErnieGramTestConfig = config or ErnieGramTestConfig()
+        self.batch_size = 2
+        self.seq_length = 7
+        self.is_training = False
+        self.use_token_type_ids = True
+        self.use_attention_mask = True
+        self.test_resize_embeddings = False
 
-        self.is_training = self.config.is_training
-
-    def __getattr__(self, key: str):
-        if not hasattr(self.config, key):
-            raise AttributeError(f"attribute <{key}> not exist")
-        return getattr(self.config, key)
+        self.num_labels = 3
+        self.attention_probs_dropout_prob = 0.1
+        self.embedding_size = 8
+        self.hidden_act = "gelu"
+        self.hidden_dropout_prob = 0.1
+        self.hidden_size = 8
+        self.initializer_range = 0.02
+        self.max_position_embeddings = 512
+        self.num_attention_heads = 2
+        self.num_hidden_layers = 2
+        self.type_vocab_size = 2
+        self.vocab_size = 1801
+        self.config = ErnieGramConfig(
+            num_labels=self.num_labels,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            embedding_size=self.embedding_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            hidden_size=self.hidden_size,
+            initializer_range=self.initializer_range,
+            max_position_embeddings=self.max_position_embeddings,
+            num_attention_heads=self.num_attention_heads,
+            num_hidden_layers=self.num_hidden_layers,
+            type_vocab_size=self.type_vocab_size,
+            vocab_size=self.vocab_size,
+        )
 
     def prepare_config_and_inputs(self) -> Tuple[Dict[str, Any], Tensor, Tensor, Tensor]:
         config = self.config
-        input_ids = ids_tensor([config.batch_size, config.seq_length], config.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], config.vocab_size)
 
         attention_mask = None
-        if config.use_attention_mask:
-            attention_mask = random_attention_mask([config.batch_size, config.seq_length])
+        if self.use_attention_mask:
+            attention_mask = random_attention_mask([self.batch_size, self.seq_length])
 
         token_type_ids = None
-        if config.use_token_type_ids:
+        if self.use_token_type_ids:
             token_type_ids = paddle.zeros_like(input_ids)
 
         sequence_labels = None
@@ -104,10 +89,8 @@ class ErnieGramModelTester:
 
         if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
-            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_classes)
+            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
-
-        config = self.get_config()
         return config, input_ids, token_type_ids, attention_mask, sequence_labels, token_labels, choice_labels
 
     def prepare_config_and_inputs_for_common(self):
@@ -129,7 +112,7 @@ class ErnieGramModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = ErnieGramModel(**config)
+        model = ErnieGramModel(config)
         model.eval()
 
         result = model(
@@ -141,10 +124,8 @@ class ErnieGramModelTester:
         if paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.hidden_size]
-        )
-        self.parent.assertEqual(result[1].shape, [self.config.batch_size, self.config.hidden_size])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.config.hidden_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.config.hidden_size])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -156,7 +137,7 @@ class ErnieGramModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = ErnieGramForSequenceClassification(ErnieGramModel(**config), num_classes=self.config.num_classes)
+        model = ErnieGramForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -173,7 +154,7 @@ class ErnieGramModelTester:
         elif token_labels is not None:
             result = result[1:]
 
-        self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.num_classes])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.config.num_labels])
 
     def create_and_check_for_question_answering(
         self,
@@ -185,7 +166,7 @@ class ErnieGramModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = ErnieGramForQuestionAnswering(ErnieGramModel(**config))
+        model = ErnieGramForQuestionAnswering(config)
         model.eval()
         result = model(
             input_ids,
@@ -200,8 +181,8 @@ class ErnieGramModelTester:
         elif token_labels is not None:
             result = result[1:]
 
-        self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.seq_length])
-        self.parent.assertEqual(result[1].shape, [self.config.batch_size, self.config.seq_length])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
 
     def create_and_check_for_token_classification(
         self,
@@ -213,7 +194,7 @@ class ErnieGramModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = ErnieGramForTokenClassification(ErnieGramModel(**config), num_classes=self.config.num_classes)
+        model = ErnieGramForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -229,14 +210,12 @@ class ErnieGramModelTester:
         elif token_labels is not None:
             result = result[1:]
 
-        self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.num_classes]
-        )
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.config.num_labels])
 
     def create_and_check_model_cache(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = ErnieGramModel(**config)
+        model = ErnieGramModel(config)
         model.eval()
 
         # first forward pass
@@ -281,12 +260,7 @@ class ErnieGramModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-4))
 
     def get_config(self) -> dict:
-        """get the base model kwargs
-
-        Returns:
-            dict: the values of kwargs
-        """
-        return self.config.model_kwargs
+        return self.config
 
 
 class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
@@ -303,7 +277,7 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = ErnieGramModelTester(self)
-        self.test_resize_embeddings = self.model_tester.config.test_resize_embeddings
+        self.test_resize_embeddings = self.model_tester.test_resize_embeddings
 
     def get_config():
         pass
