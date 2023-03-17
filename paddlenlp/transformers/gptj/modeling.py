@@ -427,11 +427,7 @@ class GPTJModel(GPTJPretrainedModel):
             attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
-        # Prepare head mask if needed
-        # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x num_attention_heads x N x N
-        # head_mask has shape n_layer x batch x num_attention_heads x N x N
-        # head_mask = self.get_head_mask(head_mask, self.config.n_layer)
+        # TODO(zhangxu): Add head_mask if  PretrainedModel supports get_head_mask method
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
@@ -456,7 +452,6 @@ class GPTJModel(GPTJPretrainedModel):
                 hidden_states,
                 layer_past=layer_past,
                 attention_mask=attention_mask,
-                # head_mask=head_mask[i],
                 use_cache=use_cache,
                 output_attentions=output_attentions,
             )
