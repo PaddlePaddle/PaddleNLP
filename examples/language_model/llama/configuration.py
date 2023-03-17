@@ -118,6 +118,16 @@ class LLaMAConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "llama"
+    attribute_map = {
+        "n_positions": "max_position_embeddings",
+        "n_embd": "hidden_size",
+        "n_layer": "num_hidden_layers",
+        "n_head": "num_attention_heads",
+        "n_inner": "intermediate_size",
+        "activation_function": "hidden_act",
+    }
+
+    pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,

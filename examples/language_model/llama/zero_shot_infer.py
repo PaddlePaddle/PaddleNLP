@@ -16,14 +16,14 @@ import paddle
 from modeling import LLaMAForCausalLM
 from tokenizer import LLaMATokenizer
 
-paddle.set_default_dtype("float16")
+# paddle.set_default_dtype("float16")
 # paddle.set_default_dtype("float32")
-# paddle.set_device("cpu")
+paddle.set_device("cpu")
 
 
-model = LLaMAForCausalLM.from_pretrained("./llama-7b", load_state_as_np=True)
+model = LLaMAForCausalLM.from_pretrained("./llama-13b", load_state_as_np=True)
 
-tokenizer = LLaMATokenizer.from_pretrained("./llama-7b")
+tokenizer = LLaMATokenizer.from_pretrained("./llama-13b")
 
 inputs = tokenizer("My name is", return_tensors="pd")
 

@@ -18,22 +18,12 @@ import os
 import paddle
 from configuration import LLaMAConfig
 from model_split_merge import merge_model_parallel
-from modeling import LLaMAForGeneration
+from modeling import LLaMAForCausalLM
 from tokenizer import LLaMATokenizer
-
-MODEL_CLASSES = {"llama-7b": (LLaMAForGeneration)}
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # Required parameters
-    parser.add_argument(
-        "--model_type",
-        default="llama-7b",
-        type=str,
-        # required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
-    )
     parser.add_argument(
         "--model_path",
         default="output/200/splits_mp_02_sharding_01/",
@@ -45,7 +35,6 @@ def parse_args():
         "--output_path",
         default="inference/llama",
         type=str,
-        # required=True,
         help="The output file prefix used to save the exported inference model.",
     )
     args = parser.parse_args()
@@ -55,41 +44,51 @@ def parse_args():
 def main():
     args = parse_args()
 
-    args.model_type = args.model_type.lower()
-    model_class = MODEL_CLASSES[args.model_type]
-
     tokenizer = LLaMATokenizer.from_pretrained(args.model_path)
     config = LLaMAConfig.from_pretrained(args.model_path)
 
     # Set the generaiton the hyperparameter
-    config.max_dec_len = 20
-    config.temperature = 0.5
-    config.decode_strateg = "sampling"
+    config.max_length = 100
+    config.min_length = 0
+    config.decode_strategy = "sampling"
+    config.temperature = 1.0
+    config.tok_k = 0
+    config.top_p = 1.0
+    config.repetition_penalty = 1.0
     config.eos_token_id = tokenizer.eos_token_id
     config.bos_token_id = tokenizer.bos_token_id
     config.pad_token_id = tokenizer.pad_token_id
     config.use_cache = True
-    config.top_k = 1
     config.use_recompute = False
 
     # Merge the model splits to a total model
     merge_model_path = merge_model_parallel(args.model_path, config)
+    # merge_model_path = args.model_path
 
     # Load the model and parameter
     config.mp_degree = 1
-    model = model_class.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
+    model = LLaMAForCausalLM.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
 
     model.eval()
     model = paddle.jit.to_static(
-        model,
+        model.generate,
         input_spec=[
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            config.max_length,
+            config.min_length,
+            config.decode_strategy,
+            config.temperature,
+            config.tok_k,
+            config.top_p,
+            config.repetition_penalty,
         ],
     )
 
-    # # Save converted static graph model
+    # Save converted static graph model
     paddle.jit.save(model, args.output_path)
-    # # Also save tokenizer for inference usage
+    # Also save tokenizer for inference usage
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 

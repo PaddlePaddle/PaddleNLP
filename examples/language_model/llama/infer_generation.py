@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import distutils.util
+
 import os
 
-import numpy as np
 import paddle
 from tokenizer import LLaMATokenizer
-from utils import left_padding
 
 
 def parse_arguments():
@@ -34,11 +32,6 @@ def parse_arguments():
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
-    parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
-    parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
     return parser.parse_args()
 
 
@@ -54,8 +47,8 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = LLaMATokenizer.from_pretrained(args.model_dir)
+        self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
-        self.max_length = args.max_length
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
@@ -68,31 +61,35 @@ class Predictor(object):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
+        config.disable_glog_info()
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
-
-        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
-
     def preprocess(self, input_text):
-        inputs = self.tokenizer(input_text)
-        inputs = left_padding(inputs, self.tokenizer.pad_token_id)
-        input_map = {
-            "input_ids": np.array(inputs["input_ids"], dtype="int64"),
-        }
-        return input_map
+        inputs = self.tokenizer(
+            input_text,
+            padding=True,
+            return_tensors="np",
+            return_attention_mask=True,
+            return_position_ids=True,
+        )
+        return inputs
 
-    def infer(self, input_map):
-        input_ids = input_map["input_ids"]
-        self.input_handles[0].copy_from_cpu(input_ids)
+    def infer(self, inputs):
+        input_handles = {}
+        for name in self.predictor.get_input_names():
+            input_handles[name] = self.predictor.get_input_handle(name)
+            input_handles[name].copy_from_cpu(inputs[name])
+
         self.predictor.run()
-        results = self.output_handle.copy_to_cpu()
+        output_names = predictor.get_output_names()
+        output_handle = predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
         return results
 
     def postprocess(self, infer_data):
         result = []
-        for x in infer_data[0].tolist():
+        for x in infer_data.tolist():
             sentence = self.tokenizer.decode(x, skip_special_tokens=True)
             result.append(sentence)
         out_dict = {"result": result}
@@ -108,17 +105,6 @@ class Predictor(object):
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
-    all_texts = [
-        "answer: Denver Broncos context: Super Bowl 50 was an American football game to "
-        "determine the champion of the National Football League (NFL) for the 2015 season. "
-        "The American Football Conference (AFC) champion Denver Broncos defeated the National "
-        "Football Conference (NFC) champion Carolina Panthers 24\u201310 to earn their third Super Bowl title. "
-        "The game was played on February 7, 2016, at Levi's Stadium in the San Francisco Bay Area at Santa Clara, California. "
-        'As this was the 50th Super Bowl, the league emphasized the "golden anniversary" with various gold-themed initiatives, '
-        "as well as temporarily suspending the tradition of naming each Super Bowl game with Roman numerals "
-        '(under which the game would have been known as "Super Bowl L"), so that the logo could prominently feature the Arabic numerals 50. </s>'
-        "question: "
-    ]
     all_texts = ["My name is"]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
