@@ -83,7 +83,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "euler_ancestral" --backend paddle --device gpu
 ```
 
 脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
