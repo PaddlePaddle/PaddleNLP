@@ -368,6 +368,7 @@ class TransformerDecoderLayer(nn.Layer):
 
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
         residual = tgt
+
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
@@ -376,7 +377,6 @@ class TransformerDecoderLayer(nn.Layer):
             tgt, attn_weights = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         else:
             tgt, attn_weights, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
-
         tgt = residual + self.dropout1(tgt)
         if not self.normalize_before:
             tgt = self.norm1(tgt)

@@ -394,7 +394,6 @@ class GenerationMixin(object):
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
-        # past_key_values = None
         if "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
 
@@ -827,7 +826,6 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
-
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
