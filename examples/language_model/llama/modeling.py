@@ -117,13 +117,9 @@ class RMSNorm(nn.Layer):
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
-        self.register_buffer("inv_freq", inv_freq)
-        # self.inv_freq = inv_freq
+        self.inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
 
-        # self.max_seq_len_cached = max_position_embeddings
-        # t = paddle.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
-        t = paddle.arange(2048, dtype=self.inv_freq.dtype)
+        t = paddle.arange(max_position_embeddings)
         freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
@@ -131,18 +127,6 @@ class RotaryEmbedding(nn.Layer):
         self.sin_cached = emb.sin()[None, None, :, :]
 
     def forward(self, x, seq_len=None):
-        # x: [bs, num_attention_heads, seq_len, head_size]
-        # This `if` block is unlikely to be run after we build sin/cos in `__init__`. Keep the logic here just in case.
-        # if seq_len > self.max_seq_len_cached:
-        #     self.max_seq_len_cached = seq_len
-        #     t = paddle.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
-        if seq_len > 2048:
-            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
-            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            # Different from paper, but it uses a different permutation in order to obtain the same calculation
-            emb = paddle.concat([freqs, freqs], axis=-1)
-            self.cos_cached = emb.cos()[None, None, :, :]
-            self.sin_cached = emb.sin()[None, None, :, :]
         return (
             self.cos_cached[:, :, :seq_len, ...],
             self.sin_cached[:, :, :seq_len, ...],
