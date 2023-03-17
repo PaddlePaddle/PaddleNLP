@@ -165,10 +165,6 @@ def main():
         eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
 
-    if training_args.do_export:
-        export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path=export_path)
-
 
 if __name__ == "__main__":
     main()

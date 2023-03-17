@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import tempfile
+
 # import sys
 import unittest
 
@@ -67,6 +69,20 @@ class TestCkptShard(unittest.TestCase):
         ret = loss.logits.abs().mean().item()
         np.testing.assert_allclose(ret, 2.109480381011963, rtol=1e-7)
 
+        # dy2static
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, 2, None], dtype="int64"),  # pos_ids
+            paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attn_ids
+        ]
+        with tempfile.TemporaryDirectory() as tempdir:
+            paddlenlp.transformers.export_model(
+                model=model,
+                input_spec=input_spec,
+                path=tempdir,
+            )
+
+    # TODO: support @ decorate for multi-gpus tests
     @unittest.skip("Skip for reuqired multi-gpus!")
     def testPaddleTensorParallelGLM(self):
         """_summary_"""
