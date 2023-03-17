@@ -292,8 +292,9 @@ class GLMStack(nn.Layer):
         new_caches = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
             mem_i = cache[i] if cache is not None else None
-
-            if self.enable_recompute:
+            has_gradient = not hidden_states.stop_gradient
+            if self.enable_recompute and has_gradient:
+                # TODO Should the attention_mask be added, it seems missing in original application.
                 hidden_states = self.recompute_training(layer, hidden_states, attention_mask, cache=mem_i)
             else:
                 hidden_states = layer(hidden_states, attention_mask, cache=mem_i)
