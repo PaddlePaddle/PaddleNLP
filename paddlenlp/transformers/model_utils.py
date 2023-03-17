@@ -87,6 +87,15 @@ def unwrap_model(model, *args, **kwargs):
     return raw_model
 
 
+def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
+    if variant is not None:
+        splits = weights_name.split(".")
+        splits = splits[:-1] + [variant] + splits[-1:]
+        weights_name = ".".join(splits)
+
+    return weights_name
+
+
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     """get dtype of parameter which should be sub-class of nn.Layer
 
@@ -1362,13 +1371,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         else:
             # 4. loading the state dict
             if config.tensor_parallel_degree > 1:
-                model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
+                if model_weight_file.endswith("model_state.pdparams"):
+                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
             else:
                 model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
         # 3. init the model
         init_args = config["init_args"] or ()
         model = cls(config, *init_args, **model_kwargs)
+        if config.tensor_parallel_degree > 1:
+            model.resource_files_names["model_state"] = _add_variant(
+                model.resource_files_names["model_state"], f"tp{config.tensor_parallel_rank:0>2d}"
+            )
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
