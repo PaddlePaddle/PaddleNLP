@@ -12,19 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 
 import numpy as np
+from config import (
+    MILVUS_HOST,
+    MILVUS_PORT,
+    data_dim,
+    index_config,
+    search_params,
+    top_k,
+)
 from pymilvus import (
-    connections,
-    utility,
-    FieldSchema,
+    Collection,
     CollectionSchema,
     DataType,
-    Collection,
+    FieldSchema,
+    connections,
+    utility,
 )
-
-from config import MILVUS_HOST, MILVUS_PORT, data_dim, index_config, top_k, search_params
 
 fmt = "\n=== {:30} ===\n"
 text_max_len = 1000

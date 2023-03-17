@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 
 import paddle
-
-from paddlenlp.utils.log import logger
 
 
 def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
@@ -139,7 +136,7 @@ def read_text_pair(data_path, is_test=False):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if is_test == False:
+            if is_test is False:
                 if len(data) != 3:
                     continue
                 yield {"text_a": data[0], "text_b": data[1], "label": data[2]}

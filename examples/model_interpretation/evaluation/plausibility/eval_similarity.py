@@ -14,11 +14,8 @@
 """
  This script includes code to calculating F1 score for results form textual similarity task
 """
-import copy
-import json
-import time
-import math
 import argparse
+import json
 
 
 def get_args():
@@ -125,8 +122,6 @@ def main(args):
     golden_b_rationales = result["golden_t_rationales"]
     pred_a_rationales = result["pred_q_rationales"]
     pred_b_rationales = result["pred_t_rationales"]
-    golden_label = result["golden_labels"]
-    pred_label = result["pred_labels"]
 
     macro_f1, scores = calc_model_f1(golden_a_rationales, golden_b_rationales, pred_a_rationales, pred_b_rationales)
     return macro_f1, len(scores)

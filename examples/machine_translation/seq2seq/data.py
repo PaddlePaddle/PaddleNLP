@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-
 from functools import partial
-import numpy as np
 
+import numpy as np
 import paddle
-from paddlenlp.data import Vocab, Pad
-from paddlenlp.data import SamplerHelper
+
+from paddlenlp.data import Pad, SamplerHelper, Vocab
 from paddlenlp.datasets import load_dataset
 
 
@@ -73,8 +70,6 @@ def create_train_loader(args):
 
 def create_infer_loader(args):
     batch_size = args.batch_size
-    max_len = args.max_len
-
     test_ds = load_dataset("iwslt15", splits="test")
     src_vocab = Vocab.load_vocabulary(**test_ds.vocab_info["en"])
     tgt_vocab = Vocab.load_vocabulary(**test_ds.vocab_info["vi"])

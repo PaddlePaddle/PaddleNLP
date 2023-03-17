@@ -14,14 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import time
-import numpy as np
 
+import numpy as np
 from paddle_serving_client import Client
 from scipy.special import expit
+
 from paddlenlp.transformers import AutoTokenizer
-import paddlenlp as ppnlp
 
 
 def convert_example(example, tokenizer, max_seq_length=512):
