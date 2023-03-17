@@ -43,12 +43,33 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_pure_fp16": False,
     },
+    "llama-13b": {
+        "hidden_size": 5120,
+        "initializer_range": 0.02,
+        "intermediate_size": 13824,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 40,
+        "num_hidden_layers": 40,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "mp_degree": 1,
+        "pp_degree": 1,
+        "mp_rank": -1,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_pure_fp16": False,
+    },
 }
 
 # Hypothetical model weights currently
 LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/llama-7b.pdparams",
+        "llama-13b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/llama-13b.pdparams",
     },
 }
 
@@ -108,10 +129,15 @@ class LLaMAConfig(PretrainedConfig):
         num_attention_heads=2,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
+        mp_degree=1,
+        pp_degree=1,
+        mp_rank=-1,
         use_cache=True,
-        pad_token_id=-1,
-        bos_token_id=0,
-        eos_token_id=1,
+        use_pure_fp16=False,
+        use_recompute=False,
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=2,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -122,7 +148,12 @@ class LLaMAConfig(PretrainedConfig):
         self.num_attention_heads = num_attention_heads
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
+        self.mp_degree = mp_degree
+        self.pp_degree = pp_degree
+        self.mp_rank = mp_rank
         self.use_cache = use_cache
+        self.use_pure_fp16 = use_pure_fp16
+        self.use_recompute = use_recompute
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id

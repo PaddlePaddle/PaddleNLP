@@ -24,7 +24,6 @@ from configuration import LLaMAConfig
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn import CrossEntropyLoss
 from processor import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -119,8 +118,8 @@ class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
-        # self.register_buffer("inv_freq", inv_freq)
-        self.inv_freq = inv_freq
+        self.register_buffer("inv_freq", inv_freq)
+        # self.inv_freq = inv_freq
 
         # self.max_seq_len_cached = max_position_embeddings
         # t = paddle.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
@@ -278,6 +277,7 @@ class LLaMAAttention(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
+        use_cache: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
 
@@ -314,7 +314,7 @@ class LLaMAAttention(nn.Layer):
             key_states = paddle.concat([past_key_value[0], key_states], axis=2)
             value_states = paddle.concat([past_key_value[1], value_states], axis=2)
 
-        past_key_value = (key_states, value_states)
+        past_key_value = (key_states, value_states) if use_cache else None
 
         attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
 
@@ -324,7 +324,7 @@ class LLaMAAttention(nn.Layer):
                 f" {attn_weights.shape}"
             )
 
-        attention_mask = attention_mask.expand([bsz, 1, q_len, kv_seq_len])
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
 
         if attention_mask is not None:
             if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
@@ -400,6 +400,7 @@ class LLaMADecoderLayer(nn.Layer):
             past_key_value=past_key_value,
             attention_mask=attention_mask,
             output_attentions=output_attentions,
+            use_cache=use_cache,
         )
         hidden_states = residual + hidden_states
 
@@ -456,9 +457,6 @@ class LLaMAModel(LLaMAPretrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
-        self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
-        )
 
         if config.mp_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
@@ -623,6 +621,36 @@ class LLaMAModel(LLaMAPretrainedModel):
         )
 
 
+class LLaMAPretrainingCriterion(paddle.nn.Layer):
+    """
+    Criterion for LLaMA.
+    It calculates the final loss.
+    """
+
+    def __init__(self, pad_token_id=None, mp_degree=1):
+        super(LLaMAPretrainingCriterion, self).__init__()
+        if mp_degree > 1:
+            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        self.pad_token_id = pad_token_id
+
+    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
+        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = masked_lm_loss.astype("float32")
+            if loss_mask is not None:
+                loss_mask = loss_mask.reshape([-1])
+                masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+                loss = masked_lm_loss / loss_mask.sum()
+            else:
+                assert self.pad_token_id is not None
+                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
+                loss = paddle.mean(masked_lm_loss)
+
+        return loss
+
+
 class LLaMAForCausalLM(LLaMAPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
@@ -631,6 +659,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         self.llama = LLaMAModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.criterion = LLaMAPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -674,15 +703,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
             shift_logits = logits[..., :-1, :]
             shift_labels = labels[..., 1:]
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            loss = loss_fct(
-                shift_logits.reshape([-1, self.config.vocab_size]),
-                shift_labels.reshape(
-                    [
-                        -1,
-                    ]
-                ),
-            )
+            loss = self.criterion(shift_logits, shift_labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

@@ -20,8 +20,9 @@ import shutil
 
 import numpy as np
 import paddle
+import torch
 
-from paddlenlp.utils import load_torch
+# from paddlenlp.utils import load_torch
 
 """
 Convert weights to paddle, will output `model_state.pdparams`:
@@ -70,68 +71,125 @@ def write_json(text, path):
 
 def write_model(model_path, input_base_path, model_size):
     assert model_size in INTERMEDIATE_SIZE_MAP
+    paddle.set_device("cpu")
     os.makedirs(model_path, exist_ok=True)
 
     params = read_json(os.path.join(input_base_path, "params.json"))
     num_shards = NUM_SHARDS[model_size]
     n_layers = params["n_layers"]
     n_heads = params["n_heads"]
+    n_heads_per_shard = n_heads // num_shards
     dim = params["dim"]
     dims_per_head = dim // n_heads
-    base = 10000.0
-    inv_freq = 1.0 / (base ** (paddle.arange(0, dims_per_head, 2) / dims_per_head))
 
     # permute for sliced rotary
     def permute(w):
         return w.reshape([n_heads, dim // n_heads // 2, 2, dim]).transpose([0, 2, 1, 3]).reshape([dim, dim])
 
     # Load weights
-    loaded = load_torch(os.path.join(input_base_path, "consolidated.00.pth"))
-
-    # Load weights
     if model_size == "7B":
         # Not shared
         # (The sharded implementation would also work, but this is simpler.)
-        loaded = load_torch(os.path.join(input_base_path, "consolidated.00.pth"))
+        loaded = torch.load(os.path.join(input_base_path, "consolidated.00.pth"), map_location="cpu")
+        for k, v in loaded.items():
+            loaded[k] = paddle.to_tensor(v.numpy())
     else:
         # Sharded
         loaded = [
-            load_torch(os.path.join(input_base_path, f"consolidated.{i:02d}.pth"), map_location="cpu")
+            torch.load(os.path.join(input_base_path, f"consolidated.{i:02d}.pth"), map_location="cpu")
             for i in range(num_shards)
         ]
-
-    for k, v in loaded.items():
-        loaded[k] = paddle.to_tensor(v)
+        for i in range(num_shards):
+            for k, v in loaded[i].items():
+                loaded[i][k] = paddle.to_tensor(v.numpy())
 
     all_state_dict = {}
     for layer_i in range(n_layers):
 
-        state_dict = {
-            f"llama.layers.{layer_i}.self_attn.q_proj.weight": permute(
-                loaded[f"layers.{layer_i}.attention.wq.weight"]
-            ),
-            f"llama.layers.{layer_i}.self_attn.k_proj.weight": permute(
-                loaded[f"layers.{layer_i}.attention.wk.weight"]
-            ),
-            f"llama.layers.{layer_i}.self_attn.v_proj.weight": loaded[f"layers.{layer_i}.attention.wv.weight"],
-            f"llama.layers.{layer_i}.self_attn.o_proj.weight": loaded[f"layers.{layer_i}.attention.wo.weight"],
-            f"llama.layers.{layer_i}.mlp.gate_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w1.weight"],
-            f"llama.layers.{layer_i}.mlp.down_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w2.weight"],
-            f"llama.layers.{layer_i}.mlp.up_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w3.weight"],
-            f"llama.layers.{layer_i}.input_layernorm.weight": loaded[f"layers.{layer_i}.attention_norm.weight"],
-            f"llama.layers.{layer_i}.post_attention_layernorm.weight": loaded[f"layers.{layer_i}.ffn_norm.weight"],
-            f"llama.layers.{layer_i}.self_attn.rotary_emb.inv_freq": inv_freq,
-        }
+        if model_size == "7B":
+            state_dict = {
+                f"llama.layers.{layer_i}.self_attn.q_proj.weight": permute(
+                    loaded[f"layers.{layer_i}.attention.wq.weight"]
+                ),
+                f"llama.layers.{layer_i}.self_attn.k_proj.weight": permute(
+                    loaded[f"layers.{layer_i}.attention.wk.weight"]
+                ),
+                f"llama.layers.{layer_i}.self_attn.v_proj.weight": loaded[f"layers.{layer_i}.attention.wv.weight"],
+                f"llama.layers.{layer_i}.self_attn.o_proj.weight": loaded[f"layers.{layer_i}.attention.wo.weight"],
+                f"llama.layers.{layer_i}.mlp.gate_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w1.weight"],
+                f"llama.layers.{layer_i}.mlp.down_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w2.weight"],
+                f"llama.layers.{layer_i}.mlp.up_proj.weight": loaded[f"layers.{layer_i}.feed_forward.w3.weight"],
+                f"llama.layers.{layer_i}.input_layernorm.weight": loaded[f"layers.{layer_i}.attention_norm.weight"],
+                f"llama.layers.{layer_i}.post_attention_layernorm.weight": loaded[f"layers.{layer_i}.ffn_norm.weight"],
+            }
+        else:
+            # Sharded
+            state_dict = {
+                f"llama.layers.{layer_i}.input_layernorm.weight": loaded[0][f"layers.{layer_i}.attention_norm.weight"],
+                f"llama.layers.{layer_i}.post_attention_layernorm.weight": loaded[0][
+                    f"layers.{layer_i}.ffn_norm.weight"
+                ],
+            }
+            state_dict[f"llama.layers.{layer_i}.self_attn.q_proj.weight"] = permute(
+                paddle.concat(
+                    [
+                        loaded[i][f"layers.{layer_i}.attention.wq.weight"].reshape(
+                            [n_heads_per_shard, dims_per_head, dim]
+                        )
+                        for i in range(num_shards)
+                    ],
+                    axis=0,
+                ).reshape([dim, dim])
+            )
+            state_dict[f"llama.layers.{layer_i}.self_attn.k_proj.weight"] = permute(
+                paddle.concat(
+                    [
+                        loaded[i][f"layers.{layer_i}.attention.wk.weight"].reshape(
+                            [n_heads_per_shard, dims_per_head, dim]
+                        )
+                        for i in range(num_shards)
+                    ],
+                    axis=0,
+                ).reshape([dim, dim])
+            )
+            state_dict[f"llama.layers.{layer_i}.self_attn.v_proj.weight"] = paddle.concat(
+                [
+                    loaded[i][f"layers.{layer_i}.attention.wv.weight"].reshape([n_heads_per_shard, dims_per_head, dim])
+                    for i in range(num_shards)
+                ],
+                axis=0,
+            ).reshape([dim, dim])
+
+            state_dict[f"llama.layers.{layer_i}.self_attn.o_proj.weight"] = paddle.concat(
+                [loaded[i][f"layers.{layer_i}.attention.wo.weight"] for i in range(num_shards)], axis=1
+            )
+            state_dict[f"llama.layers.{layer_i}.mlp.gate_proj.weight"] = paddle.concat(
+                [loaded[i][f"layers.{layer_i}.feed_forward.w1.weight"] for i in range(num_shards)], axis=0
+            )
+            state_dict[f"llama.layers.{layer_i}.mlp.down_proj.weight"] = paddle.concat(
+                [loaded[i][f"layers.{layer_i}.feed_forward.w2.weight"] for i in range(num_shards)], axis=1
+            )
+            state_dict[f"llama.layers.{layer_i}.mlp.up_proj.weight"] = paddle.concat(
+                [loaded[i][f"layers.{layer_i}.feed_forward.w3.weight"] for i in range(num_shards)], axis=0
+            )
 
         all_state_dict.update(state_dict)
 
     filename = "model_state.pdparams"
 
-    state_dict = {
-        "llama.embed_tokens.weight": loaded["tok_embeddings.weight"],
-        "llama.norm.weight": loaded["norm.weight"],
-        "lm_head.weight": loaded["output.weight"],
-    }
+    if model_size == "7B":
+        state_dict = {
+            "llama.embed_tokens.weight": loaded["tok_embeddings.weight"],
+            "llama.norm.weight": loaded["norm.weight"],
+            "lm_head.weight": loaded["output.weight"],
+        }
+    else:
+        state_dict = {
+            "llama.embed_tokens.weight": loaded[0]["tok_embeddings.weight"],
+            "llama.norm.weight": loaded[0]["norm.weight"],
+            "lm_head.weight": loaded[0]["output.weight"],
+        }
+
     all_state_dict.update(state_dict)
 
     for k, v in all_state_dict.items():
@@ -174,7 +232,6 @@ def write_tokenizer(tokenizer_path, input_tokenizer_path):
             "eos_token": "</s>",
             "cls_token": "<s>",
             "unk_token": "<unk>",
-            "pad_token": "<unk>",
             "add_bos_token": True,
             "add_eos_token": False,
             "tokenizer_class": "LLaMATokenizer",
