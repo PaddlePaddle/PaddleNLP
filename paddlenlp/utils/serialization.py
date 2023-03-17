@@ -174,14 +174,6 @@ def load_torch(path: str, **pickle_load_args):
         **pickle_load_args: args of pickle module
     Returns:
     """
-    import torch
-
-    sd = torch.load(path, map_location="cpu")
-    for key in list(sd.keys()):
-        v = sd.pop(key)
-        sd[key] = v.numpy()
-    return sd
-
     pickle_load_args.update({"encoding": "utf-8"})
 
     prefix_key = read_prefix_key(path)
