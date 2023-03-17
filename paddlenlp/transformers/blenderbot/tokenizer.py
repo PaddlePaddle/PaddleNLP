@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .. import GPTTokenizer, AddedToken
 from paddle.utils import try_import
+
+from .. import AddedToken, GPTTokenizer
 
 __all__ = ["BlenderbotTokenizer"]
 
@@ -116,6 +117,7 @@ class BlenderbotTokenizer(GPTTokenizer):
             pad_token=pad_token,
             eos_token=eos_token,
             eol_token=eol_token,
+            **kwargs,
         )
         self.add_prefix = add_prefix
 
@@ -156,4 +158,4 @@ class BlenderbotTokenizer(GPTTokenizer):
         add_prefix = kwargs.pop("add_prefix", self.add_prefix)
         if is_split_into_words or add_prefix:
             text = " " + text
-        return text
+        return text, kwargs

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
 import datetime
+import os
 import random
+import sys
 import time
 from functools import partial
 
@@ -25,16 +25,17 @@ import paddle.nn as nn
 import utils
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
+from reprod_log import ReprodLogger
+
 from paddlenlp.data import Dict, Pad, Stack
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertTokenizer
-from reprod_log import ReprodLogger
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
 CONFIG_PATH = CURRENT_DIR.rsplit("/", 2)[0]
 sys.path.append(CONFIG_PATH)
 
-from models.pd_bert import BertConfig, BertForSequenceClassification
+from models.pd_bert import BertConfig, BertForSequenceClassification  # noqa: E402
 
 
 def train_one_epoch(

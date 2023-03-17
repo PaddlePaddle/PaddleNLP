@@ -47,8 +47,10 @@ BLOOM_PRETRAINED_INIT_CONFIGURATION = {
         "unk_token_id": 0,
         "vocab_size": 250880,
         "mp_degree": 1,
+        "pp_degree": 1,
         "mp_rank": -1,
         "use_recompute": False,
+        "use_pure_fp16": False,
     }
 }
 
@@ -118,8 +120,10 @@ class BloomConfig(PretrainedConfig):
         dtype="bfloat16",
         slow_but_exact=False,
         mp_degree=1,
+        pp_degree=1,
         mp_rank=0,
         use_recompute=False,
+        use_pure_fp16=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -141,7 +145,9 @@ class BloomConfig(PretrainedConfig):
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
         self.mp_degree = mp_degree
+        self.pp_degree = mp_degree
         self.mp_rank = mp_rank
         self.use_recompute = use_recompute
+        self.use_pure_fp16 = use_pure_fp16
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)

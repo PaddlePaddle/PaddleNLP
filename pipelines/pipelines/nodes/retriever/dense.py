@@ -27,7 +27,7 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.models import SemanticIndexBatchNeg
 from pipelines.nodes.retriever.base import BaseRetriever
-from pipelines.schema import Document
+from pipelines.schema import ContentTypes, Document
 from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
@@ -173,6 +173,7 @@ class DensePassageRetriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
+        query_type: ContentTypes = "text",
         filters: dict = None,
         top_k: Optional[int] = None,
         index: str = None,
@@ -204,6 +205,7 @@ class DensePassageRetriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
+        queries_type: ContentTypes = "text",
         filters: Optional[
             Union[
                 Dict[str, Union[Dict, List, str, int, float, bool]],

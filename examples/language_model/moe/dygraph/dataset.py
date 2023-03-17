@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 import os
+import time
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.utils.log import logger
+from paddle.io import DataLoader
+
+from paddlenlp.data import Stack, Tuple
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.utils.log import logger
 
 
 def construct_samples_and_shuffle_data(
@@ -238,7 +239,6 @@ def create_pretrained_dataset(
     data_holders=None,
 ):
     device_world_size = paddle.distributed.get_world_size()
-    device_world_rank = paddle.distributed.get_rank()
 
     logger.info(
         "The distributed run, total device num:{}, distinct dataflow num:{}.".format(

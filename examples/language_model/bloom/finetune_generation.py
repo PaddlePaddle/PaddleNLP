@@ -222,6 +222,7 @@ def do_train(args):
     config["hidden_dropout_prob"] = args.hidden_dropout_prob
     config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     config["use_recompute"] = args.use_recompute
+    config["use_pure_fp16"] = args.use_pure_fp16
     config["enable_fuse_transformer"] = False
     model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
 
@@ -500,7 +501,10 @@ def do_train(args):
                     else:
                         model_to_save = model_to_save._layer
 
-                output_dir = os.path.join(args.output_dir, "{}_{}".format(model_path, global_step))
+                if config.mp_degree == 1 and config.pp_degree == 1:
+                    output_dir = os.path.join(args.output_dir, str(global_step))
+                else:
+                    output_dir = os.path.join(args.output_dir, str(global_step), model_path)
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Save model to %s" % output_dir)
 

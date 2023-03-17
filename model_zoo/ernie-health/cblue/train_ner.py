@@ -12,43 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
-import distutils.util
+from functools import partial
 
 import numpy as np
 import paddle
-from paddlenlp.data import Pad, Dict
+from model import ElectraForBinaryTokenClassification
+from utils import (
+    LinearDecayWithWarmup,
+    NERChunkEvaluator,
+    convert_example_ner,
+    create_dataloader,
+)
+
+from paddlenlp.data import Dict, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ElectraTokenizer
 
-from model import ElectraForBinaryTokenClassification
-from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup, NERChunkEvaluator
-
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default='gpu', help='Select which device to train model, default to gpu.')
-parser.add_argument('--init_from_ckpt', default=None, type=str, help='The path of checkpoint to be loaded.')
-parser.add_argument('--batch_size', default=8, type=int, help='Batch size per GPU/CPU for training.')
-parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning token classification task.')
-parser.add_argument('--max_seq_length', default=128, type=int, help='The maximum total input sequence length after tokenization.')
-parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
-parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
-parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay if we apply some.')
-parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion over the training process.')
-parser.add_argument('--use_amp', default=False, type=bool, help='Enable mixed precision training.')
-parser.add_argument('--epochs', default=1, type=int, help='Total number of training epochs.')
-parser.add_argument('--max_steps', default=-1, type=int, help='If > 0: set total number of training steps to perform. Override epochs.')
-parser.add_argument('--seed', default=1000, type=int, help='Random seed.')
-parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
-parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu", "npu"],
+    default="gpu",
+    help="Select which device to train model, default to gpu.",
+)
+parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--learning_rate", default=6e-5, type=float, help="Learning rate for fine-tuning token classification task."
+)
+parser.add_argument(
+    "--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization."
+)
+parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
+parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
+parser.add_argument("--save_steps", default=100, type=int, help="The interval steps to save checkpoints.")
+parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
+parser.add_argument(
+    "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over the training process."
+)
+parser.add_argument("--use_amp", default=False, type=bool, help="Enable mixed precision training.")
+parser.add_argument("--epochs", default=1, type=int, help="Total number of training epochs.")
+parser.add_argument(
+    "--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override epochs."
+)
+parser.add_argument("--seed", default=1000, type=int, help="Random seed.")
+parser.add_argument(
+    "--save_dir",
+    default="./checkpoint",
+    type=str,
+    help="The output directory where the model checkpoints will be written.",
+)
+parser.add_argument("--scale_loss", default=128, type=float, help="The value of scale_loss for fp16.")
 
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -99,13 +119,12 @@ def do_train():
 
     label_list = train_ds.label_list
     pad_label_id = [len(label_list[0]) - 1, len(label_list[1]) - 1]
-    ignore_label_id = -100
 
     trans_func = partial(
         convert_example_ner, tokenizer=tokenizer, max_seq_length=args.max_seq_length, pad_label_id=pad_label_id
     )
 
-    batchify_fn = lambda samples, fn=Dict(
+    batchify_fn = lambda samples, fn=Dict(  # noqa: E731
         {
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),

@@ -12,29 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import sys
 
-sys.path.append("../../..")
 import paddle
-import paddle.nn.functional as F
+
 from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
-from model import SimNet
-from utils import preprocess_data, CharTokenizer
+sys.path.append("../../..")
+from model import SimNet  # noqa: E402
+from utils import CharTokenizer, preprocess_data  # noqa: E402
 
-# yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu."
+)
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./vocab.char", help="The path to vocabulary.")
-parser.add_argument('--network', type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?")
-parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
+parser.add_argument(
+    "--network", type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?"
+)
+parser.add_argument(
+    "--params_path", type=str, default="./checkpoints/final.pdparams", help="The path of model parameter to be loaded."
+)
 parser.add_argument("--language", type=str, required=True, help="Language that this model based on")
 args = parser.parse_args()
-# yapf: enable
 
 
 def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):

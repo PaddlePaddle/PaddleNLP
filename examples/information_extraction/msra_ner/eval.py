@@ -13,31 +13,41 @@
 # limitations under the License.
 
 import argparse
-import os
-import ast
-import random
-import time
-import math
-from functools import partial
 
-import numpy as np
 import paddle
+from datasets import load_dataset
 from paddle.io import DataLoader
 
-from datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
+from paddlenlp.data import Dict, Pad, Stack
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 
 parser = argparse.ArgumentParser()
 
-# yapf: disable
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())))
-parser.add_argument("--init_checkpoint_path", default=None, type=str, required=True, help="The model checkpoint path.", )
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
-# yapf: enable
+parser.add_argument(
+    "--model_name_or_path",
+    default=None,
+    type=str,
+    required=True,
+    help="Path to pre-trained model or shortcut name selected in the list: "
+    + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())),
+)
+parser.add_argument("--init_checkpoint_path", default=None, type=str, required=True, help="The model checkpoint path.")
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer "
+    "than this will be truncated, sequences shorter will be padded.",
+)
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--device",
+    default="gpu",
+    type=str,
+    choices=["cpu", "gpu", "xpu"],
+    help="The device to select to train the model, is must be cpu/gpu/xpu.",
+)
 
 
 def do_eval(args):

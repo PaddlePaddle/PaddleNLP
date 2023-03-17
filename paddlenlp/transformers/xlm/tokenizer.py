@@ -21,11 +21,11 @@ import sys
 import unicodedata
 from typing import List, Optional
 
-from ..tokenizer_utils import AddedToken, TextInput
-from ...utils.log import logger
 from paddle.utils import try_import
 
+from ...utils.log import logger
 from .. import PretrainedTokenizer
+from ..tokenizer_utils import AddedToken, TextInput
 
 __all__ = ["XLMTokenizer"]
 
@@ -611,6 +611,19 @@ class XLMTokenizer(PretrainedTokenizer):
         do_lowercase_and_remove_accent=True,
         **kwargs,
     ):
+        super().__init__(
+            unk_token=unk_token,
+            bos_token=bos_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+            additional_special_tokens=additional_special_tokens,
+            lang2id=lang2id,
+            id2lang=id2lang,
+            do_lowercase_and_remove_accent=do_lowercase_and_remove_accent,
+            **kwargs,
+        )
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.sm = try_import("sacremoses")
@@ -693,8 +706,8 @@ class XLMTokenizer(PretrainedTokenizer):
     def get_vocab(self):
         return dict(self.encoder, **self.added_tokens_encoder)
 
-    def __len__(self):
-        return len(self.encoder)
+    # def __len__(self):
+    #     return len(self.encoder)
 
     def bpe(self, token):
         word = tuple(token[:-1]) + (token[-1] + "</w>",)

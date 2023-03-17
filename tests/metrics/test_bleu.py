@@ -20,6 +20,7 @@ from paddlenlp.metrics import BLEU
 class TestBLEU(unittest.TestCase):
     def test_metrics(self):
         bleu = BLEU()
+        bleu.reset()
         cand = ["The", "cat", "The", "cat", "on", "the", "mat"]
         ref_list = [["The", "cat", "is", "on", "the", "mat"], ["There", "is", "a", "cat", "on", "the", "mat"]]
         bleu.add_inst(cand, ref_list)
