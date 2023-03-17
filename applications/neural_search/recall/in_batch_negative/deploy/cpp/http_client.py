@@ -14,15 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import time
+
 import numpy as np
-import requests
-import json
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-
 from paddle_serving_client import HttpClient
+
+from paddlenlp.transformers import AutoTokenizer
 
 
 def convert_example(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=True):
