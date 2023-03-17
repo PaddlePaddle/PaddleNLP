@@ -29,7 +29,7 @@ except ImportError:
 
 from paddlenlp.utils.log import logger
 
-from .model_outputs import Seq2SeqLMOutput
+from .model_outputs import ModelOutput, Seq2SeqLMOutput
 
 __all__ = ["GenerationMixin"]
 
@@ -393,6 +393,10 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+
+        # past_key_values = None
+        if "past_key_values" in outputs:
+            model_kwargs["cache"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -952,14 +956,15 @@ class GenerationMixin(object):
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+
             outputs = self(**model_inputs)
             outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
             # To hundle the logits is a Seq2SeqLMOutput
-            logits = outputs.logits if isinstance(outputs, Seq2SeqLMOutput) else outputs
+            logits = outputs.logits if isinstance(outputs, (Seq2SeqLMOutput, ModelOutput)) else outputs
 
             # [batch_size, vocab_size]
             next_token_logits = logits[:, -1, :]
@@ -991,6 +996,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
+
         return input_ids[:, origin_len:], scores
 
     def sample(

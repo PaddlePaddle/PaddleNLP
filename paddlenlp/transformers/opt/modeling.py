@@ -95,9 +95,11 @@ class TransformerDecoder(Layer):
                 cache=cache[i] if cache is not None else cache,
                 output_attentions=output_attentions,
             )
+
             # outputs = hidden_states if both use_cache and output_attentions are False
             # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
             output = outputs[0] if (use_cache or output_attentions) else outputs
+
             if output_attentions:
                 all_self_attentions = all_self_attentions + (outputs[1],)
             if use_cache:
@@ -392,8 +394,9 @@ class OPTModel(OPTPretrainedModel):
         )
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
-        if past_key_values_length > 0:
+        causal_mask = None
+        if input_shape[-1] > 1:
+            causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
             causal_mask = paddle.concat(
                 [
                     paddle.zeros([input_shape[-1], past_key_values_length], dtype=causal_mask.dtype),
@@ -405,12 +408,11 @@ class OPTModel(OPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
-            attention_mask = attention_mask + causal_mask
-        else:
-            attention_mask = causal_mask
 
-        # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
+            attention_mask = attention_mask if causal_mask is None else attention_mask + causal_mask
+
+            # The tensor returned by triu not in static graph.
+            attention_mask.stop_gradient = True
 
         outputs = self.decoder(
             embedding_output,
@@ -485,7 +487,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
@@ -620,8 +622,11 @@ class OPTForCausalLM(OPTPretrainedModel):
         self._fast_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
         return self._fast_entry
 
-    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, inputs_embeds=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
+        if cache is not None:
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         if attention_mask is not None:
@@ -629,18 +634,26 @@ class OPTForCausalLM(OPTPretrainedModel):
                 attention_mask = attention_mask[:, -1, -1, :]
             if "int" in paddle.common_ops_import.convert_dtype(attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        if inputs_embeds is not None and cache is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids}
+
         if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
                 position_ids += 2
-        return {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache,
-        }
+
+        model_inputs.update(
+            {
+                "cache": cache,
+                "use_cache": use_cache,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+            }
+        )
+        return model_inputs
 
     def __getattr__(self, name):
         try:

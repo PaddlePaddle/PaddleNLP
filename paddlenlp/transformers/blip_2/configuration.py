@@ -21,8 +21,9 @@ from typing import Union
 from paddlenlp.transformers import AutoConfig
 
 from ...utils.log import logger
-from ..auto.modeling import get_init_configurations
+from ..auto.modeling import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from ..configuration_utils import PretrainedConfig
+from ..opt.configuration import OPTConfig
 from ..t5.configuration import T5Config
 
 __all__ = [
@@ -315,14 +316,17 @@ class Blip2Config(PretrainedConfig):
         # self.text_config = CONFIG_MAPPING[text_model_type](**text_config)
         if text_model_type == "t5":
             self.text_config = T5Config(**text_config)
+        elif text_model_type == "opt":
+            self.text_config = OPTConfig(**text_config)
         else:
             self.text_config = AutoConfig(**text_config)
 
         self.num_query_tokens = num_query_tokens
         self.qformer_config.encoder_hidden_size = self.vision_config.hidden_size
-        # self.use_decoder_only_language_model = self.text_config.model_type in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
-        CONFIGURATION_MODEL_MAPPING = get_init_configurations()
-        self.use_decoder_only_language_model = self.text_config.model_type in CONFIGURATION_MODEL_MAPPING
+        self.use_decoder_only_language_model = self.text_config.model_type in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
+        # CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+        # breakpoint()
+        # self.use_decoder_only_language_model = self.text_config.model_type in CONFIGURATION_MODEL_MAPPING
         self.initializer_factor = 1.0
         self.initializer_range = 0.02
 

@@ -42,6 +42,8 @@ from ..model_utils import (
     find_pruneable_heads_and_indices,
     prune_linear_layer,
 )
+from ..opt.configuration import OPTConfig
+from ..opt.modeling import OPTForCausalLM
 from ..t5.configuration import T5Config
 from ..t5.modeling import T5ForConditionalGeneration
 from .configuration import Blip2Config, Blip2QFormerConfig, Blip2VisionConfig
@@ -1178,6 +1180,8 @@ class Blip2Model(Blip2PretrainedModel):
             # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
+            else:
+                raise NotImplementedError
         self.language_model = language_model
 
         # Initialize weights and apply final processing
@@ -1464,7 +1468,6 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
 
     def __init__(self, config: Blip2Config):
         super().__init__(config)
-        from paddlenlp.transformers import AutoModelForCausalLM
 
         self.vision_model = Blip2VisionModel(config.vision_config)
 
@@ -1472,7 +1475,9 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         self.qformer = Blip2QFormerModel(config.qformer_config)
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         if config.use_decoder_only_language_model:
-            language_model = AutoModelForCausalLM.from_config(config.text_config)
+            # language_model = AutoModelForCausalLM.from_config(config.text_config)
+            if isinstance(config.text_config, OPTConfig):
+                language_model = OPTForCausalLM(config.text_config)
         else:
             # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
