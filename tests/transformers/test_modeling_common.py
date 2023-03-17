@@ -107,6 +107,7 @@ class ModelTesterMixin:
             self.assertLessEqual(max_diff, 1e-5)
 
         for model_class in self.all_model_classes:
+            print(model_class)
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():

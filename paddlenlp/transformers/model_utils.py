@@ -83,8 +83,14 @@ def unwrap_model(model, *args, **kwargs):
     raw_model = model
     while hasattr(raw_model, "_layers") or hasattr(raw_model, "_layer"):
         if hasattr(raw_model, "_layers"):
+            # Caused by issue https://github.com/PaddlePaddle/PaddleNLP/issues/5295
+            # TODO: remove this after we fix the issue
+            if raw_model._layers is None:
+                break
             raw_model = raw_model._layers
         else:
+            if raw_model._layer is None:
+                break
             raw_model = raw_model._layer
 
     return raw_model
@@ -1505,7 +1511,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
+        if hasattr(self, "_layers"):
+            print("self._layers", self._layers)
+        else:
+            print("No _layers")
         model_to_save = unwrap_model(self)
+        print(model_to_save)
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
