@@ -790,7 +790,7 @@ class TrainingArguments:
 
             return "_".join(name)
         else:
-            return ""
+            return None
 
     @property
     def weight_name_suffix(self):
@@ -803,7 +803,7 @@ class TrainingArguments:
             #     name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
         else:
-            return ""
+            return None
 
     @property
     def process_index(self):

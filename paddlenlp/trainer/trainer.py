@@ -111,8 +111,8 @@ if is_datasets_available():
     import datasets
 
 
-def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
-    if variant is not None:
+def _add_variant(weights_name: str, variant=None) -> str:
+    if variant is not None and len(variant) > 0:
         splits = weights_name.split(".")
         splits = splits[:-1] + [variant] + splits[-1:]
         weights_name = ".".join(splits)

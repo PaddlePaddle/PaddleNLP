@@ -1511,12 +1511,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
-        if hasattr(self, "_layers"):
-            print("self._layers", self._layers)
-        else:
-            print("No _layers")
         model_to_save = unwrap_model(self)
-        print(model_to_save)
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
