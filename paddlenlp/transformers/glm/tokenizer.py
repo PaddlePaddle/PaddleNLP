@@ -213,7 +213,7 @@ class GLMTokenizerMixin:
 
         batch = {"input_ids": input_ids, "position_ids": position_ids}
         if labels is None:
-            batch["generation_attention_mask"] = attention_mask
+            batch["attention_mask"] = attention_mask
         else:
             batch["attention_mask"] = attention_mask
             batch["loss_mask"] = loss_mask
