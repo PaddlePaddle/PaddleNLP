@@ -82,7 +82,7 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="pndm",
+        default="euler_ancestral",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )
