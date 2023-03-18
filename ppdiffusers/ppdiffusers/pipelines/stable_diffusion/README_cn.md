@@ -8,7 +8,8 @@
 
 ```python
 
- import paddle
+from pathlib import Path
+import paddle
 from ppdiffusers import StableDiffusionAttendAndExcitePipeline, PNDMScheduler
 
 
@@ -21,18 +22,20 @@ pipe = StableDiffusionAttendAndExcitePipeline.from_pretrained(
 seed = 123
 prompt = "A playful kitten chasing a butterfly in a wildflower meadow"
 token_indices = [3,6,10]
-output_dir = Path("output_pd")
+
 generator = paddle.Generator().manual_seed(seed)
 image = pipe(
     prompt=prompt,
     token_indices=token_indices,
     generator=generator,
-    ).images[0]
-if save_img:
-    prompt_output_path = output_dir / prompt
-    prompt_output_path.mkdir(exist_ok=True, parents=True)
-    image.save(prompt_output_path / f'{seed}.png')
-    
+).images[0]
+
+# save
+output_dir = Path("output_pd")
+prompt_output_path = output_dir / prompt
+prompt_output_path.mkdir(exist_ok=True, parents=True)
+image.save(prompt_output_path / f'{seed}.png')
+
 ```
 
 在V100-32GB显卡运行上述代码生成结果如下：
