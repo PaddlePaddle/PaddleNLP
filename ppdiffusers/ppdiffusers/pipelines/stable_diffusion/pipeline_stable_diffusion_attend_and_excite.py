@@ -132,7 +132,6 @@ class AttendExciteCrossAttnProcessor:
         return hidden_states
 
 
-
 class StableDiffusionAttendAndExcitePipeline(DiffusionPipeline):
     r"""
     Pipeline for text-to-image generation using Stable Diffusion and Attend and Excite.
