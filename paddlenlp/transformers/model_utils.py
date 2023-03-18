@@ -404,7 +404,40 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Optional[Embedding]: the otuput embedding of model
         """
-        return None
+        base_model = getattr(self, self.base_model_prefix, self)
+        if base_model is not self:
+            return base_model.get_output_embeddings()
+
+        raise NotImplementedError(
+            f"model of {type(base_model)} has not implemented the `get_output_embeddings`"
+            " or `set_output_embeddings` method"
+        )
+
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        tie_word_embeddings = (
+            self.tie_word_embeddings
+            if hasattr(self, "tie_word_embeddings")
+            else self.config.get("tie_word_embeddings", False)
+        )
+
+        if tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            input_embeddings = self.get_input_embeddings()
+            if output_embeddings is not None and input_embeddings is not None:
+                if input_embeddings.weight.shape == output_embeddings.weight.shape:
+                    output_embeddings.weight = input_embeddings.weight
+                else:
+                    raise ValueError(
+                        "when tie input/output embeddings, the shape of output embeddings: {}"
+                        "should be equal to shape of input embeddings: {}".format(
+                            input_embeddings.weight.shape,
+                            output_embeddings.weight.shape
+                        )
+                    )
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
