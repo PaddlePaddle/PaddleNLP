@@ -68,6 +68,7 @@ class ModelTesterMixin:
     test_mismatched_shapes = True
     test_missing_keys = True
     test_model_compatibility_keys = True
+    test_tie_weights = False
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
@@ -566,6 +567,39 @@ class ModelTesterMixin:
                     continue
 
                 self.assertEqual(old_value, new_value)
+
+    def test_tie_weight(self):
+        # 获取一下input_embeding 和 output_embeding 然后测试一下id 是否一致?
+        # todo加回去
+        # if not self.test_tie_weights:
+        #     return
+
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class) # 初始化模型实例
+            # model.tie_weights() # 模型进行tie weight操作
+
+            if hasattr(model, 'get_input_embeddings') and hasattr(model, 'get_output_embeddings'):
+                input_embeddings = model.get_input_embeddings()
+
+                try:
+                    output_embeddings = model.get_output_embeddings()
+                except NotImplementedError:
+                    continue
+
+                if input_embeddings is not None and output_embeddings is not None :
+                    if hasattr(output_embeddings, "weight"):
+                        output_embeddings_weight = output_embeddings.weight
+                    else:
+                        output_embeddings_weight = output_embeddings
+
+                    if hasattr(input_embeddings, "weight"):
+                        input_embeddings_weight = input_embeddings.weight
+                    else:
+                        input_embeddings_weight = input_embeddings
+
+                    print('模型名称是{},两个id是{}{}'.format(model_class,id(output_embeddings_weight),id(input_embeddings_weight)))
+                    self.assertEqual(id(output_embeddings_weight),id(input_embeddings_weight))
 
 
 class ModelTesterPretrainedMixin:
