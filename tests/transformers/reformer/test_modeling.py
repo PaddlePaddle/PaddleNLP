@@ -517,6 +517,7 @@ class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest
     test_headmasking = False
     test_torchscript = False
     test_sequence_classification_problem_types = True
+    test_tie_weights = True
     base_model_class = ReformerModel
 
     def setUp(self):
