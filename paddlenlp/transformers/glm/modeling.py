@@ -714,6 +714,11 @@ class GLMForMultipleChoice(GLMPretrainedModel):
 
     def __init__(self, config: GLMConfig):
         super(GLMForMultipleChoice, self).__init__(config)
+        # GLMForMultipleChoice need loggit
+        if not config.output_predict:
+            logger.warning("GLMForMultipleChoice need loggit, please set config.output_predict to True.")
+            config.output_predict = True
+
         self.glm = GLMModel(config)
         self.apply(self.init_weights)
 
