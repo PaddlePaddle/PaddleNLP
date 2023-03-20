@@ -131,7 +131,7 @@ def generate(
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 cache=None,
-                use_cache=True,
+                # use_cache=True,
             )
             seq_length = next_token_logits.shape[1]
             next_token_logits = next_token_logits[:, -1]
@@ -157,7 +157,7 @@ def generate(
                 position_ids=position_ids,
                 attention_mask=cur_attention_mask,
                 cache=mems,
-                use_cache=True,
+                # use_cache=True,
             )
             next_token_logits = next_token_logits[:, -1]
         next_token_logits = top_k_logits(next_token_logits, top_k=top_k, top_p=top_p)
