@@ -236,6 +236,111 @@ class StateDictKeysChecker:
         return all_diff_keys
 
 
+def merge_tensor_parallel_weight(weight_list, is_column=True):
+    """
+
+    [A1],[A2]  => [A1, A2]
+
+    Args:
+        weight_list (List[np.ndarray]): The splited tensor parallel weight list.
+        is_column (bool, optional): Is ColumnLinear or RowLinear. Defaults to True.
+
+    Returns:
+        weight (np.ndarray): the merged weight.
+    """
+    if is_column:
+        return np.concatenate(weight_list, axis=-1)
+    else:
+        return np.concatenate(weight_list, axis=0)
+
+
+def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
+    """
+
+    [A1, A2]  =>  [A1],[A2]
+
+    Args:
+        weight (numpy.ndarray): the tensor weight,
+        tensor_parallel_degree (int): tensor_parallel_degree
+        tensor_parallel_rank (int): tensor_parallel_rank
+        is_column (bool, optional): is ColumnLinear . Defaults to True.
+
+    Returns:
+        tensor (numpy.ndarray): splited weight.
+    """
+    if is_column:
+        splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
+    else:
+        splited_weights = np.split(weight, tensor_parallel_degree, axis=0)
+
+    if tensor_parallel_rank is not None:
+        return splited_weights[tensor_parallel_rank]
+
+    return splited_weights
+
+
+"""
+There're three types of MultiHeadAttention QKV Layout in Transfomers
+
+tensor_parallel_qkv = [q1, k1, v1, q2, k2, v2]
+naive_merged_qkv    = [q1, q1, k1, k2, v1, v2]
+splited_qkv         = [q1, q1], [k1, k2], [v1, v2]
+
+naive_merged_qkv -> tensor_parallel_qkv
+    : naive_merged_qkv_to_tensor_parallel_qkv
+
+splited_qkv -> tensor_parallel_qkv
+    : splited_qkv_to_tensor_parallel_qkv
+
+
+"""
+
+
+def tensor_parallel_qkv_to_naive_merged_qkv(weight, num_attention_heads):
+    """
+    [q1, q1, k1, k2, v1, v2] => [q1, k1, v1, q2, k2, v2]
+    """
+    qkvs = []
+    partition_dim = -1
+    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+    qkv_weight_num = 3
+
+    for i in range(qkv_weight_num):
+        qkv = np.concatenate(split_heads[i::qkv_weight_num], axis=partition_dim)
+        qkvs.append(qkv)
+
+    return np.concatenate(qkvs, axis=partition_dim)
+
+
+def naive_merged_qkv_to_tensor_parallel_qkv(weight, num_attention_heads):
+    """
+    [q1, q1, k1, k2, v1, v2] => [q1, k1, v1, q2, k2, v2]
+    """
+    qkv_pairs = []
+    partition_dim = -1
+    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+
+    for i in range(num_attention_heads):
+        qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
+        qkv_pairs.append(qkv_pair)
+
+    return np.concatenate(qkv_pairs, axis=partition_dim)
+
+
+def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
+    """
+    [q1, k1, v1], [q2, k2, v2] => [q1, q1, k1, k2, v1, v2]
+
+    Args:
+        weight_list (_type_): [Q,K,V] tensor list
+    """
+    assert len(
+        weight_list
+    ), f"weight_list length is not equal 3, it should be Q K V list. but got length {len(weight_list)}"
+    weight = np.concatenate(weight_list, axis=-1)
+    return naive_merged_qkv_to_tensor_parallel_qkv(weight)
+
+
 @dataclass
 class StateDictNameMapping:
     """NameMapping of StateDict between two models"""
@@ -265,6 +370,8 @@ class StateDictNameMapping:
             ndarray: the final tensor
         """
         tensor = state_dict.pop(name)
+        if callable(self.action):
+            return self.action(tensor)
         if self.action == "transpose":
             return transpose(tensor, [1, 0])
         if self.action == "merge_last_two_dim":
@@ -273,12 +380,13 @@ class StateDictNameMapping:
             return np.reshape(tensor, [shape[0], -1])
         if self.action == "split":
             assert self.index is not None, "when action is `split`, index field is required."
-
+            # FIXME if the order of split starts from index=2, no tensor left.
             if self.index < 2:
                 state_dict[name] = tensor
             # qkv is stored in same tensor, so it should be split into 3 arr
             tensors = np.split(tensor, 3, axis=-1)
             return tensors[self.index]
+
         return tensor
 
     def matched(self, text: str) -> bool:
@@ -745,6 +853,44 @@ class ConversionMixin:
 
         Returns:
             List[StateDictNameMapping]: the name-mappings of pretrained model
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+        """the entry of converting config and converting model file
+
+        Args:
+            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            config (PretrainedConfig): the PretrainedConfig instance of model
+        """
+        # FIXME(wj-Mcat): add compatibility with downstream models
+        name_mappings = cls._get_tensor_parallel_mappings(config)
+
+        state_dict = paddle.load(weight_file, return_numpy=True)
+
+        # 3. convert state_dict
+        for name_mapping in name_mappings:
+            if name_mapping.source_name not in state_dict:
+                logger.warning(f"key<{name_mapping.source_name}> not in the model state weight file.")
+                continue
+
+            state_dict[name_mapping.target_name] = name_mapping.run(state_dict, name_mapping.source_name)
+
+        return state_dict
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config: PretrainedConfig) -> List[StateDictNameMapping]:
+        """get name mapping of PretrainedModel
+
+        Args:
+            config (PretrainedConfig): the configuration of name-mapping
+
+        Raises:
+            NotImplementedError:
+
+        Returns:
+            List[StateDictNameMapping]: the name-mappings for tensor_parallel
         """
         raise NotImplementedError
 
