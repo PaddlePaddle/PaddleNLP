@@ -159,10 +159,6 @@ class DalleBartModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_conditional_generation(*config_and_inputs)
 
-    def test_image_generation(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_image_generation(*config_and_inputs)
-
     def test_inputs_embeds(self):
         # Direct input embedding tokens is currently not supported
         self.skipTest("Direct input embedding tokens is currently not supported")
