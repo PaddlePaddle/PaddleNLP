@@ -12,32 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
-import io
-import random
 import time
-import json
-import copy
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Optional
 
-import numpy as np
 import paddle
-import paddle.distributed as dist
-from paddlenlp.transformers import ErnieHealthForTotalPretraining, ElectraModel
-from paddlenlp.transformers import ErnieHealthDiscriminator, ElectraGenerator
-from paddlenlp.transformers import ElectraTokenizer, ErnieHealthPretrainingCriterion
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer import speed_metrics, get_last_checkpoint
+from dataset import DataCollatorForErnieHealth, MedicalCorpus
 
-from dataset import MedicalCorpus, DataCollatorForErnieHealth
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+)
+from paddlenlp.transformers import (
+    ElectraConfig,
+    ElectraTokenizer,
+    ErnieHealthForTotalPretraining,
+)
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
+    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ElectraTokenizer),
 }
 
 
@@ -88,6 +85,7 @@ def main():
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
+    # training_args.recompute = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -116,22 +114,13 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
+    config_class, model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
+    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
-    if model_args.model_name_or_path in pretrained_models:
-        tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
-        generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-generator"])
-        )
-        discriminator = ErnieHealthDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-discriminator"])
-        )
-        model = model_class(generator, discriminator)
-    else:
-        raise ValueError("Only support %s" % (", ".join(pretrained_models)))
+    model_config = config_class()
+    model = model_class(model_config)
 
     # Loads dataset.
     tic_load_data = time.time()
@@ -148,38 +137,8 @@ def main():
         return_dict=True,
     )
 
-    class CriterionWrapper(paddle.nn.Layer):
-        """ """
-
-        def __init__(self):
-            """CriterionWrapper"""
-            super(CriterionWrapper, self).__init__()
-            self.criterion = ErnieHealthPretrainingCriterion(
-                getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"], model.gen_weight
-            )
-
-        def forward(self, output, labels):
-            """forward function
-
-            Args:
-                output (tuple): generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, mask
-                labels (tuple): generator_labels
-
-            Returns:
-                Tensor: final loss.
-            """
-            generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = output
-            generator_labels = labels
-
-            loss, gen_loss, rtd_loss, mts_loss, csp_loss = self.criterion(
-                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
-            )
-
-            return loss
-
     trainer = Trainer(
         model=model,
-        criterion=CriterionWrapper(),
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,

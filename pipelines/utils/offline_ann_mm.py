@@ -18,10 +18,11 @@ import os
 from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import MultiModalRetriever
 from pipelines.schema import Document
-from pipelines.utils import fetch_archive_from_http, launch_es
+from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, launch_es
 
 data_dict = {
     "data/wukong_test": "https://paddlenlp.bj.bcebos.com/applications/wukong_test_demo.zip",
+    "data/wukong_text": "https://paddlenlp.bj.bcebos.com/applications/wukong_text.zip",
 }
 
 # yapf: disable
@@ -32,6 +33,7 @@ parser.add_argument("--search_engine", choices=["elastic", "milvus"], default="e
 parser.add_argument("--host", type=str, default="127.0.0.1", help="host ip of ANN search engine")
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
 parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
+parser.add_argument("--embedding_type", choices=["text", "image"], default="image", help="The type of raw data for embedding.")
 parser.add_argument("--query_embedding_model", default="PaddlePaddle/ernie_vil-2.0-base-zh", type=str, help="The query_embedding_model path")
 parser.add_argument("--document_embedding_model", default="PaddlePaddle/ernie_vil-2.0-base-zh", type=str, help="The document_embedding_model path")
 parser.add_argument("--delete_index", action="store_true", help="Whether to delete existing index while updating index")
@@ -60,22 +62,37 @@ def offline_ann(index_name, doc_dir):
             embedding_dim=args.embedding_dim,
             index=index_name,
         )
-    docs = [
-        Document(content=f"./{args.doc_dir}/{filename}", content_type="image") for filename in os.listdir(args.doc_dir)
-    ]
+    if args.embedding_type == "image":
+        docs = [
+            Document(content=f"./{args.doc_dir}/{filename}", content_type="image")
+            for filename in os.listdir(args.doc_dir)
+        ]
+    elif args.embedding_type == "text":
+        docs = convert_files_to_dicts(dir_path=args.doc_dir, split_paragraphs=True, encoding="utf-8")
+    else:
+        raise NotImplementedError
 
     print(docs[:3])
 
     # 文档数据写入数据库
     document_store.write_documents(docs)
 
-    # 语义索引模型
-    retriever_mm = MultiModalRetriever(
-        document_store=document_store,
-        query_embedding_model=args.query_embedding_model,
-        query_type="text",
-        document_embedding_models={"image": args.document_embedding_model},
-    )
+    if args.embedding_type == "image":
+        # 文搜图，对image做embedding
+        retriever_mm = MultiModalRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            query_type="text",
+            document_embedding_models={"image": args.document_embedding_model},
+        )
+    else:
+        # 图搜文，对text做embedding
+        retriever_mm = MultiModalRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            query_type="image",
+            document_embedding_models={"text": args.document_embedding_model},
+        )
 
     # 建立索引库
     document_store.update_embeddings(retriever_mm)

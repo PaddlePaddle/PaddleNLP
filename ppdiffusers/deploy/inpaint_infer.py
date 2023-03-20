@@ -102,30 +102,50 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0
+    model_dir,
+    model_prefix,
+    use_trt=False,
+    dynamic_shape=None,
+    use_fp16=False,
+    device_id=0,
+    disable_paddle_trt_ops=[],
+    disable_paddle_pass=[],
+    paddle_stream=None,
 ):
     option = fd.RuntimeOption()
-    option.use_paddle_backend()
+    option.use_paddle_infer_backend()
     if device_id == -1:
         option.use_cpu()
     else:
         option.use_gpu(device_id)
+    if paddle_stream is not None:
+        option.set_external_raw_stream(paddle_stream)
+    for pass_name in disable_paddle_pass:
+        option.paddle_infer_option.delete_pass(pass_name)
     if use_trt:
-        option.use_trt_backend()
-        option.enable_paddle_to_trt()
+        option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
+        option.paddle_infer_option.enable_trt = True
         if use_fp16:
-            option.enable_trt_fp16()
-        cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+            option.trt_option.enable_fp16 = True
+        else:
+            # Note(zhoushunjie): These four passes don't support fp32 now.
+            # Remove this line of code in future.
+            only_fp16_passes = [
+                "trt_cross_multihead_matmul_fuse_pass",
+                "trt_flash_multihead_matmul_fuse_pass",
+                "preln_elementwise_groupnorm_act_pass",
+                "elementwise_groupnorm_act_pass",
+            ]
+            for curr_pass in only_fp16_passes:
+                option.paddle_infer_option.delete_pass(curr_pass)
+        cache_file = os.path.join(model_dir, model_prefix, "_opt_cache/")
         option.set_trt_cache_file(cache_file)
         # Need to enable collect shape for ernie
         if dynamic_shape is not None:
-            option.enable_paddle_trt_collect_shape()
+            option.paddle_infer_option.collect_trt_shape = True
             for key, shape_dict in dynamic_shape.items():
-                option.set_trt_input_shape(
-                    key,
-                    min_shape=shape_dict["min_shape"],
-                    opt_shape=shape_dict.get("opt_shape", None),
-                    max_shape=shape_dict.get("max_shape", None),
+                option.trt_option.set_shape(
+                    key, shape_dict["min_shape"], shape_dict.get("opt_shape", None), shape_dict.get("max_shape", None)
                 )
     model_file = os.path.join(model_dir, model_prefix, "inference.pdmodel")
     params_file = os.path.join(model_dir, model_prefix, "inference.pdiparams")
@@ -205,8 +225,10 @@ if __name__ == "__main__":
     if args.device == "cpu":
         device_id = -1
         paddle.set_device("cpu")
+        paddle_stream = None
     else:
         paddle.set_device(f"gpu:{device_id}")
+        paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
     # 1. Init scheduler
     scheduler = get_scheduler(args)
 
@@ -277,6 +299,7 @@ if __name__ == "__main__":
             vae_decoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         vae_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -285,6 +308,7 @@ if __name__ == "__main__":
             vae_encoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
@@ -294,6 +318,7 @@ if __name__ == "__main__":
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=device_id,
+            paddle_stream=paddle_stream,
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":

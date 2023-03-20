@@ -13,37 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import sys
-import time
+import argparse
+import collections
 import json
 import logging
-import collections
-import logging
-import argparse
-
-from random import random
-from tqdm import tqdm
-from functools import reduce, partial
+import os
+import sys
+from functools import partial
 from pathlib import Path
+
 import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
 from LIME.lime_text import LimeTextExplainer
-from rnn.model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
+from rnn.model import BiLSTMAttentionModel, SelfInteractiveAttention
 from rnn.utils import CharTokenizer, convert_example
-from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
-from paddlenlp.data import Dict, Pad, Stack, Vocab
-from paddlenlp.datasets import DatasetBuilder
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-from ernie.tokenizing_ernie import ErnieTokenizer
-
 from roberta.modeling import RobertaForSequenceClassification
+from tqdm import tqdm
+
+from paddlenlp.data import Dict, Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+    match,
+)
 
 sys.path.remove("../../..")
 

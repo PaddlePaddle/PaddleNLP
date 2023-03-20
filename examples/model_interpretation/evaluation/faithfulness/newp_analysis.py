@@ -16,8 +16,8 @@
  sentiment analysis, textual similarity, and mrc task
 """
 import argparse
-import os
 import json
+
 import numpy as np
 
 

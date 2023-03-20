@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import os
-
 import paddle
-
-from seq2seq_attn import Seq2SeqAttnInferModel
 from args import parse_args
 from data import create_infer_loader
+from seq2seq_attn import Seq2SeqAttnInferModel
 
 
 def main():

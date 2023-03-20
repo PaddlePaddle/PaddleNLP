@@ -14,7 +14,8 @@
 # limitations under the License.
 
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+
+from paddlenlp.data import Dict, Pad
 
 
 class DataCollatorMLM:

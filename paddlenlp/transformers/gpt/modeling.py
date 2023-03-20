@@ -66,30 +66,28 @@ class MultiHeadAttention(nn.Layer):
 
     def __init__(
         self,
-        embed_dim,
-        num_heads,
-        dropout=0.0,
+        config,
         kdim=None,
         vdim=None,
         need_weights=False,
         weight_attr=None,
         bias_attr=None,
-        topo=None,
-        fuse=False,
     ):
         super(MultiHeadAttention, self).__init__()
-        self.embed_dim = embed_dim
-        self.kdim = kdim if kdim is not None else embed_dim
-        self.vdim = vdim if vdim is not None else embed_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
+
+        embed_dim = config.hidden_size
+        self.embed_dim = config.hidden_size
+        self.kdim = kdim if kdim is not None else config.hidden_size
+        self.vdim = vdim if vdim is not None else config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
-        self.fuse = fuse
+        self.fuse_attention_qkv = config.fuse_attention_qkv
 
-        self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+        self.head_dim = embed_dim // self.num_heads
+        assert self.head_dim * self.num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        if self.fuse:
+        if self.fuse_attention_qkv:
             assert self.kdim == embed_dim
             assert self.vdim == embed_dim
             self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
@@ -99,12 +97,22 @@ class MultiHeadAttention(nn.Layer):
             self.v_proj = nn.Linear(self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
         self.out_proj = nn.Linear(embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
 
-    def _fuse_prepare_qkv(self, query):
+    def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
         mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
-        return q, k, v
+
+        assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
+
+        if isinstance(cache, self.Cache):
+            # for decoder self-attention in inference
+            k = tensor.concat([cache.k, k], axis=2)
+            v = tensor.concat([cache.v, v], axis=2)
+        if use_cache is True:
+            cache = self.Cache(k, v)
+
+        return (q, k, v, cache) if use_cache else (q, k, v, None)
 
     def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
         r"""
@@ -130,7 +138,7 @@ class MultiHeadAttention(nn.Layer):
         if use_cache is True:
             cache = self.Cache(k, v)
 
-        return (q, k, v) if use_cache is False else (q, k, v, cache)
+        return (q, k, v, None) if use_cache is False else (q, k, v, cache)
 
     def compute_kv(self, key, value):
         r"""
@@ -180,14 +188,12 @@ class MultiHeadAttention(nn.Layer):
         """
         key = query if key is None else key
         value = query if value is None else value
-        # compute q ,k ,v
-        if use_cache is False:
-            if self.fuse:
-                q, k, v = self._fuse_prepare_qkv(query)
-            else:
-                q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
+
+        if self.fuse_attention_qkv:
+            q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+
         # scale dot product attention
         product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
@@ -220,10 +226,9 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None, topo=None):
+    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None):
         super(TransformerDecoder, self).__init__()
 
-        self.topo = topo
         self.num_layers = num_layers
         self.layers = decoder_layers
         self.norm = norm
@@ -316,20 +321,20 @@ class TransformerDecoderLayer(nn.Layer):
     It contains multiheadattention and some linear layers.
     """
 
-    def __init__(
-        self,
-        d_model,
-        nhead,
-        dim_feedforward,
-        dropout=0.1,
-        activation="gelu",
-        attn_dropout=None,
-        act_dropout=None,
-        normalize_before=True,
-        weight_attr=None,
-        bias_attr=None,
-        topo=None,
-    ):
+    def __init__(self, config):
+
+        d_model = config.hidden_size
+        nhead = config.num_attention_heads
+        dim_feedforward = config.intermediate_size
+        dropout = config.hidden_dropout_prob
+        activation = config.hidden_act
+        attn_dropout = config.attention_probs_dropout_prob
+        act_dropout = config.hidden_dropout_prob
+        normalize_before = getattr(config, "normalize_before", True)
+
+        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range))
+        bias_attr = None
+
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -343,13 +348,10 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
+            config,
             need_weights=True,
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0],
-            topo=topo,
         )
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
         self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -413,7 +415,6 @@ class GPTEmbeddings(nn.Layer):
         max_position_embeddings=512,
         type_vocab_size=16,
         initializer_range=0.02,
-        topo=None,
     ):
         super(GPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
@@ -624,7 +625,6 @@ class GPTModel(GPTPretrainedModel):
         self.bos_token_id = config.bos_token_id
         self.eol_token_id = config.eol_token_id
         self.initializer_range = config.initializer_range
-        self.topo = config.topo
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
         self.bias = paddle.tril(
@@ -638,34 +638,17 @@ class GPTModel(GPTPretrainedModel):
             config.max_position_embeddings,
             config.type_vocab_size,
             self.initializer_range,
-            config.topo,
         )
 
         decoder_layers = nn.LayerList()
         for i in range(config.num_hidden_layers):
-            decoder_layers.append(
-                TransformerDecoderLayer(
-                    d_model=config.hidden_size,
-                    nhead=config.num_attention_heads,
-                    dim_feedforward=config.intermediate_size,
-                    dropout=config.hidden_dropout_prob,
-                    activation=config.hidden_act,
-                    attn_dropout=config.attention_probs_dropout_prob,
-                    act_dropout=config.hidden_dropout_prob,
-                    weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(mean=0.0, std=self.initializer_range)
-                    ),
-                    bias_attr=None,
-                    topo=config.topo,
-                )
-            )
+            decoder_layers.append(TransformerDecoderLayer(config))
 
         self.decoder = TransformerDecoder(
             decoder_layers,
             config.num_hidden_layers,
             norm="LayerNorm",
             hidden_size=config.hidden_size,
-            topo=config.topo,
         )
 
         self.apply(self.init_weights)
@@ -776,7 +759,6 @@ class GPTModel(GPTPretrainedModel):
                 past_length = paddle.shape(cache[0].k)[-2]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
-            # .expand_as(input_ids)
             position_ids = paddle.expand(position_ids, input_shape)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
@@ -799,6 +781,7 @@ class GPTModel(GPTPretrainedModel):
             attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
         else:
             attention_mask = (1.0 - causal_mask) * -1e4
+
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -820,6 +803,7 @@ class GPTModel(GPTPretrainedModel):
                 idx = 2 if use_cache else 1
                 all_hidden_states = (embedding_output,) + outputs[idx]
                 outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
+
         self.checkpoints.extend(self.decoder.checkpoints)
 
         return outputs
@@ -902,7 +886,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     Criterion for GPT. It calculates the final loss.
     """
 
-    def __init__(self, topo=None):
+    def __init__(self):
         super(GPTPretrainingCriterion, self).__init__()
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 

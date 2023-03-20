@@ -11,45 +11,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-
-sys.path.append("../../../")
-from functools import partial
 import argparse
 import os
-import random
-import time
+import sys
+from functools import partial
 
 import paddle
+
 from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
-from model import SimNet
-from utils import convert_example, CharTokenizer
+sys.path.append("../../../")
+from model import SimNet  # noqa: E402
+from utils import CharTokenizer, convert_example  # noqa: E402
 
-# yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--epochs", type=int, default=10,
-                    help="Number of epoches for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--lr", type=float, default=5e-4,
-                    help="Learning rate used to train.")
-parser.add_argument("--save_dir", type=str, default='checkpoints/',
-                    help="Directory to save model checkpoint")
-parser.add_argument("--batch_size", type=int, default=64,
-                    help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str,
-                    default="./vocab.char",
-                    help="The directory to dataset. Chinese version uses vocab.char while English version uses vocab_QQP")
-parser.add_argument('--network', type=str, default="lstm",
-                    help="Which network you would like to choose bow, cnn, lstm or gru ?")
-parser.add_argument("--init_from_ckpt", type=str, default=None,
-                    help="The path of checkpoint to be loaded.")
-parser.add_argument("--language", type=str, required=True,
-                    help="Language that this model based on")
+parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
+parser.add_argument(
+    "--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu."
+)
+parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate used to train.")
+parser.add_argument("--save_dir", type=str, default="checkpoints/", help="Directory to save model checkpoint")
+parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
+parser.add_argument(
+    "--vocab_path",
+    type=str,
+    default="./vocab.char",
+    help="The directory to dataset. Chinese version uses vocab.char while English version uses vocab_QQP",
+)
+parser.add_argument(
+    "--network", type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?"
+)
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--language", type=str, required=True, help="Language that this model based on")
 args = parser.parse_args()
-# yapf: enable
 
 
 def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):

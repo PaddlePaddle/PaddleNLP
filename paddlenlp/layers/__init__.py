@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
+from .globalpointer import (
+    GlobalPointerForEntityExtraction,
+    GPLinkerForEventExtraction,
+    GPLinkerForRelationExtraction,
+)
+from .lora import *
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock
-from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
-from .globalpointer import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction, GPLinkerForEventExtraction

@@ -234,7 +234,7 @@ fast_gpt(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 cd ${nlp_dir}/paddlenlp/ops
 export CC=/usr/local/gcc-8.2/bin/gcc
@@ -743,7 +743,7 @@ fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 export CC=/usr/local/gcc-8.2/bin/gcc
 export CXX=/usr/local/gcc-8.2/bin/g++
@@ -884,7 +884,9 @@ print_info $? ernie-doc_dureader_robust
 #26 transformer-xl
 transformer-xl (){
 cd ${nlp_dir}/examples/language_model/transformer-xl/
-cp -r /ssd1/paddlenlp/download/transformer-xl/* ./
+mkdir gen_data && cd gen_data
+wget https://paddle-qa.bj.bcebos.com/paddlenlp/enwik8.tar.gz && tar -zxvf enwik8.tar.gz
+cd ../
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 time (sed -i 's/print_step: 100/print_step: 1/g' configs/enwik8.yaml
 sed -i 's/save_step: 10000/save_step: 3/g' configs/enwik8.yaml
@@ -1127,7 +1129,7 @@ taskflow (){
 cd ${nlp_dir}
 python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
 print_info $? taskflow_unittest
-python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
+python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
 transformers(){

@@ -15,29 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-import random
 import copy
-import math
-import numpy as np
-from typing import Optional
-from collections import OrderedDict
 import logging
+import math
+import random
+from collections import OrderedDict
+from dataclasses import dataclass
+from typing import Optional
 
+import numpy as np
 import paddle
-from paddlenlp.data import Pad
-
 from uie.evaluation.constants import (
     BaseStructureMarker,
-    text_start,
-    spot_prompt,
     asoc_prompt,
     null_span,
+    spot_prompt,
+    text_start,
 )
-from uie.evaluation.sel2record import (
-    RecordSchema,
-    convert_spot_asoc,
-)
+from uie.evaluation.sel2record import RecordSchema, convert_spot_asoc
+
+from paddlenlp.data import Pad
 
 logger = logging.getLogger("__main__")
 
@@ -45,8 +42,7 @@ logger = logging.getLogger("__main__")
 @dataclass
 class SpotAsocNoiser:
     spot_noise_ratio: float = 0.0  # Ratio of insert spot not in raw record
-    asoc_noise_ratio: float = 0.0  # Ratio of insert asoc not in raw record
-    null_span: str = null_span  # Null span string
+    asoc_noise_ratio: float = 0.0  # Ratio of insert asoc not in raw recordf
 
     def random_insert_spot(self, spot_asoc, spot_label_list=None):
         """Insert negative spot in random, sample negative spot from spot_label_list"""
@@ -58,7 +54,7 @@ class SpotAsocNoiser:
         for _ in range(random_num):
             random_position = np.random.randint(low=0, high=len(spot_asoc))
             to_insert_negative_spot = {
-                "span": self.null_span,
+                "span": null_span,
                 "label": np.random.choice(spot_label_list),  # Sample negative spot from spot_label_list
                 "asoc": list(),
             }
@@ -78,7 +74,7 @@ class SpotAsocNoiser:
             spot_position = np.random.randint(low=0, high=len(spot_asoc))
             asoc_position = np.random.randint(low=0, high=len(spot_asoc[spot_position]["asoc"]) + 1)
             # Insert random negative span at `asoc_position`
-            spot_asoc[spot_position]["asoc"].insert(asoc_position, (random_label, self.null_span))
+            spot_asoc[spot_position]["asoc"].insert(asoc_position, (random_label, null_span))
         return spot_asoc
 
     def add_noise(self, spot_asoc, spot_label_list, asoc_label_list):

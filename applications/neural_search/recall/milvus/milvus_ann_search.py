@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-from tqdm import tqdm
-import time
 import argparse
+import time
 
 import numpy as np
-from milvus_util import VecToMilvus, RecallByMilvus, text_max_len
-from config import collection_name, partition_tag, embedding_name
+from config import collection_name, embedding_name, partition_tag
+from milvus_util import RecallByMilvus, VecToMilvus, text_max_len
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

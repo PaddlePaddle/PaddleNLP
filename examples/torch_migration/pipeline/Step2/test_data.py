@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import functools
 from functools import partial
 
 import numpy as np
@@ -19,11 +18,11 @@ import paddle
 import pandas as pd
 import torch
 from datasets import Dataset
-from paddlenlp.data import Dict, Pad, Stack
-from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
-from paddlenlp.transformers import BertTokenizer as PPNLPBertTokenizer
 from reprod_log import ReprodDiffHelper, ReprodLogger
 from transformers import BertTokenizer as HFBertTokenizer
+
+from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
+from paddlenlp.transformers import BertTokenizer as PPNLPBertTokenizer
 
 
 def build_paddle_data_pipeline():
