@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
+import numpy as np
 
 
 def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
@@ -52,8 +52,8 @@ def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
         " " + example["article"], add_special_tokens=False, max_length=data_args.src_length - len(prompt)
     )
     pad_length = data_args.src_length - len(inputs["input_ids"]) - len(prompt)
-    inputs["input_ids"] = paddle.to_tensor([prompt + inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
-    inputs["attention_mask"] = paddle.to_tensor([[1] * len(prompt) + inputs["attention_mask"] + [0] * pad_length])
+    inputs["input_ids"] = np.array([prompt + inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
+    inputs["attention_mask"] = np.array([[1] * len(prompt) + inputs["attention_mask"] + [0] * pad_length])
     sep = inputs["input_ids"].shape[1]
     inputs = tokenizer.build_inputs_for_generation(
         inputs,
