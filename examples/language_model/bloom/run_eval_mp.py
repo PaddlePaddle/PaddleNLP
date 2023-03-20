@@ -28,7 +28,6 @@ from modeling import BloomForPretraining
 from paddle import LazyGuard
 from paddle.distributed import fleet
 from paddle.io import DataLoader
-from tqdm import tqdm
 from transformers import AutoTokenizer
 from utils import set_hyrbid_parallel_seed
 
@@ -329,8 +328,9 @@ def do_generation(args):
     score_name = "loss" if not args.cloze_eval else "number correct"
 
     with paddle.no_grad():
-        for step, batch in tqdm(enumerate(eval_data_loader)):
-            tokens, loss_mask, attention_mask, position_ids, labels = batch
+        for step, batch in enumerate(eval_data_loader):
+            tokens, loss_mask = batch[:2]
+            labels = batch[-1]
             with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype="float16"):
                 preds = model(tokens)
 
