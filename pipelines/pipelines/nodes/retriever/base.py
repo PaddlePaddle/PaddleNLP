@@ -13,18 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Union, Iterator
-
 import logging
 from abc import abstractmethod
-from time import perf_counter
-from functools import wraps
-from tqdm import tqdm
 from copy import deepcopy
+from functools import wraps
+from time import perf_counter
+from typing import Dict, Iterator, List, Optional, Union
 
-from pipelines.schema import Document
-from pipelines.nodes.base import BaseComponent
 from pipelines.document_stores.base import BaseDocumentStore, BaseKnowledgeGraph
+from pipelines.nodes.base import BaseComponent
+from pipelines.schema import ContentTypes, Document
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +65,7 @@ class BaseRetriever(BaseComponent):
     def retrieve(
         self,
         query: str,
+        query_type: ContentTypes = "text",
         filters: dict = None,
         top_k: Optional[int] = None,
         index: str = None,
@@ -116,6 +115,7 @@ class BaseRetriever(BaseComponent):
         self,
         root_node: str,
         query: Optional[str] = None,
+        query_type: ContentTypes = "text",
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         documents: Optional[List[dict]] = None,
@@ -125,7 +125,9 @@ class BaseRetriever(BaseComponent):
         if root_node == "Query":
             self.query_count += 1
             run_query_timed = self.timing(self.run_query, "query_time")
-            output, stream = run_query_timed(query=query, filters=filters, top_k=top_k, index=index, headers=headers)
+            output, stream = run_query_timed(
+                query=query, query_type=query_type, filters=filters, top_k=top_k, index=index, headers=headers
+            )
         elif root_node == "File":
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
@@ -138,6 +140,7 @@ class BaseRetriever(BaseComponent):
         self,
         root_node: str,
         queries: Optional[List[str]] = None,
+        query_type: ContentTypes = "text",
         filters: Optional[Union[dict, List[dict]]] = None,
         top_k: Optional[int] = None,
         documents: Optional[Union[List[Document], List[List[Document]]]] = None,
@@ -161,12 +164,15 @@ class BaseRetriever(BaseComponent):
     def run_query(
         self,
         query: str,
+        query_type: ContentTypes = "text",
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
     ):
-        documents = self.retrieve(query=query, filters=filters, top_k=top_k, index=index, headers=headers)
+        documents = self.retrieve(
+            query=query, query_type=query_type, filters=filters, top_k=top_k, index=index, headers=headers
+        )
         document_ids = [doc.id for doc in documents]
         logger.debug(f"Retrieved documents with IDs: {document_ids}")
         output = {"documents": documents}
@@ -176,6 +182,7 @@ class BaseRetriever(BaseComponent):
     def run_query_batch(
         self,
         queries: List[str],
+        query_type: ContentTypes = "text",
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -183,7 +190,13 @@ class BaseRetriever(BaseComponent):
         batch_size: Optional[int] = None,
     ):
         documents = self.retrieve_batch(
-            queries=queries, filters=filters, top_k=top_k, index=index, headers=headers, batch_size=batch_size
+            queries=queries,
+            query_type=query_type,
+            filters=filters,
+            top_k=top_k,
+            index=index,
+            headers=headers,
+            batch_size=batch_size,
         )
         if isinstance(queries, str):
             document_ids = []

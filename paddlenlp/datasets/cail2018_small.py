@@ -19,8 +19,8 @@ import os
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
 
-from paddlenlp.datasets import DatasetBuilder
-from paddlenlp.utils.env import DATA_HOME
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
 __all__ = ["CAIL2018Small"]
 

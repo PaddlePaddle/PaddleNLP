@@ -13,40 +13,50 @@
 # limitations under the License.
 
 import argparse
-import collections
-
 import os
 import random
-from functools import partial
-import time
 import string
+import time
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import BigBirdModel, BigBirdForSequenceClassification, BigBirdTokenizer
-from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
-from paddlenlp.utils.log import logger
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack
 
-# yapf: disable
+from paddlenlp.data import Stack
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    BigBirdForSequenceClassification,
+    BigBirdTokenizer,
+    create_bigbird_rand_mask_idx_list,
+)
+from paddlenlp.utils.log import logger
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased-finetune", help="pretraining model name or path")
-parser.add_argument("--max_encoder_length", type=int, default=3072, help="The maximum total input sequence length after SentencePiece tokenization.")
+parser.add_argument(
+    "--model_name_or_path", type=str, default="bigbird-base-uncased-finetune", help="pretraining model name or path"
+)
+parser.add_argument(
+    "--max_encoder_length",
+    type=int,
+    default=3072,
+    help="The maximum total input sequence length after SentencePiece tokenization.",
+)
 parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate used to train.")
 parser.add_argument("--max_steps", default=10000, type=int, help="Max training steps to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
-parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--output_dir", type=str, default="checkpoints/", help="Directory to save model checkpoint")
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
-parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
-parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
+parser.add_argument(
+    "--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler."
+)
+parser.add_argument(
+    "--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model."
+)
 parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
-# yapf: enable
+
 args = parser.parse_args()
 TRANSLATOR = str.maketrans("", "", string.punctuation)
 

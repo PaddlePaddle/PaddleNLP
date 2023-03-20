@@ -13,16 +13,15 @@
 # limitations under the License.
 
 import io
-import numpy as np
 
+import numpy as np
 import paddle
 from args import parse_args
-
-from seq2seq_attn import Seq2SeqAttnInferModel
 from data import create_infer_loader
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics import BLEU
+from seq2seq_attn import Seq2SeqAttnInferModel
+
 from paddlenlp.data import Vocab
+from paddlenlp.metrics import BLEU
 
 
 def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
@@ -39,7 +38,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    device = paddle.set_device(args.device)
+    paddle.set_device(args.device)
 
     test_loader, src_vocab_size, tgt_vocab_size, bos_id, eos_id = create_infer_loader(args)
     tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info["vi"])

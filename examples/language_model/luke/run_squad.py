@@ -13,23 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import math
 import os
 import random
 import time
-import json
-import math
-from args import parse_args
 from functools import partial
-import numpy as np
 
+import numpy as np
 import paddle
+from args import parse_args
+from datasets import load_dataset
 from paddle.io import DataLoader
 
-from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import LukeTokenizer, LukeForQuestionAnswering
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
-from datasets import load_dataset
+from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    LukeForQuestionAnswering,
+    LukeTokenizer,
+)
 
 MODEL_CLASSES = {"luke": (LukeForQuestionAnswering, LukeTokenizer)}
 

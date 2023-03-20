@@ -17,6 +17,7 @@ import unittest
 
 import paddle
 import paddle.nn as nn
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     ReformerForMaskedLM,
@@ -35,6 +36,7 @@ from tests.testing_utils import slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
+    ModelTesterPretrainedMixin,
     floats_tensor,
     ids_tensor,
     random_attention_mask,
@@ -199,6 +201,8 @@ class ReformerModelTester:
         model.eval()
         result = model(input_ids, attention_mask=input_mask)
         result = model(input_ids)
+        result = model(input_ids, attention_mask=input_mask, return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
 
         # 2 * hidden_size because we use reversible resnet layers
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, 2 * self.hidden_size])
@@ -213,7 +217,7 @@ class ReformerModelTester:
         config.lsh_num_chunks_after = 1
         model = ReformerForMaskedLM(config=config)
         model.train()
-        loss = model(input_ids, attention_mask=input_mask, labels=input_ids)[0]
+        loss = model(input_ids, attention_mask=input_mask, labels=input_ids, return_dict=self.parent.return_dict)[0]
         loss.backward()
 
     def create_and_check_reformer_with_lm(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
@@ -228,7 +232,7 @@ class ReformerModelTester:
         config.is_decoder = False
         model = ReformerForMaskedLM(config=config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, labels=input_ids)
+        result = model(input_ids, attention_mask=input_mask, labels=input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_reformer_model_with_attn_mask(
@@ -275,10 +279,14 @@ class ReformerModelTester:
         input_ids_roll = paddle.roll(input_ids_roll, roll, axis=-1)
         attn_mask_roll = paddle.roll(attn_mask, roll, axis=-1)
 
-        output_padded = model(input_ids_padded, attention_mask=attn_mask)[0][:, :half_seq_len]
-        output_padded_rolled = model(input_ids_roll, attention_mask=attn_mask_roll)[0][:, roll : half_seq_len + roll]
+        output_padded = model(input_ids_padded, attention_mask=attn_mask, return_dict=self.parent.return_dict)[0][
+            :, :half_seq_len
+        ]
+        output_padded_rolled = model(
+            input_ids_roll, attention_mask=attn_mask_roll, return_dict=self.parent.return_dict
+        )[0][:, roll : half_seq_len + roll]
 
-        self.parent.assertTrue(paddle.allclose(output_padded, output_padded_rolled, atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_padded, output_padded_rolled, atol=1e-4))
 
     def create_and_check_reformer_layer_dropout_seed(
         self, config: ReformerConfig, input_ids, input_mask, choice_labels, is_decoder=False
@@ -309,7 +317,7 @@ class ReformerModelTester:
             paddle.allclose(
                 prev_attn_output + attn_outputs.hidden_states,
                 next_attn_output,
-                atol=1e-3,
+                atol=1e-4,
             )
         )
 
@@ -319,7 +327,7 @@ class ReformerModelTester:
             paddle.allclose(
                 next_hidden_states,
                 hidden_states + feed_forward_hidden_states,
-                atol=1e-3,
+                atol=1e-4,
             )
         )
 
@@ -339,7 +347,9 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        loss_no_chunk, output_no_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
+        loss_no_chunk, output_no_chunk = model(
+            input_ids, labels=input_ids, attention_mask=input_mask, return_dict=self.parent.return_dict
+        )[:2]
         loss_no_chunk.backward()
         grad_slice_word_no_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
         grad_slice_position_factor_1_no_chunk = model.reformer.embeddings.position_embeddings.weights[0][1, 0, -5:]
@@ -351,18 +361,20 @@ class ReformerModelTester:
         paddle.seed(0)
         model = ReformerForMaskedLM(config=config)
         model.train()
-        loss_chunk, output_chunk = model(input_ids, labels=input_ids, attention_mask=input_mask)[:2]
+        loss_chunk, output_chunk = model(
+            input_ids, labels=input_ids, attention_mask=input_mask, return_dict=self.parent.return_dict
+        )[:2]
         loss_chunk.backward()
         grad_slice_word_chunk = model.reformer.embeddings.word_embeddings.weight.grad[0, :5]
         grad_slice_position_factor_1_chunk = model.reformer.embeddings.position_embeddings.weights[0][1, 0, -5:]
         grad_slice_position_factor_2_chunk = model.reformer.embeddings.position_embeddings.weights[1][0, 1, :5]
-        self.parent.assertTrue(paddle.allclose(loss_chunk, loss_no_chunk, atol=1e-3))
-        self.parent.assertTrue(paddle.allclose(grad_slice_word_no_chunk, grad_slice_word_chunk, atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(loss_chunk, loss_no_chunk, atol=1e-4))
+        self.parent.assertTrue(paddle.allclose(grad_slice_word_no_chunk, grad_slice_word_chunk, atol=1e-4))
         self.parent.assertTrue(
-            paddle.allclose(grad_slice_position_factor_1_chunk, grad_slice_position_factor_1_no_chunk, atol=1e-3)
+            paddle.allclose(grad_slice_position_factor_1_chunk, grad_slice_position_factor_1_no_chunk, atol=1e-4)
         )
         self.parent.assertTrue(
-            paddle.allclose(grad_slice_position_factor_2_chunk, grad_slice_position_factor_2_no_chunk, atol=1e-3)
+            paddle.allclose(grad_slice_position_factor_2_chunk, grad_slice_position_factor_2_no_chunk, atol=1e-4)
         )
 
     def create_and_check_reformer_model_generate(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
@@ -385,11 +397,13 @@ class ReformerModelTester:
         config.is_decoder = False
         model = ReformerForMaskedLM(config=config)
         model.eval()
-        output_logits = model(input_ids, attention_mask=input_mask)  # (loss, logits, hidden_states, attentions)
+        output_logits = model(
+            input_ids, attention_mask=input_mask, return_dict=self.parent.return_dict
+        )  # (loss, logits, hidden_states, attentions)
         self.parent.assertTrue(output_logits[0].shape[1] == input_ids.shape[-1])
 
     def create_and_check_reformer_for_question_answering(
-        self, config: ReformerConfig, input_ids, input_mask, choice_labels
+        self, config: ReformerConfig, input_ids, input_mask, choice_labels, sequence_labels
     ):
         model = ReformerForQuestionAnswering(config=config)
         model.eval()
@@ -398,9 +412,14 @@ class ReformerModelTester:
             attention_mask=input_mask,
             start_positions=choice_labels,
             end_positions=choice_labels,
+            return_dict=self.parent.return_dict,
         )
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
-        self.parent.assertEqual(result[2].shape, [self.batch_size, self.seq_length])
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
+        self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
 
     def create_and_check_cache(self, config: ReformerConfig, input_ids, input_mask, choice_labels):
         config.is_decoder = True
@@ -441,10 +460,25 @@ class ReformerModelTester:
         sequence_labels = ids_tensor([self.batch_size], config.num_labels)
         model = ReformerForSequenceClassification(config)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask, labels=sequence_labels)
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.num_labels])
+        result = model(
+            input_ids, attention_mask=input_mask, labels=sequence_labels, return_dict=self.parent.return_dict
+        )
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_labels])
 
 
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class ReformerTesterMixin:
     """
     Reformer Local and Reformer LSH run essentially the same tests
@@ -491,10 +525,9 @@ class ReformerTesterMixin:
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_reformer_for_question_answering(*config_and_inputs)
 
-    """todo:
-        def test_reformer_cached_inference(self):
+    def test_reformer_cached_inference(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_cache(*config_and_inputs)"""
+        self.model_tester.create_and_check_cache(*config_and_inputs)
 
     def test_reformer_cached_generate(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -519,6 +552,9 @@ class ReformerLocalAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest
     test_sequence_classification_problem_types = True
     test_tie_weights = True
     base_model_class = ReformerModel
+    return_dict: bool = False
+    use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     def setUp(self):
         self.model_tester = ReformerModelTester(self)
@@ -607,6 +643,9 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     test_torchscript = False
     test_tie_weights = True
     base_model_class = ReformerModel
+    return_dict: bool = False
+    use_labels: bool = False
+    use_test_inputs_embeds: bool = True
 
     def setUp(self):
         self.model_tester = ReformerModelTester(
@@ -718,3 +757,53 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     def test_problem_types(self):
         # Fails because the sequence length is not a multiple of 4
         pass
+
+
+class ReformerModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
+    base_model_class = ReformerModel
+    hf_remote_test_model_path = "PaddleCI/tiny-random-reformer"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-reformer"
+
+    @slow
+    def test_inference_no_attention(self):
+        model = ReformerModel.from_pretrained("reformer-enwik8")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 2048]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [0.08537189, -0.01475962, 0.28183940],
+                    [0.11155435, 0.03538624, 0.37847346],
+                    [0.12673721, 0.07730877, 0.48841247],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_attention(self):
+        model = ReformerModel.from_pretrained("reformer-enwik8")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 2048]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [0.08537189, -0.01475962, 0.28183940],
+                    [0.11155435, 0.03538624, 0.37847346],
+                    [0.12673721, 0.07730877, 0.48841247],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))

@@ -28,6 +28,10 @@ def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
 
 
+def is_ray_available():
+    return importlib.util.find_spec("ray.air") is not None
+
+
 def get_available_reporting_integrations():
     integrations = []
     if is_visualdl_available():
@@ -108,7 +112,7 @@ class VisualDLCallback(TrainerCallback):
             return
 
         if self.vdl_writer is None:
-            self._init_summary_writer(args)
+            return
 
         if self.vdl_writer is not None:
             logs = rewrite_logs(logs)
@@ -130,8 +134,32 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer = None
 
 
+class AutoNLPCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that sends the logs to [`Ray Tune`] for [`AutoNLP`]
+    """
+
+    def __init__(self):
+        if not is_ray_available():
+            raise RuntimeError(
+                "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
+            )
+        self.session = importlib.import_module("ray.air.session")
+        self.tune = importlib.import_module("ray.tune")
+
+    # report session metrics to Ray to track trial progress
+    def on_evaluate(self, args, state, control, **kwargs):
+        if not state.is_world_process_zero:
+            return
+
+        metrics = kwargs.get("metrics", None)
+        if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
+            self.session.report(metrics)
+
+
 INTEGRATION_TO_CALLBACK = {
     "visualdl": VisualDLCallback,
+    "autonlp": AutoNLPCallback,
 }
 
 

@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-from types import SimpleNamespace
 import argparse
 import json
+import logging
+import os
+import sys
+from types import SimpleNamespace
+
 import _jsonnet as jsonnet
 
 

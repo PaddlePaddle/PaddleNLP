@@ -256,8 +256,7 @@ def get_unweighted_text_embeddings(
             text_input_chunk[:, 0] = text_input[0, 0]
             text_input_chunk[:, -1] = text_input[0, -1]
 
-            attention_mask = paddle.ones_like(text_input_chunk)
-            text_embedding = pipe.text_encoder(text_input_chunk, attention_mask=attention_mask)[0]
+            text_embedding = pipe.text_encoder(text_input_chunk)[0]
 
             if no_boseos_middle:
                 if i == 0:
@@ -273,8 +272,7 @@ def get_unweighted_text_embeddings(
             text_embeddings.append(text_embedding)
         text_embeddings = paddle.concat(text_embeddings, axis=1)
     else:
-        attention_mask = paddle.ones_like(text_input)
-        text_embeddings = pipe.text_encoder(text_input, attention_mask=attention_mask)[0]
+        text_embeddings = pipe.text_encoder(text_input)[0]
     return text_embeddings
 
 
@@ -540,7 +538,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             new_config = dict(unet.config)
             new_config["sample_size"] = 64
             unet._internal_dict = FrozenDict(new_config)
-
         self.register_modules(
             vae=vae,
             text_encoder=text_encoder,
@@ -578,6 +575,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
         text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+        if not do_classifier_free_guidance and text_embeddings.shape[0] > 1:
+            text_embeddings = text_embeddings[:1]
         return text_embeddings
 
     def run_safety_checker(self, image, dtype):
@@ -681,7 +680,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         t_start = max(num_inference_steps - init_timestep + offset, 0)
         timesteps = self.scheduler.timesteps[t_start:]
 
-        return timesteps
+        return timesteps, num_inference_steps - t_start
 
     def prepare_latents_inpaint(self, image, timestep, num_images_per_prompt, dtype):
         image = image.cast(dtype)
@@ -838,25 +837,29 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
         # 7. Denoising loop
-        for i, t in enumerate(self.progress_bar(timesteps)):
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-            # predict the noise residual
-            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
+                # predict the noise residual
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
-            # perform guidance
-            if do_classifier_free_guidance:
-                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                # perform guidance
+                if do_classifier_free_guidance:
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
-            # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        callback(i, t, latents)
 
         # 8. Post-processing
         image = self.decode_latents(latents)
@@ -1017,7 +1020,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.get_timesteps(num_inference_steps, strength)
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
         latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
@@ -1027,25 +1030,29 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
         # 8. Denoising loop
-        for i, t in enumerate(self.progress_bar(timesteps)):
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-            # predict the noise residual
-            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
+                # predict the noise residual
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
-            # perform guidance
-            if do_classifier_free_guidance:
-                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                # perform guidance
+                if do_classifier_free_guidance:
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
-            # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        callback(i, t, latents)
 
         # 9. Post-processing
         image = self.decode_latents(latents)
@@ -1219,7 +1226,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.get_timesteps(num_inference_steps, strength)
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
         latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
@@ -1236,29 +1243,33 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
         # 9. Denoising loop
-        for i, t in enumerate(self.progress_bar(timesteps)):
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-            # predict the noise residual
-            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
+                # predict the noise residual
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
-            # perform guidance
-            if do_classifier_free_guidance:
-                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                # perform guidance
+                if do_classifier_free_guidance:
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
-            # masking
-            init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                # masking
+                init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
 
-            latents = (init_latents_proper * mask) + (latents * (1 - mask))
+                latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
-            # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        callback(i, t, latents)
 
         # 10. Post-processing
         image = self.decode_latents(latents)

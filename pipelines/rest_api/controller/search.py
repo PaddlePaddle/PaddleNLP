@@ -15,15 +15,18 @@
 
 import json
 import logging
+import shutil
 import time
+import uuid
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 from numpy import ndarray
 from pydantic import BaseConfig
 from rest_api.config import (
     CONCURRENT_REQUEST_PER_WORKER,
+    FILE_UPLOAD_PATH,
     LOG_LEVEL,
     PIPELINE_YAML_PATH,
     QUERY_PIPELINE_NAME,
@@ -95,6 +98,35 @@ def query(request: QueryRequest):
     with concurrency_limiter.run():
         result = _process_request(PIPELINE, request)
         return result
+
+
+@router.post("/query_images", response_model=QueryResponse, response_model_exclude_none=True)
+def query_images_for_retrieval(
+    files: List[UploadFile] = File(...),
+    # JSON serialized string
+    meta: Optional[str] = Form("null"),
+):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    file_paths: list = []
+    file_metas: list = []
+    meta_form = json.loads(meta) or {}  # type: ignore
+
+    for file in files:
+        try:
+            file_path = Path(FILE_UPLOAD_PATH) / f"{uuid.uuid4().hex}_{file.filename}"
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            file_paths.append(file_path)
+            # meta_form["name"] = file.filename
+            file_metas.append(meta_form)
+        finally:
+            file.file.close()
+    result = PIPELINE.run(query=str(file_paths[0]), params=meta_form, debug=True)
+    return result
 
 
 @router.post("/query_text_to_images", response_model=QueryImageResponse, response_model_exclude_none=True)

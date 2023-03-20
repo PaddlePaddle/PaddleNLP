@@ -41,13 +41,13 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
-| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |      ✅        |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 | [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
-| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |            |          | 集成文本，图片的特征抽取工具       |
+| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |     ✅       |          | 集成文本，图片的特征抽取工具       |
 
 ## QuickStart
 
@@ -1249,13 +1249,14 @@ from paddlenlp import Taskflow
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese`                     | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-zh-dureader-cross-encoder`       | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese` (默认)               | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
+  | `rocketqav2-en-marco-cross-encoder`        | 12-layers, 768-hidden, 12-heads | 英文 |
 
 
 #### 可配置参数说明
@@ -1785,7 +1786,7 @@ from paddlenlp import Taskflow
 
 <details><summary>&emsp; 基于百度自研中文图文跨模态预训练模型ERNIE-ViL 2.0</summary><div>
 
-#### 支持单条、批量预测
+#### 多模态特征提取
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -1845,6 +1846,61 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `_static_mode`：静态图模式，默认开启。
 * `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
+#### 文本特征提取
+
+```python
+>>> from paddlenlp import Taskflow
+>>> import paddle.nn.functional as F
+>>> text_encoder = Taskflow("feature_extraction", model='rocketqa-zh-base-query-encoder')
+>>> text_embeds = text_encoder(['春天适合种什么花？','谁有狂三这张高清的?'])
+>>> text_features1 = text_embeds["features"]
+>>> text_features1
+Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.27640465, -0.13405125,  0.00612330, ..., -0.15600294,
+         -0.18932408, -0.03029604],
+        [-0.12041329, -0.07424965,  0.07895312, ..., -0.17068857,
+          0.04485796, -0.18887770]])
+>>> text_embeds = text_encoder('春天适合种什么菜？')
+>>> text_features2 = text_embeds["features"]
+>>> text_features2
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.32578075, -0.02398480, -0.18929179, -0.18639392, -0.04062131,
+       ......
+>>> probs = F.cosine_similarity(text_features1, text_features2)
+>>> probs
+Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [0.86455142, 0.41222256])
+```
+
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  层数| 维度  | 语言|
+  | :---: | :--------: | :--------: | :--------: |
+  | `rocketqa-zh-dureader-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-dureader-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-medium-query-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-medium-para-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-mini-query-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-mini-para-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-micro-query-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-micro-para-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-nano-query-encoder`  | 4 | 312 | 中文|
+  | `rocketqa-zh-nano-para-encoder`  | 4 | 312 | 中文|
+  | `rocketqav2-en-marco-query-encoder`  | 12 | 768 | 英文|
+  | `rocketqav2-en-marco-para-encoder`  | 12 | 768 | 英文|
+  | `ernie-search-base-dual-encoder-marco-en"`  | 12 | 768 | 英文|
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_seq_len`：文本序列的最大长度，默认为128。
+* `return_tensors`: 返回的类型，有pd和np，默认为pd。
+* `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
 
 </div></details>
 

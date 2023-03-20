@@ -12,32 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import sys
 import random
 import time
+from functools import partial
 
-from scipy import stats
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-
+from data import (
+    convert_example,
+    create_dataloader,
+    read_simcse_text,
+    read_text_pair,
+    word_repetition,
+)
 from model import SimCSE
-from data import read_simcse_text, read_text_pair, convert_example, create_dataloader
-from data import word_repetition
+from scipy import stats
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization."
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embedding_size, 0 means use hidden_size as output embedding size.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
@@ -46,7 +47,7 @@ parser.add_argument("--epochs", default=1, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Step interval for saving checkpoint.")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override ecpochs.")
 parser.add_argument('--eval_steps', type=int, default=10000, help="Step interval for evaluation.")
@@ -60,11 +61,13 @@ parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether
 
 args = parser.parse_args()
 
+
 def set_seed(seed):
     """sets random seed"""
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
+
 
 def do_evaluate(model, tokenizer, data_loader, with_pooler=False):
     model.eval()
@@ -95,6 +98,7 @@ def do_evaluate(model, tokenizer, data_loader, with_pooler=False):
     model.train()
     return spearman_corr, total_num
 
+
 def do_train():
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
@@ -110,9 +114,9 @@ def do_train():
         read_text_pair, data_path=args.test_set_file, lazy=False)
 
     pretrained_model = AutoModel.from_pretrained(
-       'ernie-3.0-medium-zh',
-       hidden_dropout_prob=args.dropout,
-       attention_probs_dropout_prob=args.dropout)
+        'ernie-3.0-medium-zh',
+        hidden_dropout_prob=args.dropout,
+        attention_probs_dropout_prob=args.dropout)
 
     tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
@@ -187,8 +191,8 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
             if(args.dup_rate > 0):
-                query_input_ids,query_token_type_ids=word_repetition(query_input_ids,query_token_type_ids,args.dup_rate)
-                title_input_ids,title_token_type_ids=word_repetition(title_input_ids,title_token_type_ids,args.dup_rate)
+                query_input_ids, query_token_type_ids = word_repetition(query_input_ids, query_token_type_ids, args.dup_rate)
+                title_input_ids, title_token_type_ids = word_repetition(title_input_ids, title_token_type_ids, args.dup_rate)
 
             loss = model(
                 query_input_ids=query_input_ids,
@@ -223,6 +227,7 @@ def do_train():
 
             if args.max_steps > 0 and global_step >= args.max_steps:
                 return
+
 
 if __name__ == "__main__":
     do_train()

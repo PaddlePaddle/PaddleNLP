@@ -14,24 +14,21 @@
 # limitations under the License.
 
 import argparse
-import json
-import time
 import os
-import numpy as np
-import random
+import time
 from functools import partial
 
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+import numpy as np
 import paddle
 from paddle.nn import functional as F
-from paddle.nn.layer import CrossEntropyLoss
-from paddle.io import DataLoader
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ChineseBertForSequenceClassification
-from paddlenlp.transformers import ChineseBertTokenizer
-from paddlenlp.datasets import load_dataset
+from utils import create_dataloader, evaluate, load_ds, set_seed
 
-from utils import set_seed
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.transformers import (
+    ChineseBertForSequenceClassification,
+    ChineseBertTokenizer,
+    LinearDecayWithWarmup,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -74,7 +71,6 @@ train_path = os.path.join(data_dir, "train.tsv")
 dev_path = os.path.join(data_dir, "dev.tsv")
 test_path = os.path.join(data_dir, "test.tsv")
 
-from utils import load_ds
 
 train_ds, dev_ds, test_ds = load_ds(datafiles=[train_path, dev_path, test_path])
 
@@ -93,7 +89,6 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     input_ids = encoded_inputs["input_ids"]
     # token_type_ids：Does the current token belong to sentence 1 or sentence 2, that is, the segment ids.
 
-    token_type_ids = encoded_inputs["token_type_ids"]
     pinyin_ids = encoded_inputs["pinyin_ids"]
 
     label = np.array([example["label"]], dtype="int64")
@@ -112,7 +107,6 @@ batchify_fn = lambda samples, fn=Tuple(
     Stack(),  # labels
 ): [data for data in fn(samples)]
 
-from utils import create_dataloader
 
 train_data_loader = create_dataloader(
     train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
@@ -124,7 +118,6 @@ test_data_loader = create_dataloader(
     test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
 )
 
-from utils import evaluate
 
 num_training_steps = len(train_data_loader) * args.epochs
 

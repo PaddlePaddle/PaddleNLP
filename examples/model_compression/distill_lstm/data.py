@@ -13,17 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 from functools import partial
-import numpy as np
+
 import jieba
-
+import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.transformers import BertTokenizer
-from paddlenlp.datasets import load_dataset
+from utils import (
+    convert_example_for_distill,
+    convert_example_for_lstm,
+    convert_pair_example,
+)
 
-from utils import convert_example_for_lstm, convert_example_for_distill, convert_pair_example
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import BertTokenizer
 
 
 def load_vocab(vocab_file):

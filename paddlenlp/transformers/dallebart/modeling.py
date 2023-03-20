@@ -23,8 +23,14 @@ import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
 
 from ...transformers import PretrainedModel, register_base_model
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from ..generation_utils import BeamSearchScorer
+from .configuration import (
+    DALLEBART_PRETRAINED_INIT_CONFIGURATION,
+    DALLEBART_PRETRAINED_RESOURCE_FILES_MAP,
+    DalleBartConfig,
+)
 
 __all__ = [
     "DalleBartModel",
@@ -86,109 +92,11 @@ class DalleBartPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "dalle-mini": {
-            "text_vocab_size": 50264,
-            "image_vocab_size": 16384,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 2730,
-            "decoder_ffn_dim": 2730,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega-v16": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega-v26": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-        "dalle-mega": {
-            "text_vocab_size": 50272,
-            "image_vocab_size": 16415,
-            "bos_token_id": 16384,
-            "pad_token_id": 16384,
-            "eos_token_id": 16384,
-            "max_text_length": 64,
-            "max_image_length": 256,
-            "decoder_start_token_id": 16384,
-            "d_model": 2048,
-            "num_encoder_layers": 24,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.0,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "use_bias": False,
-            "init_std": 0.02,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
-            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
-            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
-            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
-        }
-    }
     base_model_prefix = "dallebart"
+    model_config_file = CONFIG_NAME
+    pretrained_init_configuration = DALLEBART_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = DALLEBART_PRETRAINED_RESOURCE_FILES_MAP
+    config_class = DalleBartConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -199,7 +107,7 @@ class DalleBartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.dallebart.config["init_std"],
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -233,20 +141,20 @@ class GLU(nn.Layer):
         self,
         count_in_out: int,
         count_middle: int,
-        act_dropout: float,
+        activation_dropout: float,
         dropout: float,
-        activation: str = "gelu",
-        bias_attr: bool = False,
+        activation_function: str = "gelu",
+        use_bias: bool = False,
     ):
         super().__init__()
         self.ln0 = nn.LayerNorm(count_in_out)
         self.ln1 = nn.LayerNorm(count_middle)
-        self.fc0 = nn.Linear(count_in_out, count_middle, bias_attr=bias_attr)
-        self.fc1 = nn.Linear(count_in_out, count_middle, bias_attr=bias_attr)
-        self.fc2 = nn.Linear(count_middle, count_in_out, bias_attr=bias_attr)
-        self.dropout1 = nn.Dropout(act_dropout)
+        self.fc0 = nn.Linear(count_in_out, count_middle, bias_attr=use_bias)
+        self.fc1 = nn.Linear(count_in_out, count_middle, bias_attr=use_bias)
+        self.fc2 = nn.Linear(count_middle, count_in_out, bias_attr=use_bias)
+        self.dropout1 = nn.Dropout(activation_dropout)
         self.dropout2 = nn.Dropout(dropout)
-        self.act = getattr(F, activation)
+        self.act = getattr(F, activation_function)
 
     def forward(self, z):
         z = self.ln0(z)
@@ -263,40 +171,35 @@ class DalleBartEncoderLayer(nn.Layer):
     The Encoder Layer of DalleBartEncoder. The arguments of DalleBartEncoderLayer can see :class:`DalleBartEncoder`.
     """
 
-    def __init__(
-        self,
-        d_model,
-        nhead,
-        dim_feedforward,
-        dropout=0.0,
-        activation="gelu",
-        attn_dropout=None,
-        act_dropout=None,
-        bias_attr=False,
-    ):
+    def __init__(self, config: DalleBartConfig):
         super().__init__()
-        assert d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(d_model)
-        assert nhead > 0, "Expected nhead to be greater than 0, " "but recieved {}".format(nhead)
-        assert dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
-            dim_feedforward
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert (
+            config.encoder_attention_heads > 0
+        ), "Expected encoder_attention_heads to be greater than 0, " "but recieved {}".format(
+            config.encoder_attention_heads
+        )
+        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+            config.encoder_ffn_dim
         )
 
-        attn_dropout = dropout if attn_dropout is None else attn_dropout
-        act_dropout = dropout if act_dropout is None else act_dropout
-
-        self.self_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
+        attention_dropout = config.dropout if config.attention_dropout is None else config.attention_dropout
+        activation_dropout = config.dropout if config.activation_dropout is None else config.activation_dropout
+        self.self_attn = nn.MultiHeadAttention(
+            config.d_model, config.encoder_attention_heads, dropout=attention_dropout, bias_attr=config.use_bias
+        )
         self.glu = GLU(
-            d_model,
-            dim_feedforward,
-            act_dropout,
-            dropout,
-            activation,
-            bias_attr=bias_attr,
+            config.d_model,
+            config.encoder_ffn_dim,
+            activation_dropout,
+            config.dropout,
+            config.activation_function,
+            use_bias=config.use_bias,
         )
 
-        self.pre_self_attn_layer_norm = nn.LayerNorm(d_model)
-        self.self_attn_layer_norm = nn.LayerNorm(d_model)
-        self.dropout1 = nn.Dropout(dropout)
+        self.pre_self_attn_layer_norm = nn.LayerNorm(config.d_model)
+        self.self_attn_layer_norm = nn.LayerNorm(config.d_model)
+        self.dropout1 = nn.Dropout(config.dropout)
 
     def forward(self, src, src_mask=None):
         src_mask = _convert_attention_mask(src_mask, src.dtype)
@@ -321,47 +224,18 @@ class DalleBartEncoder(DalleBartPretrainedModel):
     The Encoder of DalleBartModel. The arguments of DalleBartEncoder can see :class:`DalleBartModel`.
     """
 
-    def __init__(
-        self,
-        d_model=1024,
-        nhead=16,
-        dim_feedforward=2730,
-        max_text_length=64,
-        text_vocab_size=50264,
-        text_pad_token_id=1,
-        encoder_layers=12,
-        dropout=0.0,
-        activation="gelu",
-        attn_dropout=None,
-        act_dropout=None,
-        bias_attr=False,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.text_vocab_size = text_vocab_size
-        self.embed_tokens = nn.Embedding(text_vocab_size, d_model)
-        self.embed_positions = DalleBartLearnedPositionalEmbedding(max_text_length, d_model)
+    def __init__(self, config: DalleBartConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.vocab_size = config.vocab_size
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
+        self.embed_positions = DalleBartLearnedPositionalEmbedding(config.max_text_length, config.d_model)
 
-        self.layers = nn.LayerList(
-            [
-                DalleBartEncoderLayer(
-                    d_model,
-                    nhead,
-                    dim_feedforward,
-                    dropout,
-                    activation,
-                    attn_dropout,
-                    act_dropout,
-                    bias_attr,
-                )
-                for _ in range(encoder_layers)
-            ]
-        )
-        self.layernorm_embedding = nn.LayerNorm(d_model)
-        self.final_ln = nn.LayerNorm(d_model)
-        self.embedding_dropout = nn.Dropout(dropout)
-        self.text_pad_token_id = text_pad_token_id
+        self.layers = nn.LayerList([DalleBartEncoderLayer(config) for _ in range(config.num_encoder_layers)])
+        self.layernorm_embedding = nn.LayerNorm(config.d_model)
+        self.final_ln = nn.LayerNorm(config.d_model)
+        self.embedding_dropout = nn.Dropout(config.dropout)
+        self.text_pad_token_id = config.text_pad_token_id
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None, **kwargs):
@@ -407,47 +281,45 @@ class DalleBartDecoderLayer(nn.Layer):
     The Decoder Layer of DalleBartDecoder. The arguments of DalleBartDecoderLayer can see :class:`DalleBartDecoder`.
     """
 
-    def __init__(
-        self,
-        d_model=1024,
-        nhead=16,
-        dim_feedforward=2730,
-        dropout=0.0,
-        activation="gelu",
-        attn_dropout=None,
-        act_dropout=None,
-        bias_attr=False,
-    ):
+    def __init__(self, config: DalleBartConfig):
         super().__init__()
 
-        assert d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(d_model)
-        assert nhead > 0, "Expected nhead to be greater than 0, " "but recieved {}".format(nhead)
-        assert dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
-            dim_feedforward
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert (
+            config.decoder_attention_heads > 0
+        ), "Expected decoder_attention_heads to be greater than 0, " "but recieved {}".format(
+            config.decoder_attention_heads
+        )
+        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+            config.decoder_ffn_dim
         )
 
-        attn_dropout = dropout if attn_dropout is None else attn_dropout
-        act_dropout = dropout if act_dropout is None else act_dropout
+        attention_dropout = config.dropout if config.attention_dropout is None else config.attention_dropout
+        activation_dropout = config.dropout if config.activation_dropout is None else config.activation_dropout
 
-        self.self_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
-        self.cross_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
+        self.self_attn = nn.MultiHeadAttention(
+            config.d_model, config.decoder_attention_heads, dropout=attention_dropout, bias_attr=config.use_bias
+        )
+        self.cross_attn = nn.MultiHeadAttention(
+            config.d_model, config.decoder_attention_heads, dropout=attention_dropout, bias_attr=config.use_bias
+        )
 
         self.glu = GLU(
-            d_model,
-            dim_feedforward,
-            act_dropout,
-            dropout,
-            activation,
-            bias_attr=bias_attr,
+            config.d_model,
+            config.decoder_ffn_dim,
+            activation_dropout,
+            config.dropout,
+            config.activation_function,
+            use_bias=config.use_bias,
         )
 
-        self.pre_self_attn_layer_norm = nn.LayerNorm(d_model)
-        self.self_attn_layer_norm = nn.LayerNorm(d_model)
-        self.pre_cross_attn_layer_norm = nn.LayerNorm(d_model)
-        self.cross_attn_layer_norm = nn.LayerNorm(d_model)
+        self.pre_self_attn_layer_norm = nn.LayerNorm(config.d_model)
+        self.self_attn_layer_norm = nn.LayerNorm(config.d_model)
+        self.pre_cross_attn_layer_norm = nn.LayerNorm(config.d_model)
+        self.cross_attn_layer_norm = nn.LayerNorm(config.d_model)
 
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
+        self.dropout1 = nn.Dropout(config.dropout)
+        self.dropout2 = nn.Dropout(config.dropout)
 
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
 
@@ -494,44 +366,16 @@ class DalleBartDecoder(DalleBartPretrainedModel):
     The Decoder of DalleBartModel. The arguments of DalleBartDecoder can see :class:`DalleBartModel`.
     """
 
-    def __init__(
-        self,
-        d_model=1024,
-        nhead=16,
-        dim_feedforward=2730,
-        image_vocab_size=16384,
-        max_image_length=256,
-        decoder_layers=12,
-        dropout=0.0,
-        activation="gelu",
-        attn_dropout=None,
-        act_dropout=None,
-        bias_attr=False,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.embed_tokens = nn.Embedding(image_vocab_size + 1, d_model)
+    def __init__(self, config: DalleBartConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.embed_tokens = nn.Embedding(config.image_vocab_size + 1, config.d_model)
 
-        self.embed_positions = DalleBartLearnedPositionalEmbedding(max_image_length, d_model)
-        self.layers = nn.LayerList(
-            [
-                DalleBartDecoderLayer(
-                    d_model,
-                    nhead,
-                    dim_feedforward,
-                    dropout,
-                    activation,
-                    attn_dropout,
-                    act_dropout,
-                    bias_attr,
-                )
-                for _ in range(decoder_layers)
-            ]
-        )
-        self.layernorm_embedding = nn.LayerNorm(d_model)
-        self.dropout = nn.Dropout(dropout)
-        self.final_ln = nn.LayerNorm(d_model)
+        self.embed_positions = DalleBartLearnedPositionalEmbedding(config.max_image_length, config.d_model)
+        self.layers = nn.LayerList([DalleBartDecoderLayer(config) for _ in range(config.num_decoder_layers)])
+        self.layernorm_embedding = nn.LayerNorm(config.d_model)
+        self.dropout = nn.Dropout(config.dropout)
+        self.final_ln = nn.LayerNorm(config.d_model)
         self.apply(self.init_weights)
 
     def forward(
@@ -612,139 +456,22 @@ class DalleBartDecoder(DalleBartPretrainedModel):
 
 @register_base_model
 class DalleBartModel(DalleBartPretrainedModel):
-    r"""
-    The bare DalleBart Model outputting raw hidden-states.
-    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
-    Refer to the superclass documentation for the generic methods.
-    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
-    and refer to the Paddle documentation for all matter related to general usage and behavior.
-    Args:
-        text_vocab_size (int):
-            Vocabulary size of `inputs_ids` in `DalleBartModel`. Also is the vocab size of text token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `DalleBartModel`.
-        image_vocab_size (int):
-            Vocabulary size of `decoder_inputs_ids` in `DalleBartModel`. Also is the vocab size of image token embedding matrix.
-            Defines the number of different tokens that can be represented by the `decoder_inputs_ids` passed when calling `DalleBartModel`.
-        bos_token (int, optional):
-            The beginning of image sequence token that was used during pretraining.
-            Defaults to `16384`.
-        pad_token_id(int, optional):
-            The index of padding token in the image token vocabulary.
-            Defaults to `16384`.
-        eos_token (int, optional):
-            A special token representing the end of a image sequence.
-            Defaults to `16384`.
-        max_text_length (int, optional):
-            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text
-            input sequence. Defaults to `64`.
-        max_image_length (int, optional):
-            The maximum value of the dimensionality of image position encoding, which dictates the maximum supported length of the image
-            input sequence. Defaults to `256`.
-        decoder_start_token_id (int, optional):
-            The id indicating the start of decoding image sentence. Defaults to `16384`.
-        d_model (int, optional):
-            Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `1024`.
-        num_encoder_layers (int, optional):
-            Number of hidden layers in the :class:`DalleBartEncoder`. Defaults to `12`.
-        num_decoder_layers (int, optional):
-            Number of hidden layers in the :class:`DalleBartDecoder`. Defaults to `12`.
-        encoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the :class:`DalleBartEncoder`.
-            Defaults to `16`.
-        decoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the :class:`DalleBartDecoder`.
-            Defaults to `16`.
-        encoder_ffn_dim (int, optional):
-            Dimensionality of the Gated Linear Units (glu) layer in the encoder. Input tensors
-            to glu layers are firstly projected from `d_model` to `encoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `encoder_ffn_dim` is larger than `d_model`.
-            Defaults to `2730`.
-        decoder_ffn_dim (int, optional):
-            Dimensionality of the Gated Linear Units (glu) layer in the encoder. Input tensors
-            to glu layers are firstly projected from `d_model` to `decoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `decoder_ffn_dim` is larger than `d_model`.
-            Defaults to `2730`.
-        dropout (float, optional):
-            The dropout probability used in all fully connected layers (pre-process and post-process of MHA and FFN sub-layer)
-            in the encoders and decoders. Defaults to `0.`.
-        activation_function (str, optional):
-            The non-linear activation function in the glu layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"gelu"`.
-        attention_dropout (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers and decoder layers to drop some attention target.
-            Defaults to `0.`.
-        activation_dropout (float, optional):
-            The dropout probability used after glu activation in all encoder layers and decoder layers.
-            Defaults to `0.`.
-        use_bias (bool, optional):
-            Whether or not use bias in all linear layers. Defaults to `False`.
-        init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Default to `0.02`.
-    """
-
-    def __init__(
-        self,
-        text_vocab_size=50264,
-        image_vocab_size=16384,
-        bos_token_id=16384,
-        pad_token_id=16384,
-        eos_token_id=16384,
-        max_text_length=64,
-        max_image_length=256,
-        decoder_start_token_id=16384,
-        d_model=1024,
-        num_encoder_layers=12,
-        num_decoder_layers=12,
-        encoder_attention_heads=16,
-        decoder_attention_heads=16,
-        encoder_ffn_dim=2730,
-        decoder_ffn_dim=2730,
-        dropout=0.0,
-        activation_function="gelu",
-        attention_dropout=0.0,
-        activation_dropout=0.0,
-        use_bias=False,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.decoder_start_token_id = decoder_start_token_id
+    def __init__(self, config: DalleBartConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.decoder_start_token_id = config.decoder_start_token_id
         self.text_pad_token_id = 1  # encoder pad id must be 1
-        self.encoder = DalleBartEncoder(
-            d_model,
-            encoder_attention_heads,
-            encoder_ffn_dim,
-            max_text_length,
-            text_vocab_size,
-            self.text_pad_token_id,
-            num_encoder_layers,
-            dropout,
-            activation_function,
-            attention_dropout,
-            activation_dropout,
-            use_bias,
-            init_std,
-        )
+        self.encoder = DalleBartEncoder(config)
 
-        self.decoder = DalleBartDecoder(
-            d_model,
-            decoder_attention_heads,
-            decoder_ffn_dim,
-            image_vocab_size,
-            max_image_length,
-            num_decoder_layers,
-            dropout,
-            activation_function,
-            attention_dropout,
-            activation_dropout,
-            use_bias,
-            init_std,
-        )
+        self.decoder = DalleBartDecoder(config)
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.encoder.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.encoder.embed_tokens = value
 
     def get_encoder(self):
         return self.encoder
@@ -854,30 +581,36 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
     r"""
     DalleBart Model with a `language modeling` head on top.
     Args:
-        dallebart (:class:`DalleBartModel`):
-            An instance of DalleBartModel.
+        config (:class:`DalleBartConfig`):
+            An instance of DalleBartConfig used to construct DalleBartForConditionalGeneration.
     """
 
-    def __init__(self, dallebart):
-        super().__init__()
-        self.dallebart = dallebart
+    def __init__(self, config: DalleBartConfig):
+        super().__init__(config)
+        self.dallebart = DalleBartModel(config)
         self.lm_head = nn.Linear(
-            self.dallebart.config["d_model"],
-            self.dallebart.config["image_vocab_size"] + 1,
-            bias_attr=self.dallebart.config["use_bias"],
+            config.d_model,
+            config.image_vocab_size + 1,
+            bias_attr=config.use_bias,
         )
         # input_ids_uncond
         # [0, 2, 1, 1, 1,...,1]
         # attention_mask_uncond
         # [1, 1, 0, 0, 0,...,0]
-        input_ids_uncond = [0, 2] + [1] * (dallebart.config["max_text_length"] - 2)
-        attention_mask_uncond = [1, 1] + [0] * (dallebart.config["max_text_length"] - 2)
-        self.register_buffer(
-            "input_ids_uncond", paddle.to_tensor([input_ids_uncond], dtype="int64"), persistable=False
-        )
-        self.register_buffer(
-            "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
-        )
+        input_ids_uncond = [0, 2] + [1] * (config.max_text_length - 2)
+        attention_mask_uncond = [1, 1] + [0] * (config.max_text_length - 2)
+        if hasattr(self, "input_ids_uncond"):
+            self.input_ids_uncond = paddle.to_tensor([input_ids_uncond], dtype="int64")
+        else:
+            self.register_buffer(
+                "input_ids_uncond", paddle.to_tensor([input_ids_uncond], dtype="int64"), persistable=False
+            )
+        if hasattr(self, "attention_mask_uncond"):
+            self.attention_mask_uncond = paddle.to_tensor([attention_mask_uncond], dtype="int64")
+        else:
+            self.register_buffer(
+                "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
+            )
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -948,7 +681,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             return lm_logits
 
     def prepare_decoder_input_ids_from_labels(self, labels):
-        return shift_tokens_right(labels, self.dallebart.config["decoder_start_token_id"])
+        return shift_tokens_right(labels, self.config.decoder_start_token_id)
 
     def prepare_inputs_for_generation(
         self,
@@ -1477,7 +1210,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                 return getattr(getattr(self, self.base_model_prefix), name)
             except AttributeError:
                 try:
-                    return getattr(self, self.base_model_prefix).config[name]
+                    return getattr(self, self.base_model_prefix).config.name
                 except KeyError:
                     raise e
 
@@ -1659,8 +1392,8 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
             An instance of DalleBartModel.
     """
 
-    def __init__(self, dallebart):
-        super().__init__(dallebart)
+    def __init__(self, config: DalleBartConfig()):
+        super().__init__(config)
         logger.warning(
             f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
             "Please Refer to PPDiffusers for Text-to-Image Capabilities"

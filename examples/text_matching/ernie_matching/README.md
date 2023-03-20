@@ -55,7 +55,7 @@ python -u -m paddle.distributed.launch --gpus "0" train_pointwise.py \
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
-* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
+* `device`: 选用什么设备进行训练，可选cpu、gpu或npu。如使用gpu训练则参数gpus指定GPU卡号。
 
 代码示例中使用的预训练模型是 ERNIE-Gram，如果想要使用其他预训练模型如 ERNIE, BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 

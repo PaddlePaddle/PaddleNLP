@@ -19,10 +19,10 @@ export cudaid1=$2
 export cudaid2=$3
 export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-if [ ! -d "model_logs" ];then 
+if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
-if [ ! -d "unittest_logs" ];then 
+if [ ! -d "unittest_logs" ];then
     mkdir model_logs
 fi
 
@@ -119,9 +119,12 @@ print_info $? glue_${TASK_NAME}_train
 # 4 bert
 bert() {
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-cd ${nlp_dir}/model_zoo/bert/
-wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
-tar -xzvf bert.tar.gz
+# cd ${nlp_dir}/model_zoo/bert/
+# wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
+# tar -xzvf bert.tar.gz
+cd ${nlp_dir}/model_zoo/bert/data/
+wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
+cd ../
 # pretrain
 time (python -m paddle.distributed.launch run_pretrain.py \
     --model_type bert \
@@ -132,7 +135,7 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --input_dir bert/ \
+    --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
     --save_steps 1 \
@@ -140,12 +143,12 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --device gpu \
     --use_amp False >${log_path}/bert_pretrain) >>${log_path}/bert_pretrain 2>&1
 print_info $? bert_pretrain
-time (python -m paddle.distributed.launch run_glue.py \
-    --model_type bert \
+time (python -m paddle.distributed.launch run_glue_trainer.py \
     --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
+    --per_device_eval_batch_size 32   \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
@@ -153,20 +156,15 @@ time (python -m paddle.distributed.launch run_glue.py \
     --max_steps 1 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
+    --fp16 False\
+    --do_train \
+    --do_eval >${log_path}/bert_fintune) >>${log_path}/bert_fintune 2>&1
 print_info $? bert_fintune
 time (python -u ./export_model.py \
     --model_type bert \
     --model_path bert-base-uncased \
     --output_path ./infer_model/model >${log_path}/bert_export) >>${log_path}/bert_export 2>&1
 print_info $? bert_export
-time (python -u ./predict_glue.py \
-    --task_name SST2 \
-    --model_type bert \
-    --model_path ./infer_model/model \
-    --batch_size 32 \
-    --max_seq_length 128 >${log_path}/bert_predict) >>${log_path}/bert_predict 2>&1
-print_info $? bert_predict
  }
 # 5 skep (max save 不可控 内置)
 skep () {
@@ -182,13 +180,13 @@ print_info $? skep_train_aspect
 time ( python -m paddle.distributed.launch train_opinion.py  --batch_size 4 --epochs 1 --device gpu --save_dir ./opinion_checkpoints >${log_path}/skep_train_opinion) >>${log_path}/skep_train_opinion 2>&1
 print_info $? skep_train_opinion
 # predict_sentence
-time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --params_path checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
+time (python predict_sentence.py --model_name "skep_ernie_1.0_large_ch"  --ckpt_dir checkpoints/model_100 >${log_path}/skep_predict_sentence) >>${log_path}/skep_predict_sentence 2>&1
 print_info $? skep_predict_sentence
 ## predict_aspect
-time (python predict_aspect.py --device 'gpu' --params_path ./aspect_checkpoint/model_100/model_state.pdparams  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
+time (python predict_aspect.py --device 'gpu' --ckpt_dir ./aspect_checkpoints/model_100  >${log_path}/skep_predict_aspect) >>${log_path}/skep_predict_aspect 2>&1
 print_info $? skep_predict_aspect
 # # predict_opinion
-time (python predict_opinion.py --device 'gpu' --params_path ./opinion_checkpoints/model_100/model_state.pdparams >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
+time (python predict_opinion.py --device 'gpu' --ckpt_dir ./opinion_checkpoints/model_100 >${log_path}/skep_predict_opinion) >>${log_path}/skep_predict_opinion 2>&1
 print_info $? skep_predict_opinion
 }
 # 6 bigbird
@@ -236,7 +234,7 @@ fast_gpt(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 cd ${nlp_dir}/paddlenlp/ops
 export CC=/usr/local/gcc-8.2/bin/gcc
@@ -332,53 +330,81 @@ print_info $? fast_generation_gpt
 }
 # 9 ernie-1.0
 ernie-1.0 (){
+#data process
+cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
+sed -i "s/python3/python/g" Makefile
+sed -i "s/python-config/python3.7m-config/g" Makefile
+export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-if [ ! -f 'test.py' ];then
-    echo '模型测试文件不存在！'
-    #data process
-    cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-    sed -i "s/python3/python/g" Makefile
-    sed -i "s/python-config/python3.7m-config/g" Makefile
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    cd ${nlp_dir}/model_zoo/ernie-1.0/
-    mkdir data && cd data
-    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
-    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
-    cd ../
-    # pretrain
-    python -u  -m paddle.distributed.launch \
-        --log_dir "./log" \
-        run_pretrain_static.py \
-        --model_type "ernie" \
-        --model_name_or_path "ernie-1.0-base-zh " \
-        --input_dir "./data/" \
-        --output_dir "./output/" \
-        --max_seq_len 512 \
-        --micro_batch_size 16 \
-        --global_batch_size 32 \
-        --sharding_degree 1 \
-        --dp_degree 2 \
-        --use_sharding false \
-        --use_amp true \
-        --use_recompute false \
-        --max_lr 0.0001 \
-        --min_lr 0.00001 \
-        --max_steps 40 \
-        --save_steps 20 \
-        --checkpoint_steps 5000 \
-        --decay_steps 3960000 \
-        --weight_decay 0.01 \
-        --warmup_rate 0.0025 \
-        --grad_clip 1.0 \
-        --logging_freq 20\
-        --num_workers 2 \
-        --eval_freq 1000 \
-        --device "gpu" >${log_path}/ernie_pretrain >>${log_path}/ernie_pretrain 2>&1
-    print_info $? ernie_pretrain
-else 
-    python -m pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
-    print_info $? ernie-1.0
-fi
+mkdir data && cd data
+wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
+wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
+cd ../
+mkdir data_ernie_3.0 && cd data_ernie_3.0
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
+cd ../
+# pretrain_trainer
+python -u -m paddle.distributed.launch \
+    --log_dir "output/trainer_log" \
+    run_pretrain_trainer.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-3.0-base-zh" \
+    --tokenizer_name_or_path "ernie-3.0-base-zh" \
+    --input_dir "./data_ernie_3.0" \
+    --output_dir "output/trainer_log" \
+    --split 949,50,1 \
+    --max_seq_length 512 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 32 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 2 \
+    --save_steps 2\
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1\
+    --dataloader_num_workers 4 \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --device "gpu" >${log_path}/ernie_1.0_pretrain_trainer >>${log_path}/ernie_1.0_pretrain_trainer 2>&1
+    print_info $? ernie_1.0_pretrain_trainer
+# pretrain_static
+python -u -m paddle.distributed.launch \
+    --log_dir "./log" \
+    run_pretrain_static.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
+    --input_dir "./data/" \
+    --output_dir "./output/" \
+    --max_seq_len 512 \
+    --micro_batch_size 16 \
+    --global_batch_size 32 \
+    --sharding_degree 1 \
+    --dp_degree 2 \
+    --use_sharding false \
+    --use_amp true \
+    --use_recompute false \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 4 \
+    --save_steps 2 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3960000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.0025 \
+    --grad_clip 1.0 \
+    --logging_freq 2\
+    --num_workers 2 \
+    --eval_freq 1000 \
+    --device "gpu" >${log_path}/ernie_1.0_pretrain_static >>${log_path}/ernie_1.0_pretrain_static 2>&1
+    print_info $? ernie_1.0_pretrain_static
 }
 # 10 xlnet
 xlnet(){
@@ -717,7 +743,7 @@ fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 export CC=/usr/local/gcc-8.2/bin/gcc
 export CXX=/usr/local/gcc-8.2/bin/g++
@@ -858,7 +884,9 @@ print_info $? ernie-doc_dureader_robust
 #26 transformer-xl
 transformer-xl (){
 cd ${nlp_dir}/examples/language_model/transformer-xl/
-cp -r /ssd1/paddlenlp/download/transformer-xl/* ./
+mkdir gen_data && cd gen_data
+wget https://paddle-qa.bj.bcebos.com/paddlenlp/enwik8.tar.gz && tar -zxvf enwik8.tar.gz
+cd ../
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 time (sed -i 's/print_step: 100/print_step: 1/g' configs/enwik8.yaml
 sed -i 's/save_step: 10000/save_step: 3/g' configs/enwik8.yaml
@@ -969,6 +997,7 @@ if [ ! -f 'test.py' ];then
         --do_train \
         --do_eval \
         --do_export \
+        --device gpu \
         --task_type cross-lingual-transfer \
         --model_name_or_path __internal_testing__/ernie-m \
         --use_test_data True \
@@ -982,17 +1011,12 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_clt >>${log_path}/ernie-m_clt 2>&1
     print_info $? ernie-m_clt
-    # inference for cross-lingual-transfer
-    python deploy/predictor/inference.py \
-        --device cpu \
-        --task_name seq_cls \
-        --model_path output_clt/export/model >${log_path}/ernie-m_clt_infer >>${log_path}/ernie-m_clt_infer 2>&1
-    print_info $? ernie-m_clt_infer
     # finetuned for translate-train-all
     python -m paddle.distributed.launch --log_dir output_tta run_classifier.py \
         --do_train \
         --do_eval \
         --do_export \
+        --device gpu \
         --task_type translate-train-all \
         --model_name_or_path __internal_testing__/ernie-m \
         --use_test_data True \
@@ -1006,13 +1030,7 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_tta >>${log_path}/ernie-m_tta 2>&1
     print_info $? ernie-m_tta
-    # inference for translate-train-all
-    python deploy/predictor/inference.py \
-        --device cpu \
-        --task_name seq_cls \
-        --model_path output_tta/export/model >${log_path}/ernie-m_tta_infer >>${log_path}/ernie-m_tta_infer 2>&1
-    print_info $? ernie-m_tta_infer
-else 
+else
     python -m pytest ${nlp_dir}/tests/model_zoo/test_ernie_m.py >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
     print_info $? ernie-m
 fi
@@ -1111,7 +1129,7 @@ taskflow (){
 cd ${nlp_dir}
 python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
 print_info $? taskflow_unittest
-python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
+python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
 transformers(){
@@ -1189,14 +1207,14 @@ ernie-health(){
 cd ${nlp_dir}/tests/model_zoo/
 if [ ! -f 'test_ernie-health.py' ];then
     echo '模型测试文件不存在！'
-else 
+else
     python -m pytest tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health_unittest>>${log_path}/ernie-health_unittest 2>&1
     print_info $? tests ernie-health_unittest
 fi
 }
 uie(){
 cd ${nlp_dir}/model_zoo/uie/
-mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json
+mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json && cd ../
 python doccano.py --doccano_file ./data/doccano_ext.json --task_type ext --save_dir ./data --splits 0.8 0.2 0 --schema_lang ch >${log_path}/uie_doccano>>${log_path}/uie_doccano 2>&1
 print_info $? uie_doccano
 python -u -m paddle.distributed.launch finetune.py --device gpu --logging_steps 2 --save_steps 2 --eval_steps 2 --seed 42 \
@@ -1210,7 +1228,7 @@ python evaluate.py --model_path ./checkpoint/model_best --test_path ./data/dev.t
 print_info $? uie_eval
 }
 ernie-layout(){
-cd ${nlp_dir}/model_zoo/ernie-layout/  
+cd ${nlp_dir}/model_zoo/ernie-layout/
 # train ner
 python -u run_ner.py --model_name_or_path ernie-layoutx-base-uncased --output_dir ./ernie-layoutx-base-uncased/models/funsd/ \
     --dataset_name funsd --do_train --do_eval --max_steps 2 --eval_steps 2 --save_steps 2 --save_total_limit 1 --seed 1000 --overwrite_output_dir \

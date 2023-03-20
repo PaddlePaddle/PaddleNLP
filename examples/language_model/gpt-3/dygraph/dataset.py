@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 import os
+import time
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.utils.log import logger
+from paddle.io import DataLoader  # , Dataset
+
+from paddlenlp.data import Stack, Tuple
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.utils.log import logger
 
 
 def construct_samples_and_shuffle_data(
@@ -85,7 +86,7 @@ def construct_samples_and_shuffle_data(
             assert doc_idx.dtype == np.int32
             assert sizes.dtype == np.int32
 
-            import data_tools.helpers as helpers
+            from tool_helpers import helpers
 
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch)
             # sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
@@ -125,7 +126,7 @@ def construct_samples_and_shuffle_data(
                 try:
                     np.load(shuffle_idx_filename, allow_pickle=True, mmap_mode="r")
                     break
-                except Exception as e:
+                except Exception:
                     print("%s file is still writing or damaged, please wait a moment." % shuffle_idx_filename)
                     time.sleep(3)
 
@@ -171,6 +172,7 @@ def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
         # The documents repeat num_epochs times.
         doc_idx = doc_idx.reshape(-1)
         doc_idx = doc_idx.astype(np.int32)
+        np_rng.shuffle(doc_idx)
         return doc_idx
 
     doc_idx_first = _build_doc_idx(documents, num_epochs - 1, np_rng, False)
@@ -265,39 +267,14 @@ def create_pretrained_dataset(
     max_seq_len=1024,
     places=None,
     data_holders=None,
+    current_step=0,
+    old_version_accumulate_compatible=False,  # FIXME @ZHUI delete it later.
 ):
-    if local_rank == 0:
-        try:
-            import data_tools.helpers as helpers
-        except Exception as e:
-            start_time = time.time()
-            print("> compiling dataset index builder ...")
-            from data_tools.dataset_utils import compile_helper
-
-            compile_helper()
-            print(
-                ">>> done with dataset index builder. Compilation time: {:.3f} "
-                "seconds".format(time.time() - start_time),
-                flush=True,
-            )
-
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
 
-    if device_world_size > 1 and local_rank != 0:
-        while True:
-            try:
-                import data_tools.helpers as helpers
-
-                break
-            except Exception as e:
-                print("> wait for helpers to be compiled!")
-                time.sleep(1)
-
     logger.info(
-        "The distributed run, total device num:{}, distinct dataflow num:{}.".format(
-            device_world_size, data_world_size
-        )
+        f"The distributed run, total device num:{device_world_size}, distinct dataflow num:{device_world_size}, data rank {device_world_rank}"
     )
 
     assert len(input_path) == 1, "GPT only support one dataset for now."
@@ -312,7 +289,7 @@ def create_pretrained_dataset(
     else:
         for suffix in ["_ids.npy", "_idx.npz"]:
             if not os.path.isfile(input_prefix + suffix):
-                raise ValueError("File Not found, %s" % (path + suffix))
+                raise ValueError("File Not found, %s" % (input_prefix + suffix))
 
         sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
         # All documment ids, extend as 1-D array.
@@ -328,7 +305,7 @@ def create_pretrained_dataset(
         splits[-1],
     )
 
-    def build_dataset(index, name, num_samples):
+    def build_dataset(index, name, num_samples, consumed_samples=0):
         dataset = GPTDataset(
             file_path=input_prefix,
             build_data_file=local_rank == 0,
@@ -344,11 +321,12 @@ def create_pretrained_dataset(
 
         batch_sampler = DistributedBatchSampler(
             dataset,
-            batch_size=args.local_batch_size,
+            batch_size=args.micro_batch_size if not old_version_accumulate_compatible else args.local_batch_size,
             num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
             drop_last=True,
+            consumed_samples=consumed_samples,
         )
 
         data_loader = DataLoader(
@@ -366,12 +344,25 @@ def create_pretrained_dataset(
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_data_loader = build_dataset(0, "train", args.local_batch_size * args.max_steps * data_world_size)
+    train_data_loader = build_dataset(
+        0,
+        "train",
+        args.local_batch_size * args.max_steps * data_world_size,
+        consumed_samples=args.global_batch_size * current_step,
+    )
 
     valid_data_loader = build_dataset(
-        1, "valid", args.local_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size
+        1,
+        "valid",
+        args.local_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+        args.local_batch_size * ((current_step + 1) // args.eval_freq) * args.eval_iters * data_world_size,
     )
-    test_data_loader = build_dataset(2, "test", args.local_batch_size * args.test_iters * data_world_size)
+    test_data_loader = build_dataset(
+        2,
+        "test",
+        args.local_batch_size * args.test_iters * data_world_size,
+        0,
+    )
 
     return train_data_loader, valid_data_loader, test_data_loader
 
@@ -419,7 +410,7 @@ class GPTDataset(paddle.io.Dataset):
 
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
-        loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
+        loss_mask[tokens == self.eos_id] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # attention_mask = (attention_mask - 1.0) * 1e9

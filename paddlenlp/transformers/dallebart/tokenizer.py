@@ -22,7 +22,8 @@ import re
 from pathlib import Path
 
 from paddle.utils import try_import
-from ...transformers import GPTTokenizer, AddedToken
+
+from ...transformers import AddedToken, GPTTokenizer
 
 __all__ = ["DalleBartTokenizer"]
 
@@ -399,7 +400,7 @@ class DalleBartTokenizer(GPTTokenizer):
         self._wiki_word_frequency_file = wiki_word_frequency_file
         if self.normalize_text:
             self.text_processor = TextNormalizer(wiki_word_frequency_file)
-        super().__init__(vocab_file, merges_file, errors, max_len, pad_token, eos_token, unk_token)
+        super().__init__(vocab_file, merges_file, errors, max_len, pad_token, eos_token, unk_token, **kwargs)
 
     def _bpe_encode(self, text):
         bpe_tokens = []
@@ -471,8 +472,13 @@ class DalleBartTokenizer(GPTTokenizer):
             is_batched = isinstance(text, (list, tuple))
             if is_batched:
                 text = [self.text_processor(t) for t in text]
+                if text_pair:
+                    text_pair = [self.text_processor(t) for t in text_pair]
             else:
                 text = self.text_processor(text)
+                if text_pair:
+                    text_pair = self.text_processor(text_pair)
+
         return super().__call__(
             text,
             text_pair,

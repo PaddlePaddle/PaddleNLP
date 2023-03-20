@@ -14,12 +14,12 @@
 
 import copy
 import random
+import signal
 
 import pymysql
-import signal
 import sqlparse
-from sqlparse import tokens as token_types
 from sqlparse import sql as sql_types
+from sqlparse import tokens as token_types
 
 from . import util
 from .snippets import Snippet
@@ -266,7 +266,7 @@ def get_all_in_parens(sequence):
     if sequence[-1] == ";":
         sequence = sequence[:-1]
 
-    if not "(" in sequence:
+    if "(" not in sequence:
         return []
 
     if sequence[0] == "(" and sequence[-1] == ")":
@@ -414,7 +414,7 @@ def execution_results(query, username, password, timeout=3):
         except pymysql.err.InternalError:
             semantic = False
             cursor.close()
-        except Exception as e:
+        except Exception:
             signal.alarm(0)
         signal.alarm(0)
         cursor.close()
