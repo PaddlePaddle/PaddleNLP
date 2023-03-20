@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import tempfile
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
@@ -64,9 +65,11 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
+    ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
     fn_args_to_dict,
+    is_paddle_support_lazy_init,
     resolve_cache_dir,
 )
 
@@ -77,8 +80,49 @@ __all__ = [
 
 
 def unwrap_model(model, *args, **kwargs):
-    raw_model = model._layers if isinstance(model, paddle.DataParallel) else model
+    raw_model = model
+    while hasattr(raw_model, "_layers") or hasattr(raw_model, "_layer"):
+        if hasattr(raw_model, "_layers"):
+            # Caused by issue https://github.com/PaddlePaddle/PaddleNLP/issues/5295
+            # TODO: remove this after we fix the issue
+            if raw_model._layers is None:
+                break
+            raw_model = raw_model._layers
+        else:
+            if raw_model._layer is None:
+                break
+            raw_model = raw_model._layer
+
     return raw_model
+
+
+def _add_variant(weights_name: str, variant=None) -> str:
+    if variant is not None and len(variant) > 0:
+        splits = weights_name.split(".")
+        splits = splits[:-1] + [variant] + splits[-1:]
+        weights_name = ".".join(splits)
+
+    return weights_name
+
+
+_init_weights = True
+
+
+@contextmanager
+def no_init_weights(_enable=True):
+    """
+    Context manager to globally disable weight initialization to speed up loading large models.
+
+    TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
+    """
+    global _init_weights
+    old_init_weights = _init_weights
+    if _enable:
+        _init_weights = False
+    try:
+        yield
+    finally:
+        _init_weights = old_init_weights
 
 
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
@@ -995,6 +1039,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             str: the model weight file path
         """
+        # -1. when it's from HF
+        if from_hf_hub:
+            return resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path,
+                cache_dir=cache_dir,
+                support_conversion=support_conversion,
+                subfolder=subfolder,
+            )
 
         # 0. when it is local file
         if os.path.isfile(pretrained_model_name_or_path):
@@ -1050,16 +1102,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
 
-        # 4. when it's from HF
-        if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                support_conversion=support_conversion,
-                subfolder=subfolder,
-            )
-
-        # 5. download from community or hf-hub
+        # 4. download from community or hf-hub
         else:
             # assume that the community-based models, name format: community/model-name
             community_model_file_path = "/".join(
@@ -1071,6 +1114,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if url_file_exists(community_model_file_path):
                 return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
+            # 5. Final ERROR
             logger.warning(
                 f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
@@ -1106,8 +1150,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Tuple[List[str]]: _description_
         """
-
         model_state_dict = model.state_dict()
+
         expected_keys = list(model_state_dict.keys())
         prefix = model.base_model_prefix
 
@@ -1217,7 +1261,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                if isinstance(state_dict[key], np.ndarray):
+                    state_dict[key] = state_dict[key].astype(dtype=dtype)
+                else:
+                    state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:
             dtype_prefix_len = len("paddle.")
             for k, v in model_to_load.state_dict().items():
@@ -1310,6 +1357,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", None)
+
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1355,11 +1411,21 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
         else:
             # 4. loading the state dict
-            model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+            if config.tensor_parallel_degree > 1:
+                if model_weight_file.endswith("model_state.pdparams"):
+                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
+            else:
+                model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
         # 3. init the model
         init_args = config["init_args"] or ()
-        model = cls(config, *init_args, **model_kwargs)
+        with ContextManagers(init_contexts):
+            model = cls(config, *init_args, **model_kwargs)
+
+        if config.tensor_parallel_degree > 1:
+            model.resource_files_names["model_state"] = _add_variant(
+                model.resource_files_names["model_state"], f"tp{config.tensor_parallel_rank:0>2d}"
+            )
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343

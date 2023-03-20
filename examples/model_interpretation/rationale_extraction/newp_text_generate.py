@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import re
-import math
-import numpy as np
 import argparse
+import json
+import math
 import os
-import sys
 
 
 def get_args():
@@ -47,7 +44,6 @@ def generate_for_senti(args, evid_dict, ratio):
     r = {}
     ex_r = {}
 
-    raw_text = evid_dict["context"]
     label = evid_dict["pred_label"]
     char_attri = list(evid_dict["char_attri"].keys())
     length = len(char_attri)
@@ -100,7 +96,6 @@ def generate_for_similarity(args, evid_dict, ratio):
 
     label = evid_dict["pred_label"]
     # query
-    q_text = evid_dict["query"]
     q_char_attri = list(evid_dict["query_char_attri"].keys())
     q_length = len(q_char_attri)
 
@@ -128,7 +123,6 @@ def generate_for_similarity(args, evid_dict, ratio):
         q_topR_noRtext = "['UNK']"
 
     # title
-    t_text = evid_dict["title"]
     t_char_attri = list(evid_dict["title_char_attri"].keys())
     t_length = len(t_char_attri)
 
@@ -182,7 +176,6 @@ def generate_for_similarity(args, evid_dict, ratio):
 
 def generate_for_MRC(args, evid_dict, ratio):
     id = evid_dict["id"]
-    raw_text = evid_dict["context"] + evid_dict["title"]
     question = evid_dict["question"]
     char_attri = list(evid_dict["char_attri"].keys())
     length = len(char_attri)

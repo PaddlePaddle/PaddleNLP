@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding=utf-8
 
 import sys
-
-sys.path.append("../../..")
-from paddlenlp.datasets import load_dataset
 from collections import defaultdict
+
 import spacy
+
+from paddlenlp.datasets import load_dataset
 
 if sys.argv[1] == "ch":
     train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])

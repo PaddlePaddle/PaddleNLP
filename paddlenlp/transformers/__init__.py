@@ -46,6 +46,7 @@ from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
 from .electra.configuration import *
+from .albert.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -60,6 +61,7 @@ from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
+from .blenderbot.configuration import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
 from .blip.modeling import *
@@ -90,6 +92,7 @@ from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
+from .ernie_gram.configuration import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
 from .ernie_layout.configuration import *
@@ -200,6 +203,7 @@ from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
+from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 from .glm.configuration import *

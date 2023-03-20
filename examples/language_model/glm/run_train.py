@@ -22,9 +22,11 @@ from utils import GLMTrainer, generate
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -56,6 +58,7 @@ class ModelArgument:
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -68,10 +71,47 @@ def main():
 
     paddle.set_device(training_args.device)
 
+    # Log on each process the small summary:
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
+    )
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
     # Load the pretrained language model.
     model = AutoModelForConditionalGeneration.from_pretrained(
-        model_args.model_name_or_path, output_predict=True, parallel_output=True
+        model_args.model_name_or_path,
+        output_predict=True,
+        parallel_output=True,
+        load_state_as_np=True,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
+    if model_args.lora:
+        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
+        model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model.generate = partial(
         generate,
@@ -128,7 +168,7 @@ def main():
     )
 
     if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=None)
+        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
         trainer.save_model()
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
@@ -137,10 +177,6 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
-
-    if training_args.do_export:
-        export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path=export_path)
 
 
 if __name__ == "__main__":

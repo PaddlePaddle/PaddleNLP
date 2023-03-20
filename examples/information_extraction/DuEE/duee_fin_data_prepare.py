@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """duee finance dataset proces"""
-import os
-import sys
 import json
-from utils import read_by_lines, write_by_lines, text_to_sents, cal_md5
+import os
+
+from utils import cal_md5, read_by_lines, text_to_sents, write_by_lines
 
 enum_role = "环节"
 
@@ -147,7 +147,7 @@ def marked_doc_2_sentence(doc):
     title = doc["title"]
     text = doc["text"]
     sents = text_to_sents(text)
-    exist_sents, sent_mapping_event, sents_order = set(), {}, []
+    sent_mapping_event, sents_order = {}, []
     step = 3
     batch_sents = [sents[i : i + step] for i in range(0, len(sents), step)]
     if len(title) > 0:
