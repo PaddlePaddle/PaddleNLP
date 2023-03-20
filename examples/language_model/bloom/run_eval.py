@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
 import time
 from pprint import pprint as print
@@ -25,24 +24,11 @@ import paddle
 from args import get_parser
 from configuration import BloomConfig
 from modeling import BloomForPretraining
-from paddle import LazyGuard
 from paddle.io import DataLoader
-from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.utils.log import logger
-
-paddle.set_default_dtype("float16")
-
-
-def pp():
-    import os
-
-    import psutil
-
-    p = psutil.Process(int(os.getpid()))
-    print("current memory: %dMB" % int(p.memory_info().rss / 1024 / 1024))
 
 
 def get_eval_parser():
@@ -58,7 +44,6 @@ def get_eval_parser():
         "--cloze_eval", action="store_true", help="Evaluation dataset from `--eval_path` is a cloze task."
     )
     parser.add_argument("--overlapping_eval", type=int, default=32, help="Sliding window for overlapping eval.")
-    parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.")
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument(
         "--seq_length", type=int, default=1024, help="Maximum sequence length to process for evaluation."
@@ -262,6 +247,7 @@ def create_eval_dataset(args):
 
 @paddle.no_grad()
 def do_generation(args):
+    paddle.set_default_dtype("float16")
     config = BloomConfig.from_pretrained(args.model_name_or_path)
 
     # Detecting last checkpoint.
@@ -270,17 +256,9 @@ def do_generation(args):
     config["use_recompute"] = args.use_recompute
     config["enable_fuse_transformer"] = False
     config["use_cache"] = True
-    config.use_pure_fp16 = False
+    config.use_pure_fp16 = True
 
-    with LazyGuard():
-        model = BloomForPretraining(config=config)
-
-    print("start to load state-dict")
-    state_dict = paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams"), return_numpy=True)
-    # if "bloom." not in list(state_dict.keys())[0]:
-    state_dict = {"bloom." + key: value for key, value in state_dict.items()}
-
-    model.set_state_dict(state_dict)
+    model = BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)
 
     eval_data_loader = create_eval_dataset(args)
     tic_eval = time.time()
@@ -295,17 +273,16 @@ def do_generation(args):
     score_name = "loss" if not args.cloze_eval else "number correct"
 
     with paddle.no_grad():
-        for step, batch in tqdm(enumerate(eval_data_loader)):
-            tokens, loss_mask, attention_mask, position_ids, labels = batch
+        for step, batch in enumerate(eval_data_loader):
+            tokens, loss_mask = batch[:2]
+            labels = batch[-1]
             with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype="float16"):
                 preds = model(tokens)
 
                 if not args.cloze_eval:
-                    print(f"close-eval preds<{preds.shape}>  \t labels<{labels.shape}>")
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
                     loss = paddle.sum(masked_lm_loss * loss_mask)
                     total_score += loss.numpy() / (args.num_tokenized_tokens - 1)
-                    raise ValueError("error ...")
                 else:
                     outputs = paddle.argmax(preds, -1)
                     acc = paddle.cast(outputs == labels, "float32")
@@ -336,7 +313,7 @@ def do_generation(args):
         string = " validation results on {} | ".format(args.eval_path)
         string += "number correct: {:.4E} | ".format(num_correct)
         string += "total examples: {:.4E} | ".format(args.num_examples)
-        string += "avg accuracy: {:.4E}".format(acc)
+    string += "avg accuracy: {:.4E}".format(acc)
     logger.info(string)
 
 

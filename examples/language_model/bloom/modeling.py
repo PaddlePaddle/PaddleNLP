@@ -49,25 +49,24 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output=True):
-    hcg = fleet.get_hybrid_communicate_group()
-    model_parallel_group = hcg.get_model_parallel_group()
-    mp_degree = hcg.get_model_parallel_world_size()
-    # rank = hcg.get_model_parallel_rank()
+def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True, mp_degree: int = 1):
     if mp_degree > 1:
-        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=True)
         if parallel_output:
             return logits
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        logits = paddle.matmul(x, y, transpose_y=True)
         return logits
 
 
-def finfo(dtype):
+def finfo(dtype: paddle.dtype):
     if dtype == paddle.bfloat16:
-
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
         class BFloatFInfo:
             min = -3.3895313892515355e38
 
@@ -441,7 +440,7 @@ class BloomAttention(nn.Layer):
         # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
-        input_dtype = attention_scores.dtype
+        input_dtype = query_layer.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
         if self.config.use_pure_fp16:
             with paddle.amp.auto_cast(False):
@@ -970,7 +969,9 @@ class BloomLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+        logits = parallel_matmul(
+            hidden_states, self.decoder_weight, parallel_output=False, mp_degree=self.config.mp_degree
+        )
         return logits
 
 
@@ -1034,7 +1035,12 @@ class BloomForPretraining(BloomPreTrainedModel):
         else:
             encoder_outputs = outputs
 
-        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight, parallel_output=False)
+        logits = parallel_matmul(
+            encoder_outputs[0],
+            self.bloom.word_embeddings.weight,
+            parallel_output=False,
+            mp_degree=self.config.mp_degree,
+        )
         if labels is None:
             return logits
 
@@ -1111,9 +1117,9 @@ class BloomForCausalLM(BloomPreTrainedModel):
         hidden_states = transformer_outputs[0]
 
         # TODO(wj-Mcat): to enable lm_head
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, mp_degree=self.config.mp_degree)
-
-        # lm_logits = paddle.matmul(hidden_states, self.bloom.word_embeddings.weight, transpose_y=True)
+        lm_logits = parallel_matmul(
+            hidden_states, self.bloom.word_embeddings.weight, parallel_output=False, mp_degree=self.config.mp_degree
+        )
 
         # lm_logits = self.lm_head(hidden_states)
 
