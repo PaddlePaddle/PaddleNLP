@@ -31,7 +31,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="cnn_dailymail", metadata={"help": "The name of task."})
+    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
@@ -131,10 +131,9 @@ def main():
     )
 
     # Load the dataset.
-    train_ds, dev_ds, test_ds = load_dataset(data_args.task_name, splits=["train", "dev", "test"])
+    train_ds, test_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
     trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
-    dev_ds = dev_ds.map(trans_func)
     test_ds = test_ds.map(trans_func)
 
     collate_fn = DefaultDataCollator()
@@ -160,7 +159,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=train_ds,
-        eval_dataset=dev_ds,
+        eval_dataset=None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         do_generation=True,
