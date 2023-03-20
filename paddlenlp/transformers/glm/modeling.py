@@ -788,10 +788,11 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         self,
         input_ids: Tensor,
         position_ids: Tensor = None,
-        attention_mask: Tensor = None,
+        generation_attention_mask: Tensor = None,
         cache: Tensor = None,
         **kwargs
     ):
+        attention_mask = generation_attention_mask
         seq_length = input_ids.shape[1]
         if cache:
             if position_ids is not None:
