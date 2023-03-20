@@ -131,10 +131,10 @@ def main():
     )
 
     # Load the dataset.
-    train_ds, test_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
+    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
     trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
-    test_ds = test_ds.map(trans_func)
+    test_ds = dev_ds.map(trans_func)
 
     collate_fn = DefaultDataCollator()
 
@@ -159,7 +159,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=train_ds,
-        eval_dataset=None,
+        eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         do_generation=True,
