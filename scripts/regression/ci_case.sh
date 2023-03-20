@@ -219,11 +219,10 @@ time (python -u ./run_pretrain.py \
     --output_dir ./pretrain_model/ \
     --max_predictions_per_seq 20 \
     --per_device_train_batch_size 2 \
-    --learning_rate 5e-4 \
+    --per_device_train_batch_size 2 \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --logging_steps 1 \
     --save_steps 1 \
     --max_steps 1 \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
@@ -233,8 +232,8 @@ time(python -u ./get_ft_model.py \
 print_info $? electra_get_ft_model
 time (python -m paddle.distributed.launch run_glue.py \
     --model_type electra \
-    --model_name_or_path  chinese-electra-small \
-    --task_name SST2 \
+    --model_name_or_path  ./pretrain_model/ \
+    --task_name SST-2 \
     --max_seq_length 128 \
     --per_device_train_batch_size 32   \
     --per_device_eval_batch_size 32   \
