@@ -678,26 +678,33 @@ class GLMModel(GLMPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.zeros([batch_size])
 
-        output = self.transformer(word_embeddings, position_ids, attention_mask, cache, return_dict)
-        if return_dict:
-            hidden_state = output.last_hidden_state
-        else:
-            hidden_state = output[0] if isinstance(output, tuple) else output
+        outputs = self.transformer(word_embeddings, position_ids, attention_mask, cache, return_dict)
 
         if self.output_predict:
+            if return_dict:
+                hidden_states = outputs.last_hidden_state
+            else:
+                hidden_states = outputs[0] if isinstance(outputs, tuple) else outputs
+
             if self.config.tensor_parallel_degree > 1:
                 # FIXME: @ZHUI fix for jit_to_static
-                logits = parallel_matmul(hidden_state, self.word_embeddings.weight, self.config.tensor_parallel_output)
+                logits = parallel_matmul(
+                    hidden_states, self.word_embeddings.weight, self.config.tensor_parallel_output
+                )
             else:
-                logits = F.linear(hidden_state, self.word_embeddings.weight.T)
+                logits = F.linear(hidden_states, self.word_embeddings.weight.T)
+
+            if not return_dict:
+                outputs = (logits,) + outputs[1:]
+                return outputs
 
             return CausalLMOutputWithCrossAttentions(
                 logits=logits,
-                past_key_values=output.past_key_values,
-                hidden_states=output.hidden_states,
+                past_key_values=outputs.past_key_values,
+                hidden_states=outputs.hidden_states,
             )
         else:
-            return output
+            return outputs
 
 
 class GLMForMultipleChoice(GLMPretrainedModel):
