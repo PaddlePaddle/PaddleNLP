@@ -225,6 +225,7 @@ time (python -u ./run_pretrain.py \
     --warmup_steps 10000 \
     --save_steps 1 \
     --max_steps 1 \
+    --do_train true \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
 time(python -u ./get_ft_model.py \

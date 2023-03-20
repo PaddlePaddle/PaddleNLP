@@ -171,6 +171,7 @@ def do_train():
     model = ElectraForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_labels=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
         model = paddle.DataParallel(model)
 
     num_training_steps = (
