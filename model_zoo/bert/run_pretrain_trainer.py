@@ -194,6 +194,7 @@ class PretrainingDataset(Dataset):
         # softmax_with_cross_entropy enforce last dim size equal 1
         masked_lm_labels = np.expand_dims(masked_lm_labels, axis=-1)
         next_sentence_labels = np.expand_dims(next_sentence_labels, axis=-1)
+
         return [input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels]
 
 
