@@ -11,49 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import distutils.util
-import os
 
-import fastdeploy as fd
 import numpy as np
+import paddle
+from configuration import BloomConfig
+from model_split_merge import merge_model_parallel
+from modeling import BloomForGeneration
 from transformers import AutoTokenizer
-
-# from utils import left_padding
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
-    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["gpu", "cpu"],
-        help="Type of inference device, support 'cpu' or 'gpu'.",
-    )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        default="paddle",
-        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
-        help="The inference runtime backend.",
-    )
+    parser.add_argument("--model_path", required=True, help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
-    parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
-    parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
-    parser.add_argument(
-        "--use_fast",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
     return parser.parse_args()
 
 
@@ -93,54 +65,44 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.runtime = self.create_fd_runtime(args)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+        self.model = self.create_model(args)
         self.batch_size = args.batch_size
-        self.max_length = args.max_length
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
-        option.set_model_path(model_path, params_path)
-        if args.device == "cpu":
-            option.use_cpu()
-            option.set_cpu_thread_num(args.cpu_threads)
-        else:
-            option.use_gpu(args.device_id)
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        else:
-            option.use_trt_backend()
-            if args.backend == "paddle_tensorrt":
-                option.use_paddle_infer_backend()
-                option.paddle_infer_option.collect_trt_shape = True
-                option.paddle_infer_option.enable_trt = True
-            trt_file = os.path.join(args.model_dir, "model.trt")
-            option.trt_option.set_shape(
-                "input_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
-            )
-            if args.use_fp16:
-                option.trt_option.enable_fp16 = True
-                trt_file = trt_file + ".fp16"
-            option.trt_option.serialize_file = trt_file
-        return fd.Runtime(option)
+    def create_model(self, args):
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+        config = BloomConfig.from_pretrained(args.model_path)
+
+        # Set the generaiton the hyperparameter
+        config.max_dec_len = 20
+        config.temperature = 0.5
+        config.decode_strateg = "sampling"
+        config.eos_token_id = tokenizer.eos_token_id
+        config.bos_token_id = tokenizer.bos_token_id
+        config.pad_token_id = tokenizer.pad_token_id
+        config.use_cache = True
+        config.top_k = 1
+        config.use_recompute = False
+
+        # Merge the model splits to a total model
+        merge_model_path = merge_model_parallel(args.model_path, config)
+
+        # Load the model and parameter
+        config.mp_degree = 1
+        model = BloomForGeneration.from_pretrained(merge_model_path, config=config)
+        model.eval()
+        return model
 
     def preprocess(self, input_text):
         inputs = self.tokenizer(input_text)
         inputs = left_padding(inputs, self.tokenizer.pad_token_id)
-        input_ids_name = self.runtime.get_input_info(0).name
         input_map = {
-            input_ids_name: np.array(inputs["input_ids"], dtype="int64"),
+            "input_ids": np.array(inputs["input_ids"], dtype="int64"),
         }
         return input_map
 
     def infer(self, input_map):
-        results = self.runtime.infer(input_map)
+        results = self.model(paddle.to_tensor(input_map["input_ids"]))
         return results
 
     def postprocess(self, infer_data):
