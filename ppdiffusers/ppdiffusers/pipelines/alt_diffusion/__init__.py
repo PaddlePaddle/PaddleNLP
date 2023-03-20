@@ -18,13 +18,13 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import numpy as np
-import PIL
+import PIL.Image
 
 from ...utils import BaseOutput, is_paddle_available, is_paddlenlp_available
 
 
 @dataclass
-# Copied from diffusers.pipelines.stable_diffusion.__init__.StableDiffusionPipelineOutput with Stable->Alt
+# Copied from ppdiffusers.pipelines.stable_diffusion.__init__.StableDiffusionPipelineOutput with Stable->Alt
 class AltDiffusionPipelineOutput(BaseOutput):
     """
     Output class for Alt Diffusion pipelines.

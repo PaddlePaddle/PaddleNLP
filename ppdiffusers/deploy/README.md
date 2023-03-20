@@ -72,7 +72,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fd_astronaut_rides_horse.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
 
@@ -121,7 +121,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fantasy_landscape.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
 
@@ -208,9 +208,10 @@ mask 图像为：
 | --device | 运行设备。默认为 `cpu`，可选列表：`['cpu', 'gpu', 'huawei_ascend_npu', 'kunlunxin_xpu']`。 |
 | --scheduler | StableDiffusion 模型的 scheduler。默认为 `'pndm'`。可选列表：`['pndm', 'euler_ancestral']`。|
 | --unet_model_prefix | UNet 模型前缀。默认为 `unet`。 |
-| --vae_model_prefix | VAE 模型前缀。默认为 `vae_decoder`。 |
+| --vae_decoder_model_prefix | VAE Decoder 模型前缀。默认为 `vae_decoder`。 |
+| --vae_encoder_model_prefix | VAE Encoder 模型前缀。默认为 `vae_encoder`。 |
 | --text_encoder_model_prefix | TextEncoder 模型前缀。默认为 `text_encoder`。 |
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `cat_on_bench_new.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |

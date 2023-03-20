@@ -194,7 +194,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
             loss = dists.sum(2).mean(0).sum() * clip_guidance_scale
         else:
             loss = spherical_dist_loss(image_embeddings_clip, text_embeddings_clip).mean() * clip_guidance_scale
-
+        # breakpoint()
         grads = -paddle.autograd.grad(loss, latents)[0]
 
         if isinstance(self.scheduler, LMSDiscreteScheduler):

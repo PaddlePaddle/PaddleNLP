@@ -96,7 +96,7 @@ class ControlNet(nn.Layer):
         freeze_params(self.unet.parameters())
         logger.info("Freeze unet parameters!")
 
-        self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path)
+        self.controlnet = ControlNetModel.from_unet(self.unet, load_weights_from_unet=True)
 
         if not model_args.use_paddle_conv_init:
             # use torch conv2d init
@@ -160,15 +160,9 @@ class ControlNet(nn.Layer):
             timestep=timesteps,
             encoder_hidden_states=encoder_hidden_states,
             controlnet_cond=controlnet_cond,
+            conditioning_scale=self.control_scales,
             return_dict=False,
         )
-        down_block_res_samples = [
-            down_block_res_sample * controlnet_conditioning_scale
-            for down_block_res_sample, controlnet_conditioning_scale in zip(
-                down_block_res_samples, self.control_scales[:-1]
-            )
-        ]
-        mid_block_res_sample *= self.control_scales[-1]
 
         # predict the noise residual
         noise_pred = self.unet(
@@ -248,15 +242,10 @@ class ControlNet(nn.Layer):
                     t,
                     encoder_hidden_states=text_embeddings,
                     controlnet_cond=controlnet_cond_input,
+                    conditioning_scale=self.control_scales,
                     return_dict=False,
                 )
-                down_block_res_samples = [
-                    down_block_res_sample * controlnet_conditioning_scale
-                    for down_block_res_sample, controlnet_conditioning_scale in zip(
-                        down_block_res_samples, self.control_scales[:-1]
-                    )
-                ]
-                mid_block_res_sample *= self.control_scales[-1]
+
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,
@@ -286,4 +275,4 @@ class ControlNet(nn.Layer):
                 layer.gradient_checkpointing = value
                 print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
-        self.apply(fn)
+        self.controlnet.apply(fn)

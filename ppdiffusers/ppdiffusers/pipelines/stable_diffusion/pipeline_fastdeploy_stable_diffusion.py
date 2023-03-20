@@ -22,7 +22,6 @@ import paddle
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -37,6 +36,7 @@ from ...schedulers.preconfig import (
     PreconfigLMSDiscreteScheduler,
 )
 from ...utils import logging
+from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
 logger = logging.get_logger(__name__)
@@ -107,7 +107,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             )
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
+                f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
 
@@ -414,7 +414,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 self.unet.zero_copy_infer(
                     prebinded_inputs={
                         unet_input_names[0]: latent_model_input,
-                        unet_input_names[1]: t.cast("float32"),
+                        unet_input_names[1]: t,
                         unet_input_names[2]: text_embeddings,
                     },
                     prebinded_outputs={unet_output_name: noise_pred_unet},

@@ -46,10 +46,14 @@ from ppdiffusers import (
     DiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.training_utils import EMAModel, main_process_first
+from ppdiffusers.training_utils import EMAModel, freeze_params, main_process_first
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
+
+try:
+    from ppdiffusers.modeling_utils import unwrap_model
+except Exception:
+    from ppdiffusers.models.modeling_utils import unwrap_model
 
 
 def url_or_path_join(*path_list):

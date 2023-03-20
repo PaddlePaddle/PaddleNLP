@@ -20,15 +20,27 @@ import paddle.nn.functional as F
 
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
 from ppdiffusers.initializer import reset_initialized_parameter
-from ppdiffusers.modeling_utils import ModelMixin
-from ppdiffusers.models.vae import (
-    AutoencoderKLOutput,
-    Decoder,
-    DecoderOutput,
-    DiagonalGaussianDistribution,
-    Encoder,
-)
 
+try:
+    from ppdiffusers.modeling_utils import ModelMixin
+except ImportError:
+    from ppdiffusers.models.modeling_utils import ModelMixin
+try:
+    from ppdiffusers.models.vae import (
+        AutoencoderKLOutput,
+        Decoder,
+        DecoderOutput,
+        DiagonalGaussianDistribution,
+        Encoder,
+    )
+except ImportError:
+    from ppdiffusers.models.autoencoder_kl import (
+        AutoencoderKLOutput,
+        Decoder,
+        DecoderOutput,
+        DiagonalGaussianDistribution,
+        Encoder,
+    )
 from .losses import LPIPSWithDiscriminator
 
 
