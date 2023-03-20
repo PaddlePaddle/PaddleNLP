@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import math
+
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
@@ -23,6 +24,11 @@ from paddle.nn import Embedding
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    BLENDERBOT_PRETRAINED_INIT_CONFIGURATION,
+    BLENDERBOT_PRETRAINED_RESOURCE_FILES_MAP,
+    BlenderbotConfig,
+)
 
 __all__ = [
     "BlenderbotModel",
@@ -54,82 +60,10 @@ class BlenderbotPretrainedModel(PretrainedModel):
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     base_model_prefix = "blenderbot"
+    config_class = BlenderbotConfig
 
-    pretrained_init_configuration = {
-        "blenderbot-3B": {
-            "vocab_size": 8008,
-            "bos_token_id": 1,
-            "pad_token_id": 0,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 1,
-            "d_model": 2560,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 24,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 10240,
-            "decoder_ffn_dim": 10240,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "init_std": 0.02,
-            "max_position_embeddings": 128,
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "scale_embedding": True,
-            "normalize_before": True,
-        },
-        "blenderbot-400M-distill": {
-            "vocab_size": 8008,
-            "bos_token_id": 1,
-            "pad_token_id": 0,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 1,
-            "d_model": 1280,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "encoder_ffn_dim": 5120,
-            "decoder_ffn_dim": 5120,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "init_std": 0.02,
-            "max_position_embeddings": 128,
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "scale_embedding": True,
-            "normalize_before": True,
-        },
-        "blenderbot-1B-distill": {
-            "vocab_size": 8008,
-            "bos_token_id": 1,
-            "pad_token_id": 0,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 1,
-            "d_model": 2560,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 32,
-            "decoder_attention_heads": 32,
-            "decoder_ffn_dim": 10240,
-            "encoder_ffn_dim": 10240,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "init_std": 0.02,
-            "max_position_embeddings": 128,
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "normalize_before": True,
-            "scale_embedding": True,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "blenderbot-3B": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B.pdparams",
-            "blenderbot-1B-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill.pdparams",
-            "blenderbot-400M-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill.pdparams",
-        }
-    }
+    pretrained_init_configuration = BLENDERBOT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = BLENDERBOT_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -143,7 +77,7 @@ class BlenderbotPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.blenderbot.config["init_std"],
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -156,8 +90,8 @@ class BlenderbotLearnedPositionalEmbedding(Embedding):
     Please refer to the superclass for more information regarding methods and arguments.
     """
 
-    def __init__(self, num_embeddings, embedding_dim):
-        super().__init__(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+    def __init__(self, config: BlenderbotConfig):
+        super().__init__(num_embeddings=config.max_position_embeddings, embedding_dim=config.d_model)
 
     def forward(self, input_ids_shape, past_key_values_length=0):
         """
@@ -182,52 +116,33 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
     regarding methods and arguments.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embed_tokens=None,
-        pad_token_id=0,
-        d_model=1280,
-        num_encoder_layers=2,
-        encoder_attention_heads=32,
-        encoder_ffn_dim=5120,
-        dropout=0.1,
-        activation_function="gelu",
-        attention_dropout=0.0,
-        activation_dropout=0.0,
-        max_position_embeddings=128,
-        init_std=0.02,
-        scale_embedding=True,
-        normalize_before=True,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
+    def __init__(self, config: BlenderbotConfig, embed_tokens=None):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
             self.embed_tokens = nn.Embedding(
-                num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=pad_token_id
+                num_embeddings=config.vocab_size, embedding_dim=config.d_model, padding_idx=config.pad_token_id
             )
-        self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
-        self.encoder_embed_positions = BlenderbotLearnedPositionalEmbedding(
-            num_embeddings=max_position_embeddings, embedding_dim=d_model
-        )
+        self.embed_scale = math.sqrt(config.d_model) if config.scale_embedding else 1.0
+        self.encoder_embed_positions = BlenderbotLearnedPositionalEmbedding(config)
 
-        self.encoder_dropout = nn.Dropout(dropout)
-        self.encoder_layernorm = nn.LayerNorm(normalized_shape=d_model)
+        self.encoder_dropout = nn.Dropout(config.dropout)
+        self.encoder_layernorm = nn.LayerNorm(normalized_shape=config.d_model)
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=encoder_attention_heads,
-            dim_feedforward=encoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
-            normalize_before=normalize_before,
+            d_model=config.d_model,
+            nhead=config.encoder_attention_heads,
+            dim_feedforward=config.encoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
+            normalize_before=config.normalize_before,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=num_encoder_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=config.num_encoder_layers)
 
         self.apply(self.init_weights)
 
@@ -251,8 +166,10 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
             attention_mask = (
                 paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
-            attention_mask.stop_gradient = True
+        else:
+            attention_mask = attention_mask.unsqueeze([1, 2]) * -1e4
 
+        attention_mask.stop_gradient = True
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         # Different from BlenderbotSmall, Blenderbot Encoder apply the final layer norm on encoder output
         encoder_output = self.encoder_layernorm(encoder_output)
@@ -378,50 +295,31 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
     regarding methods and arguments.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embed_tokens=None,
-        pad_token_id=0,
-        d_model=1280,
-        num_decoder_layers=12,
-        decoder_attention_heads=32,
-        decoder_ffn_dim=5120,
-        dropout=0.1,
-        activation_function="gelu",
-        attention_dropout=0.0,
-        activation_dropout=0.0,
-        max_position_embeddings=128,
-        init_std=0.02,
-        scale_embedding=True,
-        normalize_before=True,
-    ):
-        super().__init__()
-        self.init_std = init_std
+    def __init__(self, config: BlenderbotConfig, embed_tokens=None):
+        super().__init__(config)
+        self.init_std = config.init_std
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
             self.embed_tokens = nn.Embedding(
-                num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=pad_token_id
+                num_embeddings=config.vocab_size, embedding_dim=config.d_model, padding_idx=config.pad_token_id
             )
-        self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
-        self.decoder_embed_positions = BlenderbotLearnedPositionalEmbedding(
-            num_embeddings=max_position_embeddings, embedding_dim=d_model
-        )
-        self.decoder_dropout = nn.Dropout(dropout)
-        self.decoder_layernorm = nn.LayerNorm(normalized_shape=d_model)
+        self.embed_scale = math.sqrt(config.d_model) if config.scale_embedding else 1.0
+        self.decoder_embed_positions = BlenderbotLearnedPositionalEmbedding(config)
+        self.decoder_dropout = nn.Dropout(config.dropout)
+        self.decoder_layernorm = nn.LayerNorm(normalized_shape=config.d_model)
 
         decoder_layer = BlenderbotDecoderLayer(
-            d_model=d_model,
-            nhead=decoder_attention_heads,
-            dim_feedforward=decoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
-            normalize_before=normalize_before,
+            d_model=config.d_model,
+            nhead=config.decoder_attention_heads,
+            dim_feedforward=config.decoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
+            normalize_before=config.normalize_before,
         )
-        self.decoder = TransformerDecoder(decoder_layer=decoder_layer, num_layers=num_decoder_layers)
+        self.decoder = TransformerDecoder(decoder_layer=decoder_layer, num_layers=config.num_decoder_layers)
         self.apply(self.init_weights)
 
     def forward(
@@ -485,126 +383,20 @@ class BlenderbotModel(BlenderbotPretrainedModel):
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
-    Args:
-        vocab_size (`int`):
-            Vocabulary size of the Blenderbot model.
-        bos_token_id (`int`, optional):
-           The id for begging of sentences token. Defaults to ``1``.
-        pad_token_id (`int`, optional):
-           The id for padding token. Defaults to ``0``.
-        eos_token_id (`int`, optional):
-           The id for end of sentence token. Defaults to ``2``.
-        decoder_start_token_id (`int`, optional):
-           The id indicating the start of decoding sentence. Defaults to ``1``.
-        d_model (`int`, optional):
-           Dimensionality of the layers and the pooler layer. Defaults to ``1280``.
-        num_encoder_layers (`int`, optional):
-           Number of Transformer encoder layers for BlenderbotEncoder. Defaults to ``2``.
-        num_decoder_layers (`int`, optional):
-           Number of Transformer decoder layers for BlenderbotDecoder. Defaults to ``12``.
-        encoder_attention_heads (`int`, optional):
-           Number of attention heads for each Transformer encoder layer in BlenderbotEncoder.
-           Defaults to ``32``.
-        decoder_attention_heads (`int`, optional):
-           Number of attention heads for each Transformer decoder layer in BlenderbotDecoder.
-           Defaults to ``32``.
-        encoder_ffn_dim (`int`, optional):
-           Dimensionality of the feed-forward layer for each Transformer encoder layer in
-           BlenderbotEncoder. Defaults to ``5120``.
-        decoder_ffn_dim (`int`, optional):
-           Dimensionality of the feed-forward layer for each Transformer dncoder layer in
-           BlenderbotDncoder. Defaults to ``5120``.
-        dropout (`float`, optional):
-           The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
-           Defaults to ``0.1``.
-        activation_function (`str`, optional):
-           The non-linear activation function (function or string) in the encoder and pooler.
-           ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-           are supported. Defaults to ``"gelu"``.
-        attention_dropout (`float`, optional):
-           The dropout ratio for the attention probabilities.
-           Defaults to ``0.0``.
-        activation_dropout (`float`, optional):
-           The dropout ratio for activations inside the fully connected layer.
-        max_position_embeddings (`int`, optional):,
-           The max position index of an input sequence. Defaults to ``128``.
-        init_std (`float`, optional):
-           The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-           Defaults to ``0.02``.
-        scale_embedding (`bool`, optional):
-           Indicate whether to scale embeddings by diving by sqrt(d_model). Defaults to ``True``.
-        normalize_before (bool, optional):
-           Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers.
-           If True, pre-process is layer normalization and post-precess includes dropout,
-           residual connection. Otherwise, no pre-process and post-precess includes dropout,
-           residual connection, layer normalization. Defaults to ``True``.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        bos_token_id=1,
-        pad_token_id=0,
-        eos_token_id=2,
-        decoder_start_token_id=1,
-        d_model=1280,
-        num_encoder_layers=2,
-        num_decoder_layers=12,
-        encoder_attention_heads=32,
-        decoder_attention_heads=32,
-        encoder_ffn_dim=5120,
-        decoder_ffn_dim=5120,
-        dropout=0.1,
-        activation_function="gelu",
-        attention_dropout=0.0,
-        activation_dropout=0.0,
-        max_position_embeddings=128,
-        init_std=0.02,
-        scale_embedding=True,
-        normalize_before=True,
-    ):
-        super(BlenderbotModel, self).__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.bos_token_id = bos_token_id
-        self.eos_token_id = eos_token_id
-        self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=pad_token_id)
-        self.encoder = BlenderbotEncoder(
-            vocab_size=vocab_size,
-            embed_tokens=self.shared,
-            pad_token_id=pad_token_id,
-            d_model=d_model,
-            num_encoder_layers=num_encoder_layers,
-            encoder_attention_heads=encoder_attention_heads,
-            encoder_ffn_dim=encoder_ffn_dim,
-            dropout=dropout,
-            activation_function=activation_function,
-            attention_dropout=attention_dropout,
-            activation_dropout=activation_dropout,
-            max_position_embeddings=max_position_embeddings,
-            init_std=init_std,
-            scale_embedding=scale_embedding,
-            normalize_before=normalize_before,
+    def __init__(self, config: BlenderbotConfig):
+        super(BlenderbotModel, self).__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.bos_token_id = config.bos_token_id
+        self.eos_token_id = config.eos_token_id
+        self.decoder_start_token_id = config.decoder_start_token_id
+        self.shared = nn.Embedding(
+            num_embeddings=config.vocab_size, embedding_dim=config.d_model, padding_idx=config.pad_token_id
         )
-
-        self.decoder = BlenderbotDecoder(
-            vocab_size=vocab_size,
-            embed_tokens=self.shared,
-            pad_token_id=pad_token_id,
-            d_model=d_model,
-            num_decoder_layers=num_decoder_layers,
-            decoder_attention_heads=decoder_attention_heads,
-            decoder_ffn_dim=decoder_ffn_dim,
-            dropout=dropout,
-            activation_function=activation_function,
-            attention_dropout=attention_dropout,
-            activation_dropout=activation_dropout,
-            max_position_embeddings=max_position_embeddings,
-            init_std=init_std,
-            scale_embedding=scale_embedding,
-            normalize_before=normalize_before,
-        )
+        self.encoder = BlenderbotEncoder(config)
+        self.decoder = BlenderbotDecoder(config)
         self.apply(self.init_weights)
 
     def forward(
@@ -711,27 +503,38 @@ class BlenderbotModel(BlenderbotPretrainedModel):
         )
         return decoder_output
 
+    def get_input_embeddings(self):
+        return self.shared
+
+    def set_input_embeddings(self, value):
+        self.shared = value
+
     def get_encoder(self):
         """This method is required for model with encoder-decoder architecture."""
         return self.encoder
 
 
 class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
-    def __init__(self, blenderbot):
-        super(BlenderbotForConditionalGeneration, self).__init__()
-        self.blenderbot = blenderbot
-        self.eos_token_id = blenderbot.eos_token_id
-        self.bos_token_id = blenderbot.bos_token_id
-        self.pad_token_id = blenderbot.pad_token_id
+    def __init__(self, config: BlenderbotConfig):
+        super(BlenderbotForConditionalGeneration, self).__init__(config)
+        self.blenderbot = BlenderbotModel(config)
+        self.eos_token_id = config.eos_token_id
+        self.bos_token_id = config.bos_token_id
+        self.pad_token_id = config.pad_token_id
         self.lm_head_weight = self.create_parameter(
-            shape=[self.blenderbot.config["vocab_size"], self.blenderbot.config["d_model"]],
+            shape=[config.vocab_size, config.d_model],
             dtype=self.blenderbot.shared.weight.dtype,
             is_bias=False,
         )
-        self.register_buffer(
-            "final_logits_bias",
-            paddle.zeros((1, self.blenderbot.config["vocab_size"]), dtype=paddle.get_default_dtype()),
-        )
+
+        if hasattr(self, "final_logits_bias"):
+            self.final_logits_bias = paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype())
+        else:
+            self.register_buffer(
+                "final_logits_bias",
+                paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype()),
+            )
+
         self.apply(self.init_weights)
 
     def forward(
@@ -852,19 +655,25 @@ class BlenderbotForCausalLM(BlenderbotPretrainedModel):
     blenderbot decoder without cross-attention.
     """
 
-    def __init__(self, blenderbot):
-        super().__init__()
-        self.blenderbot = blenderbot
-        self.decoder = blenderbot.decoder
+    def __init__(self, config: BlenderbotConfig):
+        super().__init__(config)
+        self.blenderbot = BlenderbotModel(config)
+        self.decoder = self.blenderbot.decoder
 
         self.lm_head_weight = self.create_parameter(
-            shape=[blenderbot.config["vocab_size"], blenderbot.config["d_model"]],
-            dtype=blenderbot.shared.weight.dtype,
+            shape=[config.vocab_size, config.d_model],
+            dtype=self.blenderbot.shared.weight.dtype,
             is_bias=False,
         )
-        self.register_buffer(
-            "final_logits_bias", paddle.zeros((1, blenderbot.config["vocab_size"]), dtype=paddle.get_default_dtype())
-        )
+
+        if hasattr(self, "final_logits_bias"):
+            self.final_logits_bias = paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype())
+        else:
+            self.register_buffer(
+                "final_logits_bias",
+                paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype()),
+            )
+
         self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None, use_cache=False, cache=None, **kwargs):
@@ -921,9 +730,7 @@ class BlenderbotForCausalLM(BlenderbotPretrainedModel):
             # (batch_size, len_seq, hidden_size) is passed for memory argument.
             # since the `static_cache` will not be used in BlenderbotForCausalLM
             batch_size, len_seq = input_ids.shape
-            cache = self.decoder.decoder.gen_cache(
-                memory=paddle.zeros((batch_size, len_seq, self.blenderbot.config["d_model"]))
-            )
+            cache = self.decoder.decoder.gen_cache(memory=paddle.zeros((batch_size, len_seq, self.config.d_model)))
         decoder_outputs = self.decoder(
             decoder_input_ids=input_ids, encoder_output=None, memory_mask=None, use_cache=use_cache, cache=cache
         )

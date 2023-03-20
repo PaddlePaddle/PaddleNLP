@@ -340,11 +340,12 @@ checkpoint_file = (
 
 class SegformerDetector:
     def __init__(self):
-        modelpath = os.path.join(annotator_ckpts_path, "segformer_model.pdparams")
+        segformer_annotator_ckpts_path = os.path.join(annotator_ckpts_path, "segformer_model")
+        modelpath = os.path.join(segformer_annotator_ckpts_path, "model.pdparams")
         if not os.path.exists(modelpath):
-            from basicsr.utils.download_util import load_file_from_url
+            from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
-            load_file_from_url(checkpoint_file, model_dir=annotator_ckpts_path, file_name="segformer_model.pdparams")
+            get_path_from_url_with_filelock(checkpoint_file, root_dir=segformer_annotator_ckpts_path)
         self.model_path = modelpath
 
         cfg = "annotator/segformer_paddle/segformer_b5_cityscapes_1024x1024_160k.yml"

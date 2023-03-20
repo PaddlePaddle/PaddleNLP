@@ -12,42 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import functools
+import json
 import os
-import re
 import sys
 import time
-import logging
-import json
-import collections
-from random import random
-from tqdm import tqdm
-from functools import reduce, partial
 from pathlib import Path
 
-import numpy as np
-import functools
-import argparse
-
 import paddle
-from paddle.io import DataLoader
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics.squad import squad_evaluate
-from paddlenlp.transformers import ErnieTokenizer
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+
+from paddlenlp.data import Dict, Pad
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../task/mrc")
-from saliency_map.squad import compute_prediction
-from saliency_map.squad import DuReaderChecklist, RCInterpret, compute_prediction_checklist
-from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+from saliency_map.squad import RCInterpret, compute_prediction  # noqa: E402
 
 sys.path.append("..")
-from roberta.modeling import RobertaForQuestionAnswering
+from roberta.modeling import RobertaForQuestionAnswering  # noqa: E402
 
 sys.path.remove("..")
 sys.path.remove("../task/mrc")
 sys.path.append("../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+)
 
 sys.path.remove("../..")
 
@@ -165,7 +157,6 @@ def evaluate(model, data_loader, args):
 
     all_start_logits = []
     all_end_logits = []
-    all_cls_logits = []
     tic_eval = time.time()
 
     for batch in data_loader:
@@ -191,7 +182,6 @@ def evaluate(model, data_loader, args):
     )
 
     # Can also write all_nbest_json and scores_diff_json files if needed
-    input_data = load_data(args.input_data)
     with open(os.path.join(args.output_dir, "dev"), "w") as f:
         for id in all_predictions:
             temp = {}

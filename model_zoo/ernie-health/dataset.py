@@ -24,7 +24,7 @@ class MedicalCorpus(paddle.io.Dataset):
         self.tokenizer = tokenizer
         # Add ids for suffixal chinese tokens in tokenized text, e.g. '##度' in '百度'.
         # It should coincide with the vocab dictionary in preprocess.py.
-        orig_len = len(self.tokenizer)
+        orig_len = len(self.tokenizer)  # noqa:F841
         suffix_vocab = {}
         for idx, token in enumerate(range(0x4E00, 0x9FA6)):
             suffix_vocab[len(self.tokenizer) + idx] = "##" + chr(token)

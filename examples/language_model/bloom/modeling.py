@@ -49,15 +49,14 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output=True, mp_degree: int = 1):
+def parallel_matmul(lm_output, logit_weights, parallel_output=True):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    # rank = hcg.get_model_parallel_rank()
     if mp_degree > 1:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        mp_degree = hcg.get_model_parallel_world_size()
-        # rank = hcg.get_model_parallel_rank()
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
-
         if parallel_output:
             return logits
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
@@ -755,7 +754,6 @@ class BloomModel(BloomPreTrainedModel):
 
         # Embedding + LN Embedding
         # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
-        print(f"current rank embedding -> <{self.vocab_size}, {self.embed_dim}>")
         if config.mp_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
@@ -972,8 +970,7 @@ class BloomLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, mp_degree=self.config.mp_degree)
-        # logits = paddle.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
         return logits
 
 
@@ -1020,15 +1017,14 @@ class BloomForPretraining(BloomPreTrainedModel):
         self.bloom = BloomModel(config)
         self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
         self.apply(self.init_weights)
+        self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
         self,
         input_ids,
-        position_ids=None,
-        attention_mask=None,
         labels=None,
         loss_mask=None,
-        masked_positions=None,
+        attention_mask=None,
         use_cache=False,
         cache=None,
     ):
@@ -1038,10 +1034,7 @@ class BloomForPretraining(BloomPreTrainedModel):
         else:
             encoder_outputs = outputs
 
-        logits = parallel_matmul(
-            encoder_outputs[0], self.bloom.word_embeddings.weight, mp_degree=self.config.mp_degree
-        )
-
+        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight)
         if labels is None:
             return logits
 

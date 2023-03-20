@@ -313,7 +313,7 @@ class ErnieDocEmbeddings(nn.Layer):
         super(ErnieDocEmbeddings, self).__init__()
         self.word_emb = nn.Embedding(config.vocab_size, config.hidden_size)
         self.pos_emb = nn.Embedding(config.max_position_embeddings * 2 + config.memory_len, config.hidden_size)
-        self.token_type_emb = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.token_type_emb = nn.Embedding(config.task_type_vocab_size, config.hidden_size)
         self.memory_len = config.memory_len
         self.dropouts = nn.LayerList([nn.Dropout(config.hidden_dropout_prob) for i in range(3)])
         self.norms = nn.LayerList([nn.LayerNorm(config.hidden_size) for i in range(3)])

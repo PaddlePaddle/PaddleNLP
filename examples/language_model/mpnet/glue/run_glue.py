@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import argparse
+import json
 import logging
+import math
 import os
 import random
 import time
+from collections import OrderedDict
 from functools import partial
 
 import numpy as np
@@ -24,17 +27,21 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import MPNetForSequenceClassification, MPNetTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup, CosineDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-import json
-import math
-from collections import OrderedDict
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    CosineDecayWithWarmup,
+    ElectraForSequenceClassification,
+    ElectraTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+    MPNetForSequenceClassification,
+    MPNetTokenizer,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -336,7 +343,7 @@ def do_train(args):
             return_list=True,
         )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
