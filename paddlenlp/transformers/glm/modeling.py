@@ -28,6 +28,7 @@ from paddle.distributed.fleet.utils import recompute
 from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from ...utils.initializer import normal_, ones_, zeros_
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -354,7 +355,7 @@ class GLMStack(nn.Layer):
             hidden_states = hidden_states + block_position_embeddings
         hidden_states = self.embedding_dropout(hidden_states)
 
-        new_caches = [hidden_states.detach()]
+        all_hidden_states = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
             mem_i = cache[i] if cache is not None else None
             has_gradient = not hidden_states.stop_gradient
@@ -367,10 +368,10 @@ class GLMStack(nn.Layer):
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
 
-            new_caches.append(hidden_states.detach())
+            all_hidden_states.append(hidden_states.detach())
 
         output = self.final_layernorm(hidden_states)
-        new_caches = self.update_memories(new_caches, cache)
+        new_caches = self.update_memories(all_hidden_states, cache)
 
         if not return_dict:
             return (output, new_caches)
@@ -378,6 +379,7 @@ class GLMStack(nn.Layer):
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
             past_key_values=new_caches,
+            hidden_states=all_hidden_states,
         )
 
     def update_memories(self, hiddens, cache):
@@ -678,27 +680,24 @@ class GLMModel(GLMPretrainedModel):
 
         output = self.transformer(word_embeddings, position_ids, attention_mask, cache, return_dict)
         if return_dict:
-            logits = output.last_hidden_state
+            hidden_state = output.last_hidden_state
         else:
-            logits = output[0] if isinstance(output, tuple) else output
+            hidden_state = output[0] if isinstance(output, tuple) else output
 
         if self.output_predict:
             if self.config.tensor_parallel_degree > 1:
                 # FIXME: @ZHUI fix for jit_to_static
-                logits = parallel_matmul(logits, self.word_embeddings.weight, self.config.tensor_parallel_output)
+                logits = parallel_matmul(hidden_state, self.word_embeddings.weight, self.config.tensor_parallel_output)
             else:
-                logits = F.linear(logits, self.word_embeddings.weight.T)
+                logits = F.linear(hidden_state, self.word_embeddings.weight.T)
 
-        if not return_dict:
-            if isinstance(output, tuple):
-                return tuple([logits] + [v for v in output[1:]])
-            else:
-                return logits
-
-        output.logits = logits
-        # output.last_hidden_state = logits
-
-        return output
+            return CausalLMOutputWithCrossAttentions(
+                logits=logits,
+                past_key_values=output.past_key_values,
+                hidden_states=output.hidden_states,
+            )
+        else:
+            return output
 
 
 class GLMForMultipleChoice(GLMPretrainedModel):
@@ -722,7 +721,8 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         return_dict: bool = None,
     ):
         model_output = self.glm(input_ids, position_ids, attention_mask, return_dict=return_dict)
-        lm_logits = model_output.last_hidden_state if return_dict else model_output
+        lm_logits = model_output.logits if return_dict else model_output
+        # [bs, seq_len, vocab]
         lm_logits = lm_logits[0] if isinstance(lm_logits, tuple) else lm_logits
         log_probs = []
         for output, choices, choice_index in zip(F.log_softmax(lm_logits, axis=-1), choice_ids, choice_indices):
@@ -758,6 +758,11 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
 
     def __init__(self, config: GLMConfig):
         super(GLMForConditionalGeneration, self).__init__(config)
+        # GLMForConditionalGeneration need loggit
+        if not config.output_predict:
+            logger.warning("GLMForConditionalGeneration need loggit, please set config.output_predict to True.")
+            config.output_predict = True
+
         self.glm = GLMModel(config)
         self.apply(self.init_weights)
 
@@ -811,10 +816,11 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
     ):
         model_output = self.glm(input_ids, position_ids, attention_mask, cache=cache, return_dict=return_dict)
         if return_dict:
-            lm_logits, cache = model_output.last_hidden_state, model_output.past_key_values
+            lm_logits, cache = model_output.logits, model_output.past_key_values
         else:
             lm_logits, cache = model_output
 
+        # lm_logits [bs, seq_length, vocab_size]
         loss = None
         if labels is not None:
             # Since ParallelCrossEntropy not support -100 ingore index.

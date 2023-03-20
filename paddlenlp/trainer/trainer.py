@@ -45,9 +45,10 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
-from ..transformers.model_utils import PretrainedModel, unwrap_model
+from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .trainer_callback import (
@@ -101,23 +102,8 @@ WEIGHTS_NAME = "model_state.pdparams"
 CONFIG_NAME = "model_config.json"
 
 
-def is_datasets_available():
-    import importlib
-
-    return importlib.util.find_spec("datasets") is not None
-
-
 if is_datasets_available():
     import datasets
-
-
-def _add_variant(weights_name: str, variant=None) -> str:
-    if variant is not None and len(variant) > 0:
-        splits = weights_name.split(".")
-        splits = splits[:-1] + [variant] + splits[-1:]
-        weights_name = ".".join(splits)
-
-    return weights_name
 
 
 @contextlib.contextmanager
