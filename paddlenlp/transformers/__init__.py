@@ -92,6 +92,7 @@ from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
+from .ernie_gram.configuration import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
 from .ernie_layout.configuration import *
@@ -202,6 +203,7 @@ from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
+from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 from .glm.configuration import *
