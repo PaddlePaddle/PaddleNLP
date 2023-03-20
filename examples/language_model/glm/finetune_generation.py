@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import cnn_dm_convert_example
+from data import custom_convert_example
 from utils import GLMTrainer, generate
 
 from paddlenlp.data import DefaultDataCollator
@@ -132,7 +132,7 @@ def main():
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
-    trans_func = partial(cnn_dm_convert_example, tokenizer=tokenizer, data_args=data_args)
+    trans_func = partial(custom_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     test_ds = dev_ds.map(trans_func)
 
