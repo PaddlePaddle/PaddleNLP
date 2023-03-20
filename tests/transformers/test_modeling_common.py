@@ -569,14 +569,25 @@ class ModelTesterMixin:
                 self.assertEqual(old_value, new_value)
 
     def test_tie_weight(self):
-        # 获取一下input_embeding 和 output_embeding 然后测试一下id 是否一致?
+        # test whether id of input_embeding equal id of output_embeding ?
         if not self.test_tie_weights:
             return
 
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         for model_class in self.all_model_classes:
-            model = self._make_model_instance(config, model_class) # 初始化模型实例
-            # model.tie_weights() # 模型进行tie weight操作
+            if 'CausalLM' not in model_class.__name__ and 'MaskedLM' not in model_class.__name__:
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            tie_word_embeddings = (
+                model.tie_word_embeddings
+                if hasattr(model, "tie_word_embeddings")
+                else model.config.get("tie_word_embeddings", False)
+            )
+
+            if not tie_word_embeddings:
+                continue
 
             if hasattr(model, 'get_input_embeddings') and hasattr(model, 'get_output_embeddings'):
                 try:
@@ -600,7 +611,7 @@ class ModelTesterMixin:
                     else:
                         input_embeddings_weight = input_embeddings
 
-                    print('模型名称是{},两个id是{},{}'.format(model_class,id(output_embeddings_weight),id(input_embeddings_weight)))
+                    print('model name :{},id is{},{}'.format(model_class,id(output_embeddings_weight),id(input_embeddings_weight)))
                     self.assertEqual(id(output_embeddings_weight),id(input_embeddings_weight))
 
 

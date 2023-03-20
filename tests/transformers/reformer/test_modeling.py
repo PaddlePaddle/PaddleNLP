@@ -605,6 +605,7 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     test_pruning = False
     test_headmasking = False
     test_torchscript = False
+    test_tie_weights = True
     base_model_class = ReformerModel
 
     def setUp(self):
