@@ -125,24 +125,24 @@ class GLMAttention(nn.Layer):
         query_length = hidden_states.shape[1]
         if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
-            # [bs, seq_len, num_head, 3* head_dim]
+            # [bs, seq_len, num_attention_heads, 3* head_dim]
             mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_attention_heads, 3 * self.attention_head_size])
-            # [bs,  num_head, seq_len, 3* head_dim]
+            # [bs,  num_attention_heads, seq_len, 3* head_dim]
             mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
-            # [bs,  num_head, seq_len, head_dim]
+            # [bs,  num_attention_heads, seq_len, head_dim]
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
 
         else:
             # [bs, seq_len(+cache_len), num_head * head_dim]
             concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
             mixed_layer = self.query_key_value(concat_hidden_states)
-            # [bs. seq_len(+cache_len), num_heads, 3* head_dim]
-            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_heads, 3 * self.head_dim])
-            # [bs, num_heads, seq_len(+cache_len),  3* head_dim]
+            # [bs. seq_len(+cache_len), num_attention_heads, 3* head_dim]
+            mixed_layer = paddle.reshape_(mixed_layer, [0, 0, self.num_attention_heads, 3 * self.attention_head_size])
+            # [bs, num_attention_heads, seq_len(+cache_len),  3* head_dim]
             mixed_layer = paddle.transpose(mixed_layer, [0, 2, 1, 3])
             mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, num_or_sections=3, axis=-1)
-            # [bs, num_heads, seq_len, head_dim]
-            mixed_q_layer = mixed_q_layer[:, -query_length:]
+            # [bs, num_attention_heads, seq_len, head_dim]
+            mixed_q_layer = mixed_q_layer[:, :, -query_length:]
 
         return mixed_q_layer, mixed_k_layer, mixed_v_layer
 
