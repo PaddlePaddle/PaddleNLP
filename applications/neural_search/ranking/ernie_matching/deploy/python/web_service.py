@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import sys
 import json
 
-from paddle_serving_server.web_service import WebService, Op
+from paddle_serving_server.web_service import Op, WebService
 
 
 def convert_example(example, tokenizer, max_seq_length=512):
@@ -37,7 +35,7 @@ class ErnieOp(Op):
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     def preprocess(self, input_dicts, data_id, log_id):
-        from paddlenlp.data import Stack, Tuple, Pad
+        from paddlenlp.data import Pad, Tuple
 
         ((_, input_dict),) = input_dicts.items()
         print("input dict", input_dict)
