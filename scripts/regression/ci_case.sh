@@ -214,7 +214,7 @@ export DATA_DIR=./BookCorpus/
 wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/BookCorpus.tar.gz && tar -xzvf BookCorpus.tar.gz
 time (python -u ./run_pretrain.py \
     --model_type electra \
-    --model_name_or_path electra-small \
+    --model_name_or_path chinese-electra-small \
     --input_dir ./BookCorpus/ \
     --output_dir ./pretrain_model/ \
     --train_batch_size 64 \
@@ -227,6 +227,9 @@ time (python -u ./run_pretrain.py \
     --logging_steps 1 \
     --save_steps 1 \
     --max_steps 1 \
+    --do_train true \
+    --do_train true \
+    --fp16 False \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
 }
