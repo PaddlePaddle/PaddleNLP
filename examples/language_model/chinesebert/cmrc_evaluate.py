@@ -15,7 +15,6 @@
 """
 Evaluation script for CMRC 2018
 version: v5 - special
-Note: 
 v5 - special: Evaluate on SQuAD-style CMRC 2018 Datasets
 v5: formatted output, add usage description
 v4: fixed segmentation issues
@@ -26,6 +25,7 @@ import json
 import re
 import sys
 from collections import OrderedDict
+
 import nltk
 
 
@@ -151,7 +151,6 @@ def find_lcs(s1, s2):
     return s1[p - mmax : p], mmax
 
 
-#
 def evaluate(ground_truth_file, prediction_file):
     f1 = 0
     em = 0
@@ -164,7 +163,6 @@ def evaluate(ground_truth_file, prediction_file):
             for qas in para["qas"]:
                 total_count += 1
                 query_id = qas["id"].strip()
-                query_text = qas["question"].strip()
                 answers = [x["text"] for x in qas["answers"]]
 
                 if query_id not in prediction_file:

@@ -143,7 +143,7 @@ class ChineseBertTokenizer(BertTokenizer):
         self,
         text,
         text_pair=None,
-        max_seq_len=512,
+        max_length=512,
         pad_to_max_seq_len=False,
         truncation_strategy="longest_first",
         return_position_ids=False,
@@ -152,6 +152,7 @@ class ChineseBertTokenizer(BertTokenizer):
         return_length=False,
         return_overflowing_tokens=False,
         return_special_tokens_mask=False,
+        **kwargs
     ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
@@ -166,7 +167,7 @@ class ChineseBertTokenizer(BertTokenizer):
             text_pair (str, List[str] or List[List[str]]):
                 Same as `text` argument, while it represents for the latter
                 sequence of the sequence pair.
-            max_seq_len (int, optional):
+            max_length (int, optional):
                 If set to a number, will limit the total sequence returned so
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
@@ -183,18 +184,18 @@ class ChineseBertTokenizer(BertTokenizer):
                 information will be added to the returned dictionary. Defaults to 0.
             pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
-                `max_seq_len` specified length according to padding side
+                `max_length` specified length according to padding side
                 (`self.padding_side`) and padding token id. Defaults to `False`.
             truncation_strategy (str, optional):
                 String selected in the following options:
 
                 - 'longest_first' (default) Iteratively reduce the inputs sequence
-                until the input is under `max_seq_len` starting from the longest
+                until the input is under `max_length` starting from the longest
                 one at each token (when there is a pair of input sequences).
                 - 'only_first': Only truncate the first sequence.
                 - 'only_second': Only truncate the second sequence.
                 - 'do_not_truncate': Do not truncate (raise an error if the input
-                sequence is longer than `max_seq_len`).
+                sequence is longer than `max_length`).
 
                 Defaults to 'longest_first'.
             return_position_ids (bool, optional):
@@ -232,10 +233,10 @@ class ChineseBertTokenizer(BertTokenizer):
                 - **seq_len** (int, optional): The input_ids length. Included when `return_length`
                   is `True`.
                 - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
-                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  Included when if `max_length` is specified and `return_overflowing_tokens`
                   is True.
                 - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
-                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  Included when if `max_length` is specified and `return_overflowing_tokens`
                   is True.
                 - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
@@ -274,7 +275,7 @@ class ChineseBertTokenizer(BertTokenizer):
         else:
             token_pair_offset_mapping = None
 
-        if max_seq_len and total_len > max_seq_len:
+        if max_length and total_len > max_length:
             (
                 ids,
                 pair_ids,
@@ -286,13 +287,13 @@ class ChineseBertTokenizer(BertTokenizer):
                 pair_ids=pair_ids,
                 token_offset_mapping=token_offset_mapping,
                 token_pair_offset_mapping=token_pair_offset_mapping,
-                num_tokens_to_remove=total_len - max_seq_len,
+                num_tokens_to_remove=total_len - max_length,
                 truncation_strategy=truncation_strategy,
             )
 
             if return_overflowing_tokens:
                 encoded_inputs["overflowing_tokens"] = overflowing_tokens
-                encoded_inputs["num_truncated_tokens"] = total_len - max_seq_len
+                encoded_inputs["num_truncated_tokens"] = total_len - max_length
 
         # Add special tokens
 
@@ -313,13 +314,13 @@ class ChineseBertTokenizer(BertTokenizer):
             encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
 
         # Check lengths
-        assert max_seq_len is None or len(encoded_inputs["input_ids"]) <= max_seq_len
+        assert max_length is None or len(encoded_inputs["input_ids"]) <= max_length
 
         # Padding
-        needs_to_be_padded = pad_to_max_seq_len and max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
+        needs_to_be_padded = pad_to_max_seq_len and max_length and len(encoded_inputs["input_ids"]) < max_length
 
         if needs_to_be_padded:
-            difference = max_seq_len - len(encoded_inputs["input_ids"])
+            difference = max_length - len(encoded_inputs["input_ids"])
             encoded_inputs["pinyin_ids"] = encoded_inputs["pinyin_ids"] + self.special_tokens_pinyin_ids * difference
             if self.padding_side == "right":
                 if return_attention_mask:
@@ -353,7 +354,7 @@ class ChineseBertTokenizer(BertTokenizer):
     def batch_encode(
         self,
         batch_text_or_text_pairs,
-        max_seq_len=512,
+        max_length=512,
         pad_to_max_seq_len=False,
         stride=0,
         is_split_into_words=False,
@@ -364,6 +365,7 @@ class ChineseBertTokenizer(BertTokenizer):
         return_length=False,
         return_overflowing_tokens=False,
         return_special_tokens_mask=False,
+        **kwargs,
     ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
@@ -376,7 +378,7 @@ class ChineseBertTokenizer(BertTokenizer):
                 it has been pretokenized. If each sequence is provided as a list
                 of strings (pretokenized), you must set `is_split_into_words` as
                 `True` to disambiguate with a sequence pair.
-            max_seq_len (int, optional):
+            max_length (int, optional):
                 If set to a number, will limit the total sequence returned so
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
@@ -393,18 +395,18 @@ class ChineseBertTokenizer(BertTokenizer):
                 information will be added to the returned dictionary. Defaults to 0.
             pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
-                `max_seq_len` specified length according to padding side
+                `max_length` specified length according to padding side
                 (`self.padding_side`) and padding token id. Defaults to `False`.
             truncation_strategy (str, optional):
                 String selected in the following options:
 
                 - 'longest_first' (default) Iteratively reduce the inputs sequence
-                until the input is under `max_seq_len` starting from the longest
+                until the input is under `max_length` starting from the longest
                 one at each token (when there is a pair of input sequences).
                 - 'only_first': Only truncate the first sequence.
                 - 'only_second': Only truncate the second sequence.
                 - 'do_not_truncate': Do not truncate (raise an error if the input
-                sequence is longer than `max_seq_len`).
+                sequence is longer than `max_length`).
 
                 Defaults to 'longest_first'.
             return_position_ids (bool, optional):
@@ -442,10 +444,10 @@ class ChineseBertTokenizer(BertTokenizer):
                 - **seq_len** (int, optional): The input_ids length. Included when `return_length`
                   is `True`.
                 - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
-                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  Included when if `max_length` is specified and `return_overflowing_tokens`
                   is True.
                 - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
-                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  Included when if `max_length` is specified and `return_overflowing_tokens`
                   is True.
                 - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
@@ -484,7 +486,7 @@ class ChineseBertTokenizer(BertTokenizer):
                 first_ids = get_input_ids(text)
                 second_ids = get_input_ids(text_pair)
 
-                max_len_for_pair = max_seq_len - len(first_ids) - self.num_special_tokens_to_add(pair=True)
+                max_len_for_pair = max_length - len(first_ids) - self.num_special_tokens_to_add(pair=True)
                 token_offset_mapping = self.get_offset_mapping(text)
                 token_pair_offset_mapping = self.get_offset_mapping(text_pair)
 
@@ -517,17 +519,17 @@ class ChineseBertTokenizer(BertTokenizer):
                         encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
 
                     # Check lengths
-                    assert max_seq_len is None or len(encoded_inputs["input_ids"]) <= max_seq_len
+                    assert max_length is None or len(encoded_inputs["input_ids"]) <= max_length
 
                     # Padding
                     needs_to_be_padded = (
-                        pad_to_max_seq_len and max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
+                        pad_to_max_seq_len and max_length and len(encoded_inputs["input_ids"]) < max_length
                     )
 
                     encoded_inputs["offset_mapping"] = offset_mapping
 
                     if needs_to_be_padded:
-                        difference = max_seq_len - len(encoded_inputs["input_ids"])
+                        difference = max_length - len(encoded_inputs["input_ids"])
                         # padding pinyin_ids
                         encoded_inputs["pinyin_ids"] = (
                             encoded_inputs["pinyin_ids"] + self.special_tokens_pinyin_ids * difference
@@ -589,7 +591,7 @@ class ChineseBertTokenizer(BertTokenizer):
                     self.encode(
                         text,
                         text_pair,
-                        max_seq_len=max_seq_len,
+                        max_length=max_length,
                         pad_to_max_seq_len=pad_to_max_seq_len,
                         truncation_strategy=truncation_strategy,
                         return_position_ids=return_position_ids,
@@ -685,8 +687,8 @@ class ChineseBertTokenizer(BertTokenizer):
         Returns:
             dict: the map of pinyin locations and pinyin tensor.
         """
-        pinyin = try_import("pypinyin.pinyin")
-        Style = try_import("pypinyin.Style")
+        pinyin = try_import("pypinyin").pinyin
+        Style = try_import("pypinyin").Style
         pinyin_list = pinyin(
             text,
             style=Style.TONE3,
