@@ -25,9 +25,6 @@ class Config(Tap):
     device: str = "gpu"
 
 
-paddle.set_default_dtype("float16")
-
-
 def left_padding(inputs, pad_id):
     assert "input_ids" in inputs, "input_ids should be in inputs!"
     max_length = 0
@@ -63,6 +60,8 @@ def convert_examples(sentences: list[str], tokenizer, max_length: int = 20):
 
 def generate(args: Config):
     paddle.set_device(args.device)
+    paddle.set_default_dtype("float16")
+
     config = BloomConfig.from_pretrained(args.model_name_or_path)
     config.use_cache = True
     config.use_pure_fp16 = False
