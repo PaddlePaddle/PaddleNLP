@@ -298,7 +298,7 @@ splited_qkv -> tensor_parallel_qkv
 
 def tensor_parallel_qkv_to_naive_merged_qkv(weight, num_attention_heads):
     """
-    [q1, q1, k1, k2, v1, v2] => [q1, k1, v1, q2, k2, v2]
+    [q1, k1, v1, q2, k2, v2] => [q1, q1, k1, k2, v1, v2]
     """
     qkvs = []
     partition_dim = -1
