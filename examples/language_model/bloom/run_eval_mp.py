@@ -339,7 +339,6 @@ def do_generation(args):
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
                     loss = paddle.sum(masked_lm_loss * loss_mask)
                     total_score += loss.numpy() / (args.num_tokenized_tokens - 1)
-                    raise ValueError("error ...")
                 else:
                     outputs = paddle.argmax(preds, -1)
                     acc = paddle.cast(outputs == labels, "float32")

@@ -1034,7 +1034,7 @@ class BloomForPretraining(BloomPreTrainedModel):
         else:
             encoder_outputs = outputs
 
-        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight)
+        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight, parallel_output=False)
         if labels is None:
             return logits
 
