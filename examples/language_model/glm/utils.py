@@ -89,6 +89,7 @@ def generate(
     input_ids=None,
     position_ids=None,
     attention_mask=None,
+    out_seq_length=768,
     tgt_length=256,
     min_tgt_length=5,
     num_beams=1,
@@ -114,7 +115,7 @@ def generate(
     batch_size = input_ids.shape[0]
     beam_scorer = BeamSearchScorer(
         batch_size=batch_size,
-        max_length=tgt_length,
+        max_length=out_seq_length,
         num_beams=num_beams,
         length_penalty=length_penalty,
         do_early_stopping=False,
