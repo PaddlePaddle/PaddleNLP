@@ -116,6 +116,7 @@ def main():
     model.generate = partial(
         generate,
         self=model,
+        out_seq_length=data_args.src_length + data_args.tgt_length,
         tgt_length=data_args.tgt_length,
         min_tgt_length=data_args.min_tgt_length,
         num_beams=data_args.num_beams,

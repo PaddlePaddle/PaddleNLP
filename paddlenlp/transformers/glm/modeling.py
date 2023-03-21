@@ -841,11 +841,9 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             if self.glm.config.tensor_parallel_degree > 1 and self.glm.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
                 loss = self.parallel_loss_fun(lm_logits, labels)
-                loss = loss[labels != self.glm.config.pad_token_id]
-                loss = loss.mean()
             else:
                 loss = F.cross_entropy(
-                    lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), ignore_index=-100
+                    lm_logits.reshape([-1, lm_logits.shape[-1]]), labels.reshape([-1]), reduction="none"
                 )
             label_smoothing = getattr(self.config, "label_smoothing", 0)
             if label_smoothing > 0:
