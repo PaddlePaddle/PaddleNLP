@@ -54,7 +54,8 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     """
     batch_size, target_length = input_ids_shape
 
-    mask = paddle.full((target_length, target_length), paddle.to_tensor(finfo(paddle.get_default_dtype()).min))
+    mask = paddle.full((target_length, target_length), float(finfo(paddle.get_default_dtype()).min))
+
     mask_cond = paddle.arange(mask.shape[-1])
     mask_cond = mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1])
     mask = paddle.where(mask_cond, paddle.full(mask_cond.shape, 0), mask)
@@ -270,7 +271,8 @@ class LLaMAAttention(nn.Layer):
 
         kv_seq_len = key_states.shape[-2]
         offset = 0
-        if past_key_value:
+
+        if past_key_value is not None:
             offset = past_key_value[0].shape[-2]
             kv_seq_len += offset
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -354,9 +356,9 @@ class LLaMADecoderLayer(nn.Layer):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under
                 returned tensors for more detail.
             use_cache (`bool`, *optional*):
-                If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
-                (see `past_key_values`).
-            past_key_value (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
+                If set to `True`, `cache` key value states are returned and can be used to speed up decoding
+                (see `cache`).
+            cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
 
         residual = hidden_states
@@ -475,16 +477,14 @@ class LLaMAModel(LLaMAPretrainedModel):
         input_ids=None,
         position_ids=None,
         attention_mask=None,
-        past_key_values=None,
         inputs_embeds=None,
         use_cache=None,
+        past_key_values=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
         **kwargs,
     ):
-        past_key_values = kwargs.get("cache", past_key_values)
-
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -502,11 +502,15 @@ class LLaMAModel(LLaMAPretrainedModel):
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * len(self.layers))
+
         seq_length_with_past = seq_length
-        past_key_values_length = 0
-        if past_key_values is not None:
-            past_key_values_length = past_key_values[0][0].shape[2]
-            seq_length_with_past = seq_length_with_past + past_key_values_length
+        cache_length = 0
+        if past_key_values[0] is not None:
+            cache_length = paddle.shape(past_key_values[0][0])[2]
+            seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -514,7 +518,7 @@ class LLaMAModel(LLaMAPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
         attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
+            attention_mask, (batch_size, seq_length), inputs_embeds, cache_length
         )
 
         hidden_states = inputs_embeds
@@ -536,7 +540,6 @@ class LLaMAModel(LLaMAPretrainedModel):
                 all_hidden_states += (hidden_states,)
 
             past_key_value = past_key_values[idx] if past_key_values is not None else None
-
             if self.gradient_checkpointing and self.training:
 
                 def create_custom_forward(module):
@@ -550,9 +553,7 @@ class LLaMAModel(LLaMAPretrainedModel):
                     create_custom_forward(decoder_layer),
                     hidden_states,
                     attention_mask,
-                    past_key_value,
-                    output_attentions,
-                    use_cache,
+                    None,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -633,15 +634,35 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
 
+    def prepare_inputs_for_generation(
+        self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
+    ):
+        if past_key_values:
+            input_ids = input_ids[:, -1:]
+
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        if inputs_embeds is not None and past_key_values is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids}
+
+        model_inputs.update(
+            {
+                "past_key_values": past_key_values,
+                "use_cache": use_cache,
+            }
+        )
+        return model_inputs
+
     def forward(
         self,
         input_ids,
         position_ids=None,
         attention_mask=None,
-        past_key_values=None,
         inputs_embeds=None,
         labels=None,
         use_cache=None,
+        past_key_values=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
@@ -658,6 +679,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
+            past_key_values=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -681,7 +703,7 @@ class LLaMAForCausalLM(LLaMAPretrainedModel):
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
-            past_key_values=outputs.past_key_values,
+            past_key_values=outputs.cache,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )

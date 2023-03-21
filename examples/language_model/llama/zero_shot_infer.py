@@ -16,21 +16,45 @@ import paddle
 from modeling import LLaMAForCausalLM
 from tokenizer import LLaMATokenizer
 
-# paddle.set_default_dtype("float16")
+paddle.seed(100)
+
+paddle.set_default_dtype("float16")
 # paddle.set_default_dtype("float32")
-paddle.set_device("cpu")
+# paddle.set_device("cpu")
 
+model = LLaMAForCausalLM.from_pretrained("./llama-random", load_state_as_np=True)
 
-model = LLaMAForCausalLM.from_pretrained("./llama-13b", load_state_as_np=True)
+model.eval()
 
-tokenizer = LLaMATokenizer.from_pretrained("./llama-13b")
+tokenizer = LLaMATokenizer.from_pretrained(
+    "./llama-random",
+    add_bos_token=False,
+)
+tokenizer.padding_side = "left"
+tokenizer.pad_token = tokenizer.unk_token
 
-inputs = tokenizer("My name is", return_tensors="pd")
+inputs = tokenizer(
+    ["My name is", "I am"],
+    padding=True,
+    return_tensors="pd",
+    return_attention_mask=True,
+    return_position_ids=True,
+)
 
 output = model.generate(
-    inputs["input_ids"][:, 1:],
-    max_length=100,
+    inputs["input_ids"],
+    inputs["attention_mask"],
+    inputs["position_ids"],
+    max_length=40,
+    min_length=0,
     use_cache=True,
+    temperature=1.0,
+    top_k=1,
+    top_p=1.0,
+    repetition_penalty=1.0,
+    decode_strategy="sampling",
 )[0]
 
-print(tokenizer.decode(output.tolist()[0], skip_special_tokens=True))
+for out in output.tolist():
+    print(tokenizer.decode(out, skip_special_tokens=True))
+    print("-" * 20)

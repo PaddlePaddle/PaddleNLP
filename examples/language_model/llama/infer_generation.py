@@ -46,8 +46,12 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = LLaMATokenizer.from_pretrained(args.model_dir)
+        self.tokenizer = LLaMATokenizer.from_pretrained(
+            args.model_dir,
+            add_bos_token=False,
+        )
         self.tokenizer.padding_side = "left"
+        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
@@ -62,7 +66,6 @@ class Predictor(object):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         config.disable_glog_info()
-        config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
@@ -82,8 +85,8 @@ class Predictor(object):
             input_handles[name].copy_from_cpu(inputs[name])
 
         self.predictor.run()
-        output_names = predictor.get_output_names()
-        output_handle = predictor.get_output_handle(output_names[0])
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
         results = output_handle.copy_to_cpu()
         return results
 
@@ -104,8 +107,9 @@ class Predictor(object):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    paddle.seed(100)
     predictor = Predictor(args)
-    all_texts = ["My name is"]
+    all_texts = ["My name is", "I am"]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)

@@ -44,6 +44,9 @@ def parse_args():
 def main():
     args = parse_args()
 
+    paddle.seed(100)
+    paddle.set_default_dtype("float16")
+
     tokenizer = LLaMATokenizer.from_pretrained(args.model_path)
     config = LLaMAConfig.from_pretrained(args.model_path)
 
@@ -52,12 +55,9 @@ def main():
     config.min_length = 0
     config.decode_strategy = "sampling"
     config.temperature = 1.0
-    config.tok_k = 0
+    config.top_k = 1
     config.top_p = 1.0
     config.repetition_penalty = 1.0
-    config.eos_token_id = tokenizer.eos_token_id
-    config.bos_token_id = tokenizer.bos_token_id
-    config.pad_token_id = tokenizer.pad_token_id
     config.use_cache = True
     config.use_recompute = False
 
@@ -80,7 +80,7 @@ def main():
             config.min_length,
             config.decode_strategy,
             config.temperature,
-            config.tok_k,
+            config.top_k,
             config.top_p,
             config.repetition_penalty,
         ],
