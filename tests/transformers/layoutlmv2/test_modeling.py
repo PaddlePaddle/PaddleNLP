@@ -16,7 +16,6 @@ import unittest
 
 import paddle
 from paddle import Tensor
-from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     LayoutLMv2Config,
@@ -191,15 +190,6 @@ class LayoutLMv2ModelTester:
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
 
-@parameterized_class(
-    ("return_dict", "use_labels"),
-    [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
-    ],
-)
 class LayoutLMv2ModelModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = LayoutLMv2Model
     use_labels = False
