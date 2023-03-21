@@ -107,6 +107,7 @@ from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
 from .layoutlmv2.tokenizer import *
+from .layoutlmv2.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .luke.modeling import *
