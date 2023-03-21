@@ -20,44 +20,42 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["BLOOM_PRETRAINED_INIT_CONFIGURATION", "BloomConfig", "BLOOM_PRETRAINED_RESOURCE_FILES_MAP"]
 
-BLOOM_PRETRAINED_INIT_CONFIGURATION = {
-    "bigscience/bloom-560m": {
-        "apply_residual_connection_post_layernorm": False,
-        "architectures": ["BloomModel"],
-        "attention_dropout": 0.0,
-        "attention_softmax_in_fp32": True,
-        "bias_dropout_fusion": True,
-        "bos_token_id": 1,
-        "dtype": "float32",
-        "eos_token_id": 2,
-        "hidden_dropout": 0.0,
-        "initializer_range": 0.02,
-        "layer_norm_epsilon": 1e-05,
-        "masked_softmax_fusion": True,
-        "model_type": "bloom",
-        "n_embed": 1024,
-        "n_layer": 24,
-        "num_attention_heads": 16,
-        "offset_alibi": 100,
-        "pad_token_id": 3,
-        "pretraining_tp": 1,
-        "skip_bias_add": True,
-        "skip_bias_add_qkv": False,
-        "slow_but_exact": False,
-        "unk_token_id": 0,
-        "vocab_size": 250880,
-        "mp_degree": 1,
-        "pp_degree": 1,
-        "mp_rank": -1,
-        "use_recompute": False,
-        "use_pure_fp16": False,
+
+def _construct_resource_file_url(model_names: list[str], file_name: str) -> dict[str, str]:
+    """construct resource file dict object according to the file type
+
+    TODO(wj-Mcat): this method will be moved into `PretrainedConfig` later
+
+    Args:
+        file_name (str): the name of target file
+
+    Returns:
+        dict[str, str]: the dict info of pretrained
+    """
+    return {
+        model_name: f"https://paddlenlp.bj.bcebos.com/models/community/{model_name}/{file_name}"
+        for model_name in model_names
     }
-}
+
+
+BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "bigscience/bloom-560m",
+    "bigscience/bloom-1b1",
+    "bigscience/bloom-3b",
+    "bigscience/bloom-7b1",
+    "bigscience/bloom",  # TODO(wj-Mcat): support shard weight donwloading
+    "bigscience/bloomz-560m",
+    "bigscience/bloomz-1b1",
+    "bigscience/bloomz-3b",
+    "bigscience/bloomz-7b1",
+    "bigscience/bloomz",  # TODO(wj-Mcat): support shard weight donwloading
+]
+
+BLOOM_PRETRAINED_INIT_CONFIGURATION = _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "config.json")
+
 
 BLOOM_PRETRAINED_RESOURCE_FILES_MAP = {
-    "model_state": {
-        "bigscience/bloom-560m": "https://paddlenlp.bj.bcebos.com/models/community/bigscience/bloom-560m/model_state.pdparams"
-    }
+    "model_state": _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "model_state.pdparams")
 }
 
 

@@ -618,18 +618,15 @@ class BloomPreTrainedModel(PretrainedModel):
 
     def init_weights(self, module):
         """Initialize the weights."""
-        return
-        if self.config.mp_degree > 1:
-            # TODO(wj-Mcat): disable weight initialization
-            return
-
-        # TODO(wj-Mcat): init for embedding
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.set_value(
-                paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
+                paddle.randn(module.weight.shape)
+                # paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
             if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.tensor.zeros(shape=module.weight.shape))
+                module.weight.set_value(
+                    paddle.tensor.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype())
+                )
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, BloomModel):
@@ -1338,14 +1335,6 @@ class BloomForTokenClassification(BloomPreTrainedModel):
         )
 
 
-def TopKProcess(probs, top_k, min_tokens_to_keep):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-    # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
-    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
-    return probs
-
-
 class BloomForGeneration(BloomPreTrainedModel):
     """
     Bloom Model with pretraining tasks on top.
@@ -1356,7 +1345,10 @@ class BloomForGeneration(BloomPreTrainedModel):
 
     """
 
-    def __init__(self, config):
+    def __init__(self, config: BloomConfig):
+        # when running generation, it must be True
+        config.use_cache = True
+
         super(BloomForGeneration, self).__init__(config)
         self.bloom = BloomModel(config)
         self.config = config
@@ -1597,8 +1589,7 @@ class BloomForGeneration(BloomPreTrainedModel):
             # matmul = auto.shard_op(paddle.matmul, self.bloom.mesh[-1],
             #                        [x_dims_mapping, w_dims_mapping, None])
 
-            with paddle.fluid.name_scope("skip_quant"):
-                logits = paddle.matmul(logits, self.bloom.word_embeddings.weight, transpose_y=True)
+            logits = paddle.matmul(logits, self.bloom.word_embeddings.weight, transpose_y=True)
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
@@ -1631,7 +1622,10 @@ class BloomForGeneration(BloomPreTrainedModel):
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             if not self.use_topp_sampling:
-                next_tokens = paddle.multinomial(probs)
+                # TODO(wj-Mcat): multinomial do not support fp16, so convert it to fp32
+                # refer to: https://github.com/PaddlePaddle/Paddle/issues/51852
+                next_tokens = paddle.multinomial(paddle.cast(probs, paddle.float32))
+                # next_tokens = paddle.multinomial(probs)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 

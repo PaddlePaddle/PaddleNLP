@@ -256,7 +256,7 @@ def do_generation(args):
     config["use_recompute"] = args.use_recompute
     config["enable_fuse_transformer"] = False
     config["use_cache"] = True
-    config.use_pure_fp16 = True
+    config.use_pure_fp16 = False
 
     model = BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)
 
@@ -266,21 +266,19 @@ def do_generation(args):
     total_score = 0
     score_name = "loss" if not args.cloze_eval else "number correct"
 
-    tic_eval = time.time()
-    eval_data_loader = create_eval_dataset(args)
-    model.eval()
-    total_score = 0
-    score_name = "loss" if not args.cloze_eval else "number correct"
-
     with paddle.no_grad():
         for step, batch in enumerate(eval_data_loader):
+
             tokens, loss_mask = batch[:2]
             labels = batch[-1]
+
             with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype="float16"):
-                preds = model(tokens)
+                preds = paddle.cast(model(tokens).detach(), dtype=paddle.float32)
 
                 if not args.cloze_eval:
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
+                    masked_lm_loss = paddle.cast(masked_lm_loss, "float32")
+
                     loss = paddle.sum(masked_lm_loss * loss_mask)
                     total_score += loss.numpy() / (args.num_tokenized_tokens - 1)
                 else:
@@ -313,7 +311,7 @@ def do_generation(args):
         string = " validation results on {} | ".format(args.eval_path)
         string += "number correct: {:.4E} | ".format(num_correct)
         string += "total examples: {:.4E} | ".format(args.num_examples)
-    string += "avg accuracy: {:.4E}".format(acc)
+        string += "avg accuracy: {:.4E}".format(acc)
     logger.info(string)
 
 
