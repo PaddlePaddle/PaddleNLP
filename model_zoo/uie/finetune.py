@@ -227,6 +227,8 @@ def main():
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir, "export")
         export_model(model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir)
+        trainer.tokenizer.save_pretrained(model_args.export_model_dir)
+
     if training_args.do_compress:
 
         @paddle.no_grad()
