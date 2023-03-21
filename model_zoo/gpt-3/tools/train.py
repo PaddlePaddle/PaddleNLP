@@ -27,6 +27,7 @@ from ppfleetx.core import EagerEngine
 from ppfleetx.data import build_dataloader
 from ppfleetx.distributed.apis import env
 from ppfleetx.models import build_module
+from ppfleetx.ops.fused_layers import mock_layers
 from ppfleetx.utils import config
 
 
@@ -37,6 +38,8 @@ def set_default_flags(flags):
 
 
 if __name__ == "__main__":
+    mock_layers()
+
     args = config.parse_args()
     cfg = config.get_config(args.config, overrides=args.override, show=False)
 
