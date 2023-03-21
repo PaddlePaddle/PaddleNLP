@@ -1,0 +1,28 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+
+Engine:
+  save_load:
+    ckpt_dir:
+
+
+Model:
+  module: GPTEvalModule
+  hidden_dropout_prob: 0.0
+  attention_probs_dropout_prob: 0.0
+
+
+Compress:
+  Prune:
+    enable: True
+    criterion: l1_norm
+    ratio: 0.125
+
+
+Offline_Eval:
+  eval_path: ./lambada_test.jsonl
+  cloze_eval: True
+  overlapping_eval: 32
+  batch_size: 8
+  max_seq_len: 1024
+  logging_freq: 10
