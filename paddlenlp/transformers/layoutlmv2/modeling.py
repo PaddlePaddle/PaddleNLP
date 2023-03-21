@@ -827,6 +827,7 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
         )
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.classifier.apply(self.init_weights)
+        self.num_hidden_layers = config.num_hidden_layers
 
     def get_input_embeddings(self):
         return self.layoutlmv2.embeddings.word_embeddings
@@ -869,7 +870,7 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        hidden_states = {f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(12)}
+        hidden_states = {f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(self.num_hidden_layers)}
 
         if self.training:
             outputs = logits, hidden_states
