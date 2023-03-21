@@ -580,7 +580,6 @@ class GLMPretrainedModel(PretrainedModel):
         return mappings
 
     def init_weights(self, layer):
-        return
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
