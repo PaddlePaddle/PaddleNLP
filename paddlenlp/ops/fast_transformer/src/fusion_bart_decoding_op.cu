@@ -21,6 +21,10 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "cublas_handle.h"
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fusion_bart_decoding_op.h"
