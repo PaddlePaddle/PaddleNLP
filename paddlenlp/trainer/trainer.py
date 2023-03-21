@@ -909,7 +909,7 @@ class Trainer:
         )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
-        if self.args.dataset_world_size <= 1:
+        if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
                 batch_size=self.args.per_device_eval_batch_size,
