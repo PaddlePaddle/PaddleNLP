@@ -46,7 +46,6 @@ from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
 from .electra.configuration import *
-from .albert.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -61,7 +60,6 @@ from .bigbird.configuration import *
 from .bigbird.tokenizer import *
 from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
-from .blenderbot.configuration import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
 from .blip.modeling import *
@@ -92,7 +90,6 @@ from .ernie_doc.configuration import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
-from .ernie_gram.configuration import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
 from .ernie_layout.configuration import *
@@ -107,7 +104,6 @@ from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
 from .layoutlmv2.tokenizer import *
-from .layoutlmv2.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .luke.modeling import *
@@ -165,10 +161,8 @@ from .unimo.tokenizer import *
 from .unimo.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
-from .xlnet.configuration import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
-from .xlm.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
@@ -204,9 +198,9 @@ from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
-from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .pegasus.configuration import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
@@ -219,7 +213,6 @@ from .nystromformer.tokenizer import *
 from ..utils.import_utils import is_fast_tokenizer_available
 
 if is_fast_tokenizer_available():
-    from .tokenizer_utils_fast import PretrainedFastTokenizer
     from .bert.fast_tokenizer import *
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
