@@ -2,7 +2,7 @@
 
 ## 模型介绍
 
-Bloom 。
+BLOOM是一种自回归大型语言模型(LLM)，在大量文本数据上训练从而生生成目标文本，同时它能够支持46种语言和13种编程语言的文本交互。BLOOM 主要基于文本生成任务训练而成，可以很好的完成文本续写任务，此外 BloomZ 系列模型加入了 Instruction Tuning，因为可以。
 
 ## 文本生成
 
@@ -45,4 +45,37 @@ python run_eval.py \
     --batch_size 8 \
     --eval_path ./data/./lambada_test.jsonl \
     --cloze_eval
+```
+
+## 模型 Finetune
+
+此模型也支持在生成式任务微调，示例脚本如下所示：
+
+```shell
+python -u -m paddle.distributed.launch --gpus "0" finetune_generation.py \
+    --model_type bloom \
+    --model_name_or_path "bigscience/bloom-7b1" \
+    --tokenizer_name_or_path "bigscience/bloom-7b1" \
+    --input_dir "old" \
+    --output_dir "output_generate" \
+    --weight_decay 0.01 \
+    --grad_clip 1.0 \
+    --max_steps 50000 \
+    --decay_steps 320 \
+    --device gpu \
+    --eval_freq  100 \
+    --save_steps 100 \
+    --logging_freq 10 \
+    --warmup_rate 0.01 \
+    --scale_loss 1024 \
+    --global_batch_size 256\
+    --micro_batch_size 4\
+    --max_lr 5e-4 \
+    --min_lr 1e-4 \
+    --dp_degree 1 \
+    --mp_degree 1 \
+    --sharding_degree 1 \
+    --use_pure_fp16 False\
+    --use_recompute True\
+    --sharding_stage 2
 ```
