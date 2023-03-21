@@ -22,7 +22,6 @@ import re
 import shutil
 import tempfile
 from contextlib import contextmanager
-from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 import numpy as np
@@ -541,32 +540,6 @@ class PretrainedModel(Layer, ModuleUtilsMixin, GenerationMixin, ConversionMixin)
         modules properly initialized (such as weight initialization).
         """
         self.init_weights()
-        self._backward_compatibility_gradient_checkpointing()
-
-    def _backward_compatibility_gradient_checkpointing(self):
-        if self.supports_gradient_checkpointing and getattr(self.config, "gradient_checkpointing", False):
-            self.gradient_checkpointing_enable()
-            # Remove the attribute now that is has been consumed, so it's no saved in the config.
-            delattr(self.config, "gradient_checkpointing")
-
-    def gradient_checkpointing_enable(self):
-        """
-        Activates gradient checkpointing for the current model.
-        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
-        activations".
-        """
-        if not self.supports_gradient_checkpointing:
-            raise ValueError(f"{self.__class__.__name__} does not support gradient checkpointing.")
-        self.apply(partial(self._set_gradient_checkpointing, value=True))
-
-    def gradient_checkpointing_disable(self):
-        """
-        Deactivates gradient checkpointing for the current model.
-        Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
-        activations".
-        """
-        if self.supports_gradient_checkpointing:
-            self.apply(partial(self._set_gradient_checkpointing, value=False))
 
     def __getattr__(self, name):
         """
@@ -681,7 +654,7 @@ class PretrainedModel(Layer, ModuleUtilsMixin, GenerationMixin, ConversionMixin)
 
             # Tie weights should be skipped when not initializing all weights
             # since from_pretrained(...) calls tie weights anyways
-            self.tie_weights()
+            # self.tie_weights()
 
     def _initialize_weights(self, module):
         """
@@ -691,26 +664,6 @@ class PretrainedModel(Layer, ModuleUtilsMixin, GenerationMixin, ConversionMixin)
             return
         self._init_weights(module)
         module._is_hf_initialized = True
-
-    def tie_weights(self):
-        """
-        Tie the weights between the input embeddings and the output embeddings.
-        If the `torchscript` flag is set in the configuration, can't handle parameter sharing so we are cloning the
-        weights instead.
-        """
-        if getattr(self.config, "tie_word_embeddings", True):
-            output_embeddings = self.get_output_embeddings()
-            if output_embeddings is not None:
-                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
-
-        if getattr(self.config, "is_encoder_decoder", False) and getattr(self.config, "tie_encoder_decoder", False):
-            if hasattr(self, self.base_model_prefix):
-                self = getattr(self, self.base_model_prefix)
-            self._tie_encoder_decoder_weights(self.encoder, self.decoder, self.base_model_prefix)
-
-        # for module in self.sublayers():
-        #     if hasattr(module, "_tie_weights"):
-        #         module._tie_weights()
 
     @staticmethod
     def _tie_encoder_decoder_weights(encoder: nn.Layer, decoder: nn.Layer, base_model_prefix: str):

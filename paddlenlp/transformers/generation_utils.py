@@ -29,7 +29,7 @@ except ImportError:
 
 from paddlenlp.utils.log import logger
 
-from .model_outputs import ModelOutput, Seq2SeqLMOutput
+from .model_outputs import ModelOutput
 
 __all__ = ["GenerationMixin"]
 
@@ -394,7 +394,7 @@ class GenerationMixin(object):
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
-        if "past_key_values" in outputs:
+        if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
 
         # update token_type_ids with last value
@@ -961,8 +961,8 @@ class GenerationMixin(object):
             outputs = self(**model_inputs)
             outputs = outputs[0] if isinstance(outputs, tuple) else outputs
 
-            # To hundle the logits is a Seq2SeqLMOutput
-            logits = outputs.logits if isinstance(outputs, (Seq2SeqLMOutput, ModelOutput)) else outputs
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
 
             # [batch_size, vocab_size]
             next_token_logits = logits[:, -1, :]
@@ -1022,7 +1022,10 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1096,7 +1099,10 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1233,8 +1239,11 @@ class GenerationMixin(object):
                     )
 
                 group_input_ids = input_ids[batch_group_indices]
-                logits = outputs[0] if isinstance(outputs, tuple) else outputs
+                outputs = outputs[0] if isinstance(outputs, tuple) else outputs
                 # select outputs of beams of current group only
+
+                # To hundle the logits is a ModelOutput
+                logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
 
                 logits = logits[:, -1, :]
                 logits = paddle.index_select(logits, paddle.to_tensor(batch_group_indices))

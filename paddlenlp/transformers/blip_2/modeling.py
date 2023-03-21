@@ -107,7 +107,7 @@ class Blip2VisionEmbeddings(nn.Layer):
         self.patch_size = config.patch_size
 
         self.class_embedding = Parameter(
-            paddle.randn([1, 1, self.embed_dim]),
+            paddle.randn([1, 1, self.embed_dim], dtype=paddle.get_default_dtype()),
         )
 
         self.patch_embedding = nn.Conv2D(
@@ -117,7 +117,9 @@ class Blip2VisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
 
-        self.position_embedding = Parameter(paddle.randn([1, self.num_positions, self.embed_dim]))
+        self.position_embedding = Parameter(
+            paddle.randn([1, self.num_positions, self.embed_dim], dtype=paddle.get_default_dtype())
+        )
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
         batch_size = pixel_values.shape[0]
@@ -152,8 +154,8 @@ class Blip2Attention(nn.Layer):
         self.qkv = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias_attr=False)
 
         if config.qkv_bias:
-            q_bias = Parameter(paddle.zeros([self.embed_dim]))
-            v_bias = Parameter(paddle.zeros([self.embed_dim]))
+            q_bias = Parameter(paddle.zeros([self.embed_dim], dtype=paddle.get_default_dtype()))
+            v_bias = Parameter(paddle.zeros([self.embed_dim], dtype=paddle.get_default_dtype()))
         else:
             q_bias = None
             v_bias = None
@@ -1088,7 +1090,7 @@ class Blip2QFormerModel(Blip2PretrainedModel):
 
         query_length = query_embeds.shape[1] if query_embeds is not None else 0
 
-        embedding_output = self.layernorm(query_embeds)
+        embedding_output = self.layernorm(query_embeds.cast(self.layernorm.weight.dtype))
         embedding_output = self.dropout(embedding_output)
 
         input_shape = embedding_output.shape[:-1]
@@ -1511,7 +1513,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         ```python
         >>> from PIL import Image
         >>> import requests
-        >>> from transformers import Blip2Processor, Blip2ForConditionalGeneration
+        >>> from paddlenlp.transformers import Blip2Processor, Blip2ForConditionalGeneration
         >>> import paddle
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(
@@ -1529,7 +1531,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         ```python
         >>> from PIL import Image
         >>> import requests
-        >>> from transformers import Blip2Processor, Blip2ForConditionalGeneration
+        >>> from paddlenlp.transformers import Blip2Processor, Blip2ForConditionalGeneration
         >>> import paddle
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2ForConditionalGeneration.from_pretrained(

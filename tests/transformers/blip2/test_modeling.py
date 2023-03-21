@@ -608,6 +608,7 @@ class Blip2ModelTest(ModelTesterMixin, unittest.TestCase):
     test_resize_embeddings = False
     test_attention_outputs = False
     use_test_model_name_list = False
+    use_test_inputs_embeds: bool = False
 
     def setUp(self):
         self.model_tester = Blip2ForConditionalGenerationModelTester(self)
@@ -618,10 +619,6 @@ class Blip2ModelTest(ModelTesterMixin, unittest.TestCase):
 
     @unittest.skip(reason="Hidden_states is tested in individual model tests")
     def test_hidden_states_output(self):
-        pass
-
-    @unittest.skip(reason="Inputs_embeds is tested in individual model tests")
-    def test_inputs_embeds(self):
         pass
 
     @unittest.skip(reason="Retain_grad is tested in individual model tests")
