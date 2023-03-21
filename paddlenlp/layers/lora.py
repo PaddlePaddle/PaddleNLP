@@ -156,7 +156,7 @@ def print_trainable_parameters(model: nn.Layer) -> None:
         else:
             trainable_numel += weight.numel().numpy()[0]
     logger.info(
-        f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable(%):{100 * trainable_numel / (freeze_numel+trainable_numel):.2f}"
+        f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
     )
 
 
