@@ -124,9 +124,18 @@ def data_collator(data, stack_fn=Stack()):
         size += 8 - (size % 8)
     # masked_lm_positions
     # Organize as a 1D tensor for gather or use gather_nd
+
+    # masked_lm_positions
+    # Organize as a 1D tensor for gather or use gather_nd
     out[3] = np.full(size, 0, dtype=np.int32)
     # masked_lm_labels
     out[4] = np.full([size, 1], -100, dtype=np.int64)
+    mask_token_num = 0
+    for i, x in enumerate(data):
+        for j, pos in enumerate(x[3]):
+            out[3][mask_token_num] = i * seq_length + pos
+            out[4][mask_token_num] = x[4][j]
+            mask_token_num += 1
 
     return {
         "input_ids": out[0],
