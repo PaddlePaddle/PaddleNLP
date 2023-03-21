@@ -129,11 +129,11 @@ def _find_and_replace_module(model, module_name, lora_config):
     setattr(parent_module, attribute_chain[-1], lora_module)
 
 
-def mark_only_lora_as_trainable(model: nn.Layer, bias: Optional[str] = None) -> None:
+def mark_only_lora_as_trainable(model: nn.Layer, trainable_bias: Optional[str] = None) -> None:
     for _, layer in model.named_sublayers():
         if isinstance(layer, LoRALinear):
             for name, weight in layer.state_dict().items():
-                if bias in ["lora", "all"] and "bias" in name:
+                if trainable_bias in ["lora", "all"] and "bias" in name:
                     weight.stop_gradient = False
                 elif "lora" in name:
                     weight.stop_gradient = False
@@ -141,7 +141,7 @@ def mark_only_lora_as_trainable(model: nn.Layer, bias: Optional[str] = None) -> 
                     weight.stop_gradient = True
         else:
             for name, weight in layer.state_dict().items():
-                if bias == "all" and "bias" in name:
+                if trainable_bias == "all" and "bias" in name:
                     weight.stop_gradient = False
                 else:
                     weight.stop_gradient = True
@@ -193,6 +193,9 @@ class LoRAConfig:
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout"})
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    trainable_bias: Optional[str] = field(
+        default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
 
     @property
