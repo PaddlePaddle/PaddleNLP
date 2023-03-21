@@ -31,8 +31,6 @@ __all__ = [
     "LoRALinear",
     "get_lora_model",
     "mark_only_lora_as_trainable",
-    "trainable_parameters",
-    "trainable_parameter_names",
 ]
 
 
@@ -74,7 +72,7 @@ class LoRALinear(nn.Linear):
                 shape=[r, out_features],
                 dtype=self._dtype,
                 is_bias=False,
-                default_initializer=nn.initializer.Constant(),
+                default_initializer=nn.initializer.Constant(value=0.0),
             )
             self.scaling = self.lora_alpha / self.r
 
@@ -149,7 +147,7 @@ def mark_only_lora_as_trainable(model: nn.Layer, bias: Optional[str] = None) -> 
                     weight.stop_gradient = True
 
 
-def trainable_parameters(model: nn.Layer) -> None:
+def print_trainable_parameters(model: nn.Layer) -> None:
     freeze_numel = 0
     trainable_numel = 0
     for _, weight in model.state_dict().items():
@@ -162,7 +160,7 @@ def trainable_parameters(model: nn.Layer) -> None:
     )
 
 
-def trainable_parameter_names(model: nn.Layer):
+def print_trainable_parameter_names(model: nn.Layer):
     names = []
     for name, weight in model.state_dict().items():
         if not weight.stop_gradient:
