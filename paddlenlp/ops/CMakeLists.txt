@@ -16,11 +16,6 @@ project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
-if(${CUDA_VERSION_MAJOR} VERSION_GREATER_EQUAL "11")
-  add_definitions("-DENABLE_BF16")
-  message("CUDA_VERSION ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} is greater or equal than 11.0, enable -DENABLE_BF16 flag")
-endif()
-
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
@@ -65,7 +60,7 @@ if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-list(APPEND decoding_op_files cublas_handle.cc utils.cc fusion_bloom_op.cc fusion_bloom_op.cu)
+list(APPEND decoding_op_files cublas_handle.cc utils.cc)
 
 if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
