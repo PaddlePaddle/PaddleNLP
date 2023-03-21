@@ -889,7 +889,7 @@ class Trainer:
                     batch_size=self.args.per_device_train_batch_size,
                     drop_last=self.args.dataloader_drop_last,
                     num_processes=self.args.dataset_world_size,
-                    process_index=self.args.dataset_index,
+                    process_index=self.args.dataset_rank,
                 )
 
             return DataLoader(
