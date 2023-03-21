@@ -773,6 +773,9 @@ class GenerationMixin(object):
             no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
         )
 
+        if is_tracing:
+            self._fast_entry = None
+
         if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
@@ -1064,8 +1067,11 @@ class GenerationMixin(object):
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-            next_tokens = paddle.multinomial(probs)
 
+            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            if paddle.get_default_dtype() not in ["float32", "float64"]:
+                probs = probs.astype("float32")
+            next_tokens = paddle.multinomial(probs)
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1114,8 +1120,6 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
-        output_ids = paddle.assign(input_ids)
-
         # use_cache is immutable, we split it off other mutable kwargs.
         assert "use_cache" in model_kwargs
         immutable = {"use_cache": model_kwargs["use_cache"]}
@@ -1127,7 +1131,7 @@ class GenerationMixin(object):
             del model_inputs["use_cache"]
             return self(**model_inputs, **immutable)
 
-        def _post_process_(outputs, input_ids, output_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
+        def _post_process_(outputs, input_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             # [batch_size, vocab_size]
@@ -1150,6 +1154,9 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
+            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            if paddle.get_default_dtype() not in ["float32", "float64"]:
+                probs = probs.astype("float32")
             next_tokens = paddle.multinomial(probs)
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
@@ -1158,7 +1165,7 @@ class GenerationMixin(object):
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
-            input_ids = next_tokens
+            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
                 unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
@@ -1166,14 +1173,11 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-
-            output_ids = paddle.concat([output_ids, next_tokens], axis=1)
-
-            return input_ids, output_ids, scores, unfinished_flag, model_kwargs
+            return input_ids, scores, unfinished_flag, model_kwargs
 
         outputs = _forward_(**model_kwargs)
-        input_ids, output_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-            outputs, input_ids, output_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
+        input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+            outputs, input_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
         )
 
         paddle.increment(cur_len)
@@ -1186,10 +1190,9 @@ class GenerationMixin(object):
         max_length = paddle.full([1], max_length, dtype="int64")
 
         while cur_len < max_length:
-            input_ids, output_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+            input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                 _forward_(**model_kwargs),
                 input_ids,
-                output_ids,
                 cur_len_gpu,
                 origin_len_gpu,
                 scores,
@@ -1202,7 +1205,7 @@ class GenerationMixin(object):
             if not paddle.any(unfinished_flag):
                 break
 
-        return output_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:], scores
 
     def beam_search(
         self,
