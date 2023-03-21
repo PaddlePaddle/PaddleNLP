@@ -4,6 +4,18 @@
 
 Bloom 。
 
+## 文本生成
+
+* 单卡小模型生成
+
+```bash
+python run_generation.py --model_name_or_path "bigscience/bloom-560m"
+```
+
+参数说明：
+- `model_name_or_path`: 模型名称, 例如：`bigscience/bloom-560m`, `bigscience/bloom-3b`, `bigscience/bloom-7b1`等。
+
+
 ## 模型评估
 
 我们提供了对[WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)、[LAMBADA](https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl)两种数据集的评估脚本, 并将数据放置在data 目录下， 使用如下命令启动评估：
