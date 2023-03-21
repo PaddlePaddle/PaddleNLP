@@ -904,7 +904,7 @@ class GenerationMixin(object):
                     **model_kwargs,
                 )
             else:
-                return self.sample_d2s(
+                return self.sample(
                     input_ids,
                     logits_processors,
                     max_len,
@@ -1070,8 +1070,6 @@ class GenerationMixin(object):
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
             next_tokens = paddle.multinomial(probs.astype("float32"))
-            next_scores = paddle.index_sample(origin_probs, next_tokens)
-
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
