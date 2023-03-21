@@ -115,4 +115,6 @@ ARTIST_PRETRAINED_RESOURCE_FILES_MAP = {
     }
 }
 
-ArtistConfig = GPTConfig
+
+class ArtistConfig(GPTConfig):
+    pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
