@@ -773,7 +773,7 @@ class GenerationMixin(object):
             no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
         )
 
-        if not hasattr(self, "_fast_entry"):
+        if is_tracing:
             self._fast_entry = None
 
         if getattr(self, "_fast_entry", None) is not False and use_fast:
@@ -1069,7 +1069,9 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            next_tokens = paddle.multinomial(probs.astype("float32"))
+            if paddle.get_default_dtype() not in ["float32", "float64"]:
+                probs = probs.astype("float32")
+            next_tokens = paddle.multinomial(probs)
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1153,7 +1155,9 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            next_tokens = paddle.multinomial(probs.astype("float32"))
+            if paddle.get_default_dtype() not in ["float32", "float64"]:
+                probs = probs.astype("float32")
+            next_tokens = paddle.multinomial(probs)
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1161,7 +1165,6 @@ class GenerationMixin(object):
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
-            cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
