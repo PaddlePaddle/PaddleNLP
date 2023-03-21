@@ -105,7 +105,7 @@ def main():
         output_predict=True,
         parallel_output=True,
         load_state_as_np=True,
-        # low_cpu_mem_usage=True, # todo enable low_cpu_mem_usage=Truw
+        # low_cpu_mem_usage=True, # todo enable low_cpu_mem_usage=True
         # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
