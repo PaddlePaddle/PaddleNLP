@@ -92,3 +92,18 @@ class FastDeployStableDiffusionPipeline(metaclass=DummyObject):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+
+class FastDeployStableDiffusionControlNetPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "fastdeploy"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])

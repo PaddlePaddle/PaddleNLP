@@ -594,12 +594,12 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
 
         # unet_output_name = self.unet.model.get_output_info(0).name
         # unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
-        height, width = image.shape[-2:]
+        # height, width = image.shape[-2:]
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                concat_noise_pred = paddle.zeros(
-                    [4 * batch_size * num_images_per_prompt, 4, height // 8, width // 8], dtype="float32"
-                )
+                # concat_noise_pred = paddle.zeros(
+                #     [4 * batch_size * num_images_per_prompt, 4, height // 8, width // 8], dtype="float32"
+                # )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2)
                 source_latent_model_input = paddle.concat([source_latents] * 2)

@@ -12,27 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-import argparse
 import os
-import sys
-import random
-import time
+from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.utils.log import logger
-
 from base_model import SemanticIndexBaseStatic
+from config import collection_name, embedding_name, partition_tag
 from data import convert_example, create_dataloader
-from data import gen_id2corpus, gen_text_file
-from tqdm import tqdm
 from milvus_util import RecallByMilvus
-from config import embedding_name, collection_name, partition_tag
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 
 def search_in_milvus(text_embedding):
