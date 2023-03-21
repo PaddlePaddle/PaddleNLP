@@ -10,7 +10,8 @@
     * [单机多卡](#单机多卡)
     * [预测评估](#预测评估)
   * [部署](#部署)
-    * [Python部署](#Python部署)
+    * [FastDeploy 部署](#FastDeploy部署)
+      * [Python 部署](#Python部署)
     * [服务化部署](#服务化部署)
 * [参考论文](#参考论文)
 
@@ -198,15 +199,37 @@ python run_classifier.py \
 | VECO Large | 88.9 | 82.4 | 86.0 | 84.7 | 85.3 | 86.2 | **85.8** | 80.1 | 83.0 | 77.2 | 80.9 | 82.8 | 75.3 | **83.1** | **83.0** | 83.0 |
 | **ERNIE-M Large** | **89.5** | **86.5** | **86.9** | **86.1** | **86.0** | **86.8** | 84.1 | **83.8** | **84.1** | **84.5** | **82.1** | 83.5 | 81.1 | 79.4 | 77.9 | **84.2** |
 
+<a name="部署"></a>
+
 ## 部署
 
-### Python部署
+我们基于 FastDeploy 为 ERNIE-M 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
 
-Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
+<a name="FastDeploy部署"></a>
+
+### FastDeploy 部署
+
+⚡️[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
+
+<div align="center">
+
+<img src="https://user-images.githubusercontent.com/54695910/213087724-7175953a-0e07-4af8-a4a1-5304163da2e0.png" >
+
+</div>
+
+目前 ERNIE-M 模型已提供基于 FastDeploy 的部署示例，支持在多款硬件（CPU、GPU、昆仑芯、华为昇腾以及 Graphcore IPU）以及推理引擎后端进行部署。
+
+<a name="Python部署"></a>
+
+#### Python 部署
+
+Python 部署请参考：[Python 部署指南](./deploy/python/README.md)
+
+<a name="服务化部署"></a>
 
 ### 服务化部署
 
-* [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
+* [PaddleNLP SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
 
 
 ## 参考论文

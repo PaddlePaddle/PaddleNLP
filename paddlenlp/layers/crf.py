@@ -15,8 +15,8 @@
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.layers import sequence_mask
-from paddlenlp.utils.log import logger
+from ..utils.log import logger
+from .sequence import sequence_mask
 
 __all__ = ["LinearChainCrf", "LinearChainCrfLoss", "ViterbiDecoder"]
 

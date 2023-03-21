@@ -14,11 +14,8 @@
 """
  This script includes code to calculating accuracy for results form textual similarity task
 """
-import copy
-import json
-import time
-import math
 import argparse
+import json
 
 
 def get_args():

@@ -14,22 +14,22 @@
 """
 sequence labeling
 """
-import ast
-import os
-import json
-import warnings
-import random
 import argparse
+import ast
+import json
+import os
+import random
+import warnings
 from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
+from utils import load_dict, read_by_lines, write_by_lines
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
-from utils import read_by_lines, write_by_lines, load_dict
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 
 warnings.filterwarnings("ignore")
 
@@ -153,7 +153,6 @@ def do_train():
 
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     label_map = load_dict(args.tag_path)
-    id2label = {val: key for key, val in label_map.items()}
     model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
@@ -161,7 +160,6 @@ def do_train():
     print("============start train==========")
     train_ds = DuEventExtraction(args.train_data, args.tag_path)
     dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
-    test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
     trans_func = partial(convert_example_to_feature,
                          tokenizer=tokenizer,
@@ -187,9 +185,6 @@ def do_train():
     dev_loader = paddle.io.DataLoader(dataset=dev_ds,
                                       batch_size=args.batch_size,
                                       collate_fn=batchify_fn)
-    test_loader = paddle.io.DataLoader(dataset=test_ds,
-                                       batch_size=args.batch_size,
-                                       collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
     # Generate parameter names needed to perform weight decay.
@@ -227,14 +222,11 @@ def do_train():
             if step > 0 and step % args.valid_step == 0 and rank == 0:
                 p, r, f1, avg_loss = evaluate(model, criterion, metric,
                                               len(label_map), dev_loader)
-                print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
-                        f'f1: {f1:.5f} current best {best_f1:.5f}')
+                print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, f1: {f1:.5f} current best {best_f1:.5f}')
                 if f1 > best_f1:
                     best_f1 = f1
-                    print(f'==============================================save best model ' \
-                            f'best performerence {best_f1:5f}')
-                    paddle.save(model.state_dict(),
-                                '{}/best.pdparams'.format(args.checkpoints))
+                    print(f'==============================================save best model best performerence {best_f1:5f}')
+                    paddle.save(model.state_dict(), f'{args.checkpoints}/best.pdparams')
             step += 1
 
     # save the final model
@@ -251,9 +243,6 @@ def do_predict():
     id2label = {val: key for key, val in label_map.items()}
     model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
-
-    no_entity_label = "O"
-    ignore_label = len(label_map)
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):

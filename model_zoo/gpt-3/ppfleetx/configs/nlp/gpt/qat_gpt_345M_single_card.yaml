@@ -1,0 +1,56 @@
+_base_: ./pretrain_gpt_base.yaml
+
+Global:
+  global_batch_size: 8
+  local_batch_size: 8
+  micro_batch_size: 8
+
+
+Model:
+  vocab_size: 50304
+  hidden_size: 1024
+  num_layers: 24
+  num_attention_heads: 16
+  ffn_hidden_size:
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 1024
+  type_vocab_size: 16
+  initializer_range: 0.02
+  use_recompute: False
+  recompute_granularity:
+  fused_linear: True
+  
+
+Distributed:
+  dp_degree:
+  mp_degree: 1
+  pp_degree: 1
+  sharding:
+    sharding_degree: 1
+    sharding_stage: 1
+    sharding_offload: False
+    reduce_overlap: False
+    broadcast_overlap: False
+
+
+Compress:
+  pretrained:
+  Quantization:
+    enable: True
+    weight_quantize_type: 'abs_max'
+    activation_quantize_type: 'moving_average_abs_max'
+    activation_preprocess_type: 'PACT'
+    weight_bits: 8
+    activation_bits: 8
+    quantizable_layer_type: ['Linear', 'ColumnParallelLinear', 'RowParallelLinear']
+    onnx_format: True
+    freeze_embedding: True
+    skip_tensor_map: 
+      block_3: ['linear2']
+      block_5: ['linear1']
+      block_6: ['linear2']
+      block_7: ['linear2']
+      block_10: ['linear2']
+      block_20: ['linear2']
+      block_21: ['linear2']

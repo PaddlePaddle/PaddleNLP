@@ -17,6 +17,7 @@ import os
 from dataclasses import dataclass, field
 
 import paddle
+from paddle.metric import Accuracy
 from sklearn.metrics import f1_score
 from utils import UTCLoss, read_local_dataset
 
@@ -35,6 +36,7 @@ from paddlenlp.transformers import UTC, AutoTokenizer
 class DataArguments:
     test_path: str = field(default="./data/test.txt", metadata={"help": "Test dataset file name."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
+    single_label: str = field(default=False, metadata={"help": "Predict exactly one label per sample."})
 
 
 @dataclass
@@ -71,6 +73,18 @@ def main():
         prompt_model.set_state_dict(model_state)
 
     # Define the metric function.
+    def compute_metrics_single_label(eval_preds):
+        labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
+        preds = paddle.to_tensor(eval_preds.predictions)
+        preds = paddle.nn.functional.softmax(preds, axis=-1)
+        labels = paddle.argmax(labels, axis=-1)
+        print(preds, labels)
+        metric = Accuracy()
+        correct = metric.compute(preds, labels)
+        metric.update(correct)
+        acc = metric.accumulate()
+        return {"accuracy": acc}
+
     def compute_metrics(eval_preds):
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
@@ -92,7 +106,7 @@ def main():
         train_dataset=None,
         eval_dataset=None,
         callbacks=None,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_single_label if data_args.single_label else compute_metrics,
     )
 
     if data_args.test_path is not None:
@@ -102,12 +116,20 @@ def main():
             json.dump(test_ret.metrics, fp)
 
         with open(os.path.join(training_args.output_dir, "test_predictions.json"), "w", encoding="utf-8") as fp:
-            preds = paddle.nn.functional.sigmoid(paddle.to_tensor(test_ret.predictions))
-            for index, pred in enumerate(preds):
-                result = {"id": index}
-                result["labels"] = paddle.where(pred > data_args.threshold)[0].tolist()
-                result["probs"] = pred[pred > data_args.threshold].tolist()
-                fp.write(json.dumps(result, ensure_ascii=False) + "\n")
+            if data_args.single_label:
+                preds = paddle.nn.functional.softmax(paddle.to_tensor(test_ret.predictions), axis=-1)
+                for index, pred in enumerate(preds):
+                    result = {"id": index}
+                    result["labels"] = paddle.argmax(pred).item()
+                    result["probs"] = pred[result["labels"]].item()
+                    fp.write(json.dumps(result, ensure_ascii=False) + "\n")
+            else:
+                preds = paddle.nn.functional.sigmoid(paddle.to_tensor(test_ret.predictions))
+                for index, pred in enumerate(preds):
+                    result = {"id": index}
+                    result["labels"] = paddle.where(pred > data_args.threshold)[0].tolist()
+                    result["probs"] = pred[pred > data_args.threshold].tolist()
+                    fp.write(json.dumps(result, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
-import tqdm
+import os
 
 import numpy as np
 import paddle
-from paddle import nn
-
-from text2sql.models import beam_search
-from text2sql.models import sql_beam_search
+import tqdm
+from text2sql.models import beam_search, sql_beam_search
 
 
 def inference(

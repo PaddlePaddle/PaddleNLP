@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """ mT5 model configuration"""
 from __future__ import annotations
 
@@ -20,98 +21,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["MT5_PRETRAINED_INIT_CONFIGURATION", "MT5Config"]
 
-MT5_PRETRAINED_INIT_CONFIGURATION = {
-    "mt5-small": {
-        "tie_word_embeddings": False,
-        "pad_token_id": 0,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "vocab_size": 250112,
-        "d_model": 512,
-        "d_kv": 64,
-        "d_ff": 1024,
-        "num_layers": 8,
-        "num_decoder_layers": 8,
-        "num_heads": 6,
-        "relative_attention_num_buckets": 32,
-        "dropout_rate": 0.1,
-        "layer_norm_epsilon": 1e-06,
-        "initializer_factor": 1.0,
-        "feed_forward_proj": "gated-gelu",
-    },
-    "mt5-base": {
-        "tie_word_embeddings": False,
-        "pad_token_id": 0,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "vocab_size": 250112,
-        "d_model": 768,
-        "d_kv": 64,
-        "d_ff": 2048,
-        "num_layers": 12,
-        "num_decoder_layers": 12,
-        "num_heads": 12,
-        "relative_attention_num_buckets": 32,
-        "dropout_rate": 0.1,
-        "layer_norm_epsilon": 1e-06,
-        "initializer_factor": 1.0,
-        "feed_forward_proj": "gated-gelu",
-    },
-    "mt5-large": {
-        "tie_word_embeddings": False,
-        "pad_token_id": 0,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "vocab_size": 250112,
-        "d_model": 1024,
-        "d_kv": 64,
-        "d_ff": 2816,
-        "num_layers": 24,
-        "num_decoder_layers": 24,
-        "num_heads": 16,
-        "relative_attention_num_buckets": 32,
-        "dropout_rate": 0.1,
-        "layer_norm_epsilon": 1e-06,
-        "initializer_factor": 1.0,
-        "feed_forward_proj": "gated-gelu",
-    },
-    "mt5-xl": {
-        "tie_word_embeddings": False,
-        "pad_token_id": 0,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "vocab_size": 250112,
-        "d_model": 2048,
-        "d_kv": 64,
-        "d_ff": 5120,
-        "num_layers": 24,
-        "num_decoder_layers": 24,
-        "num_heads": 32,
-        "relative_attention_num_buckets": 32,
-        "dropout_rate": 0.1,
-        "layer_norm_epsilon": 1e-06,
-        "initializer_factor": 1.0,
-        "feed_forward_proj": "gated-gelu",
-    },
-    "mt5-xxl": {
-        "tie_word_embeddings": False,
-        "pad_token_id": 0,
-        "bos_token_id": 0,
-        "eos_token_id": 1,
-        "vocab_size": 250112,
-        "d_model": 4096,
-        "d_kv": 64,
-        "d_ff": 10240,
-        "num_layers": 24,
-        "num_decoder_layers": 24,
-        "num_heads": 64,
-        "relative_attention_num_buckets": 32,
-        "dropout_rate": 0.1,
-        "layer_norm_epsilon": 1e-06,
-        "initializer_factor": 1.0,
-        "feed_forward_proj": "gated-gelu",
-    },
-}
+MT5_PRETRAINED_INIT_CONFIGURATION = {}
 
 
 class MT5Config(PretrainedConfig):

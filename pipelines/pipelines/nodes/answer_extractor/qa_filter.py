@@ -100,6 +100,7 @@ class QAFilter(BaseComponent):
             task_path=self._task_path,
             batch_size=batch_size,
             position_prob=position_prob,
+            device_id=0 if device == "gpu" else -1,
         )
 
     def _check_task_files(self):

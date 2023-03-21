@@ -11,25 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
-import sys
 import os
+import sys
+from functools import partial
 
 import paddle
 import paddle.nn as nn
-from datasets import Dataset
-from paddlenlp.data import Dict, Pad, Stack
+import pandas as pd
+
 from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
 from paddlenlp.transformers import BertTokenizer as PPNLPBertTokenizer
-from reprod_log import ReprodDiffHelper, ReprodLogger
-from transformers import BertTokenizer as HFBertTokenizer
-import functools
-import pandas as pd
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
 CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
-from models.pd_bert import BertConfig, BertForSequenceClassification
+from models.pd_bert import BertConfig, BertForSequenceClassification  # noqa: E402
 
 
 def get_data():
@@ -39,7 +35,7 @@ def get_data():
             yield {"sentence": row["sentence"], "labels": row["label"]}
 
     def convert_example(example, tokenizer, max_length=128):
-        labels = [example["labels"]]
+        # labels = [example["labels"]]
         # labels = np.array([example["labels"]], dtype="int64")
         example = tokenizer(example["sentence"], max_seq_len=max_length)
         return example
@@ -71,7 +67,6 @@ def main():
     model.load_dict(classifier_weights)
 
     model.eval()
-    tokenizer = PPNLPBertTokenizer.from_pretrained("bert-base-uncased")
     # 要预测的句子
     data = get_data()
     softmax = nn.Softmax()

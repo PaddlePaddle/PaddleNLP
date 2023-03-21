@@ -30,10 +30,6 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-
-* 🔥 **2023.2.28-2023.3.01  UIE 产业落地经验分享 2 日直播课，欢迎填写 [问卷](https://wx566b3770e2bd0b56.mp.weixinhost.com/addon/app-commonapply/index?form_id=635909496275456&channel_id=1500817731950358528) 报名线上直播课。**
-  * 金融行业中复杂单据的实体、关系抽取，更小的标注量，更优的效果；
-  * 零售行业中针对产品评论进行客户意见洞察，促进消费品牌经营转型。
   
 * **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
   * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)

@@ -93,6 +93,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieViLTokenizer", "ernie_vil"),
         ("PegasusChineseTokenizer", "pegasus"),
         ("GLM130BTokenizer", "glm_130b"),
+        ("GLMBertTokenizer", "glm"),
+        ("GLMChineseTokenizer", "glm"),
+        ("GLMGPT2Tokenizer", "glm"),
     ]
 )
 
@@ -102,6 +105,7 @@ FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieFastTokenizer", "ernie"),
         ("TinyBertFastTokenizer", "tinybert"),
         ("ErnieMFastTokenizer", "ernie_m"),
+        ("NystromformerFastTokenizer", "nystromformer"),
     ]
 )
 # For FastTokenizer

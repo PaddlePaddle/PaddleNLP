@@ -201,7 +201,10 @@ def _transformer_decoder_fwd(
 
     for i, mod in enumerate(self.layers):
         if cache is None:
-            if self.enable_recompute:
+            # if output has no gradient, recompute is unnecessary
+            memory_stop_gradient = memory is not None and memory.stop_gradient
+            has_gradient = (not tgt.stop_gradient) or (not memory_stop_gradient)
+            if self.enable_recompute and has_gradient:
                 outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask, None, output_attentions)
             else:
                 outputs = mod(
@@ -278,7 +281,9 @@ def _transformer_encoder_fwd(
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        if self.enable_recompute:
+        # if output has no gradient, recompute is unnecessary
+        has_gradient = not output.stop_gradient
+        if self.enable_recompute and has_gradient:
             # Note: recompute do not support pass as **kwargs yet.
             layer_outputs = recompute(
                 mod,
@@ -576,6 +581,45 @@ class BaseModelOutputWithPooling(ModelOutput):
 
 
 @dataclass
+class BaseModelOutputWithPast(ModelOutput):
+    """
+    Base class for model's outputs that may also contain a past key/values (to speed up sequential decoding).
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+
+            If `past_key_values` is used only the last hidden-state of the sequences of shape `(batch_size, 1,
+            hidden_size)` is output.
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and optionally if
+            `config.is_encoder_decoder=True` 2 additional tensors of shape `(batch_size, num_heads,
+            encoder_sequence_length, embed_size_per_head)`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and optionally if
+            `config.is_encoder_decoder=True` in the cross-attention blocks) that can be used (see `past_key_values`
+            input) to speed up sequential decoding.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
 class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
     """
     Base class for model's outputs that may also contain a past key/values (to speed up sequential decoding).
@@ -816,6 +860,43 @@ class MaskedLMOutput(ModelOutput):
 
     loss: Optional[paddle.Tensor] = None
     logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class CausalLMOutputWithPast(ModelOutput):
+    """
+    Base class for causal language model (or autoregressive) outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Language modeling loss (for next-token prediction).
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `paddle.Tensor` tuples of length `config.n_layers`, with each tuple containing the cached key,
+            value states of the self-attention and the cross-attention layers if model is used in encoder-decoder
+            setting. Only relevant if `config.is_decoder = True`.
+
+            Contains pre-computed hidden-states (key and values in the attention blocks) that can be used (see
+            `past_key_values` input) to speed up sequential decoding.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
 

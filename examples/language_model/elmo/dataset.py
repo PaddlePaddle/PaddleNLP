@@ -14,13 +14,12 @@
 
 import glob
 import random
-import numpy as np
 from copy import deepcopy
 from typing import List
 
+import numpy as np
 import paddle
 from paddle.io import IterableDataset
-import paddle.distributed as dist
 
 
 class Vocabulary(object):
@@ -112,8 +111,6 @@ class UnicodeCharsVocabulary(Vocabulary):
         self.bow_char = 258  # <begin word>
         self.eow_char = 259  # <end word>
         self.pad_char = 260  # <char padding>
-
-        num_words = len(self._word_to_id)
 
         self._word_char_ids = {}
 

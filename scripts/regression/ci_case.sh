@@ -19,10 +19,10 @@ export cudaid1=$2
 export cudaid2=$3
 export PATH=${PATH}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-if [ ! -d "model_logs" ];then 
+if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
-if [ ! -d "unittest_logs" ];then 
+if [ ! -d "unittest_logs" ];then
     mkdir model_logs
 fi
 
@@ -165,13 +165,6 @@ time (python -u ./export_model.py \
     --model_path bert-base-uncased \
     --output_path ./infer_model/model >${log_path}/bert_export) >>${log_path}/bert_export 2>&1
 print_info $? bert_export
-time (python -u ./predict_glue.py \
-    --task_name SST2 \
-    --model_type bert \
-    --model_path ./infer_model/model \
-    --batch_size 32 \
-    --max_seq_length 128 >${log_path}/bert_predict) >>${log_path}/bert_predict 2>&1
-print_info $? bert_predict
  }
 # 5 skep (max save 不可控 内置)
 skep () {
@@ -241,7 +234,7 @@ fast_gpt(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 cd ${nlp_dir}/paddlenlp/ops
 export CC=/usr/local/gcc-8.2/bin/gcc
@@ -337,7 +330,6 @@ print_info $? fast_generation_gpt
 }
 # 9 ernie-1.0
 ernie-1.0 (){
-cd ${nlp_dir}/model_zoo/ernie-1.0/
 #data process
 cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
 sed -i "s/python3/python/g" Makefile
@@ -413,7 +405,6 @@ python -u -m paddle.distributed.launch \
     --eval_freq 1000 \
     --device "gpu" >${log_path}/ernie_1.0_pretrain_static >>${log_path}/ernie_1.0_pretrain_static 2>&1
     print_info $? ernie_1.0_pretrain_static
-
 }
 # 10 xlnet
 xlnet(){
@@ -752,7 +743,7 @@ fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 export CC=/usr/local/gcc-8.2/bin/gcc
 export CXX=/usr/local/gcc-8.2/bin/g++
@@ -893,7 +884,9 @@ print_info $? ernie-doc_dureader_robust
 #26 transformer-xl
 transformer-xl (){
 cd ${nlp_dir}/examples/language_model/transformer-xl/
-cp -r /ssd1/paddlenlp/download/transformer-xl/* ./
+mkdir gen_data && cd gen_data
+wget https://paddle-qa.bj.bcebos.com/paddlenlp/enwik8.tar.gz && tar -zxvf enwik8.tar.gz
+cd ../
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 time (sed -i 's/print_step: 100/print_step: 1/g' configs/enwik8.yaml
 sed -i 's/save_step: 10000/save_step: 3/g' configs/enwik8.yaml
@@ -1018,12 +1011,6 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_clt >>${log_path}/ernie-m_clt 2>&1
     print_info $? ernie-m_clt
-    # inference for cross-lingual-transfer
-    python deploy/predictor/inference.py \
-        --device gpu \
-        --task_name seq_cls \
-        --model_path output_clt/export/model >${log_path}/ernie-m_clt_infer >>${log_path}/ernie-m_clt_infer 2>&1
-    print_info $? ernie-m_clt_infer
     # finetuned for translate-train-all
     python -m paddle.distributed.launch --log_dir output_tta run_classifier.py \
         --do_train \
@@ -1043,13 +1030,7 @@ if [ ! -f 'test.py' ];then
         --overwrite_output_dir \
         --remove_unused_columns False >${log_path}/ernie-m_tta >>${log_path}/ernie-m_tta 2>&1
     print_info $? ernie-m_tta
-    # inference for translate-train-all
-    python deploy/predictor/inference.py \
-        --device gpu \
-        --task_name seq_cls \
-        --model_path output_tta/export/model >${log_path}/ernie-m_tta_infer >>${log_path}/ernie-m_tta_infer 2>&1
-    print_info $? ernie-m_tta_infer
-else 
+else
     python -m pytest ${nlp_dir}/tests/model_zoo/test_ernie_m.py >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
     print_info $? ernie-m
 fi
@@ -1148,7 +1129,7 @@ taskflow (){
 cd ${nlp_dir}
 python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
 print_info $? taskflow_unittest
-python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
+python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
 transformers(){
@@ -1226,7 +1207,7 @@ ernie-health(){
 cd ${nlp_dir}/tests/model_zoo/
 if [ ! -f 'test_ernie-health.py' ];then
     echo '模型测试文件不存在！'
-else 
+else
     python -m pytest tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health_unittest>>${log_path}/ernie-health_unittest 2>&1
     print_info $? tests ernie-health_unittest
 fi
@@ -1247,7 +1228,7 @@ python evaluate.py --model_path ./checkpoint/model_best --test_path ./data/dev.t
 print_info $? uie_eval
 }
 ernie-layout(){
-cd ${nlp_dir}/model_zoo/ernie-layout/  
+cd ${nlp_dir}/model_zoo/ernie-layout/
 # train ner
 python -u run_ner.py --model_name_or_path ernie-layoutx-base-uncased --output_dir ./ernie-layoutx-base-uncased/models/funsd/ \
     --dataset_name funsd --do_train --do_eval --max_steps 2 --eval_steps 2 --save_steps 2 --save_total_limit 1 --seed 1000 --overwrite_output_dir \

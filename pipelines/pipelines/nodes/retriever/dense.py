@@ -22,13 +22,12 @@ import numpy as np
 import paddle
 from tqdm.auto import tqdm
 
-from paddlenlp.data import Pad
-from paddlenlp.transformers import AutoModel, AutoTokenizer, ErnieDualEncoder
-from pipelines.data_handler.processor import TextSimilarityProcessor
+from paddlenlp import Taskflow
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.models import SemanticIndexBatchNeg
 from pipelines.nodes.retriever.base import BaseRetriever
-from pipelines.schema import Document
+from pipelines.schema import ContentTypes, Document
 from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
@@ -117,7 +116,6 @@ class DensePassageRetriever(BaseRetriever):
         )
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
-
         if batch_size < len(self.devices):
             logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
 
@@ -125,6 +123,7 @@ class DensePassageRetriever(BaseRetriever):
         self.batch_size = batch_size
         self.progress_bar = progress_bar
         self.top_k = top_k
+        self.embed_title = embed_title
 
         if document_store is None:
             logger.warning("DensePassageRetriever initialized without a document store. ")
@@ -146,31 +145,35 @@ class DensePassageRetriever(BaseRetriever):
             self.query_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
             self.passage_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
         else:
-            self.ernie_dual_encoder = ErnieDualEncoder(
-                query_embedding_model,
-                passage_embedding_model,
+            self.query_encoder = Taskflow(
+                "feature_extraction",
+                model=query_embedding_model,
+                batch_size=self.batch_size,
+                _static_mode=True,
+                return_tensors="np",
+                max_len=max_seq_len_query,
                 output_emb_size=output_emb_size,
                 reinitialize=reinitialize,
                 share_parameters=share_parameters,
+                device_id=0 if use_gpu else -1,
             )
-            self.query_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
-            self.passage_tokenizer = AutoTokenizer.from_pretrained(passage_embedding_model)
-
-        self.processor = TextSimilarityProcessor(
-            query_tokenizer=self.query_tokenizer,
-            passage_tokenizer=self.passage_tokenizer,
-            max_seq_len_passage=max_seq_len_passage,
-            max_seq_len_query=max_seq_len_query,
-            label_list=["hard_negative", "positive"],
-            metric="text_similarity_metric",
-            embed_title=embed_title,
-            num_hard_negatives=0,
-            num_positives=1,
-        )
+            self.passage_encoder = Taskflow(
+                "feature_extraction",
+                model=passage_embedding_model,
+                batch_size=self.batch_size,
+                _static_mode=True,
+                return_tensors="np",
+                max_len=max_seq_len_passage,
+                output_emb_size=output_emb_size,
+                reinitialize=reinitialize,
+                share_parameters=share_parameters,
+                device_id=0 if use_gpu else -1,
+            )
 
     def retrieve(
         self,
         query: str,
+        query_type: ContentTypes = "text",
         filters: dict = None,
         top_k: Optional[int] = None,
         index: str = None,
@@ -202,6 +205,7 @@ class DensePassageRetriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
+        queries_type: ContentTypes = "text",
         filters: Optional[
             Union[
                 Dict[str, Union[Dict, List, str, int, float, bool]],
@@ -270,58 +274,44 @@ class DensePassageRetriever(BaseRetriever):
                     "external_id": '19930582'}, ...]
         :return: dictionary of embeddings for "passages" and "query"
         """
-        dataset, tensor_names, _, baskets = self.processor.dataset_from_dicts(
-            dicts, indices=[i for i in range(len(dicts))], return_baskets=True
-        )
-
-        def token_padding_inputs(features):
-            input_ids = [item[0] for item in features]
-            token_type_ids = [item[1] for item in features]
-            input_ids = Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id, dtype="int64")(input_ids)
-            token_type_ids = Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id, dtype="int64")(
-                token_type_ids
-            )
-            return input_ids, token_type_ids
-
-        # dataset is a MapDataset, it will raise an error when using datacollator: AttributeError: 'list' object has no attribute 'keys'
-        # collate_fn = DataCollatorWithPadding(self.passage_tokenizer)
-        collate_fn = token_padding_inputs
-
-        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=self.batch_size, shuffle=False)
-
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, return_list=True
-        )
+        datasets = []
+        if "passages" in dicts[0]:
+            # dicts is a list of passages
+            for passages in dicts:
+                for item in passages["passages"]:
+                    if self.embed_title:
+                        datasets.append(item["title"] + item["text"])
+                    else:
+                        datasets.append(item["text"])
+        elif "query" in dicts[0]:
+            # dicts is a list of passages
+            for passages in dicts:
+                datasets.append(passages["query"])
 
         all_embeddings = {"query": [], "passages": []}
 
-        # Todo(tianxin04): ErnieDualEncoder subclass nn.Module,
-        self.ernie_dual_encoder.eval()
-
         # When running evaluations etc., we don't want a progress bar for every single query
-        if len(dataset) == 1:
+        if len(datasets) == 1:
             disable_tqdm = True
         else:
             disable_tqdm = not self.progress_bar
 
         with tqdm(
-            total=len(data_loader) * self.batch_size,
+            total=len(datasets) // self.batch_size,
             unit=" Docs",
             desc="Create embeddings",
             position=1,
             leave=False,
             disable=disable_tqdm,
         ) as progress_bar:
-            for batch in data_loader:
-                input_ids, token_type_ids = batch
-                with paddle.no_grad():
-                    cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
-                        input_ids=input_ids, token_type_ids=token_type_ids
-                    )
-                    if "query" in dicts[0]:
-                        all_embeddings["query"].append(cls_embeddings.cpu().numpy())
-                    if "passages" in dicts[0]:
-                        all_embeddings["passages"].append(cls_embeddings.cpu().numpy())
+            for i in range(0, len(datasets), self.batch_size):
+
+                if "query" in dicts[0]:
+                    cls_embeddings = self.query_encoder(datasets[i : i + self.batch_size])
+                    all_embeddings["query"].append(cls_embeddings["features"])
+                if "passages" in dicts[0]:
+                    cls_embeddings = self.passage_encoder(datasets[i : i + self.batch_size])
+                    all_embeddings["passages"].append(cls_embeddings["features"])
                 progress_bar.update(self.batch_size)
 
         if all_embeddings["passages"]:
@@ -348,13 +338,6 @@ class DensePassageRetriever(BaseRetriever):
         :param docs: List of Document objects used to represent documents / passages in a standardized way within pipelines.
         :return: Embeddings of documents / passages shape (batch_size, embedding_dim)
         """
-        if self.processor.num_hard_negatives != 0:
-            logger.warning(
-                f"'num_hard_negatives' is set to {self.processor.num_hard_negatives}, but inference does "
-                f"not require any hard negatives. Setting num_hard_negatives to 0."
-            )
-            self.processor.num_hard_negatives = 0
-
         passages = [
             {
                 "passages": [

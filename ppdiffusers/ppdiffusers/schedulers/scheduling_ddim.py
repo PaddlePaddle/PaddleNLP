@@ -73,7 +73,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999) -> paddle.Tenso
         t1 = i / num_diffusion_timesteps
         t2 = (i + 1) / num_diffusion_timesteps
         betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
-    return paddle.to_tensor(betas)
+    return paddle.to_tensor(betas, dtype=paddle.float32)
 
 
 class DDIMScheduler(SchedulerMixin, ConfigMixin):
@@ -314,7 +314,8 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
 
             if variance_noise is None:
                 variance_noise = paddle.randn(model_output.shape, generator=generator, dtype=model_output.dtype)
-            variance = self._get_variance(timestep, prev_timestep) ** (0.5) * eta * variance_noise
+            # 0.13.1 update this
+            variance = std_dev_t * variance_noise
 
             prev_sample = prev_sample + variance
 
