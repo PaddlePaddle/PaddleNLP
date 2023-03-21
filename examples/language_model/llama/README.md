@@ -34,7 +34,23 @@ model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
 ## 微调
 
 ```shell
-python finetune_generation.py
+python -u  -m paddle.distributed.fleet.launch \
+    --gpus "0,1,2,3,4,5,6,7" finetune_generation.py \
+    --model_name_or_path ./llama-7b \
+    --output_dir output \
+    --max_seq_len 1024 \
+    --micro_batch_size 8 \
+    --global_batch_size 32 \
+    --sharding_degree 4 \
+    --mp_degree 2 \
+    --dp_degree 1 \
+    --pp_degree 1 \
+    --global_batch_size 4 \
+    --micro_batch_size 4 \
+    --output_dir output \
+    --max_steps 200 \
+    --use_pure_fp16 True \
+    --device gpu
 ```
 
 <a name="3"></a>
@@ -42,7 +58,9 @@ python finetune_generation.py
 ## 动转静
 
 ```shell
-python export_generation_model.py
+python export_generation_model.py \
+    --model_path output/200/splits_mp_02_sharding_04 \
+    --output_path inference/llama
 ```
 
 <a name="4"></a>
@@ -50,5 +68,7 @@ python export_generation_model.py
 ## 推理
 
 ```shell
-python infer_generation.py
+python infer_generation.py \
+    --model_dir inference \
+    --model_prefix llama
 ```
