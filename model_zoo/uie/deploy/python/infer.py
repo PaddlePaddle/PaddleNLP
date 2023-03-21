@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,65 +12,60 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import distutils.util
 import math
 import os
 import re
+from pprint import pprint
 
-import onnxruntime as ort
-import paddle2onnx
+import fastdeploy as fd
 import six
 
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 
 
-class InferBackend(object):
-    def __init__(self, model_path_prefix, device="cpu", use_fp16=False, device_id=0):
-        print(">>> [InferBackend] Creating Engine ...")
-        onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-            model_file=model_path_prefix + ".pdmodel",
-            params_file=model_path_prefix + ".pdiparams",
-            opset_version=13,
-            enable_onnx_checker=True,
-        )
-        infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
-
-        float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
-        with open(float_onnx_file, "wb") as f:
-            f.write(onnx_model)
-
-        if device == "gpu":
-            providers = [("CUDAExecutionProvider", {"device_id": device_id})]
-            print(">>> [InferBackend] Use GPU to inference ...")
-            if use_fp16:
-                print(">>> [InferBackend] Use FP16 to inference ...")
-                import onnx
-                from onnxconverter_common import float16
-
-                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
-                onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
-                onnx.save_model(trans_model, fp16_model_file)
-                onnx_model = fp16_model_file
-        else:
-            providers = ["CPUExecutionProvider"]
-            print(">>> [InferBackend] Use CPU to inference ...")
-
-        sess_options = ort.SessionOptions()
-
-        self.predictor = ort.InferenceSession(onnx_model, sess_options=sess_options, providers=providers)
-        if device == "gpu":
-            assert "CUDAExecutionProvider" in self.predictor.get_providers(), (
-                "The environment for GPU inference is not set properly. "
-                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                "Please run the following commands to reinstall: \n "
-                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-            )
-        print(">>> [InferBackend] Engine Created ...")
-
-    def infer(self, input_dict: dict):
-        result = self.predictor.run(None, input_dict)
-        return result
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_dir", required=True, help="The directory of model, params and vocab file.")
+    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["cpu", "gpu"],
+        help="Type of inference device, support 'cpu' or 'gpu'.",
+    )
+    parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
+    parser.add_argument("--multilingual", action="store_true", help="Whether is the multilingual model.")
+    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
+    parser.add_argument("--device_id", type=int, default=0, help="device(gpu) id")
+    parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
+    parser.add_argument(
+        "--position_prob",
+        default=0.5,
+        type=float,
+        help="Probability threshold for start/end index probabiliry.",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="paddle",
+        choices=["onnx_runtime", "paddle", "openvino", "paddle_tensorrt"],
+        help="The inference runtime backend.",
+    )
+    parser.add_argument(
+        "--cpu_threads", type=int, default=1, help="The number of threads to execute inference in cpu device."
+    )
+    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Use FP16 mode")
+    parser.add_argument(
+        "--use_fast",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to use fast_tokenizer to accelarate the tokenization.",
+    )
+    return parser.parse_args()
 
 
 class UIEPredictor(object):
@@ -82,22 +77,58 @@ class UIEPredictor(object):
             print(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(args.device))
             exit(0)
 
-        model_path = args.model_path_prefix[: -len(os.path.basename(args.model_path_prefix))]
-        self._tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
         self._position_prob = args.position_prob
-        self._max_seq_len = args.max_seq_len
+        self.max_length = args.max_length
         self._batch_size = args.batch_size
         self._multilingual = args.multilingual
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == "cpu":
             args.use_fp16 = False
-        self.inference_backend = InferBackend(
-            args.model_path_prefix,
-            device=args.device,
-            use_fp16=args.use_fp16,
-            device_id=args.device_id if args.device == "gpu" else 0,
-        )
+        self.runtime = self.create_fd_runtime(args)
+
+    def create_fd_runtime(self, args):
+        option = fd.RuntimeOption()
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        option.set_model_path(model_path, params_path)
+        # Set device
+        if args.device == "cpu":
+            option.use_cpu()
+            option.set_cpu_thread_num(args.cpu_threads)
+        else:
+            option.use_gpu(args.device_id)
+        # Set backend
+        if args.backend == "onnx_runtime":
+            option.use_ort_backend()
+        elif args.backend == "paddle":
+            option.use_paddle_infer_backend()
+        elif args.backend == "openvino":
+            option.use_openvino_backend()
+        elif args.backend == "paddle_tensorrt":
+            option.use_paddle_infer_backend()
+            option.paddle_infer_option.collect_trt_shape = True
+            option.paddle_infer_option.enable_trt = True
+            # Only useful for single stage predict
+            option.trt_option.set_shape(
+                "input_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "token_type_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "position_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "attention_mask", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            trt_file = os.path.join(args.model_dir, "inference.trt")
+            if args.use_fp16:
+                option.trt_option.enable_fp16 = True
+                trt_file = trt_file + ".fp16"
+            option.trt_option.serialize_file = trt_file
+        return fd.Runtime(option)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -136,7 +167,7 @@ class UIEPredictor(object):
             input_texts.append(inputs[i]["text"])
             prompts.append(inputs[i]["prompt"])
         # max predict length should exclude the length of prompt and summary tokens
-        max_predict_len = self._max_seq_len - len(max(prompts)) - 3
+        max_predict_len = self.max_length - len(max(prompts)) - 3
         short_input_texts, self.input_mapping = self._auto_splitter(input_texts, max_predict_len, split_sentence=False)
 
         short_texts_prompts = []
@@ -155,7 +186,7 @@ class UIEPredictor(object):
             text=prompts,
             text_pair=texts,
             truncation=True,
-            max_seq_len=self._max_seq_len,
+            max_seq_len=self.max_length,
             pad_to_max_seq_len=True,
             return_attention_mask=True,
             return_position_ids=True,
@@ -403,7 +434,7 @@ class UIEPredictor(object):
         return results
 
     def _infer(self, data):
-        return self.inference_backend.infer(data)
+        return self.runtime.infer(data)
 
     def predict(self, input_data):
         results = self._multi_stage_predict(input_data)
@@ -486,3 +517,36 @@ def get_id_and_prob(span_set, offset_mapping):
         end_id = offset_mapping[end[0]][1]
         sentence_id.append((start_id, end_id))
     return sentence_id, prob
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    texts = [
+        '"北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。"',
+        "原告赵六，2022年5月29日生\n委托代理人孙七，深圳市C律师事务所律师。\n被告周八，1990年7月28日出生\n委托代理人吴九，山东D律师事务所律师",
+    ]
+    schema1 = ["法院", {"原告": "委托代理人"}, {"被告": "委托代理人"}]
+    args.schema = schema1
+    uie = UIEPredictor(args)
+    print("-----------------------------")
+    outputs = uie.predict(texts)
+    for text, output in zip(texts, outputs):
+        print("1. Input text: ")
+        print(text)
+        print("2. Input schema: ")
+        print(schema1)
+        print("3. Result: ")
+        pprint(output)
+        print("-----------------------------")
+
+    schema2 = [{"原告": ["出生日期", "委托代理人"]}, {"被告": ["出生日期", "委托代理人"]}]
+    uie.set_schema(schema2)
+    outputs = uie.predict(texts)
+    for text, output in zip(texts, outputs):
+        print("1. Input text: ")
+        print(text)
+        print("2. Input schema: ")
+        print(schema2)
+        print("3. Result: ")
+        pprint(output)
+        print("-----------------------------")
