@@ -37,11 +37,13 @@ class LayoutLMv2Tokenizer(BertTokenizer):
         "vocab_file": {
             "layoutlmv2-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-base-uncased/vocab.txt",
             "layoutlmv2-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-large-uncased/vocab.txt",
+            "layoutlmv2-wo-backbone-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-base-uncased/vocab.txt",
         }
     }
     pretrained_init_configuration = {
         "layoutlmv2-base-uncased": {"do_lower_case": True},
         "layoutlmv2-large-uncased": {"do_lower_case": True},
+        "layoutlmv2-wo-backbone-base-uncased": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
