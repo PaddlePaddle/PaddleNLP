@@ -16,45 +16,28 @@ import argparse
 import os
 import sys
 
-import numpy as np
-from scipy.special import softmax
-from scipy import spatial
 import paddle
 from paddle import inference
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.utils.log import logger
+from scipy import spatial
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.transformers import AutoTokenizer
 
 sys.path.append(".")
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, required=True,
-    help="The directory to static model.")
-
-parser.add_argument("--max_seq_length", default=128, type=int,
-    help="The maximum total input sequence length after tokenization. Sequences "
-    "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=15, type=int,
-    help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
-    help="Select which device to train model, defaults to gpu.")
-
-parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
-    help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
-    help='The tensorrt precision.')
-
-parser.add_argument('--cpu_threads', default=10, type=int,
-    help='Number of threads to predict when using cpu.')
-parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
-    help='Enable to use mkldnn to speed up when using cpu.')
-
-parser.add_argument("--save_log_path", type=str, default="./log_output/",
-    help="The file path to save log.")
+parser.add_argument("--model_dir", type=str, required=True, help="The directory to static model.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=15, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
+parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
+parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
+parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def convert_example(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=False):

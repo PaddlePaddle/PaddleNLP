@@ -214,12 +214,14 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
             --train_file train.json \
             --validation_file test.json \
             --num_train_epochs 5 \
-            --logging_steps 1 \
-            --save_steps 10 \
-            --train_batch_size 2 \
-            --eval_batch_size 2 \
+            --logging_steps 10 \
+            --save_steps 1000 \
+            --per_device_train_batch_size 2 \
+            --per_device_eval_batch_size 2 \
             --learning_rate 1e-4 \
-            --warmup_proportion 0.1 \
+            --warmup_ratio 0.1 \
+            --do_train \
+            --do_eval \
             --device gpu
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
@@ -234,10 +236,12 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
-- `train_batch_size` 表示训练时**每张卡**上的样本数目。
-- `eval_batch_size` 表示测试时**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示训练时**每张卡**上的样本数目。
+- `per_device_eval_batch_size` 表示测试时**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
-- `warmup_proportion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `warmup_ratio` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `do_train` 表示是否训练。
+- `do_eval` 表示是否评测。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
 可通过`bash run_clm.sh`启动训练，更多参数详情和参数的默认值请参考`run_clm.py`。
