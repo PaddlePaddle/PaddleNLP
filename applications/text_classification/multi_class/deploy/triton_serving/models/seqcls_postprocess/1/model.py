@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import json
-import time
 
-import paddle
 import numpy as np
 
 # triton_python_backend_utils is available in every Triton Python model. You
@@ -45,7 +43,7 @@ class TritonPythonModel(object):
           * model_version: Model version
           * model_name: Model name
         """
-        self.model_config = model_config = json.loads(args["model_config"])
+        self.model_config = json.loads(args["model_config"])
         print("model_config:", self.model_config)
 
         self.input_names = []
