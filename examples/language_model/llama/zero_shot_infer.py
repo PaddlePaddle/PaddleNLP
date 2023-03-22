@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import paddle
-from modeling import LLaMAForCausalLM
-from tokenizer import LLaMATokenizer
+from modeling import LlamaForCausalLM
+from tokenizer import LlamaTokenizer
 
 paddle.seed(100)
 
@@ -22,12 +22,12 @@ paddle.set_default_dtype("float16")
 # paddle.set_default_dtype("float32")
 # paddle.set_device("cpu")
 
-model = LLaMAForCausalLM.from_pretrained("./llama-random", load_state_as_np=True)
+model = LlamaForCausalLM.from_pretrained("./llama-7b", load_state_as_np=True)
 
 model.eval()
 
-tokenizer = LLaMATokenizer.from_pretrained(
-    "./llama-random",
+tokenizer = LlamaTokenizer.from_pretrained(
+    "./llama-7b",
     add_bos_token=False,
 )
 tokenizer.padding_side = "left"
@@ -45,7 +45,7 @@ output = model.generate(
     inputs["input_ids"],
     inputs["attention_mask"],
     inputs["position_ids"],
-    max_length=40,
+    max_length=100,
     min_length=0,
     use_cache=True,
     temperature=1.0,

@@ -21,9 +21,9 @@ from functools import partial
 import numpy as np
 import paddle
 from args import parse_args
-from configuration import LLaMAConfig
+from configuration import LlamaConfig
 from model_split_merge import split_model_parallel
-from modeling import LLaMAForCausalLM
+from modeling import LlamaForCausalLM
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
@@ -32,7 +32,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from tokenizer import LLaMATokenizer
+from tokenizer import LlamaTokenizer
 from utils import (
     _rotate_checkpoints,
     all_gather,
@@ -144,8 +144,8 @@ def do_train(args):
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_length
 
-    tokenizer = LLaMATokenizer.from_pretrained(args.model_name_or_path)
-    config = LLaMAConfig.from_pretrained(args.model_name_or_path)
+    tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
+    config = LlamaConfig.from_pretrained(args.model_name_or_path)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -178,7 +178,7 @@ def do_train(args):
     OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        LLaMAForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
+        LlamaForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
         args.model_name_or_path = split_model_parallel(
             args.model_name_or_path, config, args.mp_degree, args.sharding_degree
         )
@@ -190,7 +190,7 @@ def do_train(args):
     config["use_recompute"] = args.use_recompute
     config["use_pure_fp16"] = args.use_pure_fp16
 
-    model = LLaMAForCausalLM.from_pretrained(args.model_name_or_path, config=config)
+    model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, config=config)
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:

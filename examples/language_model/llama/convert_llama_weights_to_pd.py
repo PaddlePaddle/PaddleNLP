@@ -35,12 +35,12 @@ Convert weights to paddle, will output `model_state.pdparams`:
 Load model:
 
     ```
-    from .tokenizer import LLaMATokenizer
-    from .modeling import LLaMAForCausalLM
+    from .tokenizer import LlamaTokenizer
+    from .modeling import LlamaForCausalLM
 
-    tokenizer = LLaMATokenizer.from_pretrained("/output/path/llama-7b/")
+    tokenizer = LlamaTokenizer.from_pretrained("/output/path/llama-7b/")
 
-    model = LLaMAForCausalLM.from_pretrained("/output/path/llama-7b/")
+    model = LlamaForCausalLM.from_pretrained("/output/path/llama-7b/")
     ```
 
 """
@@ -204,7 +204,7 @@ def write_model(model_path, input_base_path, model_size):
     paddle.save(all_state_dict, os.path.join(model_path, filename))
 
     config_out = {
-        "architectures": ["LLaMAForCausalLM"],
+        "architectures": ["LlamaForCausalLM"],
         "bos_token_id": 1,
         "eos_token_id": 2,
         "pad_token_id": 0,
@@ -236,7 +236,7 @@ def write_tokenizer(tokenizer_path, input_tokenizer_path):
             "unk_token": "<unk>",
             "add_bos_token": True,
             "add_eos_token": False,
-            "tokenizer_class": "LLaMATokenizer",
+            "tokenizer_class": "LlamaTokenizer",
         },
         os.path.join(tokenizer_path, "tokenizer_config.json"),
     )
@@ -247,7 +247,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dir",
-        help="Location of LLaMA weights, which contains tokenizer.model and model folders",
+        help="Location of Llama weights, which contains tokenizer.model and model folders",
     )
     parser.add_argument(
         "--model_size",

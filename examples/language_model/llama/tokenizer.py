@@ -22,10 +22,10 @@ import sentencepiece as spm
 from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
-__all__ = ["LLaMATokenizer"]
+__all__ = ["LlamaTokenizer"]
 
 
-class LLaMATokenizer(PretrainedTokenizer):
+class LlamaTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Paddle LLaMA model"""
+"""Paddle Llama model"""
 
 import math
 from typing import Optional, Tuple
@@ -20,7 +20,7 @@ from typing import Optional, Tuple
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from configuration import LLaMAConfig
+from configuration import LlamaConfig
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
@@ -33,9 +33,9 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 
 __all__ = [
-    "LLaMAModel",
-    "LLaMAPretrainedModel",
-    "LLaMAForCausalLM",
+    "LlamaModel",
+    "LlamaPretrainedModel",
+    "LlamaForCausalLM",
 ]
 
 
@@ -141,7 +141,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
     return q_embed, k_embed
 
 
-class LLaMAMLP(nn.Layer):
+class LlamaMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -178,7 +178,7 @@ class LLaMAMLP(nn.Layer):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
 
-class LLaMAAttention(nn.Layer):
+class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(self, config):
@@ -330,12 +330,12 @@ class LLaMAAttention(nn.Layer):
         return attn_output, attn_weights, past_key_value
 
 
-class LLaMADecoderLayer(nn.Layer):
+class LlamaDecoderLayer(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = LLaMAAttention(config)
-        self.mlp = LLaMAMLP(config)
+        self.self_attn = LlamaAttention(config)
+        self.mlp = LlamaMLP(config)
         self.input_layernorm = RMSNorm(config)
         self.post_attention_layernorm = RMSNorm(config)
 
@@ -392,8 +392,8 @@ class LLaMADecoderLayer(nn.Layer):
         return outputs
 
 
-class LLaMAPretrainedModel(PretrainedModel):
-    config_class = LLaMAConfig
+class LlamaPretrainedModel(PretrainedModel):
+    config_class = LlamaConfig
     base_model_prefix = "llama"
 
     def init_weights(self, layer):
@@ -416,14 +416,14 @@ class LLaMAPretrainedModel(PretrainedModel):
 
 
 @register_base_model
-class LLaMAModel(LLaMAPretrainedModel):
+class LlamaModel(LlamaPretrainedModel):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LLaMADecoderLayer`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
     Args:
-        config: LLaMAConfig
+        config: LlamaConfig
     """
 
-    def __init__(self, config: LLaMAConfig):
+    def __init__(self, config: LlamaConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -441,7 +441,7 @@ class LLaMAModel(LLaMAPretrainedModel):
             # self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size, self.padding_idx)
             self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
 
-        self.layers = nn.LayerList([LLaMADecoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.norm = RMSNorm(config)
 
         self.gradient_checkpointing = False
@@ -591,14 +591,14 @@ class LLaMAModel(LLaMAPretrainedModel):
         )
 
 
-class LLaMAPretrainingCriterion(paddle.nn.Layer):
+class LlamaPretrainingCriterion(paddle.nn.Layer):
     """
-    Criterion for LLaMA.
+    Criterion for Llama.
     It calculates the final loss.
     """
 
     def __init__(self, pad_token_id=None, mp_degree=1):
-        super(LLaMAPretrainingCriterion, self).__init__()
+        super(LlamaPretrainingCriterion, self).__init__()
         if mp_degree > 1:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
@@ -621,15 +621,15 @@ class LLaMAPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
-class LLaMAForCausalLM(LLaMAPretrainedModel):
+class LlamaForCausalLM(LlamaPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
-        self.llama = LLaMAModel(config)
+        self.llama = LlamaModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-        self.criterion = LLaMAPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
+        self.criterion = LlamaPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)

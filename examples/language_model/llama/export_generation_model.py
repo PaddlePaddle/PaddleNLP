@@ -16,10 +16,10 @@ import argparse
 import os
 
 import paddle
-from configuration import LLaMAConfig
+from configuration import LlamaConfig
 from model_split_merge import merge_model_parallel
-from modeling import LLaMAForCausalLM
-from tokenizer import LLaMATokenizer
+from modeling import LlamaForCausalLM
+from tokenizer import LlamaTokenizer
 
 
 def parse_args():
@@ -47,8 +47,8 @@ def main():
     paddle.seed(100)
     paddle.set_default_dtype("float16")
 
-    tokenizer = LLaMATokenizer.from_pretrained(args.model_path)
-    config = LLaMAConfig.from_pretrained(args.model_path)
+    tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
+    config = LlamaConfig.from_pretrained(args.model_path)
 
     # Set the generaiton the hyperparameter
     config.max_length = 100
@@ -67,7 +67,7 @@ def main():
 
     # Load the model and parameter
     config.mp_degree = 1
-    model = LLaMAForCausalLM.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
+    model = LlamaForCausalLM.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
 
     model.eval()
     model = paddle.jit.to_static(
