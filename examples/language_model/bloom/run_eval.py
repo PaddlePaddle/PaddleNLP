@@ -22,12 +22,11 @@ from pprint import pprint as print
 import numpy as np
 import paddle
 from args import get_parser
-from configuration import BloomConfig
-from modeling import BloomForPretraining
 from paddle.io import DataLoader
 from transformers import AutoTokenizer
 
 from paddlenlp.data import Stack, Tuple
+from paddlenlp.transformers import BloomConfig, BloomForPretraining
 from paddlenlp.utils.log import logger
 
 

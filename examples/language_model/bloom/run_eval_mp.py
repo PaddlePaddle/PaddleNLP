@@ -23,8 +23,6 @@ from pprint import pprint as print
 import numpy as np
 import paddle
 from args import get_parser
-from configuration import BloomConfig
-from modeling import BloomForPretraining
 from paddle import LazyGuard
 from paddle.distributed import fleet
 from paddle.io import DataLoader
@@ -32,6 +30,7 @@ from transformers import AutoTokenizer
 from utils import set_hyrbid_parallel_seed
 
 from paddlenlp.data import Stack, Tuple
+from paddlenlp.transformers import BloomConfig, BloomForPretraining
 from paddlenlp.utils.log import logger
 
 paddle.set_default_dtype("float16")

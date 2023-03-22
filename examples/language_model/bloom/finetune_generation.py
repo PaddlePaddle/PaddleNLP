@@ -19,9 +19,7 @@ from functools import partial
 
 import paddle
 from args import parse_args
-from configuration import BloomConfig
 from model_split_merge import split_model_parallel
-from modeling import BloomForCausalLM
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
@@ -45,6 +43,8 @@ from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
+    BloomConfig,
+    BloomForCausalLM,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,

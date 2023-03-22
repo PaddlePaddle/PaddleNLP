@@ -19,8 +19,8 @@ import shutil
 
 import numpy as np
 import paddle
-from modeling import BloomModel
 
+from paddlenlp.transformers import BloomModel
 from paddlenlp.utils.env import MODEL_HOME
 
 PREFIX_CHECKPOINT_DIR = "model_state"

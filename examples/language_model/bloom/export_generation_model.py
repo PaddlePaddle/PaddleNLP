@@ -16,10 +16,10 @@ import argparse
 import os
 
 import paddle
-from configuration import BloomConfig
 from model_split_merge import merge_model_parallel
-from modeling import BloomForGeneration
 from transformers import AutoTokenizer
+
+from paddlenlp.transformers import BloomConfig, BloomForGeneration
 
 MODEL_CLASSES = {"bigscience/bloom-560m": (BloomForGeneration)}
 

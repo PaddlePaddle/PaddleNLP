@@ -17,12 +17,12 @@ from __future__ import annotations
 import os
 
 import paddle
-from modeling import BloomConfig, BloomForGeneration
 from paddle.distributed import fleet
 from tap import Tap
 from transformers import AutoTokenizer
 from utils import set_hyrbid_parallel_seed
 
+from paddlenlp.transformers import BloomConfig, BloomForGeneration
 from paddlenlp.utils.log import logger
 
 

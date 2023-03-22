@@ -44,15 +44,16 @@ from paddlenlp.utils.log import logger
 filepath = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(filepath, "../"))
 from args import parse_args  # noqa e402
-from configuration import BloomConfig  # noqa e402
 from model_split_merge import split_model_parallel  # noqa e402
-from modeling import BloomForSequenceClassification  # noqa e402
 from utils import (  # noqa e402
     _rotate_checkpoints,
     all_gather,
     set_hyrbid_parallel_seed,
     wrap_sharding_2_3,
 )
+
+from paddlenlp.transformers import BloomConfig  # noqa e402
+from paddlenlp.transformers import BloomForSequenceClassification  # noqa e402
 
 METRIC_CLASSES = {
     "cola": Mcc,
