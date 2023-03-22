@@ -447,14 +447,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Optional[Embedding]: the otuput embedding of model
         """
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_output_embeddings()
-
-        raise NotImplementedError(
-            f"model of {type(base_model)} has not implemented the `get_output_embeddings`"
-            " or `set_output_embeddings` method"
-        )
+        return None
 
 
     def tie_weights(self):
