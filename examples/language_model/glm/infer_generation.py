@@ -23,7 +23,7 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, help="The directory of model.")
+    parser.add_argument("--model_path", required=True, help="The directory of model.")
     parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
@@ -60,7 +60,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path)
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
@@ -68,8 +68,8 @@ class Predictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        model_path = os.path.join(args.model_path, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_path, args.model_prefix + ".pdiparams")
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
