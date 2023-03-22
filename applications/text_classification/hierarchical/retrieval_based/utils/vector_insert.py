@@ -12,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import argparse
 
-from tqdm import tqdm
 import numpy as np
-
 from milvus_util import VecToMilvus
+from tqdm import tqdm
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--vector_path", type=str, required=True,
-    help="feature file path.")
-
+parser.add_argument("--vector_path", type=str, required=True, help="feature file path.")
 args = parser.parse_args()
-# yapf: enable
 
 
 def vector_insert(file_path):
