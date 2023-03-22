@@ -17,9 +17,6 @@
 import collections
 import logging
 import math
-import os
-import sys
-from distutils.util import strtobool
 
 import numpy as np
 import paddle
@@ -76,7 +73,6 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
     hcg = env.get_hcg()
     model_parallel_group = hcg.get_model_parallel_group()
     world_size = hcg.get_model_parallel_world_size()
-    rank = hcg.get_model_parallel_rank()
 
     if world_size > 1:
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
@@ -1461,8 +1457,6 @@ class GPTForGenerationHybrid(nn.Layer):
         repetition_penalty = self.repetition_penalty
         num_beams = self.num_beams
         num_beam_groups = self.num_beam_groups
-        length_penalty = self.length_penalty
-        early_stopping = self.early_stopping
         bos_token_id = self.bos_token_id
         eos_token_id = self.eos_token_id
         pad_token_id = self.pad_token_id
@@ -1544,7 +1538,7 @@ class GPTForGenerationHybrid(nn.Layer):
                 **model_kwargs,
             )
         else:
-            raise ValueError(f"Not support {decoding_strategy} strategy yet!")
+            raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
 
 

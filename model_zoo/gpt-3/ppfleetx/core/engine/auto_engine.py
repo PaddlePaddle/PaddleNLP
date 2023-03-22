@@ -12,27 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
-import sys
-import time
 
-import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.fluid.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
-from paddle.optimizer.lr import LRScheduler
 from ppfleetx.core.engine import BasicEngine
 from ppfleetx.core.module import BasicModule
-from ppfleetx.data import utils
 from ppfleetx.optims import build_lr_scheduler, build_optimizer
 from ppfleetx.utils.log import logger
 from ppfleetx.utils.version import version_check
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 class AutoEngine(BasicEngine):

@@ -14,13 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import paddle
 from paddle import distributed as dist
-from paddle import framework
 from paddle.autograd import PyLayer
-from paddle.distributed import fleet
-from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients_with_group,

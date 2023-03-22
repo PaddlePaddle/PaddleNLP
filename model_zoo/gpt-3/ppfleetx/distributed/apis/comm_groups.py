@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.fleet.base.orthogonal_strategy import OrthogonalStrategy
@@ -21,7 +20,6 @@ from paddle.distributed.fleet.base.strategy_group import (
     MPGroup,
     PPGroup,
     ShardingGroup,
-    StrategyGroupBase,
 )
 
 

@@ -41,6 +41,7 @@ from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
@@ -225,6 +226,17 @@ def do_train(args):
     config["use_pure_fp16"] = args.use_pure_fp16
     config["enable_fuse_transformer"] = False
     model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
+
+    if args.lora:
+        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
+        model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:

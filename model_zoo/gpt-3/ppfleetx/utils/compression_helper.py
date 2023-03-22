@@ -62,7 +62,7 @@ def prune_model(model, configs, inputs_desc=[]):
     for param in params:
         ratios[param] = ratio
     # NOTE(minghaoBD): hidden size in Layernorm must be 768/1024/2048/4096 for best inference performace, and when axis=0, the hidden size in layernorm will be changed accordingly. So axis=1 is required.
-    plan = pruner.prune_vars(ratios, [1])
+    pruner.prune_vars(ratios, [1])
 
 
 def quant_model(model, configs):
