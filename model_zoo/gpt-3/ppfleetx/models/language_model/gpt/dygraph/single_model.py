@@ -15,12 +15,8 @@
 # limitations under the License.
 
 import collections
-import logging
 import math
-import os
-from distutils.util import strtobool
 
-import numpy as np
 import paddle
 import paddle.incubate as incubate
 import paddle.nn as nn
@@ -1117,8 +1113,6 @@ class GPTForGeneration(nn.Layer):
         repetition_penalty = self.repetition_penalty
         num_beams = self.num_beams
         num_beam_groups = self.num_beam_groups
-        length_penalty = self.length_penalty
-        early_stopping = self.early_stopping
         bos_token_id = self.bos_token_id
         eos_token_id = self.eos_token_id
         pad_token_id = self.pad_token_id

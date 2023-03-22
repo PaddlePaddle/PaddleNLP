@@ -13,13 +13,11 @@
 # limitations under the License.
 
 import copy
-import os
 import random
-import sys
 
 import numpy as np
 import paddle
-from ppfleetx.data import dataset, sampler, utils
+from ppfleetx.data import utils
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
 

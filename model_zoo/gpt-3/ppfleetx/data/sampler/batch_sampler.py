@@ -15,10 +15,7 @@
 from __future__ import division, print_function
 
 import math
-import os
-import sys
 
-import numpy as np
 import paddle
 from paddle.io import DistributedBatchSampler
 from ppfleetx.distributed.apis import env
@@ -85,8 +82,6 @@ class GPTBatchSampler(paddle.io.BatchSampler):
         assert isinstance(shuffle, bool), "shuffle should be a boolean value"
         self.shuffle = shuffle
         assert isinstance(drop_last, bool), "drop_last should be a boolean number"
-
-        from paddle.distributed import ParallelEnv
 
         if num_replicas is not None:
             assert isinstance(num_replicas, int) and num_replicas > 0, "num_replicas should be a positive integer"
