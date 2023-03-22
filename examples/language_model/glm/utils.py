@@ -62,7 +62,6 @@ class GLMTrainer(Trainer):
             for label, mask in zip(inputs["labels"].numpy(), inputs["loss_mask"].numpy()):
                 label = label[mask.astype("bool")]
                 label = [x for x in label[label != self.tokenizer.pad_token_id]]
-                print(label)
                 all_labels.append(label)
             max_label_length = max([len(x) for x in all_labels])
             for index, labels in enumerate(all_labels):
