@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import time
 from typing import Any, Union
 
 import numpy as np
@@ -63,7 +64,6 @@ def reduce_tensor(tensor, buffer_size="32MiB"):
     # dtype = str(tensor.dtype)
     # numel_bits = numel * dtype_byte_size(tensor.dtype)
     buffer_size = convert_file_size_to_int(buffer_size)
-    print(numel, buffer_size)
     tensor.reshape_([-1])
 
     send_size = buffer_size // dtype_byte_size(tensor.dtype)
@@ -99,21 +99,23 @@ def distributed_gather(tensor: Any, dst: int = 0, offload=False) -> Any:
             return {k: distributed_gather(v, dst, offload) for k, v in tensor.items()}
 
         output_tensors = None
-        if dst == distributed.get_rank():
+        is_dst = dst == distributed.get_rank()
+        if is_dst:
             if offload:
-                with device_guard("cpu"):
-                    output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size())]
+                output_tensors = [[] for _ in range(distributed.get_world_size())]
+                # with device_guard("cpu"):
+                #     output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size())]
             else:
                 output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size())]
-
-            # for scalar tensor ?
-            output_tensors = [t if len(t.shape) > 0 else t[None] for t in output_tensors]
+                # for scalar tensor ?
+                output_tensors = [t if len(t.shape) > 0 else t[None] for t in output_tensors]
 
         if offload:
             origin_shape = tensor.shape
             tensor.reshape_([-1])
-            for x in output_tensors:
-                x.reshape_([-1])
+            # if is_dst:
+            #     for x in output_tensors:
+            #         x.reshape_([-1])
 
             for slice_tensor, index in reduce_tensor(tensor):
                 # paddle.empty_like(slice_tensor)
@@ -124,20 +126,35 @@ def distributed_gather(tensor: Any, dst: int = 0, offload=False) -> Any:
                     ]
                 dist_gather(slice_tensor, slice_output_tensors, dst=dst)
 
-                for x, y in zip(slice_output_tensors, output_tensors):
-                    with device_guard("cpu"):
-                        y[index[0] : index[1]] = x.cpu()
+                if is_dst:
+                    for i in range(len(output_tensors)):
+                        # 0.5008080714516545 GB/s
+                        # output_tensors[i].append(slice_output_tensors[i].cpu())
+                        # 0.50555995052532 GB/s
+                        output_tensors[i].append(
+                            paddle.to_tensor(slice_output_tensors[i], place=paddle.CUDAPinnedPlace())
+                        )
+
+                    # Ways 1:
+                    # cpu 1.1159579219409386 GB/s
+                    # cpu+set_value 0.1305151202601261 GB/s
+                    # for x, y in zip(slice_output_tensors, output_tensors):
+                    #     with device_guard("cpu"):
+                    #         # y[index[0] : index[1]] = x.cpu()
 
             tensor.reshape_(origin_shape)
-            for x in output_tensors:
-                x.reshape_(origin_shape)
+            if is_dst:
+                with device_guard("cpu"):
+                    new_output_tensors = []
+                    for x in output_tensors:
+                        t = paddle.concat([y.cpu() for y in x])
+                        t.reshape_(origin_shape)
+                        new_output_tensors.append(t)
+                    output_tensors = new_output_tensors
 
         else:
-            print("dist_gather start")
             dist_gather(tensor, output_tensors, dst=dst)
-            print("dist_gather over")
 
-        print("return output_tensors")
         return output_tensors
 
     except AssertionError:
@@ -171,10 +188,10 @@ def distributed_all_gather(tensor: Any, offload=False) -> Any:
             for slice_tensor, index in reduce_tensor(tensor):
                 # paddle.empty_like(slice_tensor)
                 slice_output_tensors = [paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size())]
-                print(index)
                 distributed.all_gather(slice_output_tensors, slice_tensor)
                 for x, y in zip(slice_output_tensors, output_tensors):
                     with device_guard("cpu"):
+                        # x.cpu()
                         y[index[0] : index[1]] = x.cpu()
 
             tensor.reshape_(origin_shape)
@@ -206,11 +223,9 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
 
     rank = distributed.get_rank()
     nranks = distributed.get_world_size()
-    # print(gather_list)
     task_list = []
     with _with_batch_p2p_guard("NCCL"):
         if rank == dst:
-            print(rank, nranks)
             for src in range(nranks):
                 wait = paddle.distributed.communication.stream.recv(
                     gather_list[src],
@@ -239,14 +254,28 @@ if __name__ == "__main__":
 
     dtype = "float32"
     shape = [32, 1024, 1024]
-    repeat = 102
+    repeat = 10
     numel = np.prod(shape)
     print("numel:", numel)
 
     local_rank = distributed.get_rank()
+    world_size = distributed.get_world_size()
     data = paddle.ones(shape=shape, dtype=dtype) + local_rank
     # ret = distributed_all_gather(data, offload=True)
-    ret = distributed_gather(data)
+
+    s1 = time.time()
+    for i in range(repeat):
+        ret = distributed_gather(data, offload=True)
+
+    if local_rank == 0:
+        print(ret[0].shape)
+        print(ret)
+
+    print(data.numel())
+    s2 = time.time()
+    print("Using time: ", s2 - s1)
+    print((world_size - 1) * 4 * numel * repeat / 2**30 / (s2 - s1), "GB/s")
+
     print("main over befor return")
 
-    print(ret)
+    # print(ret)
