@@ -1,4 +1,4 @@
-# coding=utf-8
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Optuna, Hugging Face
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
