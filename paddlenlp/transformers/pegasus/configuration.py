@@ -85,7 +85,7 @@ class PegasusConfig(PretrainedConfig):
     model_type = "pegasus"
     keys_to_ignore_at_inference = ["past_key_values"]
     attribute_map = {
-        "num_attention_heads": "encoder_attention_heads", 
+        "num_attention_heads": "encoder_attention_heads",
         "hidden_size": "d_model",
         "num_classes": "num_labels",
     }
@@ -154,4 +154,3 @@ class PegasusConfig(PretrainedConfig):
                 f"Please make sure the config includes `forced_bos_token_id={self.bos_token_id}` in future versions. "
                 "The config can simply be saved and uploaded again to be fixed."
             )
-
