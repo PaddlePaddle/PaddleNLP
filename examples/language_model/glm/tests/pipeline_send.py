@@ -190,20 +190,20 @@ def distributed_all_gather(tensor: Any, offload=False) -> Any:
         raise AssertionError("Not currently using distributed training")
 
 
-def dist_gather_v3(tensor, gather_list=None, dst=0, group=None, async_op=False):
-    rank = distributed.get_rank()
-    nranks = distributed.get_world_size()
-
-    with _with_batch_p2p_guard("NCCL"):
-        if rank == dst:
-            for src in range(nranks):
-                if src != dst:
-                    distributed.recv(gather_list[src], src=src)
-        if rank != dst:
-            distributed.send(tensor, dst=dst)
-
-
 def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
+    """_summary_
+
+    Args:
+        tensor (_type_): _description_
+        gather_list (_type_, optional): _description_. Defaults to None.
+        dst (int, optional): _description_. Defaults to 0.
+        group (_type_, optional): _description_. Defaults to None.
+        async_op (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
+
     rank = distributed.get_rank()
     nranks = distributed.get_world_size()
     # print(gather_list)
@@ -230,64 +230,6 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
         task_list.append(wait)
     for task in task_list:
         task.wait()
-
-
-def dist_gather_v1(tensor, gather_list=None, dst=0, group=None, async_op=False):
-    """_summary_
-
-    Args:
-        tensor (_type_): _description_
-        gather_list (_type_, optional): _description_. Defaults to None.
-        dst (int, optional): _description_. Defaults to 0.
-        group (_type_, optional): _description_. Defaults to None.
-        async_op (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        _type_: _description_
-    """
-
-    rank = distributed.get_rank()
-    if distributed.get_rank() == dst:
-        assert gather_list is not None
-
-    for index in range(distributed.get_world_size()):
-        # send
-        if rank != dst:
-            if index == rank:
-                print(f"send {rank}")
-                distributed.send(tensor, dst=dst)
-
-        # recv
-        if rank == dst:
-            if index != dst:
-                print(f"recv {index}")
-                # print(gather_list)
-                distributed.recv(gather_list[index], src=index)
-
-                print("over recv")
-            else:
-                gather_list[index] = tensor
-
-        # paddle.distributed.barrier()
-    # paddle
-    print("over")
-
-
-def dist_gather_v0(tensor, gather_list=None, dst=0, group=None, async_op=False):
-    rank = distributed.get_rank()
-    if distributed.get_rank() != dst:
-        print(f"send {rank} !!!!!!!!!")
-        distributed.send(tensor, dst=dst)
-    else:
-        assert gather_list is not None
-        for index in range(distributed.get_world_size()):
-            if index != dst:
-                print(len(gather_list))
-                print(gather_list)
-                print(f"recv {index} !!!!!!!!!")
-                distributed.recv(gather_list[index], src=index)
-            else:
-                gather_list[index] = tensor  # .copy_(tensor)
 
 
 if __name__ == "__main__":
