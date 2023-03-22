@@ -16,12 +16,9 @@ import copy
 import logging
 import math
 import os
-import sys
-import types
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet as fleet
 import ppfleetx.models.language_model.gpt as gpt
 from paddle.static import InputSpec
 from ppfleetx.core.module.basic_module import BasicModule
@@ -33,10 +30,10 @@ from ppfleetx.models.language_model.gpt.dygraph.sequence_parallel_utils import (
 from ppfleetx.utils.log import logger
 
 # TODO(haohongxiang): to solve the problem of cross-reference
-import paddlenlp
+import paddlenlp  # noqa: F401
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
 
-from .metrics import *
+from .metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from .utils import process_configs
 
 MODEL_CLASSES = {

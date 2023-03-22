@@ -18,7 +18,6 @@ import tarfile
 import zipfile
 from typing import Callable, Iterable
 
-import paddle
 from ppfleetx.distributed.apis import env
 
 

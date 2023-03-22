@@ -13,10 +13,7 @@
 # limitations under the License.
 
 import math
-import os
-import sys
 import warnings
-from functools import partial
 
 import numpy as np
 import paddle
@@ -643,7 +640,7 @@ class MultiLabelsMetric(Metric):
                 raise ValueError(f"Tensor label has value {paddle.max(label)}, " f"which is no less than num_labels")
 
         if pred.shape[0] != label.shape[0]:
-            raise ValueError(f"The length of pred is not equal to the length of label")
+            raise ValueError("The length of pred is not equal to the length of label")
 
         return pred, label
 

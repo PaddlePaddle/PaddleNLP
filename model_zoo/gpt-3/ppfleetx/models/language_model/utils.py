@@ -12,19 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import copy
 import logging
-import os
-import sys
-from functools import reduce
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
-import yaml
 from paddle.fluid import core
-from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
 
 
