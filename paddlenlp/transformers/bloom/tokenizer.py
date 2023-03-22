@@ -143,6 +143,8 @@ class BloomTokenizer(PretrainedTokenizer):
         "tokenizer_file": "tokenizer.json",
     }  # for save_pretrained
     pretrained_resource_files_map = PRETRAINED_RESOURCE_FILES_MAP
+
+    # TODO(wj-Mcat): disable max-model input size of bloom model
     max_model_input_sizes = {
         "bigscience/bloom-560m": 1024,
         "bigscience/bloom-1b1": 1024,
