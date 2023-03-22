@@ -14,11 +14,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-import os
 import sys
-
-import paddle
-from paddle import is_compiled_with_cuda
 
 from .device import get_device_and_mapping
 from .log import logger
