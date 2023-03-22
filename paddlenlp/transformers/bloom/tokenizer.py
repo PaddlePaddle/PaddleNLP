@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import json
 import os
@@ -34,8 +35,29 @@ __all__ = [
 PRETRAINED_RESOURCE_FILES_MAP = {
     "vocab_file": _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "vocab.json"),
     "merges_file": _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "merges.txt"),
-    "added_tokens": _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "added_tokens.json"),
+    "tokenizer_file": _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "tokenizer.json"),
 }
+
+
+def split_tokenizer_json_file(tokenizer_file: str):
+    base_dir = os.path.dirname(tokenizer_file)
+    with open(tokenizer_file, "r", encoding="utf-8") as f:
+        tokenizer = json.load(f)
+
+    def save_to_file(file: str, content: str):
+        if os.path.exists(file):
+            return
+        with open(file, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    # vocab.json
+    save_to_file(os.path.join(base_dir, "vocab.json"), json.dumps(tokenizer["model"]["vocab"], ensure_ascii=False))
+    # merge file
+    save_to_file(os.path.join(base_dir, "merges.txt"), "\t".join(tokenizer["model"]["merges"]))
+    # added tokens
+    save_to_file(
+        os.path.join(base_dir, "added_tokens.json"), json.dumps(tokenizer["added_tokens"], ensure_ascii=False)
+    )
 
 
 @lru_cache()
@@ -115,9 +137,25 @@ class BloomTokenizer(PretrainedTokenizer):
 
     """
 
-    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}  # for save_pretrained
+    resource_files_names = {
+        "vocab_file": "vocab.json",
+        "merges_file": "merges.txt",
+        "tokenizer_file": "tokenizer.json",
+    }  # for save_pretrained
     pretrained_resource_files_map = PRETRAINED_RESOURCE_FILES_MAP
-    pretrained_init_configuration = {}
+    max_model_input_sizes = {
+        "bigscience/bloom-560m": 1024,
+        "bigscience/bloom-1b1": 1024,
+        "bigscience/bloom-3b": 1024,
+        "bigscience/bloom-7b1": 1024,
+        "bigscience/bloom": 1024,
+        "bigscience/bloomz-560m": 1024,
+        "bigscience/bloomz-1b1": 1024,
+        "bigscience/bloomz-3b": 1024,
+        "bigscience/bloomz-7b1": 1024,
+        "bigscience/bloomz": 1024,
+    }
+    padding_side = "right"
 
     def __init__(
         self,
@@ -282,7 +320,9 @@ class BloomTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
-            source_path = getattr(self, "_%s" % name)
+            source_path = getattr(self, "_%s" % name, None)
+            if source_path is None:
+                continue
 
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
