@@ -1668,7 +1668,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         language_model_inputs = self.language_projection(query_output)
         language_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
         if input_ids is None:
-            input_ids = paddle.Tensor([[self.config.text_config.bos_token_id]]).tile([batch_size, 1])
+            input_ids = paddle.to_tensor([[self.config.text_config.bos_token_id]]).tile([batch_size, 1])
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
         attention_mask = paddle.concat([language_attention_mask, attention_mask], axis=1)
