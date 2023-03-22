@@ -1,406 +1,0 @@
-/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
-  warnings.warn("Setuptools is replacing distutils.")
-I0320 18:55:00.803522 23644 tcp_utils.cc:181] The server starts to listen on IP_ANY:46116
-I0320 18:55:00.803740 23644 tcp_utils.cc:130] Successfully connected to 10.255.129.12:46116
-W0320 18:55:06.167503 23644 gpu_resources.cc:61] Please NOTE: device: 0, GPU Compute Capability: 7.0, Driver API Version: 10.2, Runtime API Version: 10.2
-W0320 18:55:06.171994 23644 gpu_resources.cc:91] device: 0, cuDNN Version: 7.6.
-[2023-03-20 18:55:08,062] [    INFO] topology.py:215 - HybridParallelInfo: rank_id: 0, mp_degree: 2, sharding_degree: 1, pp_degree: 1, dp_degree: 1, mp_group: [0, 1],  sharding_group: [0], pp_group: [0], dp_group: [0], check/clip group: [0, 1]
-[32m[2023-03-20 18:55:08,065] [    INFO][0m - Model config GLMConfig {
-  "attention_dropout_prob": 0.1,
-  "attention_scale": 1.0,
-  "block_position_encoding": true,
-  "checkpoint_activations": false,
-  "checkpoint_num_layers": 1,
-  "embedding_dropout_prob": 0.1,
-  "hidden_size": 1024,
-  "initializer_range": 0.02,
-  "layernorm_epsilon": 1e-05,
-  "max_sequence_length": 1024,
-  "model_type": "glm",
-  "num_attention_heads": 16,
-  "num_layers": 24,
-  "output_dropout_prob": 0.1,
-  "output_predict": true,
-  "paddle_dtype": "float32",
-  "paddlenlp_version": null,
-  "parallel_output": false,
-  "pool_token": "cls",
-  "relative_encoding": false,
-  "spell_func": "lstm",
-  "spell_length": null,
-  "tensor_parallel_degree": 2,
-  "use_scaled_init_for_output_weights": false,
-  "vocab_size": 50048
-}
-[0m
-[32m[2023-03-20 18:55:09,533] [    INFO][0m - All model checkpoint weights were used when initializing GLMModel.
-[0m
-[32m[2023-03-20 18:55:09,533] [    INFO][0m - All the weights of GLMModel were initialized from the model checkpoint at THUDM/glm-large-chinese.
-If your task is similar to the task the model of the checkpoint was trained on, you can already use GLMModel for predictions without further training.[0m
-paddle mp 2.109375
-/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
-  warnings.warn("Setuptools is replacing distutils.")
-
-
---------------------------------------
-C++ Traceback (most recent call last):
---------------------------------------
-No stack trace in paddle, may be caused by external reasons.
-
-----------------------
-Error Message Summary:
-----------------------
-FatalError: `Termination signal` is detected by the operating system.
-  [TimeInfo: *** Aborted at 1679310394 (unix time) try "date -d @1679310394" if you are using GNU date ***]
-  [SignalInfo: *** SIGTERM (@0x4110000412e) received by PID 16805 (TID 0x7f02b045f740) from PID 16686 ***]
-
-/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
-  warnings.warn("Setuptools is replacing distutils.")
-I0320 19:11:34.174042 28988 tcp_utils.cc:181] The server starts to listen on IP_ANY:53174
-I0320 19:11:34.174299 28988 tcp_utils.cc:130] Successfully connected to 10.255.129.12:53174
-W0320 19:11:36.841234 28988 gpu_resources.cc:61] Please NOTE: device: 0, GPU Compute Capability: 7.0, Driver API Version: 10.2, Runtime API Version: 10.2
-W0320 19:11:36.845589 28988 gpu_resources.cc:91] device: 0, cuDNN Version: 7.6.
-[2023-03-20 19:11:39,023] [    INFO] topology.py:215 - HybridParallelInfo: rank_id: 0, mp_degree: 2, sharding_degree: 1, pp_degree: 1, dp_degree: 1, mp_group: [0, 1],  sharding_group: [0], pp_group: [0], dp_group: [0], check/clip group: [0, 1]
-[32m[2023-03-20 19:11:39,024] [    INFO][0m -     +==============================================================================+
-    |                                                                              |
-    |                         DistributedStrategy Overview                         |
-    |                                                                              |
-    +==============================================================================+
-    |                        a_sync=True <-> a_sync_configs                        |
-    +------------------------------------------------------------------------------+
-    |                               k_steps                    -1                  |
-    |                     max_merge_var_num                    1                   |
-    |                       send_queue_size                    16                  |
-    |               independent_recv_thread                  False                 |
-    |         min_send_grad_num_before_recv                    1                   |
-    |                      thread_pool_size                    1                   |
-    |                       send_wait_times                    1                   |
-    |               runtime_split_send_recv                  False                 |
-    |                        launch_barrier                   True                 |
-    |             heter_worker_device_guard                   cpu                  |
-    |                        lr_decay_steps                    10                  |
-    |                            use_ps_gpu                    0                   |
-    +==============================================================================+
-    |                    Environment Flags, Communication Flags                    |
-    +------------------------------------------------------------------------------+
-    |                                  mode                    1                   |
-    |                               elastic                  False                 |
-    |                                  auto                  False                 |
-    |                   sync_nccl_allreduce                   True                 |
-    |                         nccl_comm_num                    1                   |
-    |            use_hierarchical_allreduce                  False                 |
-    |   hierarchical_allreduce_inter_nranks                    1                   |
-    |                       sync_batch_norm                  False                 |
-    |                   fuse_all_reduce_ops                   True                 |
-    |                  fuse_grad_size_in_MB                    32                  |
-    |              fuse_grad_size_in_TFLOPS                   50.0                 |
-    |               cudnn_exhaustive_search                  False                 |
-    |             conv_workspace_size_limit                   512                  |
-    |    cudnn_batchnorm_spatial_persistent                  False                 |
-    |                        fp16_allreduce                  False                 |
-    |               last_comm_group_size_MB                   1.0                  |
-    |                find_unused_parameters                  False                 |
-    |            without_graph_optimization                  False                 |
-    |                 fuse_grad_size_in_num                    8                   |
-    |                 calc_comm_same_stream                  False                 |
-    |                                   asp                  False                 |
-    |                       fuse_grad_merge                  False                 |
-    |                             semi_auto                  False                 |
-    |                            adam_d2sum                  False                 |
-    |                           auto_search                  False                 |
-    |                        heter_ccl_mode                  False                 |
-    |                         is_fl_ps_mode                  False                 |
-    |                      with_coordinator                  False                 |
-    |                            split_data                   True                 |
-    |                  downpour_table_param                    []                  |
-    |                       fs_client_param                                        |
-    +==============================================================================+
-    |                                Build Strategy                                |
-    +------------------------------------------------------------------------------+
-    |           enable_sequential_execution                  False                 |
-    |              fuse_elewise_add_act_ops                  False                 |
-    |                       fuse_bn_act_ops                  False                 |
-    |              fuse_relu_depthwise_conv                  False                 |
-    |                    fuse_broadcast_ops                  False                 |
-    |                fuse_all_optimizer_ops                  False                 |
-    |                        enable_inplace                  False                 |
-    |     enable_backward_optimizer_op_deps                   True                 |
-    |                 cache_runtime_context                  False                 |
-    |                   fuse_bn_add_act_ops                   True                 |
-    |                    enable_auto_fusion                  False                 |
-    |                          enable_addto                  False                 |
-    |                      fix_op_run_order                  False                 |
-    |              allow_cuda_graph_capture                  False                 |
-    |                       reduce_strategy                    0                   |
-    |                    fuse_gemm_epilogue                  False                 |
-    |                   debug_graphviz_path                                        |
-    +==============================================================================+
-    |                              Execution Strategy                              |
-    +------------------------------------------------------------------------------+
-    |                           num_threads                    1                   |
-    |          num_iteration_per_drop_scope                    10                  |
-    |                 num_iteration_per_run                    1                   |
-    |                    use_thread_barrier                  False                 |
-    +==============================================================================+
-[0m
-[32m[2023-03-20 19:11:39,026] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
-[32m[2023-03-20 19:11:39,026] [    INFO][0m - ============================================================[0m
-[32m[2023-03-20 19:11:39,027] [    INFO][0m -      Model Configuration Arguments      [0m
-[32m[2023-03-20 19:11:39,027] [    INFO][0m - paddle commit id              : 0e92adceae06b6b7463f2dc7790ffb0601730009[0m
-[32m[2023-03-20 19:11:39,027] [    INFO][0m - label_smoothing               : 0.1[0m
-[32m[2023-03-20 19:11:39,027] [    INFO][0m - lora                          : False[0m
-[32m[2023-03-20 19:11:39,028] [    INFO][0m - lr_decay_ratio                : 0.1[0m
-[32m[2023-03-20 19:11:39,028] [    INFO][0m - model_name_or_path            : THUDM/glm-large-chinese[0m
-[32m[2023-03-20 19:11:39,028] [    INFO][0m - [0m
-[32m[2023-03-20 19:11:39,028] [    INFO][0m - ============================================================[0m
-[32m[2023-03-20 19:11:39,028] [    INFO][0m -       Data Configuration Arguments      [0m
-[32m[2023-03-20 19:11:39,029] [    INFO][0m - paddle commit id              : 0e92adceae06b6b7463f2dc7790ffb0601730009[0m
-[32m[2023-03-20 19:11:39,029] [    INFO][0m - length_penalty                : 0.7[0m
-[32m[2023-03-20 19:11:39,029] [    INFO][0m - min_tgt_length                : 55[0m
-[32m[2023-03-20 19:11:39,029] [    INFO][0m - no_block_position             : False[0m
-[32m[2023-03-20 19:11:39,030] [    INFO][0m - no_repeat_ngram_size          : 3[0m
-[32m[2023-03-20 19:11:39,030] [    INFO][0m - num_beams                     : 5[0m
-[32m[2023-03-20 19:11:39,030] [    INFO][0m - select_topk                   : True[0m
-[32m[2023-03-20 19:11:39,030] [    INFO][0m - src_length                    : 608[0m
-[32m[2023-03-20 19:11:39,030] [    INFO][0m - task_name                     : cnn_dailymail[0m
-[32m[2023-03-20 19:11:39,031] [    INFO][0m - tgt_length                    : 160[0m
-[32m[2023-03-20 19:11:39,031] [    INFO][0m - top_k                         : 0[0m
-[32m[2023-03-20 19:11:39,031] [    INFO][0m - top_p                         : 0.0[0m
-[32m[2023-03-20 19:11:39,031] [    INFO][0m - [0m
-[33m[2023-03-20 19:11:39,032] [ WARNING][0m - Process rank: 0, device: gpu, world_size: 2, distributed training: True, 16-bits training: True[0m
-2
-2
-[32m[2023-03-20 19:11:39,032] [    INFO][0m - We are using <class 'paddlenlp.transformers.glm.modeling.GLMForConditionalGeneration'> to load 'THUDM/glm-large-chinese'.[0m
-[32m[2023-03-20 19:11:39,035] [    INFO][0m - Model config GLMConfig {
-  "attention_dropout_prob": 0.1,
-  "attention_scale": 1.0,
-  "block_position_encoding": true,
-  "checkpoint_activations": false,
-  "checkpoint_num_layers": 1,
-  "embedding_dropout_prob": 0.1,
-  "hidden_size": 1024,
-  "initializer_range": 0.02,
-  "layernorm_epsilon": 1e-05,
-  "max_sequence_length": 1024,
-  "model_type": "glm",
-  "num_attention_heads": 16,
-  "num_layers": 24,
-  "output_dropout_prob": 0.1,
-  "output_predict": true,
-  "paddle_dtype": "float32",
-  "paddlenlp_version": null,
-  "parallel_output": true,
-  "pool_token": "cls",
-  "relative_encoding": false,
-  "spell_func": "lstm",
-  "spell_length": null,
-  "tensor_parallel_degree": 2,
-  "use_scaled_init_for_output_weights": false,
-  "vocab_size": 50048
-}
-[0m
-[32m[2023-03-20 19:11:42,108] [    INFO][0m - All model checkpoint weights were used when initializing GLMForConditionalGeneration.
-[0m
-[32m[2023-03-20 19:11:42,109] [    INFO][0m - All the weights of GLMForConditionalGeneration were initialized from the model checkpoint at THUDM/glm-large-chinese.
-If your task is similar to the task the model of the checkpoint was trained on, you can already use GLMForConditionalGeneration for predictions without further training.[0m
-[32m[2023-03-20 19:11:42,129] [    INFO][0m - We are using <class 'paddlenlp.transformers.glm.tokenizer.GLMChineseTokenizer'> to load 'THUDM/glm-large-chinese'.[0m
-[32m[2023-03-20 19:11:42,129] [    INFO][0m - Already cached /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/cog-pretrain.model[0m
-[32m[2023-03-20 19:11:42,129] [    INFO][0m - Already cached /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/glm-chinese-added-tokens.json[0m
-[32m[2023-03-20 19:11:42,165] [    INFO][0m - Adding <|endoftext|> to the vocabulary[0m
-[32m[2023-03-20 19:11:42,165] [    INFO][0m - Adding [SEP] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [CLS] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [MASK] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [UNUSED1] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [UNUSED2] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding <|startofpiece|> to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding <|endofpiece|> to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [sMASK] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,166] [    INFO][0m - Adding [gMASK] to the vocabulary[0m
-[32m[2023-03-20 19:11:42,167] [    INFO][0m - tokenizer config file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/tokenizer_config.json[0m
-[32m[2023-03-20 19:11:42,167] [    INFO][0m - Special tokens file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/special_tokens_map.json[0m
-[32m[2023-03-20 19:11:42,167] [    INFO][0m - added tokens file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/added_tokens.json[0m
-[32m[2023-03-20 19:12:13,044] [    INFO][0m - Using half precision[0m
-[32m[2023-03-20 19:12:13,045] [    INFO][0m - ============================================================[0m
-[32m[2023-03-20 19:12:13,045] [    INFO][0m -     Training Configuration Arguments    [0m
-[32m[2023-03-20 19:12:13,045] [    INFO][0m - paddle commit id              :0e92adceae06b6b7463f2dc7790ffb0601730009[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - _no_sync_in_gradient_accumulation:True[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - adam_beta1                    :0.9[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - adam_beta2                    :0.999[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - adam_epsilon                  :1e-08[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - bf16                          :False[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - bf16_full_eval                :False[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - current_device                :gpu:0[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - data_parallel_degree          :1[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - data_parallel_rank            :0[0m
-[32m[2023-03-20 19:12:13,046] [    INFO][0m - dataloader_drop_last          :False[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - dataloader_num_workers        :0[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - dataset_rank                  :0[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - dataset_world_size            :1[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - device                        :gpu[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - disable_tqdm                  :False[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - do_eval                       :False[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - do_export                     :False[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - do_predict                    :False[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - do_train                      :True[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - eval_batch_size               :2[0m
-[32m[2023-03-20 19:12:13,047] [    INFO][0m - eval_steps                    :1000[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - evaluation_strategy           :IntervalStrategy.NO[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - flatten_param_grads           :False[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - fp16                          :True[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - fp16_full_eval                :False[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - fp16_opt_level                :O1[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - gradient_accumulation_steps   :1[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - greater_is_better             :None[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - ignore_data_skip              :False[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - label_names                   :None[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - label_smoothing               :0.1[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - lazy_data_processing          :True[0m
-[32m[2023-03-20 19:12:13,048] [    INFO][0m - learning_rate                 :3e-05[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - load_best_model_at_end        :False[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - local_process_index           :0[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - local_rank                    :0[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - log_level                     :-1[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - log_level_replica             :-1[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - log_on_each_node              :True[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - logging_dir                   :./checkpoints/test/runs/Mar20_19-11-34_yq01-qianmo-com-255-129-12.yq01[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - logging_first_step            :False[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - logging_steps                 :1[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - logging_strategy              :IntervalStrategy.STEPS[0m
-[32m[2023-03-20 19:12:13,049] [    INFO][0m - lr_decay_ratio                :0.1[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - lr_scheduler_type             :SchedulerType.LINEAR[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - max_grad_norm                 :1.0[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - max_steps                     :-1[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - metric_for_best_model         :None[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - minimum_eval_times            :None[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - no_cuda                       :False[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - num_train_epochs              :4.0[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - optim                         :OptimizerNames.ADAMW[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - optimizer_name_suffix         :tp00[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - output_dir                    :./checkpoints/test[0m
-[32m[2023-03-20 19:12:13,050] [    INFO][0m - overwrite_output_dir          :False[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - past_index                    :-1[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - per_device_eval_batch_size    :2[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - per_device_train_batch_size   :2[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - prediction_loss_only          :False[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - process_index                 :0[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - recompute                     :False[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - remove_unused_columns         :True[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - report_to                     :['visualdl'][0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - resume_from_checkpoint        :None[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - run_name                      :./checkpoints/test[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - save_on_each_node             :False[0m
-[32m[2023-03-20 19:12:13,051] [    INFO][0m - save_steps                    :10000[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - save_strategy                 :IntervalStrategy.STEPS[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - save_total_limit              :None[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - scale_loss                    :32768[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - seed                          :42[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - sharding                      :[][0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - sharding_degree               :-1[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - sharding_parallel_degree      :1[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - sharding_parallel_rank        :0[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - should_log                    :True[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - should_save                   :True[0m
-[32m[2023-03-20 19:12:13,052] [    INFO][0m - skip_memory_metrics           :True[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - tensor_parallel_degree        :2[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - tensor_parallel_rank          :0[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - train_batch_size              :2[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - use_hybrid_parallel           :True[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - warmup_ratio                  :0.06[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - warmup_steps                  :0[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - weight_decay                  :0.1[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - weight_name_suffix            :tp00[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - world_size                    :2[0m
-[32m[2023-03-20 19:12:13,053] [    INFO][0m - [0m
-[32m[2023-03-20 19:12:13,057] [    INFO][0m - ***** Running training *****[0m
-[32m[2023-03-20 19:12:13,057] [    INFO][0m -   Num examples = 287113[0m
-[32m[2023-03-20 19:12:13,057] [    INFO][0m -   Num Epochs = 4[0m
-[32m[2023-03-20 19:12:13,057] [    INFO][0m -   Instantaneous batch size per device = 2[0m
-[32m[2023-03-20 19:12:13,057] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 2[0m
-[32m[2023-03-20 19:12:13,058] [    INFO][0m -   Gradient Accumulation steps = 1[0m
-[32m[2023-03-20 19:12:13,058] [    INFO][0m -   Total optimization steps = 574228.0[0m
-[32m[2023-03-20 19:12:13,058] [    INFO][0m -   Total num train samples = 1148452.0[0m
-[32m[2023-03-20 19:12:13,258] [    INFO][0m -   Number of trainable parameters = 178954240[0m
-  0%|          | 0/574228 [00:00<?, ?it/s][]
-  0%|          | 1/574228 [00:03<632:22:38,  3.96s/it]                                                      loss: 9.63270187, learning_rate: 8.707e-10, global_step: 1, interval_runtime: 4.1691, interval_samples_per_second: 0.48, interval_steps_per_second: 0.24, epoch: 0.0
-  0%|          | 1/574228 [00:04<632:22:38,  3.96s/it][]
-Found inf or nan, current scale is: 32768.0, decrease to: 32768.0*0.5
-  0%|          | 2/574228 [00:04<343:33:17,  2.15s/it]                                                      loss: 8.76442814, learning_rate: 8.707e-10, global_step: 2, interval_runtime: 0.7868, interval_samples_per_second: 2.542, interval_steps_per_second: 1.271, epoch: 0.0
-  0%|          | 2/574228 [00:04<343:33:17,  2.15s/it][]
-  0%|          | 3/574228 [00:05<244:23:42,  1.53s/it]                                                      loss: 7.94575834, learning_rate: 1.741e-09, global_step: 3, interval_runtime: 0.6943, interval_samples_per_second: 2.881, interval_steps_per_second: 1.44, epoch: 0.0
-  0%|          | 3/574228 [00:05<244:23:42,  1.53s/it][]
-  0%|          | 4/574228 [00:06<199:46:33,  1.25s/it]                                                      loss: 9.46533966, learning_rate: 2.612e-09, global_step: 4, interval_runtime: 0.8236, interval_samples_per_second: 2.428, interval_steps_per_second: 1.214, epoch: 0.0
-  0%|          | 4/574228 [00:06<199:46:33,  1.25s/it][]
-  0%|          | 5/574228 [00:07<170:04:25,  1.07s/it]                                                      loss: 8.14938736, learning_rate: 3.483e-09, global_step: 5, interval_runtime: 0.7359, interval_samples_per_second: 2.718, interval_steps_per_second: 1.359, epoch: 0.0
-  0%|          | 5/574228 [00:07<170:04:25,  1.07s/it][]
-  0%|          | 6/574228 [00:07<151:54:11,  1.05it/s]                                                      loss: 9.22096252, learning_rate: 4.354e-09, global_step: 6, interval_runtime: 0.7312, interval_samples_per_second: 2.735, interval_steps_per_second: 1.368, epoch: 0.0
-  0%|          | 6/574228 [00:07<151:54:11,  1.05it/s][]
-  0%|          | 7/574228 [00:08<140:51:58,  1.13it/s]                                                      loss: 9.58376884, learning_rate: 5.224e-09, global_step: 7, interval_runtime: 0.7407, interval_samples_per_second: 2.7, interval_steps_per_second: 1.35, epoch: 0.0
-  0%|          | 7/574228 [00:08<140:51:58,  1.13it/s][]
-  0%|          | 8/574228 [00:09<134:18:46,  1.19it/s]                                                      loss: 9.3005743, learning_rate: 6.095e-09, global_step: 8, interval_runtime: 0.7541, interval_samples_per_second: 2.652, interval_steps_per_second: 1.326, epoch: 0.0001
-  0%|          | 8/574228 [00:09<134:18:46,  1.19it/s][]
-  0%|          | 9/574228 [00:10<127:39:25,  1.25it/s]                                                      loss: 9.03027439, learning_rate: 6.966e-09, global_step: 9, interval_runtime: 0.7086, interval_samples_per_second: 2.823, interval_steps_per_second: 1.411, epoch: 0.0001
-  0%|          | 9/574228 [00:10<127:39:25,  1.25it/s][]
-  0%|          | 10/574228 [00:10<124:07:52,  1.28it/s]                                                       loss: 8.93558502, learning_rate: 7.837e-09, global_step: 10, interval_runtime: 0.7287, interval_samples_per_second: 2.744, interval_steps_per_second: 1.372, epoch: 0.0001
-  0%|          | 10/574228 [00:10<124:07:52,  1.28it/s][]
-  0%|          | 11/574228 [00:11<122:01:54,  1.31it/s]                                                       loss: 9.01287365, learning_rate: 8.707e-09, global_step: 11, interval_runtime: 0.7352, interval_samples_per_second: 2.72, interval_steps_per_second: 1.36, epoch: 0.0001
-  0%|          | 11/574228 [00:11<122:01:54,  1.31it/s][]
-  0%|          | 12/574228 [00:12<120:30:10,  1.32it/s]                                                       loss: 9.45102119, learning_rate: 9.578e-09, global_step: 12, interval_runtime: 0.7358, interval_samples_per_second: 2.718, interval_steps_per_second: 1.359, epoch: 0.0001
-  0%|          | 12/574228 [00:12<120:30:10,  1.32it/s][]
-  0%|          | 13/574228 [00:13<117:07:02,  1.36it/s]                                                       loss: 9.04531479, learning_rate: 1.045e-08, global_step: 13, interval_runtime: 0.6834, interval_samples_per_second: 2.926, interval_steps_per_second: 1.463, epoch: 0.0001
-  0%|          | 13/574228 [00:13<117:07:02,  1.36it/s][]
-  0%|          | 14/574228 [00:13<117:57:51,  1.35it/s]                                                       loss: 8.98330021, learning_rate: 1.132e-08, global_step: 14, interval_runtime: 0.7516, interval_samples_per_second: 2.661, interval_steps_per_second: 1.33, epoch: 0.0001
-  0%|          | 14/574228 [00:13<117:57:51,  1.35it/s][]
-  0%|          | 15/574228 [00:14<118:27:41,  1.35it/s]                                                       loss: 9.01428604, learning_rate: 1.219e-08, global_step: 15, interval_runtime: 0.7499, interval_samples_per_second: 2.667, interval_steps_per_second: 1.334, epoch: 0.0001
-  0%|          | 15/574228 [00:14<118:27:41,  1.35it/s][]
-  0%|          | 16/574228 [00:15<117:44:51,  1.35it/s]                                                       loss: 8.91506863, learning_rate: 1.306e-08, global_step: 16, interval_runtime: 0.7278, interval_samples_per_second: 2.748, interval_steps_per_second: 1.374, epoch: 0.0001
-  0%|          | 16/574228 [00:15<117:44:51,  1.35it/s][]
-  0%|          | 17/574228 [00:15<117:38:19,  1.36it/s]                                                       loss: 9.11491776, learning_rate: 1.393e-08, global_step: 17, interval_runtime: 0.737, interval_samples_per_second: 2.714, interval_steps_per_second: 1.357, epoch: 0.0001
-  0%|          | 17/574228 [00:15<117:38:19,  1.36it/s][]
-  0%|          | 18/574228 [00:16<118:42:20,  1.34it/s]                                                       loss: 8.88675308, learning_rate: 1.48e-08, global_step: 18, interval_runtime: 0.7587, interval_samples_per_second: 2.636, interval_steps_per_second: 1.318, epoch: 0.0001
-  0%|          | 18/574228 [00:16<118:42:20,  1.34it/s][]
-  0%|          | 19/574228 [00:17<118:47:46,  1.34it/s]                                                       loss: 9.76167297, learning_rate: 1.567e-08, global_step: 19, interval_runtime: 0.7467, interval_samples_per_second: 2.678, interval_steps_per_second: 1.339, epoch: 0.0001
-  0%|          | 19/574228 [00:17<118:47:46,  1.34it/s][]
-  0%|          | 20/574228 [00:18<118:26:11,  1.35it/s]                                                       loss: 9.45098877, learning_rate: 1.654e-08, global_step: 20, interval_runtime: 0.7367, interval_samples_per_second: 2.715, interval_steps_per_second: 1.357, epoch: 0.0001
-  0%|          | 20/574228 [00:18<118:26:11,  1.35it/s][]
-  0%|          | 21/574228 [00:18<119:21:27,  1.34it/s]                                                       loss: 9.06679344, learning_rate: 1.741e-08, global_step: 21, interval_runtime: 0.7618, interval_samples_per_second: 2.625, interval_steps_per_second: 1.313, epoch: 0.0001
-  0%|          | 21/574228 [00:18<119:21:27,  1.34it/s][]
-  0%|          | 22/574228 [00:19<118:24:18,  1.35it/s]                                                       loss: 8.83608532, learning_rate: 1.829e-08, global_step: 22, interval_runtime: 0.7284, interval_samples_per_second: 2.746, interval_steps_per_second: 1.373, epoch: 0.0002
-  0%|          | 22/574228 [00:19<118:24:18,  1.35it/s][]
-  0%|          | 23/574228 [00:20<119:26:32,  1.34it/s]                                                       loss: 8.72374821, learning_rate: 1.916e-08, global_step: 23, interval_runtime: 0.764, interval_samples_per_second: 2.618, interval_steps_per_second: 1.309, epoch: 0.0002
-  0%|          | 23/574228 [00:20<119:26:32,  1.34it/s][]
-  0%|          | 24/574228 [00:21<116:21:30,  1.37it/s]                                                       loss: 9.51282501, learning_rate: 2.003e-08, global_step: 24, interval_runtime: 0.6844, interval_samples_per_second: 2.922, interval_steps_per_second: 1.461, epoch: 0.0002
-  0%|          | 24/574228 [00:21<116:21:30,  1.37it/s][]
-  0%|          | 25/574228 [00:21<116:41:44,  1.37it/s]                                                       loss: 9.13230038, learning_rate: 2.09e-08, global_step: 25, interval_runtime: 0.7488, interval_samples_per_second: 2.671, interval_steps_per_second: 1.336, epoch: 0.0002
-  0%|          | 25/574228 [00:21<116:41:44,  1.37it/s][]
-  0%|          | 26/574228 [00:22<119:47:17,  1.33it/s]                                                       loss: 9.50671291, learning_rate: 2.177e-08, global_step: 26, interval_runtime: 0.784, interval_samples_per_second: 2.551, interval_steps_per_second: 1.276, epoch: 0.0002
-  0%|          | 26/574228 [00:22<119:47:17,  1.33it/s][]
-  0%|          | 27/574228 [00:23<118:48:33,  1.34it/s]                                                       loss: 9.38456345, learning_rate: 2.264e-08, global_step: 27, interval_runtime: 0.7308, interval_samples_per_second: 2.737, interval_steps_per_second: 1.368, epoch: 0.0002
-  0%|          | 27/574228 [00:23<118:48:33,  1.34it/s][]
-  0%|          | 28/574228 [00:24<117:56:19,  1.35it/s]                                                       loss: 9.65797329, learning_rate: 2.351e-08, global_step: 28, interval_runtime: 0.7264, interval_samples_per_second: 2.753, interval_steps_per_second: 1.377, epoch: 0.0002
-  0%|          | 28/574228 [00:24<117:56:19,  1.35it/s][]
-  0%|          | 29/574228 [00:24<119:20:24,  1.34it/s]                                                       loss: 9.38463783, learning_rate: 2.438e-08, global_step: 29, interval_runtime: 0.7709, interval_samples_per_second: 2.594, interval_steps_per_second: 1.297, epoch: 0.0002
-  0%|          | 29/574228 [00:24<119:20:24,  1.34it/s][]
-  0%|          | 30/574228 [00:25<119:08:15,  1.34it/s]                                                       loss: 9.13523579, learning_rate: 2.525e-08, global_step: 30, interval_runtime: 0.7754, interval_samples_per_second: 2.579, interval_steps_per_second: 1.29, epoch: 0.0002
-  0%|          | 30/574228 [00:25<119:08:15,  1.34it/s][]
-  0%|          | 31/574228 [00:26<131:09:28,  1.22it/s]                                                       loss: 9.23861504, learning_rate: 2.612e-08, global_step: 31, interval_runtime: 0.9645, interval_samples_per_second: 2.074, interval_steps_per_second: 1.037, epoch: 0.0002
-  0%|          | 31/574228 [00:26<131:09:28,  1.22it/s][]
-  0%|          | 32/574228 [00:27<127:21:24,  1.25it/s]                                                       loss: 9.03789234, learning_rate: 2.699e-08, global_step: 32, interval_runtime: 0.7764, interval_samples_per_second: 2.576, interval_steps_per_second: 1.288, epoch: 0.0002
-  0%|          | 32/574228 [00:27<127:21:24,  1.25it/s][]
-  0%|          | 33/574228 [00:28<125:54:22,  1.27it/s]                                                       loss: 9.27166557, learning_rate: 2.786e-08, global_step: 33, interval_runtime: 0.7347, interval_samples_per_second: 2.722, interval_steps_per_second: 1.361, epoch: 0.0002
-  0%|          | 33/574228 [00:28<125:54:22,  1.27it/s][]
-  0%|          | 34/574228 [00:28<123:21:59,  1.29it/s]                                                       loss: 9.32053185, learning_rate: 2.873e-08, global_step: 34, interval_runtime: 0.7363, interval_samples_per_second: 2.716, interval_steps_per_second: 1.358, epoch: 0.0002
-  0%|          | 34/574228 [00:28<123:21:59,  1.29it/s][]
-  0%|          | 35/574228 [00:29<121:33:13,  1.31it/s]                                                       loss: 9.49331665, learning_rate: 2.96e-08, global_step: 35, interval_runtime: 0.7645, interval_samples_per_second: 2.616, interval_steps_per_second: 1.308, epoch: 0.0002
-  0%|          | 35/574228 [00:29<121:33:13,  1.31it/s][]
-  0%|          | 36/574228 [00:30<122:03:08,  1.31it/s]                                                       loss: 9.08504105, learning_rate: 3.048e-08, global_step: 36, interval_runtime: 0.7436, interval_samples_per_second: 2.69, interval_steps_per_second: 1.345, epoch: 0.0003
-  0%|          | 36/574228 [00:30<122:03:08,  1.31it/s][]
-  0%|          | 37/574228 [00:31<121:32:11,  1.31it/s]                                                       loss: 9.42029095, learning_rate: 3.135e-08, global_step: 37, interval_runtime: 0.756, interval_samples_per_second: 2.646, interval_steps_per_second: 1.323, epoch: 0.0003
-  0%|          | 37/574228 [00:31<121:32:11,  1.31it/s][]
-  0%|          | 38/574228 [00:31<120:31:16,  1.32it/s]                                                       loss: 9.45788956, learning_rate: 3.222e-08, global_step: 38, interval_runtime: 0.7397, interval_samples_per_second: 2.704, interval_steps_per_second: 1.352, epoch: 0.0003
-  0%|          | 38/574228 [00:31<120:31:16,  1.32it/s][]
-  0%|          | 39/574228 [00:32<117:12:43,  1.36it/s]                                                       loss: 9.16955185, learning_rate: 3.309e-08, global_step: 39, interval_runtime: 0.6861, interval_samples_per_second: 2.915, interval_steps_per_second: 1.458, epoch: 0.0003
-  0%|          | 39/574228 [00:32<117:12:43,  1.36it/s][]
-  0%|          | 40/574228 [00:33<116:49:48,  1.37it/s]                                                       loss: 9.06997871, learning_rate: 3.396e-08, global_step: 40, interval_runtime: 0.7279, interval_samples_per_second: 2.748, interval_steps_per_second: 1.374, epoch: 0.0003
-  0%|          | 40/574228 [00:33<116:49:48,  1.37it/s][]
-  0%|          | 41/574228 [00:34<116:59:51,  1.36it/s]                                                       loss: 9.46562481, learning_rate: 3.483e-08, global_step: 41, interval_runtime: 0.7352, interval_samples_per_second: 2.72, interval_steps_per_second: 1.36, epoch: 0.0003
-  0%|          | 41/574228 [00:34<116:59:51,  1.36it/s][]
