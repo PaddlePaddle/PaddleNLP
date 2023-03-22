@@ -181,16 +181,14 @@ class PegasusModelTester:
         output, cache = outputs
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")  # 13,3
-        next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3], dtype=paddle.get_default_dtype())  # 13,1,1,3
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
+        next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3], dtype=paddle.get_default_dtype())
 
         # append to next input_ids and
-        next_input_ids = paddle.concat([decoder_input_ids, next_tokens], axis=-1)  # 13,4
-        next_attention_mask = paddle.concat([decoder_attention_mask, next_attn_mask], axis=-1)  # 13,1,1,4
+        next_input_ids = paddle.concat([decoder_input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([decoder_attention_mask, next_attn_mask], axis=-1)
 
-        # 13,4,16
         output_from_no_past, _ = decoder(next_input_ids, next_attention_mask, encoder_output, attention_mask)
-        # import pdb;pdb.set_trace()
         output_from_past, _ = decoder(
             next_tokens,
             next_attention_mask,
@@ -198,7 +196,6 @@ class PegasusModelTester:
             attention_mask,
             cache=cache,
         )
-        # import pdb;pdb.set_trace()
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()

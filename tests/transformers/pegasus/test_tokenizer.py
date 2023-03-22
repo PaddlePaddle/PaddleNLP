@@ -26,8 +26,6 @@ SAMPLE_VOCAB = get_tests_dir("fixtures/vocab.zh.pegasus.txt")
 class PegasusTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = PegasusChineseTokenizer
     test_rust_tokenizer = False
-    # test_offsets = True
-    # test_sentencepiece = True
 
     def setUp(self):
         super().setUp()
