@@ -1,0 +1,418 @@
+/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
+  warnings.warn("Setuptools is replacing distutils.")
+I0320 18:55:00.785019 23646 tcp_utils.cc:107] Retry to connect to 10.255.129.12:46116 while the server is not yet listening.
+I0320 18:55:03.785316 23646 tcp_utils.cc:130] Successfully connected to 10.255.129.12:46116
+W0320 18:55:06.235033 23646 gpu_resources.cc:61] Please NOTE: device: 1, GPU Compute Capability: 7.0, Driver API Version: 10.2, Runtime API Version: 10.2
+W0320 18:55:06.239456 23646 gpu_resources.cc:91] device: 1, cuDNN Version: 7.6.
+[2023-03-20 18:55:07,962] [    INFO] topology.py:215 - HybridParallelInfo: rank_id: 1, mp_degree: 2, sharding_degree: 1, pp_degree: 1, dp_degree: 1, mp_group: [0, 1],  sharding_group: [1], pp_group: [1], dp_group: [1], check/clip group: [0, 1]
+[32m[2023-03-20 18:55:07,965] [    INFO][0m - Model config GLMConfig {
+  "attention_dropout_prob": 0.1,
+  "attention_scale": 1.0,
+  "block_position_encoding": true,
+  "checkpoint_activations": false,
+  "checkpoint_num_layers": 1,
+  "embedding_dropout_prob": 0.1,
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "layernorm_epsilon": 1e-05,
+  "max_sequence_length": 1024,
+  "model_type": "glm",
+  "num_attention_heads": 16,
+  "num_layers": 24,
+  "output_dropout_prob": 0.1,
+  "output_predict": true,
+  "paddle_dtype": "float32",
+  "paddlenlp_version": null,
+  "parallel_output": false,
+  "pool_token": "cls",
+  "relative_encoding": false,
+  "spell_func": "lstm",
+  "spell_length": null,
+  "tensor_parallel_degree": 2,
+  "tensor_parallel_rank": 1,
+  "use_scaled_init_for_output_weights": false,
+  "vocab_size": 50048
+}
+[0m
+[32m[2023-03-20 18:55:09,546] [    INFO][0m - All model checkpoint weights were used when initializing GLMModel.
+[0m
+[32m[2023-03-20 18:55:09,546] [    INFO][0m - All the weights of GLMModel were initialized from the model checkpoint at THUDM/glm-large-chinese.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use GLMModel for predictions without further training.[0m
+paddle mp 2.109375
+/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
+  warnings.warn("Setuptools is replacing distutils.")
+usage: run_train.py [-h] [--model_name_or_path MODEL_NAME_OR_PATH]
+                    [--label_smoothing LABEL_SMOOTHING]
+                    [--lr_decay_ratio LR_DECAY_RATIO] [--lora [LORA]]
+                    [--task_name TASK_NAME] [--src_length SRC_LENGTH]
+                    [--tgt_length TGT_LENGTH]
+                    [--min_tgt_length MIN_TGT_LENGTH]
+                    [--length_penalty LENGTH_PENALTY]
+                    [--no_repeat_ngram_size NO_REPEAT_NGRAM_SIZE]
+                    [--num_beams NUM_BEAMS] [--select_topk [SELECT_TOPK]]
+                    [--no_select_topk] [--top_p TOP_P] [--top_k TOP_K]
+                    [--no_block_position [NO_BLOCK_POSITION]] --output_dir
+                    OUTPUT_DIR [--overwrite_output_dir [OVERWRITE_OUTPUT_DIR]]
+                    [--do_train [DO_TRAIN]] [--do_eval [DO_EVAL]]
+                    [--do_predict [DO_PREDICT]] [--do_export [DO_EXPORT]]
+                    [--evaluation_strategy {no,steps,epoch}]
+                    [--prediction_loss_only [PREDICTION_LOSS_ONLY]]
+                    [--per_device_train_batch_size PER_DEVICE_TRAIN_BATCH_SIZE]
+                    [--per_device_eval_batch_size PER_DEVICE_EVAL_BATCH_SIZE]
+                    [--gradient_accumulation_steps GRADIENT_ACCUMULATION_STEPS]
+                    [--learning_rate LEARNING_RATE]
+                    [--weight_decay WEIGHT_DECAY] [--adam_beta1 ADAM_BETA1]
+                    [--adam_beta2 ADAM_BETA2] [--adam_epsilon ADAM_EPSILON]
+                    [--max_grad_norm MAX_GRAD_NORM]
+                    [--num_train_epochs NUM_TRAIN_EPOCHS]
+                    [--max_steps MAX_STEPS]
+                    [--lr_scheduler_type LR_SCHEDULER_TYPE]
+                    [--warmup_ratio WARMUP_RATIO]
+                    [--warmup_steps WARMUP_STEPS]
+                    [--log_on_each_node [LOG_ON_EACH_NODE]]
+                    [--no_log_on_each_node] [--logging_dir LOGGING_DIR]
+                    [--logging_strategy {no,steps,epoch}]
+                    [--logging_first_step [LOGGING_FIRST_STEP]]
+                    [--logging_steps LOGGING_STEPS]
+                    [--save_strategy {no,steps,epoch}]
+                    [--save_steps SAVE_STEPS]
+                    [--save_total_limit SAVE_TOTAL_LIMIT]
+                    [--save_on_each_node [SAVE_ON_EACH_NODE]]
+                    [--no_cuda [NO_CUDA]] [--seed SEED] [--bf16 [BF16]]
+                    [--fp16 [FP16]] [--fp16_opt_level FP16_OPT_LEVEL]
+                    [--bf16_full_eval [BF16_FULL_EVAL]]
+                    [--fp16_full_eval [FP16_FULL_EVAL]] [--sharding SHARDING]
+                    [--sharding_degree SHARDING_DEGREE]
+                    [--sharding_parallel_degree SHARDING_PARALLEL_DEGREE]
+                    [--tensor_parallel_degree TENSOR_PARALLEL_DEGREE]
+                    [--recompute [RECOMPUTE]] [--scale_loss SCALE_LOSS]
+                    [--minimum_eval_times MINIMUM_EVAL_TIMES]
+                    [--local_rank LOCAL_RANK]
+                    [--dataloader_drop_last [DATALOADER_DROP_LAST]]
+                    [--eval_steps EVAL_STEPS]
+                    [--dataloader_num_workers DATALOADER_NUM_WORKERS]
+                    [--past_index PAST_INDEX] [--run_name RUN_NAME]
+                    [--device DEVICE] [--disable_tqdm DISABLE_TQDM]
+                    [--remove_unused_columns [REMOVE_UNUSED_COLUMNS]]
+                    [--no_remove_unused_columns]
+                    [--label_names LABEL_NAMES [LABEL_NAMES ...]]
+                    [--load_best_model_at_end [LOAD_BEST_MODEL_AT_END]]
+                    [--metric_for_best_model METRIC_FOR_BEST_MODEL]
+                    [--greater_is_better GREATER_IS_BETTER]
+                    [--ignore_data_skip [IGNORE_DATA_SKIP]] [--optim OPTIM]
+                    [--report_to REPORT_TO [REPORT_TO ...]]
+                    [--resume_from_checkpoint RESUME_FROM_CHECKPOINT]
+                    [--skip_memory_metrics [SKIP_MEMORY_METRICS]]
+                    [--no_skip_memory_metrics]
+                    [--flatten_param_grads [FLATTEN_PARAM_GRADS]]
+                    [--lazy_data_processing [LAZY_DATA_PROCESSING]]
+                    [--no_lazy_data_processing]
+run_train.py: error: argument --tensor_parallel_degree: invalid int value: '2--output_dir'
+/ssd2/hesijun/miniconda3/envs/paddle_ray_gpu/lib/python3.9/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.
+  warnings.warn("Setuptools is replacing distutils.")
+I0320 19:11:34.290314 28990 tcp_utils.cc:130] Successfully connected to 10.255.129.12:53174
+W0320 19:11:37.154487 28990 gpu_resources.cc:61] Please NOTE: device: 1, GPU Compute Capability: 7.0, Driver API Version: 10.2, Runtime API Version: 10.2
+W0320 19:11:37.159128 28990 gpu_resources.cc:91] device: 1, cuDNN Version: 7.6.
+[2023-03-20 19:11:38,922] [    INFO] topology.py:215 - HybridParallelInfo: rank_id: 1, mp_degree: 2, sharding_degree: 1, pp_degree: 1, dp_degree: 1, mp_group: [0, 1],  sharding_group: [1], pp_group: [1], dp_group: [1], check/clip group: [0, 1]
+[32m[2023-03-20 19:11:38,925] [    INFO][0m -     +==============================================================================+
+    |                                                                              |
+    |                         DistributedStrategy Overview                         |
+    |                                                                              |
+    +==============================================================================+
+    |                        a_sync=True <-> a_sync_configs                        |
+    +------------------------------------------------------------------------------+
+    |                               k_steps                    -1                  |
+    |                     max_merge_var_num                    1                   |
+    |                       send_queue_size                    16                  |
+    |               independent_recv_thread                  False                 |
+    |         min_send_grad_num_before_recv                    1                   |
+    |                      thread_pool_size                    1                   |
+    |                       send_wait_times                    1                   |
+    |               runtime_split_send_recv                  False                 |
+    |                        launch_barrier                   True                 |
+    |             heter_worker_device_guard                   cpu                  |
+    |                        lr_decay_steps                    10                  |
+    |                            use_ps_gpu                    0                   |
+    +==============================================================================+
+    |                    Environment Flags, Communication Flags                    |
+    +------------------------------------------------------------------------------+
+    |                                  mode                    1                   |
+    |                               elastic                  False                 |
+    |                                  auto                  False                 |
+    |                   sync_nccl_allreduce                   True                 |
+    |                         nccl_comm_num                    1                   |
+    |            use_hierarchical_allreduce                  False                 |
+    |   hierarchical_allreduce_inter_nranks                    1                   |
+    |                       sync_batch_norm                  False                 |
+    |                   fuse_all_reduce_ops                   True                 |
+    |                  fuse_grad_size_in_MB                    32                  |
+    |              fuse_grad_size_in_TFLOPS                   50.0                 |
+    |               cudnn_exhaustive_search                  False                 |
+    |             conv_workspace_size_limit                   512                  |
+    |    cudnn_batchnorm_spatial_persistent                  False                 |
+    |                        fp16_allreduce                  False                 |
+    |               last_comm_group_size_MB                   1.0                  |
+    |                find_unused_parameters                  False                 |
+    |            without_graph_optimization                  False                 |
+    |                 fuse_grad_size_in_num                    8                   |
+    |                 calc_comm_same_stream                  False                 |
+    |                                   asp                  False                 |
+    |                       fuse_grad_merge                  False                 |
+    |                             semi_auto                  False                 |
+    |                            adam_d2sum                  False                 |
+    |                           auto_search                  False                 |
+    |                        heter_ccl_mode                  False                 |
+    |                         is_fl_ps_mode                  False                 |
+    |                      with_coordinator                  False                 |
+    |                            split_data                   True                 |
+    |                  downpour_table_param                    []                  |
+    |                       fs_client_param                                        |
+    +==============================================================================+
+    |                                Build Strategy                                |
+    +------------------------------------------------------------------------------+
+    |           enable_sequential_execution                  False                 |
+    |              fuse_elewise_add_act_ops                  False                 |
+    |                       fuse_bn_act_ops                  False                 |
+    |              fuse_relu_depthwise_conv                  False                 |
+    |                    fuse_broadcast_ops                  False                 |
+    |                fuse_all_optimizer_ops                  False                 |
+    |                        enable_inplace                  False                 |
+    |     enable_backward_optimizer_op_deps                   True                 |
+    |                 cache_runtime_context                  False                 |
+    |                   fuse_bn_add_act_ops                   True                 |
+    |                    enable_auto_fusion                  False                 |
+    |                          enable_addto                  False                 |
+    |                      fix_op_run_order                  False                 |
+    |              allow_cuda_graph_capture                  False                 |
+    |                       reduce_strategy                    0                   |
+    |                    fuse_gemm_epilogue                  False                 |
+    |                   debug_graphviz_path                                        |
+    +==============================================================================+
+    |                              Execution Strategy                              |
+    +------------------------------------------------------------------------------+
+    |                           num_threads                    1                   |
+    |          num_iteration_per_drop_scope                    10                  |
+    |                 num_iteration_per_run                    1                   |
+    |                    use_thread_barrier                  False                 |
+    +==============================================================================+
+[0m
+[32m[2023-03-20 19:11:38,926] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
+[32m[2023-03-20 19:11:38,927] [    INFO][0m - ============================================================[0m
+[32m[2023-03-20 19:11:38,927] [    INFO][0m -      Model Configuration Arguments      [0m
+[32m[2023-03-20 19:11:38,928] [    INFO][0m - paddle commit id              : 0e92adceae06b6b7463f2dc7790ffb0601730009[0m
+[32m[2023-03-20 19:11:38,928] [    INFO][0m - label_smoothing               : 0.1[0m
+[32m[2023-03-20 19:11:38,928] [    INFO][0m - lora                          : False[0m
+[32m[2023-03-20 19:11:38,928] [    INFO][0m - lr_decay_ratio                : 0.1[0m
+[32m[2023-03-20 19:11:38,929] [    INFO][0m - model_name_or_path            : THUDM/glm-large-chinese[0m
+[32m[2023-03-20 19:11:38,929] [    INFO][0m - [0m
+[32m[2023-03-20 19:11:38,929] [    INFO][0m - ============================================================[0m
+[32m[2023-03-20 19:11:38,929] [    INFO][0m -       Data Configuration Arguments      [0m
+[32m[2023-03-20 19:11:38,929] [    INFO][0m - paddle commit id              : 0e92adceae06b6b7463f2dc7790ffb0601730009[0m
+[32m[2023-03-20 19:11:38,930] [    INFO][0m - length_penalty                : 0.7[0m
+[32m[2023-03-20 19:11:38,930] [    INFO][0m - min_tgt_length                : 55[0m
+[32m[2023-03-20 19:11:38,930] [    INFO][0m - no_block_position             : False[0m
+[32m[2023-03-20 19:11:38,930] [    INFO][0m - no_repeat_ngram_size          : 3[0m
+[32m[2023-03-20 19:11:38,930] [    INFO][0m - num_beams                     : 5[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - select_topk                   : True[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - src_length                    : 608[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - task_name                     : cnn_dailymail[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - tgt_length                    : 160[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - top_k                         : 0[0m
+[32m[2023-03-20 19:11:38,931] [    INFO][0m - top_p                         : 0.0[0m
+[32m[2023-03-20 19:11:38,932] [    INFO][0m - [0m
+[33m[2023-03-20 19:11:38,932] [ WARNING][0m - Process rank: 1, device: gpu, world_size: 2, distributed training: True, 16-bits training: True[0m
+2
+2
+[32m[2023-03-20 19:11:38,933] [    INFO][0m - We are using <class 'paddlenlp.transformers.glm.modeling.GLMForConditionalGeneration'> to load 'THUDM/glm-large-chinese'.[0m
+[32m[2023-03-20 19:11:38,935] [    INFO][0m - Model config GLMConfig {
+  "attention_dropout_prob": 0.1,
+  "attention_scale": 1.0,
+  "block_position_encoding": true,
+  "checkpoint_activations": false,
+  "checkpoint_num_layers": 1,
+  "embedding_dropout_prob": 0.1,
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "layernorm_epsilon": 1e-05,
+  "max_sequence_length": 1024,
+  "model_type": "glm",
+  "num_attention_heads": 16,
+  "num_layers": 24,
+  "output_dropout_prob": 0.1,
+  "output_predict": true,
+  "paddle_dtype": "float32",
+  "paddlenlp_version": null,
+  "parallel_output": true,
+  "pool_token": "cls",
+  "relative_encoding": false,
+  "spell_func": "lstm",
+  "spell_length": null,
+  "tensor_parallel_degree": 2,
+  "tensor_parallel_rank": 1,
+  "use_scaled_init_for_output_weights": false,
+  "vocab_size": 50048
+}
+[0m
+[32m[2023-03-20 19:11:41,853] [    INFO][0m - All model checkpoint weights were used when initializing GLMForConditionalGeneration.
+[0m
+[32m[2023-03-20 19:11:41,853] [    INFO][0m - All the weights of GLMForConditionalGeneration were initialized from the model checkpoint at THUDM/glm-large-chinese.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use GLMForConditionalGeneration for predictions without further training.[0m
+[32m[2023-03-20 19:11:41,876] [    INFO][0m - We are using <class 'paddlenlp.transformers.glm.tokenizer.GLMChineseTokenizer'> to load 'THUDM/glm-large-chinese'.[0m
+[32m[2023-03-20 19:11:41,877] [    INFO][0m - Already cached /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/cog-pretrain.model[0m
+[32m[2023-03-20 19:11:41,877] [    INFO][0m - Already cached /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/glm-chinese-added-tokens.json[0m
+[32m[2023-03-20 19:11:41,902] [    INFO][0m - Adding <|endoftext|> to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding [SEP] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding [CLS] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding [MASK] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding [UNUSED1] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding [UNUSED2] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding <|startofpiece|> to the vocabulary[0m
+[32m[2023-03-20 19:11:41,903] [    INFO][0m - Adding <|endofpiece|> to the vocabulary[0m
+[32m[2023-03-20 19:11:41,904] [    INFO][0m - Adding [sMASK] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,904] [    INFO][0m - Adding [gMASK] to the vocabulary[0m
+[32m[2023-03-20 19:11:41,904] [    INFO][0m - tokenizer config file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/tokenizer_config.json[0m
+[32m[2023-03-20 19:11:41,905] [    INFO][0m - Special tokens file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/special_tokens_map.json[0m
+[32m[2023-03-20 19:11:41,905] [    INFO][0m - added tokens file saved in /ssd2/hesijun/.paddlenlp/models/THUDM/glm-large-chinese/added_tokens.json[0m
+[32m[2023-03-20 19:12:14,028] [    INFO][0m - Using half precision[0m
+[32m[2023-03-20 19:12:14,029] [    INFO][0m - ============================================================[0m
+[32m[2023-03-20 19:12:14,029] [    INFO][0m -     Training Configuration Arguments    [0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - paddle commit id              :0e92adceae06b6b7463f2dc7790ffb0601730009[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - _no_sync_in_gradient_accumulation:True[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - adam_beta1                    :0.9[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - adam_beta2                    :0.999[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - adam_epsilon                  :1e-08[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - bf16                          :False[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - bf16_full_eval                :False[0m
+[32m[2023-03-20 19:12:14,030] [    INFO][0m - current_device                :gpu:1[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - data_parallel_degree          :1[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - data_parallel_rank            :0[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - dataloader_drop_last          :False[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - dataloader_num_workers        :0[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - dataset_rank                  :0[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - dataset_world_size            :1[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - device                        :gpu[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - disable_tqdm                  :False[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - do_eval                       :False[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - do_export                     :False[0m
+[32m[2023-03-20 19:12:14,031] [    INFO][0m - do_predict                    :False[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - do_train                      :True[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - eval_batch_size               :2[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - eval_steps                    :1000[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - evaluation_strategy           :IntervalStrategy.NO[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - flatten_param_grads           :False[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - fp16                          :True[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - fp16_full_eval                :False[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - fp16_opt_level                :O1[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - gradient_accumulation_steps   :1[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - greater_is_better             :None[0m
+[32m[2023-03-20 19:12:14,032] [    INFO][0m - ignore_data_skip              :False[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - label_names                   :None[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - label_smoothing               :0.1[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - lazy_data_processing          :True[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - learning_rate                 :3e-05[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - load_best_model_at_end        :False[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - local_process_index           :1[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - local_rank                    :1[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - log_level                     :-1[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - log_level_replica             :-1[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - log_on_each_node              :True[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - logging_dir                   :./checkpoints/test/runs/Mar20_19-11-34_yq01-qianmo-com-255-129-12.yq01[0m
+[32m[2023-03-20 19:12:14,033] [    INFO][0m - logging_first_step            :False[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - logging_steps                 :1[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - logging_strategy              :IntervalStrategy.STEPS[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - lr_decay_ratio                :0.1[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - lr_scheduler_type             :SchedulerType.LINEAR[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - max_grad_norm                 :1.0[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - max_steps                     :-1[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - metric_for_best_model         :None[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - minimum_eval_times            :None[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - no_cuda                       :False[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - num_train_epochs              :4.0[0m
+[32m[2023-03-20 19:12:14,034] [    INFO][0m - optim                         :OptimizerNames.ADAMW[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - optimizer_name_suffix         :tp01[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - output_dir                    :./checkpoints/test[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - overwrite_output_dir          :False[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - past_index                    :-1[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - per_device_eval_batch_size    :2[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - per_device_train_batch_size   :2[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - prediction_loss_only          :False[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - process_index                 :1[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - recompute                     :False[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - remove_unused_columns         :True[0m
+[32m[2023-03-20 19:12:14,035] [    INFO][0m - report_to                     :['visualdl'][0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - resume_from_checkpoint        :None[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - run_name                      :./checkpoints/test[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - save_on_each_node             :False[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - save_steps                    :10000[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - save_strategy                 :IntervalStrategy.STEPS[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - save_total_limit              :None[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - scale_loss                    :32768[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - seed                          :42[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - sharding                      :[][0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - sharding_degree               :-1[0m
+[32m[2023-03-20 19:12:14,036] [    INFO][0m - sharding_parallel_degree      :1[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - sharding_parallel_rank        :0[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - should_log                    :False[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - should_save                   :True[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - skip_memory_metrics           :True[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - tensor_parallel_degree        :2[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - tensor_parallel_rank          :1[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - train_batch_size              :2[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - use_hybrid_parallel           :True[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - warmup_ratio                  :0.06[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - warmup_steps                  :0[0m
+[32m[2023-03-20 19:12:14,037] [    INFO][0m - weight_decay                  :0.1[0m
+[32m[2023-03-20 19:12:14,038] [    INFO][0m - weight_name_suffix            :tp01[0m
+[32m[2023-03-20 19:12:14,038] [    INFO][0m - world_size                    :2[0m
+[32m[2023-03-20 19:12:14,038] [    INFO][0m - [0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m - ***** Running training *****[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Num examples = 287113[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Num Epochs = 4[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Instantaneous batch size per device = 2[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 2[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Gradient Accumulation steps = 1[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Total optimization steps = 574228.0[0m
+[32m[2023-03-20 19:12:14,042] [    INFO][0m -   Total num train samples = 1148452.0[0m
+[32m[2023-03-20 19:12:14,234] [    INFO][0m -   Number of trainable parameters = 178954240[0m
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
+[]
