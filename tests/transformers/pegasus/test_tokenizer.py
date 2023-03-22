@@ -20,22 +20,25 @@ from tests.testing_utils import get_tests_dir
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
-SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")
+SAMPLE_VOCAB = get_tests_dir("fixtures/vocab.zh.pegasus.txt")
 
 
 class PegasusTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = PegasusChineseTokenizer
     test_rust_tokenizer = False
-    test_sentencepiece = True
+    # test_offsets = True
+    # test_sentencepiece = True
 
     def setUp(self):
         super().setUp()
+        tokenizer = PegasusChineseTokenizer(SAMPLE_VOCAB)
+        tokenizer.save_pretrained(self.tmpdirname)
 
     def get_tokenizer(self, **kwargs) -> PegasusChineseTokenizer:
         return PegasusChineseTokenizer.from_pretrained("IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese", **kwargs)
 
     def get_input_output_texts(self, tokenizer):
-        return ("This is a test", "This is a test")
+        return ("这是一个测试。", "这是一个测试。")
 
     def test_convert_token_and_id(self):
         """Test ``_convert_token_to_id`` and ``_convert_id_to_token``."""
@@ -96,3 +99,17 @@ class PegasusTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         assert batch.attention_mask.shape == [2, 1024]
         assert targets["input_ids"].shape == [2, 5]
         assert len(batch) == 2  # input_ids, attention_mask.
+
+    def test_consecutive_unk_string(self):
+        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
+        for tokenizer in tokenizers:
+            tokens = [tokenizer.unk_token for _ in range(2)]
+            string = tokenizer.convert_tokens_to_string(tokens)
+            encoding = tokenizer(
+                text=string,
+                runcation=True,
+                return_offsets_mapping=True,
+            )
+            # BOS is never used.
+            self.assertEqual(len(encoding["input_ids"]), 3)
+            self.assertEqual(len(encoding["offset_mapping"]), 3)

@@ -35,6 +35,13 @@ __all__ = [
     "PegasusForConditionalGeneration",
 ]
 
+PEGASUS_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+    "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA"
+    "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+]
+
 Cache = MultiHeadAttention.Cache
 StaticCache = MultiHeadAttention.StaticCache
 
