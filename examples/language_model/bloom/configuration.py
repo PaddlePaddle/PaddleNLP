@@ -42,12 +42,12 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "bigscience/bloom-560m",
     "bigscience/bloom-1b1",
     "bigscience/bloom-3b",
-    "bigscience/bloom-7b1",
+    "bigscience/bloom-7b1",  # TODO(wj-Mcat): support shard weight donwloading
     "bigscience/bloom",  # TODO(wj-Mcat): support shard weight donwloading
     "bigscience/bloomz-560m",
     "bigscience/bloomz-1b1",
     "bigscience/bloomz-3b",
-    "bigscience/bloomz-7b1",
+    "bigscience/bloomz-7b1",  # TODO(wj-Mcat): support shard weight donwloading
     "bigscience/bloomz",  # TODO(wj-Mcat): support shard weight donwloading
 ]
 

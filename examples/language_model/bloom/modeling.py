@@ -629,8 +629,7 @@ class BloomPreTrainedModel(PretrainedModel):
         """Initialize the weights."""
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.set_value(
-                paddle.randn(module.weight.shape)
-                # paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
+                paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
             if getattr(module, "bias", None) is not None:
                 module.weight.set_value(
@@ -745,7 +744,15 @@ class BloomPreTrainedModel(PretrainedModel):
                     [f"h.{i}.mlp.dense_4h_to_h.bias", f"h.{i}.mlp.dense_4h_to_h.bias"],
                 ]
             )
+
+        model_class_name = config.architectures[0]
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
+
+        if model_class_name != "BloomModel":
+            for mapping in mappings:
+                mapping.source_name = "transformer." + mapping.source_name
+                mapping.target_name = "bloom." + mapping.target_name
+
         return mappings
 
 
