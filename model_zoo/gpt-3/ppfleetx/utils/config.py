@@ -46,6 +46,8 @@ def process_dist_config(configs):
     # sharding default
     sharding_config = config["sharding"]
     sharding_degree = sharding_config.setdefault("sharding_degree", 1)
+    sharding_config.setdefault("sharding_stage", 2)
+    sharding_config.setdefault("sharding_offload", False)
     reduce_overlap = sharding_config.setdefault("reduce_overlap", False)
     broadcast_overlap = sharding_config.setdefault("broadcast_overlap", False)
 
