@@ -62,9 +62,9 @@ def run_evaluate(vae, val_dataloader, writer, global_step):
         for k, v in log_dict_disc.items():
             log_dict_disc_all[k].append(v)
     for name, val in log_dict_ae_all.items():
-        writer.add_scalar(name, np.mean(val), step=global_step)
+        writer.add_scalar(name, np.mean(val), global_step)
     for name, val in log_dict_disc_all.items():
-        writer.add_scalar(name, np.mean(val), step=global_step)
+        writer.add_scalar(name, np.mean(val), global_step)
 
 
 def parse_args():
@@ -441,7 +441,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(name, val, step=global_step)
+                        writer.add_scalar(name, val, global_step)
 
                 if global_step % args.image_logging_steps == 0:
                     images_log = unwrap_model(vae).log_images(batch["image"])

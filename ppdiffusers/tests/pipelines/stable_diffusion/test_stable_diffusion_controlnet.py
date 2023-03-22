@@ -33,9 +33,7 @@ from ppdiffusers import (
     UNet2DConditionModel,
 )
 from ppdiffusers.utils import load_image, load_numpy, randn_tensor, slow
-from ppdiffusers.utils.import_utils import (
-    is_cutlass_fused_multihead_attention_available,
-)
+from ppdiffusers.utils.import_utils import is_ppxformers_available
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
 
 
@@ -133,7 +131,7 @@ class StableDiffusionControlNetPipelineFastTests(PipelineTesterMixin, unittest.T
         return self._test_attention_slicing_forward_pass(expected_max_diff=2e-3)
 
     @unittest.skipIf(
-        not is_cutlass_fused_multihead_attention_available(),
+        not is_ppxformers_available(),
         reason="XFormers attention is only available with CUDA and `xformers` installed",
     )
     def test_xformers_attention_forwardGenerator_pass(self):

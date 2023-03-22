@@ -340,6 +340,9 @@ def parse_args(input_args=None):
         default=500,
         help=("Save a checkpoint of the training state every X updates."),
     )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -440,6 +443,9 @@ def main():
         unet.enable_gradient_checkpointing()
         if args.train_text_encoder:
             set_recompute(text_encoder, True)
+
+    if args.enable_xformers_memory_efficient_attention:
+        unet.enable_xformers_memory_efficient_attention()
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
@@ -718,7 +724,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(f"train/{name}", val, step=global_step)
+                        writer.add_scalar(f"train/{name}", val, global_step)
 
                     if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")

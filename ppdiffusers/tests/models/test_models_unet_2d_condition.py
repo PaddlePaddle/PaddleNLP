@@ -35,9 +35,7 @@ from ppdiffusers.utils import (
     require_paddle_gpu,
     slow,
 )
-from ppdiffusers.utils.import_utils import (
-    is_cutlass_fused_multihead_attention_available,
-)
+from ppdiffusers.utils.import_utils import is_ppxformers_available
 
 logger = logging.get_logger(__name__)
 
@@ -307,8 +305,8 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         assert (sample - old_sample).abs().max() < 0.0001
 
     @unittest.skipIf(
-        not is_cutlass_fused_multihead_attention_available(),
-        reason="cutlass_fused_multihead_attention attention is only available with CUDA and `cutlass_fused_multihead_attention` installed",
+        not is_ppxformers_available(),
+        reason="scaled_dot_product_attention attention is only available with CUDA and `scaled_dot_product_attention` installed",
     )
     def test_lora_xformers_on_off(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()

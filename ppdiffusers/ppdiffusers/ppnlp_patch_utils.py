@@ -18,6 +18,7 @@ import contextlib
 import copy
 import functools
 import json
+import math
 import weakref
 from collections import OrderedDict
 from types import FunctionType, MethodType
@@ -34,6 +35,7 @@ from .utils import (
     get_logger,
     is_paddle_available,
     is_paddlenlp_available,
+    is_ppxformers_available,
     is_safetensors_available,
     is_torch_available,
     smart_load,
@@ -274,7 +276,10 @@ if is_paddle_available():
                     raise RuntimeError("You are trying to revive the hook of a dead Module!")
                 self.module = weakref.ref(state["module"])
 
-    from paddle.fluid.dygraph.layers import HookRemoveHelper
+    try:
+        from paddle.nn.layer.layers import HookRemoveHelper
+    except ImportError:
+        from paddle.fluid.dygraph.layers import HookRemoveHelper
 
     @patch_to(nn.Layer)
     def register_load_state_dict_pre_hook(self, hook, with_module=False):
@@ -309,6 +314,52 @@ if is_paddle_available() and is_paddlenlp_available():
     from paddlenlp import __version__
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
     from paddlenlp.utils.log import logger as ppnlp_logger
+
+    if is_ppxformers_available():
+        import paddle.incubate.nn as inn
+
+        def scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=None,
+            dropout_p=0.0,
+            is_causal=False,
+            scale=None,
+            training=False,
+            attention_op="cutlass",
+        ):
+            if attention_op is None or attention_op == "cutlass" or training:
+                if scale is None:
+                    scale = 1 / math.sqrt(query.shape[-1])
+                # support fp32, fp16, bfp16
+                output = inn.memory_efficient_attention.memory_efficient_attention(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    p=dropout_p,
+                    scale=scale,
+                    training=training,
+                )
+            elif attention_op == "flash":
+                raw_dtype = query.dtype
+                if raw_dtype == paddle.float32:
+                    query, key, value = (
+                        query.cast(paddle.float16),
+                        key.cast(paddle.float16),
+                        value.cast(paddle.float16),
+                    )
+                output = inn.flash_attention.flash_attention(
+                    query, key, value, dropout=dropout_p, causal=is_causal, return_softmax=False
+                )[0]
+                if raw_dtype == paddle.float32:
+                    output = output.cast(raw_dtype)
+            else:
+                raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash']")
+            return output
+
+        paddle.nn.functional.scaled_dot_product_attention = scaled_dot_product_attention
 
     @patch_to(nn.Layer, as_prop=True)
     def dtype(parameter: nn.Layer) -> paddle.dtype:

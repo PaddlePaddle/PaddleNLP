@@ -853,7 +853,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(f"train/{name}", val, step=global_step)
+                        writer.add_scalar(f"train/{name}", val, global_step)
 
                     if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")

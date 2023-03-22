@@ -172,7 +172,7 @@ def main():
                     if rank == 0:
                         # add scalar
                         for name, val in logs.items():
-                            writer.add_scalar(name, val, step=global_steps)
+                            writer.add_scalar(name, val, global_steps)
                     log_str = "Train: global_steps {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, train_loss: {4:.10f}, lr_abs: {5:.10f}, speed: {6:.2f} s/it.".format(
                         global_steps,
                         training_args.max_steps,

@@ -19,27 +19,9 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..initializer import normal_, zeros_
-from ..utils import (
-    deprecate,
-    is_cutlass_fused_multihead_attention_available,
-    is_flash_attention_available,
-    logging,
-)
+from ..utils import deprecate, is_ppxformers_available, logging
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
-
-
-if is_cutlass_fused_multihead_attention_available():
-    from paddle.incubate.nn.functional import cutlass_fused_multihead_attention
-
-else:
-    cutlass_fused_multihead_attention = None
-
-if is_flash_attention_available():
-    from paddle.nn.functional.flash_attention import flash_attention
-
-else:
-    flash_attention = None
 
 
 class CrossAttention(nn.Layer):
@@ -111,12 +93,10 @@ class CrossAttention(nn.Layer):
         self.to_out.append(nn.Dropout(dropout))
 
         # set attention processor
-        # We use the AttnProcessor2_5 by default when paddle 2.5 is used which uses
-        # paddle.incubate.nn.functional.cutlass_fused_multihead_attention for native Flash/memory_efficient_attention
         if processor is None:
             processor = CrossAttnProcessor()
             # processor = (
-            #     AttnProcessor2_5() if is_cutlass_fused_multihead_attention_available() else CrossAttnProcessor()
+            #     AttnProcessor2_5() if is_ppxformers_available() else CrossAttnProcessor()
             # )
         self.set_processor(processor)
 
@@ -136,30 +116,20 @@ class CrossAttention(nn.Layer):
                     "Memory efficient attention with `xformers` is currently not supported when"
                     " `self.added_kv_proj_dim` is defined."
                 )
-            elif not is_cutlass_fused_multihead_attention_available() and not is_flash_attention_available():
+            elif not is_ppxformers_available():
                 raise NotImplementedError(
-                    "requires the CUTLASS_FUSED_MULTI_HEAD_ATTENTIOPN or FLASH ATTENTION but your PaddlePaddle donot have this. Checkout the instructions on the installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment."
+                    "requires the scaled_dot_product_attention but your PaddlePaddle donot have this. Checkout the instructions on the installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment."
                 )
             else:
-                if attention_op is None or attention_op == "cutlass_attention":
-                    try:
-                        # Make sure we can run the cutlass_fused_multihead_attention
-                        _ = cutlass_fused_multihead_attention(
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        )
-                    except Exception as e:
-                        raise e
-                elif attention_op == "flash_attention":
-                    try:
-                        _ = flash_attention(
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                            paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        )
-                    except Exception as e:
-                        raise e
+                try:
+                    _ = F.scaled_dot_product_attention(
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        attention_op=attention_op,
+                    )
+                except Exception as e:
+                    raise e
 
             if is_lora:
                 processor = LoRAXFormersCrossAttnProcessor(
@@ -170,7 +140,7 @@ class CrossAttention(nn.Layer):
                 )
                 processor.load_dict(self.processor.state_dict())
             else:
-                if self.head_dim > 128 and attention_op == "flash_attention":
+                if self.head_dim > 128 and attention_op == "flash":
                     processor = CrossAttnProcessor()
                 else:
                     processor = XFormersCrossAttnProcessor(attention_op=attention_op)
@@ -433,7 +403,7 @@ class CrossAttnAddedKVProcessor:
 
 class XFormersCrossAttnProcessor:
     def __init__(self, attention_op: Optional[str] = None):
-        assert attention_op in [None, "cutlass_attention", "flash_attention"]
+        assert attention_op in [None, "cutlass", "flash"]
         self.attention_op = attention_op
 
     def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
@@ -456,26 +426,16 @@ class XFormersCrossAttnProcessor:
         key = attn.head_to_batch_dim(key, transpose=False)
         value = attn.head_to_batch_dim(value, transpose=False)
 
-        raw_dtype = hidden_states.dtype
-        if self.attention_op is None or self.attention_op == "cutlass_attention":
-            if raw_dtype in [paddle.float32, paddle.bfloat16]:
-                query = query.cast(paddle.float16)
-                key = key.cast(paddle.float16)
-                value = value.cast(paddle.float16)
-                if attention_mask is not None:
-                    attention_mask = attention_mask.cast(paddle.float16)
-            # [batch_size, seq_len, num_heads, head_dim]
-            hidden_states = cutlass_fused_multihead_attention(query, key, value, attention_mask, attn.scale)
-        elif self.attention_op == "flash_attention":
-            if raw_dtype == paddle.float32:
-                query = query.cast(paddle.float16)
-                key = key.cast(paddle.float16)
-                value = value.cast(paddle.float16)
-            # [batch_size, seq_len, num_heads, head_dim]
-            assert attention_mask is None, "flash_attention donot support attention_mask!"
-            hidden_states = flash_attention(query, key, value, dropout=0.0, causal=False, return_softmax=False)[0]
-
-        hidden_states = hidden_states.cast(raw_dtype)
+        hidden_states = F.scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=attention_mask,
+            scale=attn.scale,
+            dropout_p=0.0,
+            training=attn.training,
+            attention_op=self.attention_op,
+        )
 
         # hidden_states = hidden_states.cast(query.dtype)
         hidden_states = attn.batch_to_head_dim(hidden_states, transpose=False)
@@ -517,26 +477,16 @@ class LoRAXFormersCrossAttnProcessor(nn.Layer):
         key = attn.head_to_batch_dim(key, transpose=False)
         value = attn.head_to_batch_dim(value, transpose=False)
 
-        raw_dtype = hidden_states.dtype
-        if self.attention_op is None or self.attention_op == "cutlass_attention":
-            if raw_dtype in [paddle.float32, paddle.bfloat16]:
-                query = query.cast(paddle.float16)
-                key = key.cast(paddle.float16)
-                value = value.cast(paddle.float16)
-                if attention_mask is not None:
-                    attention_mask = attention_mask.cast(paddle.float16)
-            # [batch_size, seq_len, num_heads, head_dim]
-            hidden_states = cutlass_fused_multihead_attention(query, key, value, attention_mask, attn.scale)
-        elif self.attention_op == "flash_attention":
-            if raw_dtype == paddle.float32:
-                query = query.cast(paddle.float16)
-                key = key.cast(paddle.float16)
-                value = value.cast(paddle.float16)
-            # [batch_size, seq_len, num_heads, head_dim]
-            assert attention_mask is None, "flash_attention donot support attention_mask!"
-            hidden_states = flash_attention(query, key, value, dropout=0.0, causal=False, return_softmax=False)[0]
-
-        hidden_states = hidden_states.cast(raw_dtype)
+        hidden_states = F.scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=attention_mask,
+            scale=attn.scale,
+            dropout_p=0.0,
+            training=attn.training,
+            attention_op=self.attention_op,
+        )
 
         hidden_states = attn.batch_to_head_dim(hidden_states, transpose=False)
 
