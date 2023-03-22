@@ -46,15 +46,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_name_or_path",
-        default="./llama-random",
+        default="facebookresearch/tiny-random-llama",
         type=str,
-        required=True,
+        # required=True,
         help="",
     )
 
     parser.add_argument(
         "--global_batch_size",
-        default=None,
+        default=2,
         type=int,
         help="Global batch size for all training process. None for not check the size is valid. "
         "If we only use data parallelism, it should be device_num * micro_batch_size.",
@@ -62,14 +62,14 @@ def parse_args():
 
     parser.add_argument(
         "--local_batch_size",
-        default=None,
+        default=2,
         type=int,
         help="Batch size per device for one step training.",
     )
 
     parser.add_argument(
         "--micro_batch_size",
-        default=8,
+        default=1,
         type=int,
         help="Batch size per device for one step training.",
     )

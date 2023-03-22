@@ -31,12 +31,12 @@ class LlamaTokenizer(PretrainedTokenizer):
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
+            "facebookresearch/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
         },
     }
 
     pretrained_init_configuration = {
-        "llama-7b": {},
+        "facebookresearch/tiny-random-llama": {},
     }
 
     def __init__(
@@ -45,6 +45,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         unk_token="<unk>",
         bos_token="<s>",
         eos_token="</s>",
+        pad_token="<unk>",
         add_bos_token=True,
         add_eos_token=False,
         sp_model_kwargs=None,

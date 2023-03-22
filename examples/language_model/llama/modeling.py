@@ -32,6 +32,10 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
 
+LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "meta/tiny-random-llama",
+]
+
 __all__ = [
     "LlamaModel",
     "LlamaPretrainedModel",
@@ -393,6 +397,7 @@ class LlamaDecoderLayer(nn.Layer):
 
 
 class LlamaPretrainedModel(PretrainedModel):
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
     config_class = LlamaConfig
     base_model_prefix = "llama"
 

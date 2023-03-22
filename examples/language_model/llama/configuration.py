@@ -23,14 +23,14 @@ __all__ = [
 ]
 
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
-    "llama-7b": {
-        "hidden_size": 4096,
+    "facebookresearch/tiny-random-llama": {
+        "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
         "max_position_embeddings": 2048,
         "model_type": "llama",
-        "num_attention_heads": 32,
-        "num_hidden_layers": 32,
+        "num_attention_heads": 2,
+        "num_hidden_layers": 2,
         "rms_norm_eps": 1e-06,
         "vocab_size": 32000,
         "bos_token_id": 1,
@@ -43,33 +43,52 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_pure_fp16": False,
     },
-    "llama-13b": {
-        "hidden_size": 5120,
-        "initializer_range": 0.02,
-        "intermediate_size": 13824,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 40,
-        "num_hidden_layers": 40,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "mp_degree": 1,
-        "pp_degree": 1,
-        "mp_rank": -1,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_pure_fp16": False,
-    },
+    # "llama-7b": {
+    #     "hidden_size": 4096,
+    #     "initializer_range": 0.02,
+    #     "intermediate_size": 11008,
+    #     "max_position_embeddings": 2048,
+    #     "model_type": "llama",
+    #     "num_attention_heads": 32,
+    #     "num_hidden_layers": 32,
+    #     "rms_norm_eps": 1e-06,
+    #     "vocab_size": 32000,
+    #     "bos_token_id": 1,
+    #     "eos_token_id": 2,
+    #     "pad_token_id": 0,
+    #     "mp_degree": 1,
+    #     "pp_degree": 1,
+    #     "mp_rank": -1,
+    #     "use_cache": False,
+    #     "use_recompute": False,
+    #     "use_pure_fp16": False,
+    # },
+    # "llama-13b": {
+    #     "hidden_size": 5120,
+    #     "initializer_range": 0.02,
+    #     "intermediate_size": 13824,
+    #     "max_position_embeddings": 2048,
+    #     "model_type": "llama",
+    #     "num_attention_heads": 40,
+    #     "num_hidden_layers": 40,
+    #     "rms_norm_eps": 1e-06,
+    #     "vocab_size": 32000,
+    #     "bos_token_id": 1,
+    #     "eos_token_id": 2,
+    #     "pad_token_id": 0,
+    #     "mp_degree": 1,
+    #     "pp_degree": 1,
+    #     "mp_rank": -1,
+    #     "use_cache": False,
+    #     "use_recompute": False,
+    #     "use_pure_fp16": False,
+    # },
 }
 
 # Hypothetical model weights currently
 LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/llama-7b.pdparams",
-        "llama-13b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/llama-13b.pdparams",
+        "facebookresearch/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/facebookresearch/tiny-random-llama/model_state.pdparams",
     },
 }
 
@@ -126,7 +145,6 @@ class LlamaConfig(PretrainedConfig):
         "n_inner": "intermediate_size",
         "activation_function": "hidden_act",
     }
-
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
