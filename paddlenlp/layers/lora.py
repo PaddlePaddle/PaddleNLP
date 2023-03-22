@@ -136,8 +136,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         # compatible
         self.name = self._name
 
-        # out_features = out_features // self.world_size
-
         # Actual trainable parameters
         if r > 0:
             self.lora_A = self.create_parameter(
