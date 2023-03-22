@@ -20,12 +20,12 @@ from types import MethodType
 import paddle
 
 from ppdiffusers import (
+    FastDeployRuntimeModel,
     FastDeployStableDiffusionInpaintPipeline,
     FastDeployStableDiffusionMegaPipeline,
     StableDiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(

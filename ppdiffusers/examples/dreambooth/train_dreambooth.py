@@ -47,7 +47,7 @@ from ppdiffusers import (
     DiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.models.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
 
 

@@ -27,14 +27,14 @@ from ppdiffusers import (
     LDMBertModel,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.models.attention import AttentionBlock
 from ppdiffusers.models.ema import LitEma
+from ppdiffusers.training_utils import freeze_params
 
 try:
     from ppdiffusers.models.attention import SpatialTransformer
 except ImportError:
-    from ppdiffusers.models.attention import Transformer2DModel as SpatialTransformer
+    from ppdiffusers.models.transformer_2d import Transformer2DModel as SpatialTransformer
 
 import json
 

@@ -46,9 +46,13 @@ from ppdiffusers import (
     DiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.training_utils import EMAModel, main_process_first
+from ppdiffusers.training_utils import (
+    EMAModel,
+    freeze_params,
+    main_process_first,
+    unwrap_model,
+)
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 

@@ -22,7 +22,6 @@ import paddle
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -37,6 +36,7 @@ from ...schedulers.preconfig import (
     PreconfigLMSDiscreteScheduler,
 )
 from ...utils import logging
+from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
 logger = logging.get_logger(__name__)
@@ -107,7 +107,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             )
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
+                f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
 
@@ -397,17 +397,11 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
-
-        if do_classifier_free_guidance:
-            noise_pred_unet_batch_size = 2 * batch_size * num_images_per_prompt
-        else:
-            noise_pred_unet_batch_size = batch_size * num_images_per_prompt
-
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
                 noise_pred_unet = paddle.zeros(
-                    [noise_pred_unet_batch_size, 4, height // 8, width // 8], dtype="float32"
+                    [2 * batch_size * num_images_per_prompt, 4, height // 8, width // 8], dtype="float32"
                 )
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
@@ -420,7 +414,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 self.unet.zero_copy_infer(
                     prebinded_inputs={
                         unet_input_names[0]: latent_model_input,
-                        unet_input_names[1]: t.cast("float32"),
+                        unet_input_names[1]: t,
                         unet_input_names[2]: text_embeddings,
                     },
                     prebinded_outputs={unet_output_name: noise_pred_unet},

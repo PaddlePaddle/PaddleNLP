@@ -384,8 +384,10 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
 
             # perform guidance
             if do_classifier_free_guidance:
-                noise_pred_uncond = (noise_preds[~mask] * neg_weights).sum(axis=0, keepdim=True)
-                noise_pred_text = (noise_preds[mask] * pos_weights).sum(axis=0, keepdim=True)
+                mask_index = paddle.nonzero(mask).reshape([-1])
+                non_mask_index = paddle.nonzero(~mask).reshape([-1])
+                noise_pred_uncond = (noise_preds[non_mask_index] * neg_weights).sum(axis=0, keepdim=True)
+                noise_pred_text = (noise_preds[mask_index] * pos_weights).sum(axis=0, keepdim=True)
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1

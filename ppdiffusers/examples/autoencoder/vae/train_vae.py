@@ -27,8 +27,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
 from paddlenlp.utils.log import logger
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
-from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 
 
 def read_json(file):

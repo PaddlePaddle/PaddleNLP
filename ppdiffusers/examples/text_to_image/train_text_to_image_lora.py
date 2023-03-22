@@ -49,10 +49,9 @@ from ppdiffusers import (
     UNet2DConditionModel,
 )
 from ppdiffusers.loaders import AttnProcsLayers
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
 from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 

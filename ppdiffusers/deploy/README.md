@@ -72,7 +72,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fd_astronaut_rides_horse.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
 
@@ -83,7 +83,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "euler_ancestral" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
 ```
 
 脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
@@ -121,7 +121,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fantasy_landscape.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
 
@@ -214,4 +214,4 @@ mask 图像为：
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `cat_on_bench_new.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |

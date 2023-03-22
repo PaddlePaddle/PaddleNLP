@@ -34,8 +34,8 @@ from paddle.optimizer import AdamW
 
 from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.utils.log import logger
-from ppdiffusers.modeling_utils import unwrap_model
 from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.training_utils import unwrap_model
 
 
 def get_writer(training_args):

@@ -20,11 +20,11 @@ import paddle
 
 from ppdiffusers import (
     ControlNetModel,
+    FastDeployRuntimeModel,
     FastDeployStableDiffusionControlNetPipeline,
     StableDiffusionControlNetPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
 
 
 class ControlNetWithUnetModel(paddle.nn.Layer):
@@ -45,13 +45,9 @@ class ControlNetWithUnetModel(paddle.nn.Layer):
             timestep,
             encoder_hidden_states=encoder_hidden_states,
             controlnet_cond=controlnet_cond,
+            conditioning_scale=controlnet_conditioning_scale,
             return_dict=False,
         )
-        down_block_res_samples = [
-            down_block_res_sample * ccs
-            for down_block_res_sample, ccs in zip(down_block_res_samples, controlnet_conditioning_scale[:-1])
-        ]
-        mid_block_res_sample *= controlnet_conditioning_scale[-1]
 
         noise_pred = self.unet(
             sample,

@@ -48,14 +48,9 @@ from ppdiffusers import (
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.training_utils import freeze_params, unfreeze_params, unwrap_model
 from ppdiffusers.utils import PIL_INTERPOLATION
-
-
-def unfreeze_params(params):
-    for param in params:
-        param.stop_gradient = False
 
 
 def url_or_path_join(*path_list):
@@ -704,6 +699,7 @@ def main():
 
     if num_processes > 1:
         text_encoder = paddle.DataParallel(text_encoder)
+        # unet = paddle.DataParallel(unet)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
@@ -759,10 +755,10 @@ def main():
                 # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
-                unet_ctx_manager = unet.no_sync()
+                # unet_ctx_manager = unet.no_sync()
                 text_encoder_ctx_manager = text_encoder.no_sync()
             else:
-                unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                # unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
                 text_encoder_ctx_manager = (
                     contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
                 )
@@ -775,22 +771,22 @@ def main():
                     attention_mask = None
                 encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
 
-                with unet_ctx_manager:
-                    # Predict the noise or sample
-                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                # with unet_ctx_manager:
+                # Predict the noise or sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
-                    # Get the target for loss depending on the prediction type
-                    if noise_scheduler.config.prediction_type == "epsilon":
-                        target = noise
-                    elif noise_scheduler.config.prediction_type == "v_prediction":
-                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                    else:
-                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-                    loss = F.mse_loss(model_pred, target, reduction="mean")
+                # Get the target for loss depending on the prediction type
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                loss = F.mse_loss(model_pred, target, reduction="mean")
 
-                    if args.gradient_accumulation_steps > 1:
-                        loss = loss / args.gradient_accumulation_steps
-                    loss.backward()
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
+                loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
@@ -801,6 +797,7 @@ def main():
                 # Let's make sure we don't update any embedding weights besides the newly added token
                 with paddle.no_grad():
                     index_no_updates = paddle.arange(len(tokenizer)) != placeholder_token_id
+                    index_no_updates = paddle.nonzero(index_no_updates).reshape([-1])
                     unwrap_model(text_encoder).get_input_embeddings().weight[index_no_updates] = orig_embeds_params[
                         index_no_updates
                     ]

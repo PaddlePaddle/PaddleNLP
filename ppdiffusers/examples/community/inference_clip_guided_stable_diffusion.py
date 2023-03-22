@@ -122,7 +122,7 @@ if __name__ == "__main__":
     seed = 3788086447  # @param {type: "number"}
 
     model_id = "CompVis/stable-diffusion-v1-4"
-    clip_model_id = "openai/clip-vit-large-patch14"  # @param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
+    clip_model_id = "openai/clip-vit-base-patch32"  # @param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
     scheduler = "plms"  # @param ['plms', 'lms']
     guided_pipeline = create_clip_guided_pipeline(model_id, clip_model_id)
 
