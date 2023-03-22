@@ -34,7 +34,7 @@ class PegasusConfig(PretrainedConfig):
 
     Args:
         vocab_size (`int`, optional):
-            Vocabulary size of the BART model. Defines the number of different tokens that can be represented by the
+            Vocabulary size of the PEGASUS model. Defines the number of different tokens that can be represented by the
             `inputs_ids` passed when calling [`PegasusModel`]. Default to 50000.
         d_model (`int`, optional):
             Dimensionality of the layers and the pooler layer. Default to 1024
@@ -66,7 +66,7 @@ class PegasusConfig(PretrainedConfig):
         init_std (`float`, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices. Default to 0.02.
         num_labels (`int`, optional):
-            The number of labels to use in [`BartForSequenceClassification`]. Default to 3.
+            The number of labels. Default to 3.
         forced_eos_token_id (`int`, optional):
             The id of the token to force as the last generated token when `max_length` is reached. Usually set to
             `eos_token_id`. Default to 1.
@@ -84,7 +84,11 @@ class PegasusConfig(PretrainedConfig):
     """
     model_type = "pegasus"
     keys_to_ignore_at_inference = ["past_key_values"]
-    attribute_map = {"num_attention_heads": "encoder_attention_heads", "hidden_size": "d_model"}
+    attribute_map = {
+        "num_attention_heads": "encoder_attention_heads", 
+        "hidden_size": "d_model",
+        "num_classes": "num_labels",
+    }
     pretrained_init_configuration = PEGASUS_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -151,10 +155,3 @@ class PegasusConfig(PretrainedConfig):
                 "The config can simply be saved and uploaded again to be fixed."
             )
 
-    @property
-    def num_attention_heads(self) -> int:
-        return self.encoder_attention_heads
-
-    @property
-    def hidden_size(self) -> int:
-        return self.d_model
