@@ -177,6 +177,7 @@ def do_train(args):
     WEIGHTS_NAME = "model_state.pdparams"
     OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
+        model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, config=config)
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         LlamaForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
         args.model_name_or_path = split_model_parallel(

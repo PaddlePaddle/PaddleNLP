@@ -700,7 +700,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             shift_labels = labels[..., 1:]
             # Flatten the tokens
             loss = self.criterion(shift_logits, shift_labels)
-
+        return logits
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
