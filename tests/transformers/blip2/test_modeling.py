@@ -34,6 +34,7 @@ from paddlenlp.transformers import (
     Blip2QFormerConfig,
     Blip2VisionConfig,
     Blip2VisionModel,
+    OPTConfig,
     T5Config,
 )
 from paddlenlp.transformers.blip_2.modeling import BLIP_2_PRETRAINED_MODEL_ARCHIVE_LIST
@@ -334,7 +335,7 @@ class Blip2TextModelDecoderOnlyTester:
     def prepare_config_and_inputs(self):
         config = self.get_config()
 
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size).clip(
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64").clip(
             3,
         )
         input_ids[:, -1] = self.eos_token_id  # Eos Token
@@ -344,7 +345,7 @@ class Blip2TextModelDecoderOnlyTester:
         return config, input_ids, attention_mask
 
     def get_config(self):
-        return T5Config(
+        return OPTConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
             num_hidden_layers=self.num_hidden_layers,
@@ -400,10 +401,8 @@ class Blip2ForConditionalGenerationDecoderOnlyModelTester:
     def create_and_check_for_conditional_generation(self, config, input_ids, attention_mask, pixel_values):
         model = Blip2ForConditionalGeneration(config)
         model.eval()
-        # breakpoint()
         with paddle.no_grad():
-            result = model(pixel_values, input_ids, attention_mask)
-
+            result = model(pixel_values, input_ids, attention_mask, return_dict=True)
         expected_seq_length = self.num_query_tokens + self.text_model_tester.seq_length
         self.parent.assertEqual(
             result.logits.shape,
@@ -418,8 +417,83 @@ class Blip2ForConditionalGenerationDecoderOnlyModelTester:
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "labels": input_ids,
+            "return_dict": True,
         }
         return config, inputs_dict
+
+
+class Blip2ForConditionalGenerationDecoderOnlyTest(ModelTesterMixin, unittest.TestCase):
+    all_model_classes = (Blip2ForConditionalGeneration,)
+    fx_compatible = False
+    test_head_masking = False
+    test_pruning = False
+    test_resize_embeddings = False
+    test_attention_outputs = False
+    use_test_model_name_list = False
+
+    def setUp(self):
+        self.model_tester = Blip2ForConditionalGenerationDecoderOnlyModelTester(self)
+
+    def test_for_conditional_generation(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_conditional_generation(*config_and_inputs)
+
+    @unittest.skip(reason="Hidden_states is tested in individual model tests")
+    def test_hidden_states_output(self):
+        pass
+
+    @unittest.skip(reason="Inputs_embeds is tested in individual model tests")
+    def test_inputs_embeds(self):
+        pass
+
+    @unittest.skip(reason="Retain_grad is tested in individual model tests")
+    def test_retain_grad_hidden_states_attentions(self):
+        pass
+
+    @unittest.skip(reason="Blip2Model does not have input/output embeddings")
+    def test_model_common_attributes(self):
+        pass
+
+    @unittest.skip(reason="There's no base Blip2Model")
+    def test_save_load_fast_init_from_base(self):
+        pass
+
+    @unittest.skip(reason="There's no base Blip2Model")
+    def test_save_load_fast_init_to_base(self):
+        pass
+
+    def test_forward_signature(self):
+        config, _ = self.model_tester.prepare_config_and_inputs_for_common()
+
+        for model_class in self.all_model_classes:
+            model = model_class(config)
+            signature = inspect.signature(model.forward)
+            # signature.parameters is an OrderedDict => so arg_names order is deterministic
+            arg_names = [*signature.parameters.keys()]
+
+            expected_arg_names = ["pixel_values"]
+            self.assertListEqual(arg_names[:1], expected_arg_names)
+
+    def test_load_vision_qformer_text_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        # Save Blip2Config and check if we can load Blip2VisionConfig from it
+        with tempfile.TemporaryDirectory() as tmp_dir_name:
+            config.save_pretrained(tmp_dir_name)
+            vision_config = Blip2VisionConfig.from_pretrained(tmp_dir_name)
+            self.assertDictEqual(config.vision_config.to_dict(), vision_config.to_dict())
+
+        # Save Blip2Config and check if we can load Blip2QFormerConfig from it
+        with tempfile.TemporaryDirectory() as tmp_dir_name:
+            config.save_pretrained(tmp_dir_name)
+            qformer_config = Blip2QFormerConfig.from_pretrained(tmp_dir_name)
+            self.assertDictEqual(config.qformer_config.to_dict(), qformer_config.to_dict())
+
+    @slow
+    def test_model_from_pretrained(self):
+        for model_name in BLIP_2_PRETRAINED_MODEL_ARCHIVE_LIST:
+            model = Blip2ForConditionalGeneration.from_pretrained(model_name)
+            self.assertIsNotNone(model)
 
 
 # this class is based on `T5ModelTester` found in tests/models/t5/test_modeling_t5.py
@@ -600,6 +674,89 @@ class Blip2ForConditionalGenerationModelTester:
         return config, inputs_dict
 
 
+# this model tester uses an encoder-decoder language model (T5)
+class Blip2ModelTester:
+    def __init__(
+        self, parent, vision_kwargs=None, qformer_kwargs=None, text_kwargs=None, is_training=True, num_query_tokens=10
+    ):
+        if vision_kwargs is None:
+            vision_kwargs = {}
+        if qformer_kwargs is None:
+            qformer_kwargs = {}
+        if text_kwargs is None:
+            text_kwargs = {}
+
+        self.parent = parent
+        self.vision_model_tester = Blip2VisionModelTester(parent, **vision_kwargs)
+        self.qformer_model_tester = Blip2QFormerModelTester(parent, **qformer_kwargs)
+        self.text_model_tester = Blip2TextModelTester(parent, **text_kwargs)
+        self.is_training = is_training
+        self.num_query_tokens = num_query_tokens
+
+    def prepare_config_and_inputs(self):
+        _, pixel_values = self.vision_model_tester.prepare_config_and_inputs()
+        (
+            _,
+            input_ids,
+            decoder_input_ids,
+            attention_mask,
+            decoder_attention_mask,
+            lm_labels,
+        ) = self.text_model_tester.prepare_config_and_inputs()
+
+        config = self.get_config()
+
+        return config, input_ids, attention_mask, pixel_values, decoder_input_ids, decoder_attention_mask, lm_labels
+
+    def get_config(self):
+        return Blip2Config.from_vision_qformer_text_configs(
+            vision_config=self.vision_model_tester.get_config(),
+            qformer_config=self.qformer_model_tester.get_config(),
+            text_config=self.text_model_tester.get_config(),
+            num_query_tokens=self.num_query_tokens,
+        )
+
+    def create_and_check_for_conditional_generation(
+        self, config, input_ids, attention_mask, pixel_values, decoder_input_ids, decoder_attention_mask, labels
+    ):
+        model = Blip2ForConditionalGeneration(config)
+        model.eval()
+        with paddle.no_grad():
+            result = model(
+                pixel_values, input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, return_dict=True
+            )
+
+        self.parent.assertEqual(
+            result.logits.shape,
+            [
+                self.vision_model_tester.batch_size,
+                self.text_model_tester.seq_length,
+                self.text_model_tester.vocab_size,
+            ],
+        )
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            attention_mask,
+            pixel_values,
+            decoder_input_ids,
+            decoder_attention_mask,
+            labels,
+        ) = config_and_inputs
+        inputs_dict = {
+            "pixel_values": pixel_values,
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "decoder_input_ids": decoder_input_ids,
+            "decoder_attention_mask": decoder_attention_mask,
+            "labels": labels,
+        }
+        return config, inputs_dict
+
+
 class Blip2ModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (Blip2ForConditionalGeneration, Blip2Model)
     fx_compatible = False
@@ -611,7 +768,7 @@ class Blip2ModelTest(ModelTesterMixin, unittest.TestCase):
     use_test_inputs_embeds: bool = False
 
     def setUp(self):
-        self.model_tester = Blip2ForConditionalGenerationModelTester(self)
+        self.model_tester = Blip2ModelTester(self)
 
     def test_for_conditional_generation(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

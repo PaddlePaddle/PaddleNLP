@@ -462,6 +462,9 @@ class OPTLMHead(Layer):
         )
 
     def forward(self, hidden_states):
+        if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
+            hidden_states = hidden_states["last_hidden_state"]
+        # breakpoint()
         logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
