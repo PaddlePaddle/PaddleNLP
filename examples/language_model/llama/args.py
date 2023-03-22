@@ -54,7 +54,7 @@ def parse_args():
 
     parser.add_argument(
         "--global_batch_size",
-        default=4,
+        default=8,
         type=int,
         help="Global batch size for all training process. None for not check the size is valid. "
         "If we only use data parallelism, it should be device_num * micro_batch_size.",
@@ -128,12 +128,12 @@ def parse_args():
     # Config for 4D Parallelism
 
     parser.add_argument(
-        "--sharding_degree", type=int, default=4, help="Sharding degree. Share the parameters to many cards."
+        "--sharding_degree", type=int, default=8, help="Sharding degree. Share the parameters to many cards."
     )
 
     parser.add_argument("--dp_degree", type=int, default=1, help="Data Parallelism degree.")
     parser.add_argument(
-        "--mp_degree", type=int, default=2, help="Model Parallelism degree. Spliting the linear layers to many cards."
+        "--mp_degree", type=int, default=1, help="Model Parallelism degree. Spliting the linear layers to many cards."
     )
     parser.add_argument(
         "--pp_degree",
