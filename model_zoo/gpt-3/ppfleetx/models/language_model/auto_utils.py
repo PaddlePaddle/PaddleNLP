@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 from functools import reduce
 
 import numpy as np
-import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
 
 
