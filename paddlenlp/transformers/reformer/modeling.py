@@ -2418,7 +2418,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
         self.lm_head = ReformerOnlyLMHead(config)
 
         self.init_weights()
-        self.tie_weight()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -2574,7 +2574,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
         ], "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
         self.lm_head = ReformerOnlyLMHead(config)
         self.init_weights()
-        self.tie_weight()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder

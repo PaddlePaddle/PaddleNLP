@@ -613,7 +613,7 @@ class ModelTesterMixin:
                 except NotImplementedError:
                     continue
 
-                if input_embeddings is not None and output_embeddings is not None :
+                if input_embeddings is not None and output_embeddings is not None:
                     if hasattr(output_embeddings, "weight"):
                         output_embeddings_weight = output_embeddings.weight
                     else:
@@ -624,8 +624,9 @@ class ModelTesterMixin:
                     else:
                         input_embeddings_weight = input_embeddings
 
-                    print('model name :{},id is{},{}'.format(model_class,id(output_embeddings_weight),id(input_embeddings_weight)))
-                    self.assertEqual(id(output_embeddings_weight),id(input_embeddings_weight))
+                    print('model name :{},id is{},{}'.format(model_class, id(output_embeddings_weight),
+                                                             id(input_embeddings_weight)))
+                    self.assertEqual(id(output_embeddings_weight), id(input_embeddings_weight))
 
 
 class ModelTesterPretrainedMixin:

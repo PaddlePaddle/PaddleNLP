@@ -254,7 +254,6 @@ def register_base_model(cls):
 
 class BackboneMixin:
     def forward_with_filtered_kwargs(self, *args, **kwargs):
-
         signature = dict(inspect.signature(self.forward).parameters)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
@@ -448,7 +447,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             Optional[Embedding]: the otuput embedding of model
         """
         return None
-
 
     def tie_weights(self):
         """
@@ -732,14 +730,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         unexpected_keys = []
         missing_keys = []
         if not hasattr(model, cls.base_model_prefix) and any(
-            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
+                s.startswith(cls.base_model_prefix) for s in state_dict.keys()
         ):
             # base model
             state_to_load = {}
             start_prefix = cls.base_model_prefix + "."
             for k, v in state_dict.items():
                 if k.startswith(cls.base_model_prefix):
-                    state_to_load[k[len(start_prefix) :]] = v
+                    state_to_load[k[len(start_prefix):]] = v
                 else:
                     unexpected_keys.append(k)
         if hasattr(model, cls.base_model_prefix) and not any(

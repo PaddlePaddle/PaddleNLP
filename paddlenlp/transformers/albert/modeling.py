@@ -761,7 +761,7 @@ class AlbertMLMHead(Layer):
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-        self.decoder = nn.Linear(config.vocab_size,config.embedding_size)
+        self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
         self.activation = ACT2FN[config.hidden_act]
 
         # link bias
@@ -771,7 +771,7 @@ class AlbertMLMHead(Layer):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.matmul(hidden_states,self.decoder.weight,transpose_y=True)+self.bias
+        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
 
         prediction_scores = hidden_states
         return prediction_scores
