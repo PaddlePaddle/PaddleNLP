@@ -18,7 +18,7 @@ import random
 import numpy as np
 import paddle
 from ppfleetx.data import dataset as fleetx_dataset
-from ppfleetx.data import utils
+from ppfleetx.data import sampler, utils
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
 
