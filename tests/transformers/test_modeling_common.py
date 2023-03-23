@@ -527,7 +527,6 @@ class ModelTesterMixin:
         self.assertTrue(len(model.model_name_list) != 0)
 
     def test_pretrained_config_save_load(self):
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return
 
@@ -549,7 +548,6 @@ class ModelTesterMixin:
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return None
 
@@ -588,7 +586,7 @@ class ModelTesterMixin:
 
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         for model_class in self.all_model_classes:
-            if 'CausalLM' not in model_class.__name__ and 'MaskedLM' not in model_class.__name__:
+            if "CausalLM" not in model_class.__name__ and "MaskedLM" not in model_class.__name__:
                 continue
 
             model = self._make_model_instance(config, model_class)
@@ -602,7 +600,7 @@ class ModelTesterMixin:
             if not tie_word_embeddings:
                 continue
 
-            if hasattr(model, 'get_input_embeddings') and hasattr(model, 'get_output_embeddings'):
+            if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
                 try:
                     input_embeddings = model.get_input_embeddings()
                 except NotImplementedError:
@@ -624,8 +622,11 @@ class ModelTesterMixin:
                     else:
                         input_embeddings_weight = input_embeddings
 
-                    print('model name :{},id is{},{}'.format(model_class, id(output_embeddings_weight),
-                                                             id(input_embeddings_weight)))
+                    print(
+                        "model name :{},id is{},{}".format(
+                            model_class, id(output_embeddings_weight), id(input_embeddings_weight)
+                        )
+                    )
                     self.assertEqual(id(output_embeddings_weight), id(input_embeddings_weight))
 
 

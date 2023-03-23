@@ -468,8 +468,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     raise ValueError(
                         "when tie input/output embeddings, the shape of output embeddings: {}"
                         "should be equal to shape of input embeddings: {}".format(
-                            input_embeddings.weight.shape,
-                            output_embeddings.weight.shape
+                            input_embeddings.weight.shape, output_embeddings.weight.shape
                         )
                     )
 
@@ -730,14 +729,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         unexpected_keys = []
         missing_keys = []
         if not hasattr(model, cls.base_model_prefix) and any(
-                s.startswith(cls.base_model_prefix) for s in state_dict.keys()
+            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
         ):
             # base model
             state_to_load = {}
             start_prefix = cls.base_model_prefix + "."
             for k, v in state_dict.items():
                 if k.startswith(cls.base_model_prefix):
-                    state_to_load[k[len(start_prefix):]] = v
+                    state_to_load[k[len(start_prefix) :]] = v
                 else:
                     unexpected_keys.append(k)
         if hasattr(model, cls.base_model_prefix) and not any(
@@ -1105,7 +1104,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
                 if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
