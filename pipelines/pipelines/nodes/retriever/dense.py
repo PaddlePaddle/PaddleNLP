@@ -173,7 +173,7 @@ class DensePassageRetriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
-        query_type: ContentTypes = "text",
+        query_type: Optional[ContentTypes] = None,
         filters: dict = None,
         top_k: Optional[int] = None,
         index: str = None,
@@ -205,7 +205,7 @@ class DensePassageRetriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
-        queries_type: ContentTypes = "text",
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[
             Union[
                 Dict[str, Union[Dict, List, str, int, float, bool]],
