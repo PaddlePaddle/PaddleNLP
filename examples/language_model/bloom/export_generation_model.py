@@ -35,15 +35,15 @@ def parse_args():
         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
-        "--model_path",
-        default="./pretrained/bloom-560m",
+        "--model_name_or_path",
+        default="bigscience/bloom-560m",
         type=str,
         required=False,
-        help="Path of the trained model to be exported.",
+        help="name or path of the trained model to be exported.",
     )
     parser.add_argument(
         "--output_path",
-        default="./pretrained/bloom-560m-inference/bloom",
+        default="./pretrained/bloom-560m-generation/bloom",
         type=str,
         # required=True,
         help="The output file prefix used to save the exported inference model.",
@@ -66,8 +66,8 @@ def main():
     args.model_type = args.model_type.lower()
     model_class = MODEL_CLASSES[args.model_type]
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    config = BloomConfig.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    config = BloomConfig.from_pretrained(args.model_name_or_path)
 
     # Set the generaiton the hyperparameter
     config.max_dec_len = args.max_length
@@ -80,13 +80,11 @@ def main():
     config.top_k = 1
     config.use_recompute = False
 
-    if os.path.isdir(args.model_path):
-        # Merge the model splits to a total model
-        args.model_path = merge_model_parallel(args.model_path, config)
+    args.model_name_or_path = merge_model_parallel(args.model_name_or_path, config)
 
     # Load the model and parameter
     config.mp_degree = 1
-    model = model_class.from_pretrained(args.model_path, config=config)
+    model = model_class.from_pretrained(args.model_name_or_path, config=config)
 
     model.eval()
     model = paddle.jit.to_static(
