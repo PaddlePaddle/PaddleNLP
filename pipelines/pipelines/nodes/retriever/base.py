@@ -87,6 +87,7 @@ class BaseRetriever(BaseComponent):
     def retrieve_batch(
         self,
         queries: List[str],
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[Dict[str, Union[Dict, List, str, int, float, bool]]] = None,
         top_k: Optional[int] = None,
         index: str = None,
@@ -115,7 +116,7 @@ class BaseRetriever(BaseComponent):
         self,
         root_node: str,
         query: Optional[str] = None,
-        query_type: ContentTypes = "text",
+        query_type: Optional[ContentTypes] = None,
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         documents: Optional[List[dict]] = None,
@@ -140,7 +141,7 @@ class BaseRetriever(BaseComponent):
         self,
         root_node: str,
         queries: Optional[List[str]] = None,
-        query_type: ContentTypes = "text",
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[Union[dict, List[dict]]] = None,
         top_k: Optional[int] = None,
         documents: Optional[Union[List[Document], List[List[Document]]]] = None,
@@ -164,7 +165,7 @@ class BaseRetriever(BaseComponent):
     def run_query(
         self,
         query: str,
-        query_type: ContentTypes = "text",
+        query_type: Optional[ContentTypes] = None,
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -182,7 +183,7 @@ class BaseRetriever(BaseComponent):
     def run_query_batch(
         self,
         queries: List[str],
-        query_type: ContentTypes = "text",
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[dict] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -191,7 +192,7 @@ class BaseRetriever(BaseComponent):
     ):
         documents = self.retrieve_batch(
             queries=queries,
-            query_type=query_type,
+            queries_type=queries_type,
             filters=filters,
             top_k=top_k,
             index=index,
