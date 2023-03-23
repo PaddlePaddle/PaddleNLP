@@ -315,7 +315,7 @@ class GLMStack(nn.Layer):
         memory_length = cache[0].shape[1] if cache is not None else 0
 
         if attention_mask.dim == 1:
-            is_scalar = (paddle.numel(attention_mask) == 1)[0]
+            is_scalar = bool(paddle.numel(attention_mask) == 1)
             scalar_sep = attention_mask[0] if is_scalar else attention_mask
 
             # attention mask is the beginning postion of B region in [0, query_len)
