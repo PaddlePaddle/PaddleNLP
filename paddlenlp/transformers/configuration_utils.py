@@ -813,11 +813,13 @@ class PretrainedConfig:
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
+            print("configuration_file", configuration_file)
             if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:
                 # try to detect old-school config file
                 configuration_file = os.path.join(pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+                print("configuration_file legacy", configuration_file)
                 if os.path.exists(configuration_file):
                     resolved_config_file = configuration_file
                 else:

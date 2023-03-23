@@ -156,7 +156,10 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def _find_weight_file_path(
-    cache_dir: str, model_class: Type[PretrainedModel], resource_uri: Optional[str] = None
+    cache_dir: str,
+    model_class: Type[PretrainedModel],
+    config: PretrainedConfig = None,
+    resource_uri: Optional[str] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
@@ -178,7 +181,15 @@ def _find_weight_file_path(
     if os.path.isfile(weight_file_path):
         return weight_file_path
 
-    # 3. find the target weight file if there is only one weight file
+    # 3. find the target weight file name for splited tensor parallel
+    if config and config.tensor_parallel_degree > 1:
+        tensor_parallel_weight_file_path = os.path.join(
+            cache_dir, _add_variant(resource_weight_file_name, f"tp{config.tensor_parallel_rank:0>2d}")
+        )
+        if os.path.isfile(tensor_parallel_weight_file_path):
+            return tensor_parallel_weight_file_path
+
+    # 4. find the target weight file if there is only one weight file
     weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
     if len(weight_file_names) == 1:
         logger.warning(
@@ -360,7 +371,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         config = kwargs["config"]
         if not isinstance(config, PretrainedConfig):
-            raise TypeError("config parameter should be the instance of PretraiendConfig")
+            raise TypeError("config parameter should be the instance of PretrainedConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
         self.model_config_file = CONFIG_NAME
@@ -1023,6 +1034,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         cache_dir: str | None = None,
         subfolder: str | None = None,
+        config: PretrainedConfig = None,
         support_conversion: bool = False,
     ) -> str:
         """resolve model target file path from `` and `cache_dir`
@@ -1110,32 +1122,31 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
 
-        # 4. download from community or hf-hub
-        else:
+            # 4. download from community or hf-hub
             # assume that the community-based models, name format: community/model-name
             community_model_file_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]]
             )
             assert is_url(community_model_file_path)
 
-            # check wether the target file exist in the comunity bos server
-            if url_file_exists(community_model_file_path):
-                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
+        # check wether the target file exist in the comunity bos server
+        if url_file_exists(community_model_file_path):
+            return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
-            # 5. Final ERROR
-            logger.warning(
-                f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-                f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-            )
+        # 5. Final ERROR
+        logger.warning(
+            f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
+            f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
+        )
 
-            if ENABLE_TORCH_CHECKPOINT:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
-            else:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+        if ENABLE_TORCH_CHECKPOINT:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+        else:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
 
-            raise FileNotFoundError(msg)
+        raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(
@@ -1404,6 +1415,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
+            config=config,
             support_conversion=support_conversion,
         )
 
@@ -1423,9 +1435,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
         else:
             # 4. loading the state dict
-            if config.tensor_parallel_degree > 1:
-                if model_weight_file.endswith("model_state.pdparams"):
-                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
+            if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):
+                model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
             else:
                 model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
@@ -1433,11 +1444,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
-
-        if config.tensor_parallel_degree > 1:
-            model.resource_files_names["model_state"] = _add_variant(
-                model.resource_files_names["model_state"], f"tp{config.tensor_parallel_rank:0>2d}"
-            )
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
@@ -1526,6 +1532,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         model_to_save = unwrap_model(self)
+
+        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
+
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
@@ -1538,6 +1547,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
         else:
+            if config_to_save.tensor_parallel_degree > 1:
+                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
             state_dict_to_save = self.state_dict()
 
         # Attach architecture to the config
@@ -1546,7 +1557,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, self.resource_files_names["model_state"])
+            file_name = os.path.join(save_dir, WEIGHTS_NAME)
             paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:
