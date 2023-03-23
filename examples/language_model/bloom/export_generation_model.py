@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import argparse
 import os
 
 import paddle
 from model_split_merge import merge_model_parallel
-from transformers import AutoTokenizer
 
-from paddlenlp.transformers import BloomConfig, BloomForGeneration
+from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForGeneration
 
-MODEL_CLASSES = {"bigscience/bloom-560m": (BloomForGeneration)}
+MODEL_CLASSES = {"bloom": (BloomForGeneration)}
 
 
 def parse_args():
@@ -29,30 +29,38 @@ def parse_args():
     # Required parameters
     parser.add_argument(
         "--model_type",
-        default="bigscience/bloom-560m",
+        default="bloom",
         type=str,
         # required=True,
         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_path",
-        default="output_generate/splits_mp_01_sharding_01_500/",
+        default="./pretrained/bloom-560m",
         type=str,
         required=False,
         help="Path of the trained model to be exported.",
     )
     parser.add_argument(
         "--output_path",
-        default="inference/bloom",
+        default="./pretrained/bloom-560m-inference/bloom",
         type=str,
         # required=True,
         help="The output file prefix used to save the exported inference model.",
+    )
+    parser.add_argument(
+        "--max_length",
+        default=20,
+        type=int,
+        help="max length of output sentence",
     )
     args = parser.parse_args()
     return args
 
 
 def main():
+    # most dtype of bloom model weights are float16, expect Bloom(176B) is bfloat16
+    paddle.set_default_dtype("float16")
     args = parse_args()
 
     args.model_type = args.model_type.lower()
@@ -62,7 +70,7 @@ def main():
     config = BloomConfig.from_pretrained(args.model_path)
 
     # Set the generaiton the hyperparameter
-    config.max_dec_len = 20
+    config.max_dec_len = args.max_length
     config.temperature = 0.5
     config.decode_strateg = "sampling"
     config.eos_token_id = tokenizer.eos_token_id
@@ -72,12 +80,13 @@ def main():
     config.top_k = 1
     config.use_recompute = False
 
-    # Merge the model splits to a total model
-    merge_model_path = merge_model_parallel(args.model_path, config)
+    if os.path.isdir(args.model_path):
+        # Merge the model splits to a total model
+        args.model_path = merge_model_parallel(args.model_path, config)
 
     # Load the model and parameter
     config.mp_degree = 1
-    model = model_class.from_pretrained(merge_model_path, config=config)
+    model = model_class.from_pretrained(args.model_path, config=config)
 
     model.eval()
     model = paddle.jit.to_static(

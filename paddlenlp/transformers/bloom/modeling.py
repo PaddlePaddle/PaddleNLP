@@ -84,7 +84,10 @@ def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True, mp_degree: int =
         return logits
 
 
-def finfo(dtype: paddle.dtype):
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
     if dtype == paddle.bfloat16:
         # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
         class BFloatFInfo:
