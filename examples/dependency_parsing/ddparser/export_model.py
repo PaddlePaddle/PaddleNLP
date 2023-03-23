@@ -16,18 +16,18 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-
-from model.dep import BiAffineParser
 from data import load_vocab
+from model.dep import BiAffineParser
 
-# yapf: disable
+from paddlenlp.transformers import AutoModel
+
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--encoding_model", choices=["lstm-pe", "ernie-1.0", "ernie-3.0-medium-zh", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-3.0-medium-zh", help="Select the encoding model.")
 parser.add_argument("--params_path", type=str, required=True, default='./model_file/best.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 if __name__ == "__main__":
 

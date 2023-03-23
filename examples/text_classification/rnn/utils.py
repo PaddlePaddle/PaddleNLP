@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import defaultdict
-import re
+
+import numpy as np
 
 from paddlenlp import Taskflow
-import numpy as np
 
 word_segmenter = Taskflow("word_segmentation", mode="fast")
 

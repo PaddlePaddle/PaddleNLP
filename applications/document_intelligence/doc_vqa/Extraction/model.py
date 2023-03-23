@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-
 import paddle
-import paddle.nn as nn
 import paddle.fluid as fluid
+import paddle.nn as nn
+
 from paddlenlp.transformers import LayoutXLMPretrainedModel
 
 
@@ -146,10 +145,7 @@ class LayoutXLMForTokenClassification_with_CRF(LayoutXLMPretrainedModel):
     def __init__(self, layoutxlm, num_classes, dropout=None):
         super(LayoutXLMForTokenClassification_with_CRF, self).__init__()
         self.num_classes = num_classes
-        if isinstance(layoutxlm, dict):
-            self.layoutxlm = LayoutXLMModel(**layoutxlm)
-        else:
-            self.layoutxlm = layoutxlm
+        self.layoutxlm = layoutxlm
         self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutxlm.config["hidden_dropout_prob"])
         self.emission_classifier = nn.Linear(self.layoutxlm.config["hidden_size"], self.num_classes)
         self.emission_classifier.apply(self.init_weights)
@@ -196,7 +192,7 @@ class LayoutXLMForTokenClassification_with_CRF(LayoutXLMPretrainedModel):
         )
         seq_length = input_ids.shape[1]
         # sequence out and image out
-        sequence_logits, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_logits, _ = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
         emission = self.emission_classifier(sequence_logits)
         length = paddle.sum(attention_mask, axis=1)
         labels = labels.reshape([-1, seq_length, 1])

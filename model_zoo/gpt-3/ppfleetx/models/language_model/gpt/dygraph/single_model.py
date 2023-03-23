@@ -315,8 +315,8 @@ class TransformerDecoder(nn.Layer):
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
 
-        # if self.norm is not None:
-        #    output = self.norm(output)
+        if self.norm is not None:
+            output = self.norm(output)
         return output if use_cache is False else (output, new_caches)
 
     def gen_cache(self, memory, do_zip=False):
@@ -418,8 +418,8 @@ class TransformerDecoderLayer(nn.Layer):
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
         residual = tgt
 
-        # if self.normalize_before:
-        #     tgt = self.norm1(tgt)
+        if self.normalize_before:
+            tgt = self.norm1(tgt)
 
         if use_cache is False:
             if self.use_recompute and self.recompute_granularity == "full_attn" and self.do_recompute:
@@ -429,18 +429,20 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         tgt = residual + self.dropout1(tgt)
-        # if not self.normalize_before:
-        #    tgt = self.norm1(tgt)
+
+        if not self.normalize_before:
+            tgt = self.norm1(tgt)
+
         residual = tgt
-        # if self.normalize_before:
-        #    tgt = self.norm2(tgt)
+        if self.normalize_before:
+            tgt = self.norm2(tgt)
 
         tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
 
         tgt = residual + tgt
 
-        # if not self.normalize_before:
-        #    tgt = self.norm2(tgt)
+        if not self.normalize_before:
+            tgt = self.norm2(tgt)
 
         return tgt if use_cache is False else (tgt, incremental_cache)
 

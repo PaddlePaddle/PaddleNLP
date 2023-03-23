@@ -59,6 +59,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 
 
 def get_attr(layer, name):
@@ -569,8 +570,9 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+        self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
+        self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
+
         self.activation = getattr(F, activation)
 
     def forward(self, tgt, memory=None, tgt_mask=None, use_cache=False, cache=None):
@@ -593,7 +595,7 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = residual + self.dropout1(tgt)
+            tgt = self.fused_dropout_add1(tgt, residual)
 
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -603,9 +605,7 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.dropout2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
-
-        tgt = residual + tgt
+            tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
