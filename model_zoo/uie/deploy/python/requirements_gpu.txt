@@ -1,3 +1,0 @@
-onnx
-onnxconverter_common
-onnxruntime-gpu

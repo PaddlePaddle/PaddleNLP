@@ -17,14 +17,13 @@ import time
 
 import paddle
 import paddle.nn as nn
-from paddle.metric import Accuracy
-
-from paddlenlp.transformers import BertForSequenceClassification
-from paddlenlp.metrics import AccuracyAndF1
-
 from args import parse_args
-from small import BiLSTM
 from data import create_distill_loader
+from paddle.metric import Accuracy
+from small import BiLSTM
+
+from paddlenlp.metrics import AccuracyAndF1
+from paddlenlp.transformers import BertForSequenceClassification
 
 METRIC_CLASSES = {"sst-2": Accuracy, "qqp": AccuracyAndF1, "chnsenticorp": Accuracy}
 
@@ -67,7 +66,7 @@ def evaluate(task_name, model, metric, data_loader):
 
 
 def do_train(agrs):
-    device = paddle.set_device(args.device)
+    paddle.set_device(args.device)
     train_data_loader, dev_data_loader = create_distill_loader(
         args.task_name,
         model_name=args.model_name,
@@ -153,7 +152,7 @@ def do_train(agrs):
                     % (global_step, epoch, i, loss, args.log_freq / (time.time() - tic_train))
                 )
                 tic_eval = time.time()
-                acc = evaluate(args.task_name, model, metric, dev_data_loader)
+                evaluate(args.task_name, model, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
 

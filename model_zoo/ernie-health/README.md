@@ -135,7 +135,6 @@ python -u -m paddle.distributed.launch \
     --max_seq_length 512 \
     --gradient_accumulation_steps 1\
     --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 8 \
     --learning_rate 0.001 \
     --max_steps 1000000 \
     --save_steps 50000 \
@@ -148,13 +147,12 @@ python -u -m paddle.distributed.launch \
     --fp16  \
     --fp16_opt_level "O1"  \
     --do_train \
-    --disable_tqdm \
+    --disable_tqdm True\
     --save_total_limit 10
 ```
 大部分参数含义如上文所述，这里简要介绍一些新参数:
 
 - ``per_device_train_batch_size`` 同上文batch_size。训练时，每次迭代每张卡上的样本数目。
-- ``per_device_eval_batch_size`` 同上文batch_size。评估时，每次迭代每张卡上的样本数目。
 - ``warmup_ratio`` 与warmup_steps类似，warmup步数占总步数的比例。
 - ``fp16`` 与`use_amp`相同，表示使用混合精度
 - ``fp16_opt_level`` 混合精度的策略。注：O2训练eHealth存在部分问题，暂时请勿使用。

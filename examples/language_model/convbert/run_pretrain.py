@@ -13,22 +13,26 @@
 # limitations under the License.
 
 import argparse
+import copy
+import io
+import json
 import logging
 import os
-import io
 import random
 import time
-import json
-import copy
 
 import numpy as np
-
 import paddle
 
-from paddlenlp.transformers import ConvBertForTotalPretraining, ConvBertModel, ConvBertPretrainingCriterion
-from paddlenlp.transformers import ConvBertDiscriminator, ConvBertGenerator
-from paddlenlp.transformers import ConvBertTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import (
+    ConvBertDiscriminator,
+    ConvBertForTotalPretraining,
+    ConvBertGenerator,
+    ConvBertModel,
+    ConvBertPretrainingCriterion,
+    ConvBertTokenizer,
+    LinearDecayWithWarmup,
+)
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -248,9 +252,7 @@ class DataCollatorForConvBert(object):
             raise ValueError("the tensor in examples not have same shape, please check input examples")
 
     def add_special_tokens_and_set_maskprob(self, inputs, truncation, max_seq_length):
-        sep_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.sep_token)
         pad_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.pad_token)
-        cls_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.cls_token)
         full_inputs = []
         full_maskprob = []
         max_length = 0
@@ -342,7 +344,7 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args)
-    worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
+    WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]

@@ -14,7 +14,6 @@
 
 import numpy as np
 import paddle
-from paddlenlp.datasets import load_dataset
 
 
 def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):

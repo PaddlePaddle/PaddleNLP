@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import copy
 import json
 import os
 import random
@@ -26,18 +25,15 @@ from dataset import DataCollatorForErnieHealth, MedicalCorpus, create_dataloader
 from visualdl import LogWriter
 
 from paddlenlp.transformers import (
-    ElectraGenerator,
-    ElectraModel,
+    ElectraConfig,
     ElectraTokenizer,
-    ErnieHealthDiscriminator,
     ErnieHealthForTotalPretraining,
-    ErnieHealthPretrainingCriterion,
     LinearDecayWithWarmup,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
+    "ernie-health": (ElectraConfig, ErnieHealthForTotalPretraining, ElectraTokenizer),
 }
 
 
@@ -143,54 +139,31 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
+    config_class, model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
 
-    if args.model_name_or_path in pretrained_models:
+    if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
+        # Load checkpoint
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-generator"])
-        )
-        discriminator = ErnieHealthDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-discriminator"])
-        )
-        model = model_class(generator, discriminator)
-        args.init_from_ckpt = False
-    else:
-        if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-            # Load checkpoint
-            tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
-                config_dict = json.load(f)
-                model_name = config_dict["model_name"]
-            if model_name in pretrained_models:
-                generator = ElectraGenerator(
-                    ElectraModel(**model_class.pretrained_init_configuration[model_name + "-generator"])
-                )
-                discriminator = ErnieHealthDiscriminator(
-                    ElectraModel(**model_class.pretrained_init_configuration[model_name + "-discriminator"])
-                )
-                model = model_class(generator, discriminator)
-                model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
-            else:
-                raise ValueError(
-                    "initialize a model from ckpt need model_name "
-                    "in model_config_file. The supported model_name "
-                    "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
-                )
+        with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
+            config_dict = json.load(f)
+            model_name = config_dict["model_name"]
+        if model_name in pretrained_models:
+            model = model_class.from_pretrained(args.model_name_or_path)
+            model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
         else:
             raise ValueError(
-                "initialize a model need identifier or the "
-                "directory of storing model. if use identifier, the supported model "
-                "identifiers are as follows: {}, if use directory, "
-                "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
+                "initialize a model from ckpt need model_name "
+                "in model_config_file. The supported model_name "
+                "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
             )
-
-    criterion = ErnieHealthPretrainingCriterion(
-        getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"], model.gen_weight
-    )
+    else:
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+        model_config = config_class()
+        model = model_class(model_config)
+        args.init_from_ckpt = False
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -272,11 +245,10 @@ def do_train(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
-                    gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
-                        input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
-                    )
-                    loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                        gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
+                    loss, gen_loss, rtd_loss, mts_loss, csp_loss = model(
+                        input_ids=masked_input_ids,
+                        raw_input_ids=input_ids,
+                        generator_labels=gen_labels,
                     )
 
                 scaled = scaler.scale(loss)
@@ -288,11 +260,10 @@ def do_train(args):
                 t_loss["csp"] += csp_loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
-                    input_ids=masked_input_ids, raw_input_ids=input_ids, generator_labels=gen_labels
-                )
-                loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                    gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
+                loss, gen_loss, rtd_loss, mts_loss, csp_loss = model(
+                    input_ids=masked_input_ids,
+                    raw_input_ids=input_ids,
+                    generator_labels=gen_labels,
                 )
                 loss.backward()
                 t_loss["loss"] += loss.detach()
@@ -384,7 +355,7 @@ def do_train(args):
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config)
+                    config_to_save = model_to_save.discriminator.electra.config.to_dict()
                     if "self" in config_to_save:
                         del config_to_save["self"]
                     run_states = {

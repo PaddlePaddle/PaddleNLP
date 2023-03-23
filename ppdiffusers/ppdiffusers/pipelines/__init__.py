@@ -96,6 +96,7 @@ except OptionalDependencyNotAvailable:
 else:
     from .stable_diffusion import (
         FastDeployCycleDiffusionPipeline,
+        FastDeployStableDiffusionControlNetPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,

@@ -13,21 +13,13 @@
 # limitations under the License.
 """Model for classifier."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
-import time
 import logging
+import time
+
 import numpy as np
-from six.moves import xrange
-from scipy.stats import pearsonr, spearmanr
-
 import paddle.fluid as fluid
-
 from model.ernie import ErnieModel
+from scipy.stats import pearsonr, spearmanr
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +78,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False, task_na
         """
 
         num_seqs = fluid.layers.create_tensor(dtype="int64")
-        ## add focal loss
+        # add focal loss
         ce_loss, probs = fluid.layers.softmax_with_cross_entropy(logits=logits, label=labels, return_softmax=True)
         loss = fluid.layers.mean(x=ce_loss)
         accuracy = fluid.layers.accuracy(input=probs, label=labels, total=num_seqs)
@@ -104,7 +96,6 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False, task_na
         graph_vars = _model(is_noise=True)
         old_loss = graph_vars["loss"]
         token_emb = fluid.default_main_program().global_block().var("word_embedding")
-        # print(token_emb)
         token_emb.stop_gradient = False
         token_gradient = fluid.gradients(old_loss, token_emb)[0]
         token_gradient.stop_gradient = False
@@ -272,7 +263,6 @@ def f1_score(preds, labels):
     labels = np.array(labels)
 
     tp = np.sum((labels == 1) & (preds == 1))
-    tn = np.sum((labels == 0) & (preds == 0))
     fp = np.sum((labels == 0) & (preds == 1))
     fn = np.sum((labels == 1) & (preds == 0))
     p = tp / (tp + fp)
@@ -315,7 +305,7 @@ def simple_accuracy(preds, labels):
 
 def predict(exe, test_program, test_pyreader, graph_vars, dev_count=1):
     test_pyreader.start()
-    qids, scores, probs = [], [], []
+    qids, probs = [], []
     preds = []
 
     fetch_list = [graph_vars["probs"].name, graph_vars["qids"].name]

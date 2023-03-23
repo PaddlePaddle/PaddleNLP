@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """duee 1.0 dataset process"""
-import os
-import sys
 import json
+import os
+
 from utils import read_by_lines, write_by_lines
 
 

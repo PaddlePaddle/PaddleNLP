@@ -17,24 +17,40 @@ import argparse
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddle import inference
+
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_file", type=str, required=True,
-    default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
-parser.add_argument("--params_file", type=str, required=True,
-    default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
+parser.add_argument(
+    "--model_file",
+    type=str,
+    required=True,
+    default="./static_graph_params.pdmodel",
+    help="The path to model info in static graph.",
+)
+parser.add_argument(
+    "--params_file",
+    type=str,
+    required=True,
+    default="./static_graph_params.pdiparams",
+    help="The path to parameters in static graph.",
+)
 parser.add_argument("--vocab_path", type=str, default="./robot_chat_word_dict.txt", help="The path to vocabulary.")
-parser.add_argument("--max_seq_length",
-    default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. "
+    "Sequences longer than this will be truncated, sequences shorter will be padded.",
+)
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'],
-    default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
 args = parser.parse_args()
-# yapf: enable
 
 
 def convert_example(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):

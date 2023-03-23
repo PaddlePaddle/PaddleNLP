@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import importlib
-
-import paddle.nn as nn
-from paddle.jit import to_static
-from paddle.static import InputSpec
 import paddle
+from paddle.jit import to_static
 
 
 def create_input_specs():

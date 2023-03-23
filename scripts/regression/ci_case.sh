@@ -328,8 +328,8 @@ cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
 }
-# 9 ernie-1.0
-ernie-1.0 (){
+# 9 ernie
+ernie(){
 #data process
 cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
 sed -i "s/python3/python/g" Makefile
@@ -362,7 +362,7 @@ python -u -m paddle.distributed.launch \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
     --max_steps 2 \
-    --save_steps 2\
+    --save_steps 2 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
@@ -429,7 +429,7 @@ cd ${nlp_dir}/examples/model_compression/ofa/
 cd ../../benchmark/glue/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 # finetuing
-time (python -u ./run_glue.py \
+time (python -u run_glue.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --task_name SST-2 \
@@ -1244,5 +1244,36 @@ cd ${nlp_dir}/model_zoo/ernie-layout/deploy/python
 wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
 python infer.py --model_path_prefix ../../ner_export/inference --task_type ner --lang "en" --batch_size 8 >${log_path}/ernie-layout_deploy>>${log_path}/ernie-layout_deploy 2>&1
 print_info $? ernie-layout_deploy
+}
+ernie-1.0(){
+    ernie
+}
+
+ernie-3.0(){
+    ernie
+}
+
+ernie_m(){
+    ernie-m
+}
+
+ernie_layout(){
+ernie-layout
+}
+
+ernie_csc(){
+    ernie-csc
+}
+
+ernie_ctm(){
+    ernie-ctm
+}
+
+ernie_doc(){
+    ernie-doc
+}
+
+ernie_health(){
+    ernie-health
 }
 $1

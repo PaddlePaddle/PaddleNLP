@@ -14,13 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import time
-import numpy as np
-import requests
-import json
 
+import numpy as np
 from paddle_serving_client.httpclient import HttpClient
+
 import paddlenlp as ppnlp
 
 

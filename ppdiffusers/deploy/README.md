@@ -83,7 +83,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "euler_ancestral" --backend paddle --device gpu
 ```
 
 脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
@@ -208,7 +208,8 @@ mask 图像为：
 | --device | 运行设备。默认为 `cpu`，可选列表：`['cpu', 'gpu', 'huawei_ascend_npu', 'kunlunxin_xpu']`。 |
 | --scheduler | StableDiffusion 模型的 scheduler。默认为 `'pndm'`。可选列表：`['pndm', 'euler_ancestral']`。|
 | --unet_model_prefix | UNet 模型前缀。默认为 `unet`。 |
-| --vae_model_prefix | VAE 模型前缀。默认为 `vae_decoder`。 |
+| --vae_decoder_model_prefix | VAE Decoder 模型前缀。默认为 `vae_decoder`。 |
+| --vae_encoder_model_prefix | VAE Encoder 模型前缀。默认为 `vae_encoder`。 |
 | --text_encoder_model_prefix | TextEncoder 模型前缀。默认为 `text_encoder`。 |
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `cat_on_bench_new.png`。  |
