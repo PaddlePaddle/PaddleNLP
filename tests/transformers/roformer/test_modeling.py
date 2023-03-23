@@ -223,6 +223,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
+        config.num_labels = self.num_classes
         model = RoFormerForTokenClassification(config)
         model.eval()
         result = model(
@@ -283,6 +284,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
+        config.num_labels = self.num_classes
         model = RoFormerForSequenceClassification(config)
         model.eval()
         result = model(
