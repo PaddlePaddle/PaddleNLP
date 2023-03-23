@@ -239,6 +239,38 @@ class ErnieCtmModelTester:
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.num_labels])
 
+    def create_and_check_for_wordtag(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = ErnieCtmWordtagModel(config)
+
+        model.eval()
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.num_labels])
+
+    def create_and_check_for_nptag(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = ErnieCtmNptagModel(config)
+
+        model.eval()
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, labels=token_labels)
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
         (
@@ -267,6 +299,7 @@ class ErnieCtmModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieCtmModel
     return_dict = False
     use_labels = False
+    is_encoder_decoder = False
 
     all_model_classes = (
         ErnieCtmModel,
@@ -282,24 +315,24 @@ class ErnieCtmModelTest(ModelTesterMixin, unittest.TestCase):
         self.config_tester = ConfigTester(self, config_class=ErnieCtmConfig, vocab_size=256, hidden_size=24)
 
     def test_config(self):
-        # self.config_tester.create_and_test_config_from_and_save_pretrained()
+        self.config_tester.create_and_test_config_from_and_save_pretrained()
         self.config_tester.run_common_tests()
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_decoder_model_past_with_large_inputs(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_model_past_large_inputs(*config_and_inputs)
-
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
-    def test_for_custom_params(self):
+    def test_for_wordtag(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.test_addition_params(*config_and_inputs)
+        self.model_tester.create_and_check_for_wordtag(*config_and_inputs)
+
+    def test_for_nptag(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_nptag(*config_and_inputs)
 
     def test_model_name_list(self):
         config = self.model_tester.get_config()
