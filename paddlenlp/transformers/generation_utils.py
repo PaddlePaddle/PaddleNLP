@@ -1331,7 +1331,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
                     lambda x: paddle.index_select(x, beam_idx), model_kwargs["cache"]
@@ -1457,7 +1457,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
                     lambda x: paddle.index_select(x, reordering_indices), model_kwargs["cache"]
