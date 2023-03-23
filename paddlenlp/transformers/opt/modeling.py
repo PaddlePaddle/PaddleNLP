@@ -413,7 +413,7 @@ class OPTModel(OPTPretrainedModel):
 
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
-        # breakpoint()
+
         outputs = self.decoder(
             embedding_output,
             memory=None,
