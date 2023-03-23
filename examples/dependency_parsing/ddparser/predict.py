@@ -13,21 +13,20 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
 import copy
+import os
 from functools import partial
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import AutoTokenizer, AutoModel
-from paddlenlp.datasets import load_dataset
-
-from data import create_dataloader, convert_example, load_vocab
+from data import convert_example, create_dataloader, load_vocab
 from model.dep import BiAffineParser
-from utils import decode, index_sample, flat_words
+from utils import decode, flat_words
 
-# yapf: disable
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel
+
+# fmt: off
 parser = argparse.ArgumentParser()
 # Predict
 parser.add_argument("--params_path", type=str, default='model_file/best.pdparams', required=True, help="Directory to load model parameters.")
@@ -43,7 +42,7 @@ parser.add_argument("--tree", type=bool, default=True, help="Ensure the output c
 # Lstm
 parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 @paddle.no_grad()
@@ -86,12 +85,12 @@ def batch_predict(
 def do_predict(args):
     paddle.set_device(args.device)
 
-    if args.encoding_model.startswith("ernie"):
-        tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
-    elif args.encoding_model == "lstm-pe":
-        tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-    else:
-        tokenizer = None
+    # if args.encoding_model.startswith("ernie"):
+    #     tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
+    # elif args.encoding_model == "lstm-pe":
+    #     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    # else:
+    #     tokenizer = None
 
     # Load vocabs from model file path
     vocab_dir = os.path.split(args.params_path)[0]

@@ -871,7 +871,7 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
 
         if self._is_iterable_dataset(train_dataset):
-            if self.args.world_size > 1:
+            if self.args.dataset_world_size > 1:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
@@ -933,7 +933,7 @@ class Trainer:
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
 
         if self._is_iterable_dataset(eval_dataset):
-            if self.args.world_size > 1:
+            if self.args.dataset_world_size > 1:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -973,7 +973,7 @@ class Trainer:
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
 
         if self._is_iterable_dataset(test_dataset):
-            if self.args.world_size > 1:
+            if self.args.dataset_world_size > 1:
                 test_dataset = IterableDatasetShard(
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1450,7 +1450,7 @@ class Trainer:
             paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{local_rank}.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save:
+        if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):

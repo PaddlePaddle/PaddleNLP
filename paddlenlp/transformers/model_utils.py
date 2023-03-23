@@ -105,6 +105,16 @@ def _add_variant(weights_name: str, variant=None) -> str:
     return weights_name
 
 
+@contextmanager
+def dtype_guard(dtype="float32"):
+    origin_dtype = paddle.get_default_dtype()
+    paddle.set_default_dtype(dtype)
+    try:
+        yield
+    finally:
+        paddle.set_default_dtype(origin_dtype)
+
+
 _init_weights = True
 
 
@@ -1366,6 +1376,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
+            if dtype:
+                init_contexts.append(dtype_guard(dtype))
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 

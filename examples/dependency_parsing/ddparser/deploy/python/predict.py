@@ -13,20 +13,17 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
 import copy
-from functools import partial
+import os
 
 import numpy as np
 import paddle
-from paddlenlp.data import Pad
+from data import convert_example, load_vocab
+from utils import eisner, flat_words, istree, pad_sequence
+
 from paddlenlp.datasets import load_dataset
 
-from data import create_dataloader, convert_example, load_vocab
-from utils import flat_words, pad_sequence, istree, eisner
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, help="The path to static model.")
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
@@ -35,34 +32,13 @@ parser.add_argument("--batch_size", type=int, default=64, help="Numbers of examp
 parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def batchify_fn(batch):
     raw_batch = [raw for raw in zip(*batch)]
     batch = [pad_sequence(data) for data in raw_batch]
     return batch
-
-
-def flat_words(words, pad_index=0):
-    mask = words != pad_index
-    lens = np.sum(mask.astype(int), axis=-1)
-    position = np.cumsum(lens + (lens == 0).astype(int), axis=1) - 1
-    lens = np.sum(lens, -1)
-    words = words.ravel()[np.flatnonzero(words)]
-
-    sequences = []
-    idx = 0
-    for l in lens:
-        sequences.append(words[idx : idx + l])
-        idx += l
-    words = Pad(pad_val=pad_index)(sequences)
-
-    max_len = words.shape[1]
-
-    mask = (position >= max_len).astype(int)
-    position = position * np.logical_not(mask) + mask * (max_len - 1)
-    return words, position
 
 
 def decode(s_arc, s_rel, mask, tree=True):

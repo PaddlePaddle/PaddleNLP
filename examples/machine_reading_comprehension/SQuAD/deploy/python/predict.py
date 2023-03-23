@@ -12,22 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
 import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
 from functools import partial
 
 import paddle
-from paddle import inference
-from paddle.io import DataLoader
 from datasets import load_dataset
-from paddlenlp.data import Pad, Stack, Dict
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
-from args import parse_args
-from run_squad import MODEL_CLASSES, prepare_validation_features
+from paddlenlp.data import Dict, Pad
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
+from args import parse_args  # noqa: E402
+from run_squad import MODEL_CLASSES, prepare_validation_features  # noqa: E402
 
 
 class Predictor(object):

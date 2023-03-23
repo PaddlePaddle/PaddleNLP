@@ -496,7 +496,7 @@ TASKS = {
             },
         },
         "default": {
-            "model": "pai-painter-painting-base-zh",
+            "model": "CompVis/stable-diffusion-v1-4",
         },
     },
     "document_intelligence": {

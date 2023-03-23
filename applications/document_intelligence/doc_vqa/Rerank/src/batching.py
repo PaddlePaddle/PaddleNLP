@@ -13,12 +13,7 @@
 # limitations under the License.
 """Mask, padding and batching."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
-from six.moves import xrange
 
 
 def pad_batch_data(

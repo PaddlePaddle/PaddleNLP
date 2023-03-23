@@ -1439,8 +1439,7 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 pai-painter-painting-base-zh
->>> text_to_image = Taskflow("text_to_image")
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-painting-base-zh")
 # 单条输入， 默认返回2张图片。
 >>> image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
 # [[<PIL.Image.Image image mode=RGB size=256x256>], [<PIL.Image.Image image mode=RGB size=256x256>]]
