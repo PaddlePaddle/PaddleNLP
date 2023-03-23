@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import time
 
 import numpy as np
-from tqdm import tqdm
-
-from metric import MetricReport
 from data import label2ids
+from metric import MetricReport
+from tqdm import tqdm
 
 # yapf: disable
 parser = argparse.ArgumentParser()

@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
+import os
 import subprocess
-import random
 import sys
+import time
 from collections import defaultdict
 
-from pynvml import *
+from pynvml import (
+    nvmlDeviceGetCount,
+    nvmlDeviceGetHandleByIndex,
+    nvmlDeviceGetMemoryInfo,
+    nvmlInit,
+)
 
 nvmlInit()
 
@@ -98,7 +103,7 @@ def get_cls_tasks(model_name_or_path):
 
 
 def do_task(task):
-    tmp = task.split(" ")
+    # tmp = task.split(" ")
     est = 15
     # if int(tmp[4]) * int(tmp[6]) > 32 * 128:
     #     est = 30
@@ -172,7 +177,7 @@ def main():
             else:
                 runs.append({"ps": ps, "ts": task})
 
-        print(f"> Wait for 15 seconds to start!")
+        print("> Wait for 15 seconds to start!")
         time.sleep(15)
     print("All done!")
     status = os.system(f"bash extract_result.sh {model_name_or_path}")

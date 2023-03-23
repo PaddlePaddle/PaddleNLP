@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import time
-import numpy as np
 
+import numpy as np
 from paddle_serving_client import Client
+
 from paddlenlp.transformers import AutoTokenizer
 
 

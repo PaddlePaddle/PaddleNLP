@@ -14,13 +14,14 @@
 
 import os
 import random
+
 import numpy as np
 import paddle
+from data import InputFeatures
 from paddle.io import DataLoader
 from paddle.optimizer.lr import LambdaDecay
-from paddlenlp.datasets import MapDataset
 
-from data import InputFeatures
+from paddlenlp.datasets import MapDataset
 
 
 def set_seed(seed):
@@ -43,7 +44,7 @@ def check_args(args):
 
 def convert_example(example, template, tokenizer_wrapper, verbalizer=None):
     if verbalizer is not None and hasattr(verbalizer, "wrap_one_example"):
-        exmaple = verbalizer.wrap_one_example(example)
+        example = verbalizer.wrap_one_example(example)
     example = template.wrap_one_example(example)
     encoded_inputs = InputFeatures(**tokenizer_wrapper.tokenize_one_example(example), **example[1])
     return encoded_inputs

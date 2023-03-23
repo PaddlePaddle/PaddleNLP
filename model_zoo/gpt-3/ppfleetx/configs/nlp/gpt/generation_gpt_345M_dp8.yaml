@@ -1,0 +1,24 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+Model:
+  module: GPTGenerationModule
+
+Generation:
+  top_k: 50
+  top_p: 0.75
+  temperature: 1.0
+  min_dec_len: 1
+  max_dec_len: 200
+  num_return_sequences: 1
+  decode_strategy: "sampling"
+
+Distributed:
+  dp_degree: 
+  mp_degree: 1
+  pp_degree: 1
+  sharding:
+    sharding_degree: 1
+    sharding_stage: 1
+    sharding_offload: False
+    reduce_overlap: False
+    broadcast_overlap: False

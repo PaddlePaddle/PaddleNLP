@@ -14,6 +14,7 @@
 """Utils."""
 
 from itertools import chain
+
 import numpy as np
 import paddle
 
@@ -28,7 +29,6 @@ def repeat_array(array, times):
 
 def gen_inputs(inputs, latent_type_size):
     batch_size = len(inputs["data_id"])
-    new_bsz = batch_size * latent_type_size
     inputs = {name: repeat_array(array, latent_type_size) for name, array in inputs.items()}
     # Add latent_id
     inputs["latent_id"] = np.array(

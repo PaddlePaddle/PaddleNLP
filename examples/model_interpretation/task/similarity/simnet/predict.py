@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-
 from model import SimNet
 from utils import preprocess_prediction_data
+
+from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)

@@ -193,3 +193,36 @@ class StandardConfigMappingTest(unittest.TestCase):
 
             loaded_config = FakeBertConfig.from_pretrained(tempdir)
             self.assertEqual(loaded_config.fake_field, config.hidden_size)
+
+
+class TestTensorParallelConveter(unittest.TestCase):
+    def test_qkv_convertor(self):
+        """test_qkv_convertor"""
+        hidden_size = 8
+        tensor_parallel_degree = 4
+        num_attention_heads = 4
+        # head_dim = hidden_size // num_attention_heads
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            merge_tensor_parallel_weight,
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+            tensor_parallel_qkv_to_naive_merged_qkv,
+        )
+
+        naive_merged_qkv = np.arange(3 * hidden_size * hidden_size).reshape([hidden_size, -1])
+        tensor_parallel_qkv = naive_merged_qkv_to_tensor_parallel_qkv(naive_merged_qkv, num_attention_heads)
+        new_naive_merged_qkv = tensor_parallel_qkv_to_naive_merged_qkv(tensor_parallel_qkv, num_attention_heads)
+        np.testing.assert_equal(new_naive_merged_qkv, naive_merged_qkv)
+        # print("tensor_parallel_qkv", tensor_parallel_qkv)
+        np.testing.assert_equal(
+            tensor_parallel_qkv[0],
+            [0, 1, 8, 9, 16, 17, 2, 3, 10, 11, 18, 19, 4, 5, 12, 13, 20, 21, 6, 7, 14, 15, 22, 23],
+        )
+
+        mp_qkv_splited = split_tensor_parallel_weight(tensor_parallel_qkv, tensor_parallel_degree)
+        new_tensor_parallel_qkv = merge_tensor_parallel_weight(mp_qkv_splited)
+        # print("mp_qkv_splited", mp_qkv_splited[0])
+        np.testing.assert_equal(new_tensor_parallel_qkv, tensor_parallel_qkv)
+        np.testing.assert_equal(mp_qkv_splited[0][0], [0, 1, 8, 9, 16, 17])

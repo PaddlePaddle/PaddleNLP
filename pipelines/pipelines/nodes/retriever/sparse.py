@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Union
 
 from pipelines.document_stores import BaseDocumentStore, KeywordDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
-from pipelines.schema import Document
+from pipelines.schema import ContentTypes, Document
 
 
 class BM25Retriever(BaseRetriever):
@@ -104,6 +104,7 @@ class BM25Retriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
+        query_type: ContentTypes = "text",
         filters: Optional[Dict[str, Union[Dict, List, str, int, float, bool]]] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -207,6 +208,7 @@ class BM25Retriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
+        queries_type: ContentTypes = "text",
         filters: Optional[
             Union[
                 Dict[str, Union[Dict, List, str, int, float, bool]],

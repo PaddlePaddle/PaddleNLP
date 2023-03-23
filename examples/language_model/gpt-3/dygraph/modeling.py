@@ -1097,7 +1097,7 @@ class GPTForPretrainingPipe(PipelineLayer):
         num_partitions=1,
         topology=None,
         use_recompute=False,
-        fuse=False,
+        enable_fuse_transformer=False,
     ):
 
         # forward desc
@@ -1131,7 +1131,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                     weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
                     bias_attr=None,
                     num_partitions=num_partitions,
-                    fuse=fuse,
+                    enable_fuse_transformer=enable_fuse_transformer,
                 )
             )
 

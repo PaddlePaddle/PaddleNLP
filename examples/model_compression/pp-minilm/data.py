@@ -13,10 +13,14 @@
 # limitations under the License.
 
 import numpy as np
-from paddle.metric import Metric, Accuracy
+from paddle.metric import Accuracy
 
-from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    PPMiniLMForSequenceClassification,
+    PPMiniLMTokenizer,
+)
 
 MODEL_CLASSES = {
     "ppminilm": (PPMiniLMForSequenceClassification, PPMiniLMTokenizer),
@@ -38,7 +42,6 @@ def convert_example(example, label_list, tokenizer=None, is_test=False, max_seq_
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
         # Get the label
         example["label"] = np.array(example["label"], dtype="int64")
         label = example["label"]

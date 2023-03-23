@@ -21,11 +21,14 @@ from annotator.segformer_paddle import SegformerDetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
-from ppdiffusers import StableDiffusionControlNetPipeline
+from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
 apply_uniformer = SegformerDetector()
 
-pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_seg", safety_checker=None)
+controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-seg")
+pipe = StableDiffusionControlNetPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
+)
 
 
 def process(
