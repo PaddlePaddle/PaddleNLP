@@ -260,7 +260,6 @@ class RoFormerPretrainedModel(PretrainedModel):
         mappings: List[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
             ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
@@ -337,6 +336,16 @@ class RoFormerPretrainedModel(PretrainedModel):
                 mapping[0] = "roformer." + mapping[0]
                 mapping[1] = "roformer." + mapping[1]
 
+        if "RoFormerForMaskedLM" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["cls.predictions.transform.dense.weight", "cls.predictions.transform.weight", "transpose"],
+                    ["cls.predictions.transform.dense.bias", "cls.predictions.transform.bias"],
+                    ["cls.predictions.transform.LayerNorm.weight", "cls.predictions.layer_norm.weight"],
+                    ["cls.predictions.transform.LayerNorm.bias", "cls.predictions.layer_norm.bias"],
+                    ["cls.predictions.decoder.bias", "cls.predictions.decoder_bias"],
+                ]
+            )
         # downstream mappings
         if "RoFormerForQuestionAnswering" in config.architectures:
             model_mappings.extend(
