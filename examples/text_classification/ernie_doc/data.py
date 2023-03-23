@@ -14,8 +14,10 @@
 import itertools
 import json
 from collections import namedtuple
+
 import numpy as np
 from paddle.utils import try_import
+
 from paddlenlp.transformers import tokenize_chinese_chars
 from paddlenlp.utils.log import logger
 
@@ -747,7 +749,6 @@ class MCQIterator(MRCIterator):
         Feature = namedtuple("Feature", ["qid", "src_ids", "segment_ids", "label", "cal_loss"])
         features = []
         self.features_all = []
-        pad_token_id = self.tokenizer.pad_token_id
         for (ex_index, example) in enumerate(examples):
             context_tokens = self.tokenizer.tokenize(example.context)
             question_tokens = self.tokenizer.tokenize(example.question)
@@ -911,7 +912,6 @@ class MCQIterator(MRCIterator):
             else:
                 yield self._pad_batch_records(batch_records, gather_idx)
                 batch_records, max_len = [records], max(len(record.src_ids) for record in records)
-                start_index = index - len(records) + 1
                 gather_idx = gather_idx_candidate
         if len(batch_records) > 0:
             yield self._pad_batch_records(batch_records, gather_idx)
@@ -970,7 +970,6 @@ class SemanticMatchingIterator(MRCIterator):
         )
         features = []
         self.features_all = []
-        pad_token_id = self.tokenizer.pad_token_id
         for (ex_index, example) in enumerate(examples):
             text_a_tokens = self.tokenizer.tokenize(example.text_a)
             text_b_tokens = self.tokenizer.tokenize(example.text_b)

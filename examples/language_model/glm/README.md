@@ -14,7 +14,7 @@
 ### CNN DailyMail 任务 Fine-tuning：
 
 ```
-python -m paddle.distributed.launch --gpus "0,1,2,3" run_train.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --model_name_or_path THUDM/glm-2b \
 --num_train_epochs 4 \
 --learning_rate 3e-5 \

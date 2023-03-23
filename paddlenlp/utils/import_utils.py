@@ -25,6 +25,12 @@ import pip
 from paddlenlp.utils.log import logger
 
 
+def is_datasets_available():
+    import importlib
+
+    return importlib.util.find_spec("datasets") is not None
+
+
 def is_paddle_cuda_available() -> bool:
     if is_paddle_available():
         import paddle

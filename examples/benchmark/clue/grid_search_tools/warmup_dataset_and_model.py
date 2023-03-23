@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import os
+import sys
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
@@ -25,7 +26,7 @@ for task in ["afqmc", "tnews", "iflytek", "ocnli", "cmnli", "cluewsc2020", "csl"
     load_dataset("clue", task, splits=("train", "dev", "test"))
 
 # Downloads HF dataset
-from datasets import load_dataset
+from datasets import load_dataset  # noqa: E402
 
 load_dataset("clue", "chid")
 load_dataset("clue", "cmrc2018")

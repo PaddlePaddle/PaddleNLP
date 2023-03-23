@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import sys
-import time
+
 import faiss
-import math
 import numpy as np
 
 
