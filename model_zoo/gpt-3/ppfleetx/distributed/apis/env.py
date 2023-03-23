@@ -90,7 +90,7 @@ def init_dist_env(config):
     paddle.set_device(config.Global.device)
 
     strategy = fleet.DistributedStrategy()
-    if config.Distributed.mp_degree == 1 and config.Distributed.sharding_degree == 1:
+    if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
         order = ["pp", "dp", "sharding", "mp"]
     else:
         order = ["dp", "pp", "sharding", "mp"]
