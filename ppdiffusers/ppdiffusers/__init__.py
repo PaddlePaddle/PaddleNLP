@@ -15,7 +15,7 @@
 # flake8: noqa
 
 
-from . import ppnlp_patch_utils
+from . import ppnlp_patch_utils, webui_lora_helper
 from .configuration_utils import ConfigMixin
 from .utils import (
     OptionalDependencyNotAvailable,
@@ -28,6 +28,7 @@ from .utils import (
     is_paddle_version,
     is_paddlenlp_available,
     is_paddlenlp_version,
+    is_ppxformers_available,
     is_safetensors_available,
     is_scipy_available,
     is_torch_available,

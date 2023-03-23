@@ -50,6 +50,7 @@ from ppdiffusers import (
     DiffusionPipeline,
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.loaders import AttnProcsLayers
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
@@ -400,6 +401,9 @@ def parse_args(input_args=None):
         choices=["tensorboard", "visualdl"],
         help="Log writer type.",
     )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -570,6 +574,14 @@ def main():
                 args.pretrained_model_name_or_path,
                 safety_checker=None,
             )
+            if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+                try:
+                    pipeline.unet.enable_xformers_memory_efficient_attention()
+                except Exception as e:
+                    logger.warn(
+                        "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                        f" correctly and a GPU is available: {e}"
+                    )
             pipeline.set_progress_bar_config(disable=True)
 
             num_new_images = args.num_class_images - cur_class_images
@@ -662,6 +674,15 @@ def main():
 
     unet.set_attn_processor(lora_attn_procs)
     lora_layers = AttnProcsLayers(unet.attn_processors)
+
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
 
     # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(

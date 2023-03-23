@@ -47,6 +47,7 @@ from ppdiffusers import (
     DiffusionPipeline,
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import freeze_params, unfreeze_params, unwrap_model
@@ -316,6 +317,9 @@ def parse_args():
             " `args.validation_prompt` multiple times: `args.num_validation_images`"
             " and logging the images."
         ),
+    )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
     args = parser.parse_args()
 
@@ -631,6 +635,15 @@ def main():
         unet.enable_gradient_checkpointing()
         set_recompute(text_encoder, True)
 
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
+
     train_dataset = TextualInversionDataset(
         data_root=args.train_data_dir,
         tokenizer=tokenizer,
@@ -699,7 +712,6 @@ def main():
 
     if num_processes > 1:
         text_encoder = paddle.DataParallel(text_encoder)
-        # unet = paddle.DataParallel(unet)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")

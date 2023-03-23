@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Inc. team.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #

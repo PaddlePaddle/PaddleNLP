@@ -29,6 +29,7 @@ from ppdiffusers import (
     DDPMScheduler,
     LDMBertModel,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.initializer import reset_initialized_parameter
 from ppdiffusers.models.ema import LitEma
@@ -120,6 +121,16 @@ class ControlNet(nn.Layer):
             self.model_ema = LitEma(self.controlnet)
         self.control_scales = [1.0] * 13
         self.only_mid_control = model_args.only_mid_control
+
+        if model_args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+            try:
+                self.unet.enable_xformers_memory_efficient_attention()
+                self.controlnet.enable_xformers_memory_efficient_attention()
+            except Exception as e:
+                logger.warn(
+                    "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                    f" correctly and a GPU is available: {e}"
+                )
 
     @contextlib.contextmanager
     def ema_scope(self, context=None):

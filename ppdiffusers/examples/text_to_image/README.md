@@ -73,6 +73,7 @@ python -u train_text_to_image.py \
 > * `--resolution`: 输入给模型图片的`分辨率`，当`高度`或`宽度`为`None`时，我们将会使用`resolution`，默认值为`512`。
 > * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`sd-pokemon-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。

@@ -47,6 +47,7 @@ from ppdiffusers import (
     DiffusionPipeline,
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.loaders import AttnProcsLayers
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
@@ -371,6 +372,9 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--report_to", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -493,6 +497,15 @@ def main():
 
     unet.set_attn_processor(lora_attn_procs)
     lora_layers = AttnProcsLayers(unet.attn_processors)
+
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).

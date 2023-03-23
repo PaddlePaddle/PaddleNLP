@@ -45,6 +45,7 @@ from ppdiffusers import (
     DDPMScheduler,
     DiffusionPipeline,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import (
@@ -444,8 +445,14 @@ def main():
         if args.train_text_encoder:
             set_recompute(text_encoder, True)
 
-    if args.enable_xformers_memory_efficient_attention:
-        unet.enable_xformers_memory_efficient_attention()
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).

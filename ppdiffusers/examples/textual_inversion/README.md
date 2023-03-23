@@ -60,6 +60,7 @@ python -u train_textual_inversion.py \
 > * `--max_train_steps`: 最大的训练步数，当我们设置这个值后，它会重新计算所需的`num_train_epochs`轮数。
 > * `--save_steps`: 每间隔多少步`（global step步数）`，保存学习到的文件`learned_embeds.pdparams`。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
 > 可以修改的参数
 > * `--language`: 模型的语言，`zh`、`en`或`zh_en`，当我们使用中文模型时候，请设置成`zh`。
