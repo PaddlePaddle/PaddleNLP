@@ -40,7 +40,7 @@ paddlenlp.utils.serialization.load_torch = load_torch
 paddlenlp.transformers.conversion_utils.load_torch = load_torch
 
 
-class TestCkptShard(unittest.TestCase):
+class TestGLM(unittest.TestCase):
     def testTorchGLM(self):
         from transformers import AutoModel
 
@@ -107,6 +107,6 @@ class TestCkptShard(unittest.TestCase):
         model.eval()
 
 
-class TestGLM(TestMultipleGpus):
-    def testGlmMP(self):
+class TestGLMTensorParallel(TestMultipleGpus):
+    def testPaddleTensorParallelGLM(self):
         self.run_2gpu("glm_mp.py")
