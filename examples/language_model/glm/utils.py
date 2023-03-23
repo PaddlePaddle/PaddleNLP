@@ -51,14 +51,17 @@ class GLMTrainer(Trainer):
                 position_ids=inputs["position_ids"],
                 attention_mask=inputs["attention_mask"],
             )[0]
-            all_preds = tokens.tolist()
+            all_preds = []
+            for pred_tokens in tokens:
+                all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
             max_pred_length = max([len(x) for x in all_preds])
             for index, preds in enumerate(all_preds):
                 all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
 
             all_labels = []
-            for label, mask in zip(inputs["labels"].numpy(), inputs["attention_mask"].numpy()):
-                label = [x for x in label[mask.astype("bool")][0]]
+            for label, mask in zip(inputs["labels"].numpy(), inputs["loss_mask"].numpy()):
+                label = label[mask.astype("bool")]
+                label = [x for x in label[label != self.tokenizer.pad_token_id]]
                 all_labels.append(label)
             max_label_length = max([len(x) for x in all_labels])
             for index, labels in enumerate(all_labels):

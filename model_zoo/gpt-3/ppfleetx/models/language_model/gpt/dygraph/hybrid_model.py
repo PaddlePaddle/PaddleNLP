@@ -17,9 +17,6 @@
 import collections
 import logging
 import math
-import os
-import sys
-from distutils.util import strtobool
 
 import numpy as np
 import paddle
@@ -62,6 +59,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 
 
 def get_attr(layer, name):
@@ -76,7 +74,6 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
     hcg = env.get_hcg()
     model_parallel_group = hcg.get_model_parallel_group()
     world_size = hcg.get_model_parallel_world_size()
-    rank = hcg.get_model_parallel_rank()
 
     if world_size > 1:
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
@@ -573,8 +570,9 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+        self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
+        self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
+
         self.activation = getattr(F, activation)
 
     def forward(self, tgt, memory=None, tgt_mask=None, use_cache=False, cache=None):
@@ -597,7 +595,7 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = residual + self.dropout1(tgt)
+            tgt = self.fused_dropout_add1(tgt, residual)
 
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -607,9 +605,7 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.dropout2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
-
-        tgt = residual + tgt
+            tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
@@ -1461,8 +1457,6 @@ class GPTForGenerationHybrid(nn.Layer):
         repetition_penalty = self.repetition_penalty
         num_beams = self.num_beams
         num_beam_groups = self.num_beam_groups
-        length_penalty = self.length_penalty
-        early_stopping = self.early_stopping
         bos_token_id = self.bos_token_id
         eos_token_id = self.eos_token_id
         pad_token_id = self.pad_token_id
@@ -1544,7 +1538,7 @@ class GPTForGenerationHybrid(nn.Layer):
                 **model_kwargs,
             )
         else:
-            raise ValueError(f"Not support {decoding_strategy} strategy yet!")
+            raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
 
 

@@ -13,165 +13,154 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
-import time
+from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-from utils import create_dataloader, evaluate, load_ds_xnli, set_seed
+from paddle.metric import Accuracy
+from utils import load_ds_xnli
 
-from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.data import Pad, Stack
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments, set_seed
 from paddlenlp.transformers import (
     ChineseBertForSequenceClassification,
     ChineseBertTokenizer,
-    LinearDecayWithWarmup,
 )
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--save_dir",
-    default="outputs/xnli",
-    type=str,
-    help="The output directory where the model checkpoints will be written.",
-)
-parser.add_argument(
-    "--max_seq_length",
-    default=256,
-    type=int,
-    help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.",
-)
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=1.5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0001, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=5, type=int, help="Total number of training epochs to perform.")
-parser.add_argument(
-    "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over the training process."
-)
-parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed", type=int, default=2333, help="random seed for initialization")
-parser.add_argument(
-    "--device",
-    choices=["cpu", "gpu", "xpu"],
-    default="gpu",
-    help="Select which device to train model, defaults to gpu.",
-)
-parser.add_argument("--data_path", type=str, default="./data/XNLI", help="The path of datasets to be loaded")
-parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-args = parser.parse_args()
 
-paddle.set_device(args.device)
-set_seed(args.seed)
-
-data_dir = args.data_path
-train_path = os.path.join(data_dir, "train.tsv")
-dev_path = os.path.join(data_dir, "dev.tsv")
-test_path = os.path.join(data_dir, "test.tsv")
-
-train_ds, dev_ds, test_ds = load_ds_xnli(datafiles=[train_path, dev_path, test_path])
-model = ChineseBertForSequenceClassification.from_pretrained("ChineseBERT-large", num_classes=3)
-tokenizer = ChineseBertTokenizer.from_pretrained("ChineseBERT-large")
-
-print(" | load pretrained model state sucessfully.")
-# model = paddle.DataParallel(model)
-idx = 1
+@dataclass
+class ModelArguments:
+    max_seq_length: Optional[int] = field(
+        default=512,
+        metadata={
+            "help": (
+                "The maximum total input sequence length after tokenization. "
+                "Sequences longer than this will be truncated, sequences shorter will be padded."
+            )
+        },
+    )
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
+@dataclass
+class DataArguments:
+    data_path: Optional[str] = field(
+        default="./data",
+        metadata={"help": "The path of datasets to be loaded."},
+    )
+
+
+def convert_example(example, tokenizer, max_length=512, is_test=False):
 
     label_map = {"contradictory": 0, "contradiction": 0, "entailment": 2, "neutral": 1}
     first, second, third = example["sentence1"], example["sentence2"], example["label"]
 
-    encoded_inputs = tokenizer(first, second, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(first, second, max_length=max_length)
     input_ids = encoded_inputs["input_ids"]
     pinyin_ids = encoded_inputs["pinyin_ids"]
 
     label = np.array([label_map[third]], dtype="int64")
-    assert len(input_ids) <= max_seq_length
+    assert len(input_ids) <= max_length
     return input_ids, pinyin_ids, label
 
 
-# Process the data into a data format that the model can read in.
-trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
+@dataclass
+class DataCollator:
+    tokenizer: ChineseBertTokenizer
 
-# Form data into batch data, such as padding text sequences of different lengths into the maximum length of batch data,
-# and stack each data label together
-batchify_fn = lambda samples, fn=Tuple(
-    Pad(axis=0, pad_val=tokenizer.pad_token_id), Pad(axis=0, pad_val=0), Stack()  # input_ids  # pinyin_ids  # labels
-): [data for data in fn(samples)]
+    def __call__(self, features):
+        input_ids = []
+        pinyin_ids = []
+        labels = []
+        batch = {}
 
-train_data_loader = create_dataloader(
-    train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
-)
+        for feature in features:
+            input_idx, pinyin_idx, label = feature
+            input_ids.append(input_idx)
+            pinyin_ids.append(pinyin_idx)
+            labels.append(label)
 
-dev_data_loader = create_dataloader(
-    dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
-)
+        input_ids = (Pad(axis=0, pad_val=self.tokenizer.pad_token_id)(input_ids),)  # input_ids
+        pinyin_ids = (Pad(axis=0, pad_val=0)(pinyin_ids),)  # pinyin_ids
+        labels = (Stack()(labels),)  # labels
 
-test_data_loader = create_dataloader(
-    test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
-)
+        batch["input_ids"] = input_ids[0]
+        batch["pinyin_ids"] = pinyin_ids[0]
+        batch["labels"] = labels[0]
 
-num_training_steps = len(train_data_loader) * args.epochs
+        return batch
 
-lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
-# Generate parameter names needed to perform weight decay.
-# All bias and LayerNorm parameters are excluded.
-decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+def compute_metrics(eval_preds):
+    labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
+    preds = paddle.to_tensor(eval_preds.predictions)
+    preds = paddle.nn.functional.softmax(preds, axis=-1)
+    labels = paddle.argmax(labels, axis=-1)
+    metric = Accuracy()
+    correct = metric.compute(preds, labels)
+    metric.update(correct)
+    acc = metric.accumulate()
+    return {"accuracy": acc}
 
-optimizer = paddle.optimizer.AdamW(
-    beta1=0.9,
-    beta2=0.98,
-    learning_rate=lr_scheduler,
-    epsilon=args.adam_epsilon,
-    parameters=model.parameters(),
-    weight_decay=args.weight_decay,
-    apply_decay_param_fun=lambda x: x in decay_params,
-)
 
-# cross-entropy cost function
-criterion = paddle.nn.loss.CrossEntropyLoss()
-# accuracy metric
-metric = paddle.metric.Accuracy()
-print(args)
-# train
-global_step = 0
-tic_train = time.time()
-for epoch in range(1, args.epochs + 1):
-    for step, batch in enumerate(train_data_loader, start=1):
-        input_ids, pinyin_ids, labels = batch
-        batch_size, length = input_ids.shape
-        pinyin_ids = paddle.reshape(pinyin_ids, [batch_size, length, 8])
-        logits = model(input_ids, pinyin_ids)
-        loss = criterion(logits, labels)
-        probs = F.softmax(logits, axis=1)
-        correct = metric.compute(probs, labels)
-        metric.update(correct)
-        acc = metric.accumulate()
+def do_train():
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-        global_step += 1
-        if global_step % 10 == 0:
-            print(
-                "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                % (global_step, epoch, step, loss, acc, 10 / (time.time() - tic_train))
-            )
-            tic_train = time.time()
+    paddle.set_device(training_args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
-        loss.backward()
-        optimizer.step()
-        lr_scheduler.step()
-        optimizer.clear_grad()
+    set_seed(training_args.seed)
 
-        if global_step % 100 == 0:
-            dev_acc = evaluate(model, criterion, metric, dev_data_loader)
-            test_acc = evaluate(model, criterion, metric, test_data_loader)
-            if test_acc >= 0.816:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                    model.save_pretrained(save_dir)
-                    tokenizer.save_pretrained(save_dir)
+    data_dir = data_args.data_path
+    train_path = os.path.join(data_dir, "train.tsv")
+    dev_path = os.path.join(data_dir, "dev.tsv")
+    test_path = os.path.join(data_dir, "test.tsv")
+
+    train_ds, dev_ds, test_ds = load_ds_xnli(datafiles=[train_path, dev_path, test_path])
+
+    model = ChineseBertForSequenceClassification.from_pretrained("ChineseBERT-large", num_classes=3)
+    tokenizer = ChineseBertTokenizer.from_pretrained("ChineseBERT-large")
+
+    print(" | load pretrained model state sucessfully.")
+
+    # Process the data into a data format that the model can read in.
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_length=model_args.max_seq_length)
+    train_ds = train_ds.map(trans_func, lazy=False)
+    dev_ds = dev_ds.map(trans_func, lazy=False)
+    test_ds = test_ds.map(trans_func, lazy=False)
+
+    # Form data into batch data, such as padding text sequences of different lengths into the maximum length of batch data,
+    # and stack each data label together
+    batchify_fn = DataCollator(tokenizer)
+    criterion = paddle.nn.loss.CrossEntropyLoss()
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds if training_args.do_train else None,
+        eval_dataset=dev_ds if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        data_collator=batchify_fn,
+        criterion=criterion,
+        compute_metrics=compute_metrics,
+    )
+
+    if training_args.do_train:
+        train_results = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        metrics = train_results.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+
+
+if __name__ == "__main__":
+    do_train()

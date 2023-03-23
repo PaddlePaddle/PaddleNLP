@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
-import sys
-import time
-from tokenize import group
 
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
-import paddleslim
 from paddle.distributed.fleet.meta_parallel import TensorParallel
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -30,7 +25,6 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.distributed.parallel import sync_params_buffers
 from paddle.distributed.sharding import group_sharded_parallel
 from paddle.incubate.distributed.utils.io import save_for_auto_inference
-from paddle.optimizer.lr import LRScheduler
 from paddle.profiler import SummaryView
 from ppfleetx.core.engine import BasicEngine, InferenceEngine, TensorRTConfig
 from ppfleetx.core.module import BasicModule
@@ -454,7 +448,6 @@ class EagerEngine(BasicEngine):
                     try:
                         fused_allreduce_gradients(list(self._module.model.parameters()), None)
                     except:
-                        m = self._module.model.state_dict()
                         fused_allreduce_gradients(list(self._module.model.parameters()), None)
                 else:
                     all_reduce_parameters(self._optimizer.all_fused_tensors, self._dp_group)

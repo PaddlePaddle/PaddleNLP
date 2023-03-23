@@ -607,7 +607,7 @@ def do_train(args):
                             res[k] = sum(loss_res[k]) / len(loss_res[k]) / worker_num
                             loss_res[k] = []
                         else:
-                            res[k] = v[0]
+                            res[k] = v
 
                     speed = args.logging_freq / (time.time() - tic_train)
                     res["global_step"] = global_step

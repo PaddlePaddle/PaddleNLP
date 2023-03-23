@@ -16,7 +16,6 @@ import json
 import math
 import os
 import re
-import sys
 import time
 
 import numpy as np
@@ -26,7 +25,7 @@ from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
 
 # TODO(haohongxiang): to solve the problem of cross-reference
-import paddlenlp
+import paddlenlp  # noqa: F401
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
 
 mode_to_index = {"Train": 0, "Eval": 1, "Test": 2}
@@ -49,7 +48,7 @@ class GPTDataset(paddle.io.Dataset):
         if local_rank == 0:
             try:
                 import ppfleetx.data.data_tools.cpp.fast_index_map_helpers
-            except Exception as e:
+            except Exception:
                 start_time = time.time()
                 print("> compiling dataset index builder ...")
                 from ppfleetx.data.data_tools.cpp.compile import compile_helper
@@ -66,10 +65,10 @@ class GPTDataset(paddle.io.Dataset):
         if device_world_size > 1 and local_rank != 0:
             while True:
                 try:
-                    import ppfleetx.data.data_tools.cpp.fast_index_map_helpers
+                    import ppfleetx.data.data_tools.cpp.fast_index_map_helpers  # noqa: F401, F811
 
                     break
-                except Exception as e:
+                except Exception:
                     print("> wait for helpers to be compiled!")
                     time.sleep(1)
 
@@ -364,7 +363,7 @@ def construct_samples_and_shuffle_data(
                 try:
                     np.load(shuffle_idx_filename, allow_pickle=True, mmap_mode="r")
                     break
-                except Exception as e:
+                except Exception:
                     print("%s file is still writing or damaged, please wait a moment." % shuffle_idx_filename)
                     time.sleep(3)
 

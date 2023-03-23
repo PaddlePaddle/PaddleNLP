@@ -14,17 +14,12 @@
 
 from __future__ import absolute_import, division, print_function
 
-import argparse
 import copy
-import os
-import sys
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
 import ppfleetx.models.language_model.gpt as gpt
 from paddle import LazyGuard
-from paddle.distributed.fleet import auto
 from paddle.static import InputSpec
 from ppfleetx.core.module.basic_module import BasicModule
 from ppfleetx.data.tokenizers import GPTTokenizer

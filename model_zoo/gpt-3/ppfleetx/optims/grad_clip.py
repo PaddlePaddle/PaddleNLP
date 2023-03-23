@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# flake8: noqa
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed import collective

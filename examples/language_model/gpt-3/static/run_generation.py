@@ -1,3 +1,5 @@
+# flake8: noqa
+# isort: skip_file
 #   Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
 import os
 import sys
 import random
-import math
-import time
 import numpy as np
 
 os.path.expandvars("$HOME")
@@ -31,21 +30,18 @@ import paddle
 import paddle.distributed.fleet as fleet
 
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.ops import guard, Topology, get_rng_state_tracker
+from paddlenlp.ops import Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
-import paddlenlp.ops as ops
 
-from paddle.distributed import init_parallel_env
 from paddle.static.amp import AutoMixedPrecisionLists
 
-from modeling import GPTModel, GPTForPretraining, GPTForGeneration
+from modeling import GPTModel, GPTForGeneration
 
 # Used to load the data_tools path, should import before dataset
 filepath = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(filepath, "../../"))
 from dataset import create_pretrained_dataset
 from args import parse_args
-import lr
 
 MODEL_CLASSES = {
     "gpt": (GPTForGeneration, GPTTokenizer),
