@@ -42,6 +42,7 @@ from .import_utils import (
 )
 from .logging import get_logger
 from .outputs import BaseOutput
+from .paddle_utils import rand_tensor, randint_tensor, randn_tensor
 from .pil_utils import PIL_INTERPOLATION
 
 if is_paddle_available():

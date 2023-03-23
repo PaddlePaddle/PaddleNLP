@@ -41,8 +41,10 @@ else:
     from .initializer import *
     from .modeling_utils import ModelMixin
     from .models import (
+        Adapter,
         AutoencoderKL,
         ControlNetModel,
+        MultiAdapter,
         PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
@@ -115,6 +117,7 @@ else:
         LDMBertModel,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
+        StableDiffusionAdapterPipeline,
         StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,

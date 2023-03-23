@@ -492,26 +492,37 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         sample = self.conv_in(sample)
 
         # 3. down
+        is_controlnet = mid_block_additional_residual is not None and down_block_additional_residuals is not None
+        is_adapter = mid_block_additional_residual is None and down_block_additional_residuals is not None
+
         down_block_res_samples = (sample,)
         if self.resnet_pre_temb_non_linearity:
             down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
         else:
             down_nonlinear_temb = emb
-        for downsample_block in self.down_blocks:
+        for idx, downsample_block in enumerate(self.down_blocks):
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
+                additional_kwargs = {}
+                if is_adapter and idx < len(down_block_additional_residuals):
+                    additional_kwargs["additional_residuals"] = down_block_additional_residuals[idx]
+
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
                     temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
+                    **additional_kwargs,
                 )
             else:
                 sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
 
+                if is_adapter and idx < len(down_block_additional_residuals):
+                    sample += down_block_additional_residuals[idx]
+
             down_block_res_samples += res_samples
 
-        if down_block_additional_residuals is not None:
+        if is_controlnet:
             new_down_block_res_samples = ()
 
             for down_block_res_sample, down_block_additional_residual in zip(
@@ -531,7 +542,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             cross_attention_kwargs=cross_attention_kwargs,
         )
 
-        if mid_block_additional_residual is not None:
+        if is_controlnet:
             sample += mid_block_additional_residual
 
         # 5. up
