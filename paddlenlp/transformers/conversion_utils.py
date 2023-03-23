@@ -936,9 +936,6 @@ class ConversionMixin:
             input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
-        # if config is None:
-        #     config = self.config
-
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
 

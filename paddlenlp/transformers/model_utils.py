@@ -1131,9 +1131,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
             assert is_url(community_model_file_path)
 
-        # check wether the target file exist in the comunity bos server
-        if url_file_exists(community_model_file_path):
-            return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
+            # check wether the target file exist in the comunity bos server
+            if url_file_exists(community_model_file_path):
+                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
         # 5. Final ERROR
         logger.warning(
