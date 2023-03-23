@@ -101,7 +101,7 @@ class MultiModalRetriever(BaseRetriever):
     def retrieve(  # type: ignore
         self,
         query: Any,
-        query_type: ContentTypes = "text",
+        query_type: Optional[ContentTypes] = None,
         filters: Optional[FilterType] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -140,7 +140,7 @@ class MultiModalRetriever(BaseRetriever):
     def retrieve_batch(  # type: ignore
         self,
         queries: List[Any],
-        queries_type: ContentTypes = "text",
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[Union[FilterType, List[Optional[FilterType]]]] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
