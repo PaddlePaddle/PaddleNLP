@@ -822,7 +822,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
 
     def __init__(self, config: RoFormerConfig):
         super().__init__(config)
-        self.roformer = RoFormerConfig(config)
+        self.roformer = RoFormerModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob

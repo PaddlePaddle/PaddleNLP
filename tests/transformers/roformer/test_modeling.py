@@ -202,6 +202,8 @@ class RoFormerModelTester:
             end_positions=sequence_labels,
             return_dict=self.parent.return_dict,
         )
+        if sequence_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
