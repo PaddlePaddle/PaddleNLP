@@ -19,6 +19,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.fluid.dygraph.base import in_declarative_mode
 
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
@@ -93,7 +94,7 @@ class ErnieEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
