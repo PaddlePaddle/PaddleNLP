@@ -716,7 +716,7 @@ time (
     --batch_size 128 \
     --model_name bert-base-uncased \
     --output_dir distilled_models/SST-2 \
-    --teacher_dir ./SST-2/sst-2_ft_model_1.pdparams \
+    --teacher_dir ./SST-2/sst-2_ft_model_1.pdparams/ \
     --save_steps 1000 \
     --n_iter 1 \
     --embedding_name w2v.google_news.target.word-word.dim300.en >${log_path}/distilbert_teacher_train) >>${log_path}/distilbert_teacher_train 2>&1
