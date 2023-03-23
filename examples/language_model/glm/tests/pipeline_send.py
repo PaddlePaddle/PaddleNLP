@@ -91,22 +91,23 @@ def dtype_byte_size(dtype):
     return bit_size // 8
 
 
-def distributed_gather(tensor: Any, dst: int = 0, offload=False) -> Any:
+def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> Any:
     try:
         if isinstance(tensor, (tuple, list)):
-            return type(tensor)(distributed_gather(t, dst, offload) for t in tensor)
+            return type(tensor)(distributed_gather(t, dst, group, offload) for t in tensor)
         if isinstance(tensor, dict):
-            return {k: distributed_gather(v, dst, offload) for k, v in tensor.items()}
+            return {k: distributed_gather(v, dst, group, offload) for k, v in tensor.items()}
 
         output_tensors = None
-        is_dst = dst == distributed.get_rank()
+
+        is_dst = dst == distributed.get_rank(group=group)
         if is_dst:
             if offload:
-                output_tensors = [[] for _ in range(distributed.get_world_size())]
+                output_tensors = [[] for _ in range(distributed.get_world_size(group=group))]
                 # with device_guard("cpu"):
                 #     output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size())]
             else:
-                output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size())]
+                output_tensors = [paddle.empty_like(tensor) for _ in range(distributed.get_world_size(group=group))]
                 # for scalar tensor ?
                 output_tensors = [t if len(t.shape) > 0 else t[None] for t in output_tensors]
 
@@ -120,11 +121,11 @@ def distributed_gather(tensor: Any, dst: int = 0, offload=False) -> Any:
             for slice_tensor, index in reduce_tensor(tensor):
                 # paddle.empty_like(slice_tensor)
                 slice_output_tensors = None
-                if distributed.get_rank() == dst:
+                if distributed.get_rank(group=group) == dst:
                     slice_output_tensors = [
-                        paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size())
+                        paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size(group=group))
                     ]
-                dist_gather(slice_tensor, slice_output_tensors, dst=dst)
+                dist_gather(slice_tensor, slice_output_tensors, dst=dst, group=group)
 
                 if is_dst:
                     for i in range(len(output_tensors)):
@@ -221,8 +222,8 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
         _type_: _description_
     """
 
-    rank = distributed.get_rank()
-    nranks = distributed.get_world_size()
+    rank = distributed.get_rank(group=group)
+    nranks = distributed.get_world_size(group=group)
     task_list = []
     with _with_batch_p2p_guard("NCCL"):
         if rank == dst:
@@ -230,7 +231,7 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
                 wait = paddle.distributed.communication.stream.recv(
                     gather_list[src],
                     src=src,
-                    group=None,
+                    group=group,
                     sync_op=False,
                     use_calc_stream=False,
                 )
@@ -238,7 +239,7 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
         wait = paddle.distributed.communication.stream.send(
             tensor,
             dst=dst,
-            group=None,
+            group=group,
             sync_op=False,
             use_calc_stream=False,
         )

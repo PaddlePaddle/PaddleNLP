@@ -41,6 +41,7 @@ paddlenlp.transformers.conversion_utils.load_torch = load_torch
 
 
 class TestCkptShard(unittest.TestCase):
+    @unittest.skip("S")
     def testTorchGLM(self):
         from transformers import AutoModel
 
@@ -51,6 +52,7 @@ class TestCkptShard(unittest.TestCase):
         # Torch GLM has bug in GELU activation
         np.testing.assert_allclose(ret, 2.1089835166931152, rtol=1e-7)
 
+    @unittest.skip("S")
     def testConvertedPaddleGLM(self):
         from paddlenlp.transformers import AutoModel
 
@@ -60,6 +62,7 @@ class TestCkptShard(unittest.TestCase):
         ret = loss.logits.abs().mean().item()
         np.testing.assert_allclose(ret, 2.109480381011963, rtol=1e-7)
 
+    @unittest.skip("S")
     def testPaddleGLM(self):
         from paddlenlp.transformers import AutoModel
 

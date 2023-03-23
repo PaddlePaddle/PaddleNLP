@@ -47,6 +47,7 @@ from tqdm.auto import tqdm
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils import device_guard
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
@@ -104,19 +105,6 @@ CONFIG_NAME = "model_config.json"
 
 if is_datasets_available():
     import datasets
-
-
-@contextlib.contextmanager
-def device_guard(device="cpu", dev_id=0):
-    origin_device = paddle.device.get_device()
-    if device == "cpu":
-        paddle.set_device(device)
-    elif device in ["gpu", "xpu", "npu"]:
-        paddle.set_device("{}:{}".format(device, dev_id))
-    try:
-        yield
-    finally:
-        paddle.set_device(origin_device)
 
 
 def paddlenlp_load(path, return_numpy=False):

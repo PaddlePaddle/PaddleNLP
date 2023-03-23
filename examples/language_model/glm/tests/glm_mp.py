@@ -39,7 +39,7 @@ model = GLMModel.from_pretrained(
     "THUDM/glm-large-chinese",
     tensor_parallel_degree=tensor_parallel_degree,
     tensor_parallel_rank=tensor_parallel_rank,
-    # dtype="float16",
+    dtype="float16",
     low_cpu_mem_usage=True,
 )
 
@@ -47,3 +47,6 @@ model.eval()
 ret = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
 
 print("paddle mp", ret.logits.abs().mean().item())
+
+
+model.save_pretrained(save_dir="tmp_for_tp", merge_tensor_parallel=True)

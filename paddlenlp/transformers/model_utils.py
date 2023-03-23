@@ -812,7 +812,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with io.open(model_config_file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
-    def save_pretrained(self, save_dir: str):
+    def save_pretrained(self, save_dir: str, *args, **kwargs):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -836,7 +836,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
         if self.constructed_from_pretrained_config():
-            return self.save_pretrained_v2(save_dir)
+            return self.save_pretrained_v2(save_dir, *args, **kwargs)
 
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
@@ -1357,7 +1357,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
         init_contexts = []
         if low_cpu_mem_usage:
@@ -1413,7 +1413,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # 4. loading the state dict
             if config.tensor_parallel_degree > 1:
                 if model_weight_file.endswith("model_state.pdparams"):
-                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
+                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
             else:
                 model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
@@ -1481,7 +1481,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model, model_state_dict
 
-    def save_pretrained_v2(self, save_dir: str):
+    def save_pretrained_v2(self, save_dir: str, *args, **kwargs):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -1507,6 +1507,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
+        merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+
         # 1. retrieve the model related config
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
@@ -1515,14 +1517,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        # Attach architecture to the config
-        model_to_save.config.architectures = [model_to_save.__class__.__name__]
+        state_dict_to_save = None
+        config_to_save = model_to_save.config
+        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
+            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+            config_to_save.tensor_parallel_degree = 1
+            if config_to_save.tensor_parallel_rank != 0:
+                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                return
+        else:
+            state_dict_to_save = self.state_dict()
 
-        model_to_save.config.save_pretrained(save_dir)
+        # Attach architecture to the config
+        config_to_save.architectures = [model_to_save.__class__.__name__]
+        config_to_save.save_pretrained(save_dir)
 
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(save_dir, self.resource_files_names["model_state"])
-            paddle.save(self.state_dict(), file_name)
+            paddle.save(state_dict_to_save, file_name)
+            del model_to_save
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")
