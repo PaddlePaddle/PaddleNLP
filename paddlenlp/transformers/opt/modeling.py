@@ -394,9 +394,8 @@ class OPTModel(OPTPretrainedModel):
         )
 
         # TODO, use registered buffer
-        causal_mask = None
-        if input_shape[-1] > 1:
-            causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
+        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
+        if past_key_values_length > 0:
             causal_mask = paddle.concat(
                 [
                     paddle.zeros([input_shape[-1], past_key_values_length], dtype=causal_mask.dtype),
@@ -408,12 +407,13 @@ class OPTModel(OPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
+            attention_mask = attention_mask + causal_mask
+        else:
+            attention_mask = causal_mask
 
-            attention_mask = attention_mask if causal_mask is None else attention_mask + causal_mask
-
-            # The tensor returned by triu not in static graph.
-            attention_mask.stop_gradient = True
-
+        # The tensor returned by triu not in static graph.
+        attention_mask.stop_gradient = True
+        # breakpoint()
         outputs = self.decoder(
             embedding_output,
             memory=None,
@@ -464,7 +464,7 @@ class OPTLMHead(Layer):
     def forward(self, hidden_states):
         if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
             hidden_states = hidden_states["last_hidden_state"]
-        # breakpoint()
+
         logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
