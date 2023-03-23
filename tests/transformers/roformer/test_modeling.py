@@ -22,6 +22,7 @@ from paddle import Tensor
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    RoFormerConfig,
     RoFormerForMaskedLM,
     RoFormerForMultipleChoice,
     RoFormerForQuestionAnswering,
@@ -120,13 +121,8 @@ class RoFormerModelTester:
         config = self.get_config()
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-    def get_config(self) -> dict:
-        return self.config.model_kwargs
-
-    def __getattr__(self, key: str):
-        if not hasattr(self.config, key):
-            raise AttributeError(f"attribute <{key}> not exist")
-        return getattr(self.config, key)
+    def get_config(self) -> RoFormerConfig:
+        return RoFormerConfig(**self.config.model_kwargs)
 
     def create_and_check_model(
         self,
@@ -138,7 +134,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerModel(**config)
+        model = RoFormerModel(config)
         model.eval()
         result = model(
             input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
@@ -161,7 +157,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerForMultipleChoice(RoFormerModel(**config), num_choices=self.config.num_choices)
+        model = RoFormerForMultipleChoice(config)
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.config.num_choices, -1])
 
@@ -198,7 +194,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerForQuestionAnswering(RoFormerModel(**config))
+        model = RoFormerForQuestionAnswering(config)
         model.eval()
         result = model(
             input_ids,
@@ -227,7 +223,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerForTokenClassification(RoFormerModel(**config), num_classes=self.num_classes)
+        model = RoFormerForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -257,7 +253,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerForMaskedLM(RoFormerModel(**config))
+        model = RoFormerForMaskedLM(config)
         model.eval()
         result = model(
             input_ids,
@@ -287,7 +283,7 @@ class RoFormerModelTester:
         token_labels: Tensor,
         choice_labels: Tensor,
     ):
-        model = RoFormerForSequenceClassification(RoFormerModel(**config), num_classes=self.config.num_classes)
+        model = RoFormerForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -307,7 +303,7 @@ class RoFormerModelTester:
     def create_and_check_model_cache(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = RoFormerModel(**config)
+        model = RoFormerModel(config)
         model.eval()
 
         # first forward pass

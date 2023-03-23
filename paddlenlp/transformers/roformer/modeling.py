@@ -331,7 +331,7 @@ class RoFormerPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
-        # base-model prefix "BertModel"
+        # base-model prefix "RoFormerModel"
         if "RoFormerModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "roformer." + mapping[0]
