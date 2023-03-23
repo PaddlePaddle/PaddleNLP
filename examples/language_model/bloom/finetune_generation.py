@@ -164,6 +164,7 @@ def do_train(args):
 
     fleet.init(is_collective=True, strategy=strategy)
 
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     # Obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
     mp_rank = hcg.get_model_parallel_rank()
@@ -214,9 +215,19 @@ def do_train(args):
     if args.mp_degree > 1:
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         BloomForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
-        args.model_name_or_path = split_model_parallel(
-            args.model_name_or_path, config, args.mp_degree, args.sharding_degree
-        )
+        if mp_rank == 0 and local_rank == 0:
+            args.model_name_or_path = split_model_parallel(
+                args.model_name_or_path, config, args.mp_degree, args.sharding_degree
+            )
+            paddle.distributed.barrier()
+            paddle.distributed.barrier()
+        else:
+            paddle.distributed.barrier()
+            args.model_name_or_path = split_model_parallel(
+                args.model_name_or_path, config, args.mp_degree, args.sharding_degree
+            )
+            paddle.distributed.barrier()
+            
     config.mp_rank = mp_rank
     config.mp_degree = args.mp_degree
 
