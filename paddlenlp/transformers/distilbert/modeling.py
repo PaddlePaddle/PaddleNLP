@@ -219,10 +219,7 @@ class DistilBertModel(DistilBertPretrainedModel):
                 )
                 attention_mask = (1.0 - attention_mask) * -1e4
         embedding_output = self.embeddings(input_ids=input_ids)
-        print(embedding_output.shape)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
-        print(encoder_outputs.shape)
-
         return encoder_outputs
 
 
