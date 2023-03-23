@@ -555,13 +555,6 @@ class PretrainedModel(Layer, ModuleUtilsMixin, GenerationMixin, ConversionMixin)
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-    def post_init(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.init_weights()
-
     def __getattr__(self, name):
         """
         called when the attribute name is missed in the model
