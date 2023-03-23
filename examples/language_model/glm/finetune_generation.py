@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 from data import custom_convert_example
-from utils import GLMTrainer, generate
+from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
@@ -122,23 +122,23 @@ def main():
         mark_only_lora_as_trainable(model)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model.generate = partial(
-        generate,
-        self=model,
-        out_seq_length=data_args.src_length + data_args.tgt_length,
-        tgt_length=data_args.tgt_length,
-        min_tgt_length=data_args.min_tgt_length,
-        num_beams=data_args.num_beams,
-        length_penalty=data_args.length_penalty,
-        no_repeat_ngram_size=data_args.no_repeat_ngram_size,
-        end_token_id=tokenizer.eop_token_id,
-        pad_token_id=tokenizer.pad_token_id,
-        mask_token_id=tokenizer.smask_token_id,
-        no_block_position=data_args.no_block_position,
-        select_topk=data_args.select_topk,
-        top_k=data_args.top_k,
-        top_p=data_args.top_p,
-    )
+    # model.generate = partial(
+    #    generate,
+    #    self=model,
+    #    out_seq_length=data_args.src_length + data_args.tgt_length,
+    #    tgt_length=data_args.tgt_length,
+    #    min_tgt_length=data_args.min_tgt_length,
+    #    num_beams=data_args.num_beams,
+    #    length_penalty=data_args.length_penalty,
+    #    no_repeat_ngram_size=data_args.no_repeat_ngram_size,
+    #    end_token_id=tokenizer.eop_token_id,
+    #    pad_token_id=tokenizer.pad_token_id,
+    #    mask_token_id=tokenizer.gmask_token_id,
+    #    no_block_position=data_args.no_block_position,
+    #    select_topk=data_args.select_topk,
+    #    top_k=data_args.top_k,
+    #    top_p=data_args.top_p,
+    # )
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
@@ -154,6 +154,8 @@ def main():
         rougel = RougeL()
         predictions = [x[x != -100] for x in eval_preds.predictions]
         references = [x[x != -100] for x in eval_preds.label_ids]
+
+        # for pred in predictions:
 
         rouge1_score = rouge1.score(predictions, references)
         rouge2_score = rouge2.score(predictions, references)
