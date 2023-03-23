@@ -38,7 +38,8 @@ __all__ = [
 PEGASUS_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
     "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
-    "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA"
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+    "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
     "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
 ]
 

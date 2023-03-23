@@ -27,6 +27,7 @@ __all__ = ["PegasusChineseTokenizer"]
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": 1024,
     "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": 1024,
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": 1024,
     "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": 1024,
     "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": 1024,
 }
@@ -125,6 +126,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": "",
             "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": "",
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": "",
             "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": "",
             "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": "",
         },
