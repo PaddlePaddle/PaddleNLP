@@ -464,11 +464,9 @@ class GenerationMixin(object):
             }
             # Use inputs_embeds as the priority if inputs_embeds exists
             if "inputs_embeds" in encoder_kwargs:
-                encoder_kwargs["return_dict"] = True
                 model_kwargs["encoder_output"] = encoder(**encoder_kwargs)
             else:
                 model_kwargs["encoder_output"] = encoder(input_ids=input_ids, **encoder_kwargs)
-
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self, input_ids, decoder_start_token_id=None, bos_token_id=None):
