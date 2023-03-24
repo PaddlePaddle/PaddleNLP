@@ -118,8 +118,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_dreambooth.py \
 当训练完成后，模型将自动保存到`output_dir`目录，在上述例子中，我们的模型最终保存到了`dream_outputs`文件夹。我们可以使用`StableDiffusionPipeline`快速加载该模型。
 
 ```
-├── run_multi.sh # 4卡训练命令
-├── run_single.sh # 单卡训练命令
 ├── train_dreambooth.py # 训练脚本
 ├── dream_outputs  # 我们指定的输出文件路径
     ├── vae # vae权重文件夹

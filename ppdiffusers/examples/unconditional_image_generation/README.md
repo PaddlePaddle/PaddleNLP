@@ -26,8 +26,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3"  train_unconditional.py 
   --gradient_accumulation_steps=1 \
   --use_ema \
   --learning_rate=1e-4 \
-  --lr_warmup_steps=500 \
-  --mixed_precision=no
+  --lr_warmup_steps=500
 ```
 
 完整的训练需要在4xV100 GPUs上训练2小时.
@@ -49,8 +48,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_unconditional.py \
   --gradient_accumulation_steps=1 \
   --use_ema \
   --learning_rate=1e-4 \
-  --lr_warmup_steps=500 \
-  --mixed_precision=no
+  --lr_warmup_steps=500
 ```
 
 完整的训练需要在4xV100 GPUs上训练2小时.
@@ -83,7 +81,7 @@ data_dir/[...]/xxz.png
 换句话说，脚本将负责收集文件夹中的所有图像。然后可以像这样运行脚本:
 
 ```bash
-accelerate launch train_unconditional.py \
+python train_unconditional.py \
     --train_data_dir <path-to-train-directory> \
     <other-arguments>
 ```

@@ -61,12 +61,15 @@ class ControlNetWithUnetModel(paddle.nn.Layer):
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-    model_path: str, output_path: str, sample: bool = False, height: int = None, width: int = None
+    model_path: str,
+    controlnet_model_path: str,
+    output_path: str,
+    sample: bool = False,
+    height: int = None,
+    width: int = None,
 ):
     unet_tmp = UNet2DConditionModel.from_pretrained(model_path, resnet_pre_temb_non_linearity=True, subfolder="unet")
-    controlnet_tmp = ControlNetModel.from_pretrained(
-        model_path, resnet_pre_temb_non_linearity=True, subfolder="controlnet"
-    )
+    controlnet_tmp = ControlNetModel.from_pretrained(controlnet_model_path, resnet_pre_temb_non_linearity=True)
 
     pipeline = StableDiffusionControlNetPipeline.from_pretrained(
         model_path,
@@ -202,8 +205,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="takuma104/control_sd15_canny",
+        default="runwayml/stable-diffusion-v1-5",
         help="Path to the `ppdiffusers` checkpoint to convert (either a local directory or on the bos).",
+    )
+    parser.add_argument(
+        "--controlnet_pretrained_model_name_or_path",
+        type=str,
+        default="lllyasviel/sd-controlnet-canny",
+        help="Path to the `ppdiffusers` controlnet_pretrained_model_name_or_path  checkpoint to convert (either a local directory or on the bos).",
     )
     parser.add_argument("--output_path", type=str, required=True, help="Path to the output model.")
     parser.add_argument(
@@ -214,5 +223,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-        args.pretrained_model_name_or_path, args.output_path, args.sample, args.height, args.width
+        args.pretrained_model_name_or_path,
+        args.controlnet_pretrained_model_name_or_path,
+        args.output_path,
+        args.sample,
+        args.height,
+        args.width,
     )

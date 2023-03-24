@@ -157,6 +157,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_vae.py \
 
 ## 2 模型推理
 ```python
+import paddle
 from ppdiffusers import AutoencoderKL, StableDiffusionImg2ImgPipeline
 from ppdiffusers.utils import load_image
 from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import preprocess
