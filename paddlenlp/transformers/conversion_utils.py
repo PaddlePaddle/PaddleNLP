@@ -944,12 +944,14 @@ class ConversionMixin:
 
         state_dict_to_save = {}
 
-        is_dst = paddle.distributed.get_rank() == 0
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        is_dst = paddle.distributed.get_rank(mp_group) == 0
 
         for key in state_dict.keys():
             tensor = state_dict[key]
             if key in name_action_mappings:
-                ret = distributed_gather(tensor, group=None, offload=True)
+                ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = name_action_mappings.pop(key)
                 tensor = action(ret) if is_dst else None
             else:

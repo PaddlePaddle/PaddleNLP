@@ -15,6 +15,7 @@
 import os
 import tempfile
 
+import numpy as np
 import paddle
 
 from paddlenlp.transformers import GLMModel
@@ -29,16 +30,22 @@ GLMModel.init_weights = func
 
 
 def main():
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
+    world_size = paddle.distributed.get_world_size()
+    dp_degree = 2 if world_size >= 4 else 1
+    tensor_parallel_degree = world_size // dp_degree
+
     strategy = paddle.distributed.fleet.DistributedStrategy()
     strategy.hybrid_configs = {
-        "dp_degree": 1,
+        "dp_degree": dp_degree,
         "mp_degree": tensor_parallel_degree,
         "pp_degree": 1,
         "sharding_degree": 1,
     }
     paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
+
+    hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+    mp_group = hcg.get_model_parallel_group()
+    tensor_parallel_rank = mp_group.rank
 
     model = GLMModel.from_pretrained(
         "THUDM/glm-large-chinese",
@@ -49,8 +56,9 @@ def main():
     )
 
     model.eval()
-    ret = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
-    print("paddle tensor parallel results", ret.logits.abs().mean().item())
+    loss = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+    ret = loss.logits.abs().mean().item()
+    np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
 
     with tempfile.TemporaryDirectory() as tempdir:
         model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=False)
@@ -64,12 +72,13 @@ def main():
             low_cpu_mem_usage=True,
         )
         load_model.eval()
-        ret = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
-        print("paddle tensor parallel results", ret.logits.abs().mean().item())
+        loss = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
 
     with tempfile.TemporaryDirectory() as tempdir:
         object_list = []
-        paddle.distributed.all_gather_object(object_list, tempdir)
+        paddle.distributed.all_gather_object(object_list, tempdir, group=mp_group)
         tempdir = object_list[0]
         model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=True)
         paddle.distributed.barrier()
@@ -82,9 +91,9 @@ def main():
             low_cpu_mem_usage=True,
         )
         load_model.eval()
-        ret = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
-
-        print("paddle tensor parallel results", ret.logits.abs().mean().item())
+        loss = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
 
 
 if __name__ == "__main__":

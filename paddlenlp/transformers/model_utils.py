@@ -1548,7 +1548,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return
         else:
             if config_to_save.tensor_parallel_degree > 1:
-                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
+                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
+                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{paddle.distributed.get_rank():0>2d}")
+
             state_dict_to_save = self.state_dict()
 
         # Attach architecture to the config

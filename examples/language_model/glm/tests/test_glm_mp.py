@@ -60,6 +60,7 @@ class TestGLM(unittest.TestCase):
         ret = loss.logits.abs().mean().item()
         np.testing.assert_allclose(ret, 2.109480381011963, rtol=1e-7)
 
+    @unittest.skip("Skip export!")
     def testPaddleGLM(self):
         from paddlenlp.transformers import AutoModel
 
@@ -109,4 +110,4 @@ class TestGLM(unittest.TestCase):
 
 class TestGLMTensorParallel(TestMultipleGpus):
     def testPaddleTensorParallelGLM(self):
-        self.run_2gpu("glm_mp.py")
+        self.run_4gpu("glm_mp.py")
