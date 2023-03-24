@@ -718,7 +718,6 @@ class PipelineSlowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdirname:
             ddpm.save_pretrained(tmpdirname)
             new_ddpm = DDPMPipeline.from_pretrained(tmpdirname)
-            new_ddpm
         generator = paddle.Generator().manual_seed(0)
         image = ddpm(generator=generator, num_inference_steps=5, output_type="numpy").images
         generator = paddle.Generator().manual_seed(0)
@@ -729,7 +728,6 @@ class PipelineSlowTests(unittest.TestCase):
         model_path = "google/ddpm-cifar10-32"
         scheduler = DDPMScheduler(num_train_timesteps=10)
         ddpm = DDPMPipeline.from_pretrained(model_path, scheduler=scheduler)
-        ddpm = ddpm
         ddpm.set_progress_bar_config(disable=None)
         ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path, scheduler=scheduler)
         ddpm_from_hub = ddpm_from_hub
@@ -748,7 +746,6 @@ class PipelineSlowTests(unittest.TestCase):
         ddpm_from_hub_custom_model = ddpm_from_hub_custom_model
         ddpm_from_hub_custom_model.set_progress_bar_config(disable=None)
         ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path, scheduler=scheduler)
-        ddpm_from_hub = ddpm_from_hub
         ddpm_from_hub_custom_model.set_progress_bar_config(disable=None)
         generator = paddle.Generator().manual_seed(0)
         image = ddpm_from_hub_custom_model(generator=generator, num_inference_steps=5, output_type="numpy").images
