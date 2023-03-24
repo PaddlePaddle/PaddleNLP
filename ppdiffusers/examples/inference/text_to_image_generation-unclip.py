@@ -18,7 +18,7 @@ pipe = UnCLIPPipeline.from_pretrained("kakaobrain/karlo-v1-alpha")
 
 # 执行pipeline进行推理
 prompt = "a high-resolution photograph of a big red frog on a green leaf."
-image = pipe([prompt]).images[0]
+image = pipe(prompt).images[0]
 
 # 保存图片
 image.save("text_to_image_generation-unclip-result.png")

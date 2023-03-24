@@ -39,5 +39,5 @@ output = pipe(
     width=512,
     height=512,
 )
-image = output.images
+image = output.images[0]
 image.save("text_guided_generation-semantic_stable_diffusion-result.png")
