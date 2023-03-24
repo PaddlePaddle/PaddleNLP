@@ -171,7 +171,7 @@ class MultiModalEmbedder:
                 document_converter = DOCUMENT_CONVERTERS[doc.content_type]
             except KeyError:
                 raise Exception(
-                    f"Unknown content type '{doc.content_type}'. Known types: 'text', 'table', 'image'."  # FIXME {', '.join(get_args(ContentTypes))}"  from Python3.8 on
+                    f"Unknown content type '{doc.content_type}'. Known types: 'text', 'image'."  # FIXME {', '.join(get_args(ContentTypes))}"  from Python3.8 on
                 )
 
             data = document_converter(doc)

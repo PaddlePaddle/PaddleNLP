@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from milvus import *
-
-from config import MILVUS_HOST, MILVUS_PORT, collection_param, index_type, index_param
-from config import top_k, search_param
+from config import (
+    MILVUS_HOST,
+    MILVUS_PORT,
+    collection_param,
+    index_param,
+    index_type,
+    search_param,
+    top_k,
+)
+from milvus import Milvus
 
 
 class VecToMilvus:

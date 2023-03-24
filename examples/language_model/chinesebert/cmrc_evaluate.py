@@ -152,7 +152,6 @@ def find_lcs(s1, s2):
     return s1[p - mmax : p], mmax
 
 
-#
 def evaluate(ground_truth_file, prediction_file):
     f1 = 0
     em = 0

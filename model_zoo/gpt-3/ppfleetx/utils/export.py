@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 
 import paddle
@@ -34,7 +33,7 @@ def _prune_input_spec(input_spec, program, targets):
     global_block = program.global_block()
     for spec in input_spec:
         try:
-            v = global_block.var(spec.name)
+            global_block.var(spec.name)
             pruned_input_spec.append(spec)
         except Exception:
             pass

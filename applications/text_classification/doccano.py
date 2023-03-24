@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
 import argparse
 import json
+import os
 import random
+import time
 from decimal import Decimal
 
-from tqdm import tqdm
 import numpy as np
-
 import paddle
+from tqdm import tqdm
+
 from paddlenlp.utils.log import logger
 
 # yapf: disable
@@ -80,7 +80,7 @@ def do_convert():
 
     examples = []
     label_list = []
-    with tqdm(total=len(raw_examples)) as pbar:
+    with tqdm(total=len(raw_examples)):
         for line in raw_examples:
             items = json.loads(line)
             # Compatible with doccano >= 1.6.2

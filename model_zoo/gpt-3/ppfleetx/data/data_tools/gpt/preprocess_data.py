@@ -30,7 +30,6 @@ except ImportError:
     __dir__ = os.path.dirname(os.path.abspath(__file__))
     sys.path.append(os.path.abspath(os.path.join(__dir__, "../../../../")))
     from ppfleetx.data import tokenizers as tfs
-    from ppfleetx.utils.log import logger
 
 try:
     import nltk
@@ -122,7 +121,7 @@ def chinese_segmentation_fn():
     lac_cws = LAC(mode="seg")
 
     def process(line):
-        words = lac.run(line)
+        words = lac_cws.run(line)
         return words
 
     return process
