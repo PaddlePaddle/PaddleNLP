@@ -22,4 +22,4 @@ low_res_img = load_image(url).resize((128, 128))
 
 prompt = "a white cat"
 upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
-upscaled_image.save("upsampled_cat_sd2.png")
+upscaled_image.save("text_guided_image_upscaling-stable_diffusion_2-result.png")

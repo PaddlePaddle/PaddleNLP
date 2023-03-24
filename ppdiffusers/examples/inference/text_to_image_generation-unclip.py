@@ -21,4 +21,4 @@ prompt = "a high-resolution photograph of a big red frog on a green leaf."
 image = pipe([prompt]).images[0]
 
 # 保存图片
-image.save("./frog.png")
+image.save("text_to_image_generation-unclip-result.png")

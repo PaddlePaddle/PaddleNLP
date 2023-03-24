@@ -20,3 +20,5 @@ print(pipe.safety_concept)
 prompt = "the four horsewomen of the apocalypse, painting by tom of finland, gaston bussiere, craig mullins, j. c. leyendecker"
 out = pipe(prompt=prompt, **SafetyConfig.MAX)
 out.images[0].save("sd_safe.png")
+
+out.save("text_to_image_generation-stable_diffusion_safe-result.png")
