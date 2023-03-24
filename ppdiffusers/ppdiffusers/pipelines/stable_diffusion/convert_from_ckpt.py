@@ -845,6 +845,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     paddle_dtype: Optional[bool] = None,
     requires_safety_checker: bool = False,
     controlnet: Optional[bool] = None,
+    cls=None,
     **kwargs,
 ) -> StableDiffusionPipeline:
     """
@@ -882,6 +883,9 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             Whether the attention computation should always be upcasted. This is necessary when running stable
             diffusion 2.1.
     """
+    if cls is None or cls.__name__ == "DiffusionPipeline":
+        cls = StableDiffusionPipeline
+
     if prediction_type == "v-prediction":
         prediction_type = "v_prediction"
 
@@ -1030,7 +1034,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             vae.to(dtype=paddle_dtype)
             text_model.to(dtype=paddle_dtype)
             unet.to(dtype=paddle_dtype)
-        pipe = StableDiffusionPipeline(
+        pipe = cls(
             vae=vae,
             text_encoder=text_model,
             tokenizer=tokenizer,
@@ -1091,7 +1095,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 requires_safety_checker=requires_safety_checker,
             )
         else:
-            pipe = StableDiffusionPipeline(
+            pipe = cls(
                 vae=vae,
                 text_encoder=text_model,
                 tokenizer=tokenizer,

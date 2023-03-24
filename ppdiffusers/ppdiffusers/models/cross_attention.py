@@ -206,8 +206,10 @@ class CrossAttention(nn.Layer):
         return tensor
 
     def get_attention_scores(self, query, key, attention_mask=None):
-        if self.upcast_attention:
+        if self.upcast_softmax:
             dtype = query.dtype
+
+        if self.upcast_attention:
             query = query.cast(paddle.float32)
             key = key.cast(paddle.float32)
 

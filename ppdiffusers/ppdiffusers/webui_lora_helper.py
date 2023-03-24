@@ -21,11 +21,15 @@ import paddle.nn as nn
 
 from .pipelines import DiffusionPipeline
 from .ppnlp_patch_utils import patch_to
+from .utils.constants import PPDIFFUSERS_CACHE
+from .utils.download_utils import ppdiffusers_url_download
 from .utils.initializer_utils import kaiming_uniform_, zeros_
 from .utils.load_utils import smart_load
 
 
-def convert_pt_to_pd(state):
+def convert_pt_to_pd(state, dtype):
+    if dtype is None:
+        dtype = "float32"
     new_state = {}
     for a, b in safetensors_weight_mapping:
         if a in state:
@@ -34,7 +38,7 @@ def convert_pt_to_pd(state):
                 val = val.T
             if val.ndim == 0:
                 val = val.reshape((1,))
-            new_state[b] = paddle.to_tensor(val).cast("float32")
+            new_state[b] = paddle.to_tensor(val).cast(dtype)
         else:
             print(f"We find {a} not in state_dict and we will continue!")
     return new_state
@@ -89,9 +93,26 @@ def apply_lora(
     multiplier=1.0,
     text_encoder_target_replace_modules=["TransformerEncoderLayer"],
     unet_target_replace_modules=["Transformer2DModel", "Attention"],
+    **kwargs,
 ):
+    resume_download = kwargs.pop("resume_download", False)
+    force_download = kwargs.pop("force_download", False)
+    paddle_dtype = kwargs.pop("paddle_dtype", None)
+    cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
     if lora_weight_or_path is not None:
-        lora_weight_or_path = convert_pt_to_pd(smart_load(lora_weight_or_path))
+        lora_weight_or_path = str(lora_weight_or_path)
+        if os.path.isfile(lora_weight_or_path):
+            lora_weight_or_path = lora_weight_or_path
+        elif lora_weight_or_path.startswith("http://") or lora_weight_or_path.startswith("https://"):
+            lora_weight_or_path = ppdiffusers_url_download(
+                lora_weight_or_path,
+                cache_dir=cache_dir,
+                resume_download=resume_download,
+                force_download=force_download,
+            )
+        else:
+            raise EnvironmentError(f"Please check your {lora_weight_or_path}.")
+        lora_weight_or_path = convert_pt_to_pd(smart_load(lora_weight_or_path), paddle_dtype)
 
         mayberanklist = []
         maybealphalist = []

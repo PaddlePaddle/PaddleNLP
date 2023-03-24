@@ -966,7 +966,7 @@ class DiffusionPipeline(ConfigMixin):
         resume_download = kwargs.pop("resume_download", False)
         force_download = kwargs.pop("force_download", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
-        cache_dir = kwargs.pop("cache_dir", DIFFUSERS_CACHE)
+        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         original_config_file = kwargs.pop("original_config_file", None)
         requires_safety_checker = kwargs.pop("requires_safety_checker", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -988,6 +988,7 @@ class DiffusionPipeline(ConfigMixin):
             original_config_file=original_config_file,
             paddle_dtype=paddle_dtype,
             requires_safety_checker=requires_safety_checker,
+            cls=cls,
             **kwargs,
         )
 
@@ -1095,7 +1096,7 @@ class DiffusionPipeline(ConfigMixin):
         >>> from ppdiffusers import DiffusionPipeline
 
         >>> pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", paddle_dtype=paddle.float16)
-        >>> pipe.enable_xformers_memory_efficient_attention("cutlass_attention")
+        >>> pipe.enable_xformers_memory_efficient_attention("cutlass")
         ```
         """
         self.set_use_memory_efficient_attention_xformers(True, attention_op)
