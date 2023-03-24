@@ -23,10 +23,9 @@ import numpy as np
 import paddle
 from args import get_parser
 from paddle.io import DataLoader
-from transformers import AutoTokenizer
 
 from paddlenlp.data import Stack, Tuple
-from paddlenlp.transformers import BloomConfig, BloomForPretraining
+from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForPretraining
 from paddlenlp.utils.log import logger
 
 

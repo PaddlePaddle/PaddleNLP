@@ -19,10 +19,9 @@ import os
 import paddle
 from paddle.distributed import fleet
 from tap import Tap
-from transformers import AutoTokenizer
 from utils import set_hyrbid_parallel_seed
 
-from paddlenlp.transformers import BloomConfig, BloomForGeneration
+from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForGeneration
 from paddlenlp.utils.log import logger
 
 
@@ -74,7 +73,7 @@ def left_padding(inputs, pad_id):
 
 
 def convert_examples(sentences: list[str], tokenizer, max_length: int = 20):
-    features = tokenizer.batch_encode_plus(
+    features = tokenizer.batch_encode(
         sentences,
         padding="max_length",
         max_length=max_length,
@@ -130,7 +129,9 @@ def load_model(args: Args, config: BloomConfig):
     return model
 
 
-def generate(args: Args):
+@paddle.no_grad()
+def generate():
+    args = Args().parse_args(known_only=True)
     paddle.set_device(args.device)
 
     assert args.dtype in ["float16", "bfloat16"], "dtype must be one of `float16`, `bfloat16`"
@@ -140,7 +141,7 @@ def generate(args: Args):
     config.top_k = 1
     model = load_model(args, config)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, low_cpu_mem_usage=True)
     tokenizer.padding_side = "left"
 
     sentences = [
@@ -164,5 +165,4 @@ def generate(args: Args):
 
 
 if __name__ == "__main__":
-    args = Args().parse_args(known_only=True)
-    generate(args)
+    generate()

@@ -17,9 +17,12 @@ import os
 
 import paddle
 from model_split_merge import merge_model_parallel
-from transformers import AutoTokenizer
 
-from paddlenlp.transformers import BloomConfig, BloomForSequenceClassification
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    BloomConfig,
+    BloomForSequenceClassification,
+)
 
 MODEL_CLASSES = {"bloom": (BloomForSequenceClassification)}
 
@@ -67,7 +70,7 @@ def main():
 
     args.model_name_or_path = merge_model_parallel(args.model_name_or_path, config)
     config.mp_degree = 1
-    model = model_class.from_pretrained(args.model_name_or_path, config=config)
+    model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
     model.eval()
     model = paddle.jit.to_static(

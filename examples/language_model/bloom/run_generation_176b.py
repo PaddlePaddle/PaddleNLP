@@ -20,11 +20,15 @@ import paddle
 from args import parse_args
 from paddle import LazyGuard
 from paddle.distributed import fleet
-from transformers import AutoTokenizer, PreTrainedTokenizer
 from utils import set_hyrbid_parallel_seed
 
 from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.transformers import BloomConfig, BloomForGeneration
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    BloomConfig,
+    BloomForGeneration,
+    PreTrainedTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 paddle.set_default_dtype("bfloat16")

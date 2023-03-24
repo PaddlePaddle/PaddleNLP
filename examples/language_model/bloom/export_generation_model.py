@@ -84,7 +84,7 @@ def main():
 
     # Load the model and parameter
     config.mp_degree = 1
-    model = model_class.from_pretrained(args.model_name_or_path, config=config)
+    model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
     model.eval()
     model = paddle.jit.to_static(

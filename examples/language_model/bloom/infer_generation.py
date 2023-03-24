@@ -16,7 +16,8 @@ import os
 
 import fastdeploy as fd
 import numpy as np
-from transformers import AutoTokenizer
+
+from paddlenlp.transformers import AutoTokenizer
 
 # from utils import left_padding
 

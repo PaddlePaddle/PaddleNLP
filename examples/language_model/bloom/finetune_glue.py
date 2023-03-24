@@ -24,7 +24,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
 from paddle.metric import Accuracy
-from transformers import AutoTokenizer
 from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorWithPadding
@@ -34,6 +33,9 @@ from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
+    AutoTokenizer,
+    BloomConfig,
+    BloomForSequenceClassification,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
@@ -51,9 +53,6 @@ from utils import (  # noqa e402
     set_hyrbid_parallel_seed,
     wrap_sharding_2_3,
 )
-
-from paddlenlp.transformers import BloomConfig  # noqa e402
-from paddlenlp.transformers import BloomForSequenceClassification  # noqa e402
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -170,8 +169,11 @@ def run_evaluate(args, data_loader, model, log_writer, global_step, metric, task
     model.train()
 
 
-def do_train(args):
+def do_train():
+    args = parse_args()
     paddle.set_device(args.device)
+    # must be trained with paddle.distributed.launch
+
     nranks = paddle.distributed.get_world_size()
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
@@ -553,5 +555,4 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    do_train(args)
+    do_train()

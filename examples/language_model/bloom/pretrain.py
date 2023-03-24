@@ -24,10 +24,10 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from transformers import AutoTokenizer
 from visualdl import LogWriter
 
 from paddlenlp.transformers import (
+    AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,

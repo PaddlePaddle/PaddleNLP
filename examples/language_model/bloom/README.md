@@ -15,6 +15,85 @@ python run_generation.py --model_name_or_path "bigscience/bloom-560m"
 参数说明：
 - `model_name_or_path`: 模型名称, 例如：`bigscience/bloom-560m`, `bigscience/bloom-3b`, `bigscience/bloom-7b1`等。
 
+## 模型 Finetune
+
+此模型也支持在生成式任务微调，示例脚本如下所示：
+
+```shell
+python -u -m paddle.distributed.launch --gpus "0" finetune_generation.py \
+    --model_type bloom \
+    --model_name_or_path "bigscience/bloom-560m" \
+    --tokenizer_name_or_path "bigscience/bloom-560m" \
+    --input_dir "old" \
+    --output_dir "output_generate" \
+    --weight_decay 0.01 \
+    --grad_clip 1.0 \
+    --max_steps 50000 \
+    --decay_steps 320 \
+    --device gpu \
+    --eval_freq  100 \
+    --save_steps 100 \
+    --logging_freq 10 \
+    --warmup_rate 0.01 \
+    --scale_loss 1024 \
+    --global_batch_size 256\
+    --micro_batch_size 4\
+    --max_lr 5e-4 \
+    --min_lr 1e-4 \
+    --dp_degree 1 \
+    --mp_degree 1 \
+    --sharding_degree 1 \
+    --use_pure_fp16 False\
+    --use_recompute True\
+    --sharding_stage 2
+```
+
+此外也提供了在 glue 任务上的微调代码，执行脚本如下所示：
+
+```shell
+python -u -m paddle.distributed.launch --gpus "0" finetune_glue.py \
+    --model_type bloom \
+    --model_name_or_path "bigscience/bloom-560m" \
+    --tokenizer_name_or_path "bigscience/bloom-560m" \
+    --input_dir "old" \
+    --output_dir "output_glue" \
+    --weight_decay 0.01 \
+    --grad_clip 1.0 \
+    --max_steps 50000 \
+    --decay_steps 320 \
+    --device gpu \
+    --eval_freq  100 \
+    --save_steps 100 \
+    --logging_freq 10 \
+    --warmup_rate 0.01 \
+    --scale_loss 1024 \
+    --global_batch_size 256\
+    --micro_batch_size 4\
+    --max_lr 5e-4 \
+    --min_lr 1e-4 \
+    --dp_degree 1 \
+    --mp_degree 1 \
+    --sharding_degree 1 \
+    --use_pure_fp16 False\
+    --use_recompute True\
+    --sharding_stage 2
+```
+
+## 模型导出
+
+当在指定数据集上 finetune 过后可导出模型部署，此时将会体验到paddle内置的加速优化，针对于不同任务提供了相同的导出脚本：
+
+* 导出生成模型
+
+```shell
+python export_generation_model.py --model_name_or_path "output_generation" --output_path "export_generation"
+```
+
+* 导出分类模型
+
+```shell
+python export_glue_model.py --model_name_or_path "output_glue" --output_path "export_glue"
+```
 
 ## 模型评估
 
@@ -45,37 +124,4 @@ python run_eval.py \
     --batch_size 8 \
     --eval_path ./data/./lambada_test.jsonl \
     --cloze_eval
-```
-
-## 模型 Finetune
-
-此模型也支持在生成式任务微调，示例脚本如下所示：
-
-```shell
-python -u -m paddle.distributed.launch --gpus "0" finetune_generation.py \
-    --model_type bloom \
-    --model_name_or_path "bigscience/bloom-7b1" \
-    --tokenizer_name_or_path "bigscience/bloom-7b1" \
-    --input_dir "old" \
-    --output_dir "output_generate" \
-    --weight_decay 0.01 \
-    --grad_clip 1.0 \
-    --max_steps 50000 \
-    --decay_steps 320 \
-    --device gpu \
-    --eval_freq  100 \
-    --save_steps 100 \
-    --logging_freq 10 \
-    --warmup_rate 0.01 \
-    --scale_loss 1024 \
-    --global_batch_size 256\
-    --micro_batch_size 4\
-    --max_lr 5e-4 \
-    --min_lr 1e-4 \
-    --dp_degree 1 \
-    --mp_degree 1 \
-    --sharding_degree 1 \
-    --use_pure_fp16 False\
-    --use_recompute True\
-    --sharding_stage 2
 ```
