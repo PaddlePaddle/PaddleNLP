@@ -35,4 +35,4 @@ output = pipe(
 )
 inpainted_image = output.images[0]
 
-inpainted_image.save("repaint-image.png")
+inpainted_image.save("image_inpainting-repaint-result.png")
