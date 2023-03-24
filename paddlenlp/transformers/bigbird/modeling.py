@@ -72,11 +72,8 @@ class BigBirdEncoderLayerOutput(ModelOutput):
 
 class TransformerEncoderLayer(Layer):
     def __init__(self, config: BigBirdConfig):
-        self._config = locals()
-        self._config.pop("self")
-        self._config.pop("__class__", None)  # py3
-
         super(TransformerEncoderLayer, self).__init__()
+        self.config = config
         attn_dropout = config.dropout if config.attn_dropout is None else config.attn_dropout
         act_dropout = config.dropout if config.act_dropout is None else config.act_dropout
         self.normalize_before = config.normalize_before
@@ -146,7 +143,7 @@ class TransformerEncoder(Layer):
     def __init__(self, encoder_layer, num_layers):
         super(TransformerEncoder, self).__init__()
         self.layers = LayerList(
-            [(encoder_layer if i == 0 else type(encoder_layer)(**encoder_layer._config)) for i in range(num_layers)]
+            [(encoder_layer if i == 0 else type(encoder_layer)(encoder_layer.config)) for i in range(num_layers)]
         )
         self.num_layers = num_layers
         self.norm = LayerNorm(self.layers[0].d_model, epsilon=1e-12)
@@ -486,7 +483,13 @@ class BigBirdModel(BigBirdPretrainedModel):
                 output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
         """
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = input_ids.shape
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.shape[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         output_attentions = output_attentions if output_attentions is not None else False
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
@@ -494,7 +497,7 @@ class BigBirdModel(BigBirdPretrainedModel):
 
         embedding_output = self.embeddings(input_ids, token_type_ids, inputs_embeds=inputs_embeds)
         attention_mask, query_mask, key_mask = self._process_mask(input_ids, inputs_embeds, attention_mask)
-        seq_len = len(input_ids[1]) if input_ids is not None else inputs_embeds.shape[1]
+        batch_size, seq_len = input_shape
         rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
             self.config["num_layers"],
             seq_len,

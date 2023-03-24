@@ -11,22 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
-import sys
-import os
 import json
-import random
 import logging
+import sys
+from collections import namedtuple
+from io import open
+
 import numpy as np
 import six
-from io import open
-from collections import namedtuple
-
 import tokenization
 from batching import pad_batch_data
 
@@ -261,7 +254,7 @@ class BaseReader(object):
             try:
                 for i in wrapper():
                     yield i
-            except Exception as e:
+            except Exception:
                 import traceback
 
                 traceback.print_exc()

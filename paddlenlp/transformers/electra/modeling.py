@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import Optional
 
 import paddle
@@ -25,6 +26,7 @@ from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
     MaskedLMOutput,
+    ModelOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
@@ -1130,6 +1132,23 @@ class ElectraPooler(nn.Layer):
         return pooled_output
 
 
+@dataclass
+class ErnieHealthForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`ErnieHealthForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss of the ELECTRA objective.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    gen_loss: Optional[paddle.Tensor] = None
+    disc_rtd_loss: Optional[paddle.Tensor] = None
+    disc_mts_loss: Optional[paddle.Tensor] = None
+    disc_csp_loss: Optional[paddle.Tensor] = None
+
+
 class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
     """
     ERNIE-Health Model for pretraining task.
@@ -1140,6 +1159,13 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         discriminator (:class:`ErnieHealthDiscriminator):
             An instance of :class:`ErnieHealthDiscriminator`.
     """
+
+    def __init__(self, config: ElectraConfig):
+        super(ErnieHealthForTotalPretraining, self).__init__(config)
+        self.generator = ElectraGenerator(config)
+        self.discriminator = ErnieHealthDiscriminator(config)
+        self.initializer_range = config.initializer_range
+        self.init_weights()
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample
@@ -1195,8 +1221,11 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         attention_mask=None,
         raw_input_ids=None,
         generator_labels=None,
+        return_dict: Optional[bool] = None,
     ):
         assert generator_labels is not None, "generator_labels should not be None, please check DataCollator"
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         generator_logits = self.generator(input_ids, token_type_ids, position_ids, attention_mask)
 
@@ -1215,7 +1244,23 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         else:
             attention_mask = attention_mask.astype("bool")
 
-        return generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+        total_loss = None
+        gen_loss = None
+        disc_rtd_loss = None
+        disc_mts_loss = None
+        disc_csp_loss = None
+
+        if generator_labels is not None and disc_labels is not None:
+            loss_fct = ErnieHealthPretrainingCriterion(self.config)
+            total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss = loss_fct(
+                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+            )
+
+        if not return_dict:
+            # return total_loss
+            return total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss
+
+        return ErnieHealthForPreTrainingOutput(total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss)
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):

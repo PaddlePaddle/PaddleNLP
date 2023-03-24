@@ -14,32 +14,29 @@
 """
 classification
 """
+import argparse
 import ast
-import os
 import csv
 import json
-import warnings
+import os
 import random
-import argparse
 import traceback
-from functools import partial
 from collections import namedtuple
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+from utils import load_dict, read_by_lines, write_by_lines
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from utils import read_by_lines, write_by_lines, load_dict
-
-# warnings.filterwarnings('ignore')
 """
 For All pre-trained model（English and Chinese),
 Please refer to https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer
 """
 
-# yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--num_epoch", type=int, default=3, help="Number of epoches for fine-tuning.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train with warmup.")
@@ -51,7 +48,9 @@ parser.add_argument("--predict_data", type=str, default=None, help="predict data
 parser.add_argument("--do_train", type=ast.literal_eval, default=True, help="do train")
 parser.add_argument("--do_predict", type=ast.literal_eval, default=True, help="do predict")
 parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay rate for L2 regularizer.")
-parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Warmup proportion params for warmup strategy")
+parser.add_argument(
+    "--warmup_proportion", type=float, default=0.1, help="Warmup proportion params for warmup strategy"
+)
 parser.add_argument("--max_seq_len", type=int, default=512, help="Number of words of the longest seqence.")
 parser.add_argument("--valid_step", type=int, default=100, help="validation step")
 parser.add_argument("--skip_step", type=int, default=20, help="skip step")
@@ -60,9 +59,10 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu."
+)
 args = parser.parse_args()
-# yapf: enable.
 
 
 def set_seed(random_seed):
@@ -98,11 +98,7 @@ def evaluate(model, criterion, metric, data_loader):
     return float(np.mean(losses)), accuracy
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_map=None,
-                    max_seq_len=512,
-                    is_test=False):
+def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test=False):
     """convert_example"""
     has_text_b = False
     if isinstance(example, dict):
@@ -114,11 +110,9 @@ def convert_example(example,
     if has_text_b:
         text_b = example.text_b
 
-    tokenized_input = tokenizer(text=example.text_a,
-                                text_pair=text_b,
-                                max_seq_len=max_seq_len)
-    input_ids = tokenized_input['input_ids']
-    token_type_ids = tokenized_input['token_type_ids']
+    tokenized_input = tokenizer(text=example.text_a, text_pair=text_b, max_seq_len=max_seq_len)
+    input_ids = tokenized_input["input_ids"]
+    token_type_ids = tokenized_input["token_type_ids"]
 
     if is_test:
         return input_ids, token_type_ids
@@ -139,10 +133,8 @@ class DuEventExtraction(paddle.io.Dataset):
         with open(input_file, "r", encoding="UTF-8") as f:
             reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
             headers = next(reader)
-            text_indices = [
-                index for index, h in enumerate(headers) if h != "label"
-            ]
-            Example = namedtuple('Example', headers)
+            text_indices = [index for index, h in enumerate(headers) if h != "label"]
+            Example = namedtuple("Example", headers)
             examples = []
             for line in reader:
                 for index, text in enumerate(line):
@@ -167,10 +159,10 @@ def data_2_examples(datas):
     """data_2_examples"""
     has_text_b, examples = False, []
     if isinstance(datas[0], list):
-        Example = namedtuple('Example', ["text_a", "text_b"])
+        Example = namedtuple("Example", ["text_a", "text_b"])
         has_text_b = True
     else:
-        Example = namedtuple('Example', ["text_a"])
+        Example = namedtuple("Example", ["text_a"])
     for item in datas:
         if has_text_b:
             example = Example(text_a=item[0], text_b=item[1])
@@ -189,57 +181,38 @@ def do_train():
 
     set_seed(args.seed)
     label_map = load_dict(args.tag_path)
-    id2label = {val: key for key, val in label_map.items()}
-
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "ernie-3.0-medium-zh", num_classes=len(label_map))
+    model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     print("============start train==========")
     train_ds = DuEventExtraction(args.train_data, args.tag_path)
     dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
-    test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         label_map=label_map,
-                         max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example, tokenizer=tokenizer, label_map=label_map, max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
-            ),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
-            ),
-        Stack(dtype="int64")  # label
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype="int32"),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype="int32"),
+        Stack(dtype="int64"),  # label
     ): fn(list(map(trans_func, samples)))
 
-    batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
-    train_loader = paddle.io.DataLoader(dataset=train_ds,
-                                        batch_sampler=batch_sampler,
-                                        collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(dataset=dev_ds,
-                                      batch_size=args.batch_size,
-                                      collate_fn=batchify_fn)
-    test_loader = paddle.io.DataLoader(dataset=test_ds,
-                                       batch_size=args.batch_size,
-                                       collate_fn=batchify_fn)
+    batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
+    train_loader = paddle.io.DataLoader(dataset=train_ds, batch_sampler=batch_sampler, collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(dataset=dev_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
     metric = paddle.metric.Accuracy()
     criterion = paddle.nn.loss.CrossEntropyLoss()
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=args.learning_rate,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     step, best_performerence = 0, 0.0
     model.train()
@@ -256,25 +229,25 @@ def do_train():
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
             if step > 0 and step % args.skip_step == 0 and rank == 0:
-                print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) ' \
-                    f'- loss: {loss_item:.6f} acc {acc:.5f}')
+                print(
+                    f"train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f} acc {acc:.5f}"
+                )
             if step > 0 and step % args.valid_step == 0 and rank == 0:
-                loss_dev, acc_dev = evaluate(model, criterion, metric,
-                                             dev_loader)
-                print(f'dev step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, ' \
-                        f'current best {best_performerence:.5f}')
+                loss_dev, acc_dev = evaluate(model, criterion, metric, dev_loader)
+                print(
+                    f"dev step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, current best {best_performerence:.5f}"
+                )
                 if acc_dev > best_performerence:
                     best_performerence = acc_dev
-                    print(f'==============================================save best model ' \
-                            f'best performerence {best_performerence:5f}')
-                    paddle.save(model.state_dict(),
-                                '{}/best.pdparams'.format(args.checkpoints))
+                    print(
+                        f"==============================================save best model best performerence {best_performerence:5f}"
+                    )
+                    paddle.save(model.state_dict(), f"{args.checkpoints}/best.pdparams")
             step += 1
 
     # save the final model
     if rank == 0:
-        paddle.save(model.state_dict(),
-                    '{}/final.pdparams'.format(args.checkpoints))
+        paddle.save(model.state_dict(), "{}/final.pdparams".format(args.checkpoints))
 
 
 def do_predict():
@@ -284,8 +257,7 @@ def do_predict():
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "ernie-3.0-medium-zh", num_classes=len(label_map))
+    model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
@@ -308,8 +280,7 @@ def do_predict():
         if "text_b" in sent:
             input_sent = [[sent, sent["text_b"]]]  # add text_b
         example = data_2_examples(input_sent)[0]
-        input_ids, token_type_ids = convert_example(
-            example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
+        input_ids, token_type_ids = convert_example(example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids))
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -318,8 +289,7 @@ def do_predict():
     ): fn(samples)
     # Separates data into some batches.
     batch_encoded_inputs = [
-        encoded_inputs_list[i:i + args.batch_size]
-        for i in range(0, len(encoded_inputs_list), args.batch_size)
+        encoded_inputs_list[i : i + args.batch_size] for i in range(0, len(encoded_inputs_list), args.batch_size)
     ]
     results = []
     model.eval()
@@ -345,7 +315,7 @@ def do_predict():
     print("save data {} to {}".format(len(sentences), args.predict_save_path))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     if args.do_train:
         do_train()

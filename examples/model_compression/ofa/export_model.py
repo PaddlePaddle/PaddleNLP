@@ -13,24 +13,19 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
-import math
-import random
-import time
 import json
-from functools import partial
+import math
+import os
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import BertModel, BertForSequenceClassification, BertTokenizer
-from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
-from paddleslim.nas.ofa.layers import BaseBlock
+
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertModel,
+    BertTokenizer,
+)
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
@@ -192,7 +187,7 @@ def do_train(args):
     model_to_save = origin_model
     model_to_save.save_pretrained(output_dir)
 
-    if args.static_sub_model != None:
+    if args.static_sub_model is not None:
         export_static_model(origin_model, args.static_sub_model, args.max_seq_length)
 
 

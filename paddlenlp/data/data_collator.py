@@ -100,7 +100,7 @@ def paddle_default_data_collator(features: List[InputDataClass]) -> Dict[str, An
         if isinstance(first["label_ids"], paddle.Tensor):
             batch["labels"] = paddle.stack([f["label_ids"] for f in features])
         else:
-            dtype = "int64" if type(first["label_ids"][0]) is int else "float32"
+            dtype = "int64" if type(first["label_ids"][0]) is int or np.int32 or np.int64 else "float32"
             batch["labels"] = paddle.to_tensor([f["label_ids"] for f in features], dtype=dtype)
 
     # Handling of all other possible keys.
@@ -133,7 +133,7 @@ def numpy_default_data_collator(features: List[InputDataClass]) -> Dict[str, Any
         if isinstance(first["label_ids"], np.ndarray):
             batch["labels"] = np.stack([f["label_ids"] for f in features])
         else:
-            dtype = np.int64 if type(first["label_ids"][0]) is int else np.float32
+            dtype = np.int64 if type(first["label_ids"][0]) is int or np.int32 or np.int64 else np.float32
             batch["labels"] = np.array([f["label_ids"] for f in features], dtype=dtype)
 
     # Handling of all other possible keys.

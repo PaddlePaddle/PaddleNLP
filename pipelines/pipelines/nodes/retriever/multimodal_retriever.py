@@ -75,6 +75,7 @@ class MultiModalRetriever(BaseRetriever):
         self.progress_bar = progress_bar
         self.top_k = top_k
         self.scale_score = scale_score
+        self.query_type = query_type
 
         self.document_embedder = MultiModalEmbedder(
             embedding_models=document_embedding_models,
@@ -101,7 +102,7 @@ class MultiModalRetriever(BaseRetriever):
     def retrieve(  # type: ignore
         self,
         query: Any,
-        query_type: ContentTypes = "text",
+        query_type: Optional[ContentTypes] = None,
         filters: Optional[FilterType] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
@@ -125,6 +126,8 @@ class MultiModalRetriever(BaseRetriever):
                             value range is scaled to a range of [0,1], where 1 means extremely relevant.
                             Otherwise raw similarity scores (for example, cosine or dot_product) are used.
         """
+        if query_type is None:
+            query_type = self.query_type
         return self.retrieve_batch(
             queries=[query],
             queries_type=query_type,
@@ -140,7 +143,7 @@ class MultiModalRetriever(BaseRetriever):
     def retrieve_batch(  # type: ignore
         self,
         queries: List[Any],
-        queries_type: ContentTypes = "text",
+        queries_type: Optional[ContentTypes] = None,
         filters: Optional[Union[FilterType, List[Optional[FilterType]]]] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,

@@ -16,6 +16,14 @@ from __future__ import annotations
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
+__all__ = [
+    "ERNIE_CTM_CONFIG",
+    "ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION",
+    "ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP",
+    "ErnieCtmConfig",
+]
+
+
 ERNIE_CTM_CONFIG = {
     "vocab_size": 23000,
     "embedding_size": 128,
@@ -98,7 +106,7 @@ class ErnieCtmConfig(PretrainedConfig):
     """
     model_type = "ernie-ctm"
     pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
-    attribute_map = {"num_tag": "num_labels", "dropout": "classifier_dropout"}
+    attribute_map = {"num_tag": "num_labels", "dropout": "classifier_dropout", "num_classes": "num_labels"}
 
     def __init__(
         self,

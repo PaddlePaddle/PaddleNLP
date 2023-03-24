@@ -25,24 +25,25 @@
 """
 
 import argparse
-import os
 import csv
 import glob
-import json
 import gzip
+import json
 import logging
 import pickle
 import time
-from typing import List, Tuple, Dict, Iterator
-import paddle
+from typing import Dict, Iterator, List, Tuple
+
 import numpy as np
+import paddle
+from biencoder_base_model import BiEncoder
+from faiss_indexer import DenseFlatIndexer, DenseHNSWFlatIndexer, DenseIndexer
+from NQdataset import BertTensorizer
 from paddle import Tensor as T
 from paddle import nn
-from paddlenlp.transformers.bert.modeling import BertModel
 from qa_validation import calculate_matches
-from NQdataset import BertTensorizer
-from faiss_indexer import DenseIndexer, DenseHNSWFlatIndexer, DenseFlatIndexer
-from biencoder_base_model import BiEncoder
+
+from paddlenlp.transformers.bert.modeling import BertModel
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

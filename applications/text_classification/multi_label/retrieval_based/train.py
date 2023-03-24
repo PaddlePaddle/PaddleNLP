@@ -15,95 +15,59 @@ import argparse
 import os
 import random
 import time
-import numpy as np
 from functools import partial
-from collections import Counter
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-from paddlenlp.utils.log import logger
-from paddlenlp.data import Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-
-from base_model import SemanticIndexBase
-from model import SemanticIndexBatchNeg
 from data import (
-    read_text_pair,
+    build_index,
     convert_example,
     create_dataloader,
     gen_id2corpus,
     gen_text_file,
-    convert_corpus_example,
+    label2ids,
+    read_text_pair,
 )
-from data import convert_label_example
-from data import build_index, label2ids
 from metric import MetricReport
+from model import SemanticIndexBatchNeg
 
-# yapf: disable
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset, load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
+
+# fmt: off
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./checkpoint', type=str,
-                    help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=512, type=int,
-                    help="The maximum total input sequence length after tokenization. "
-                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--output_emb_size", default=256,
-                    type=int, help="output_embedding_size")
-parser.add_argument("--learning_rate", default=5E-5, type=float,
-                    help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float,
-                    help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=10, type=int,
-                    help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float,
-                    help="Linear warmup proportion over the training process.")
-parser.add_argument("--init_from_ckpt", type=str, default=None,
-                    help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed", type=int, default=1000,
-                    help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--save_steps', type=int, default=10000,
-                    help="Inteval steps to save checkpoint")
-parser.add_argument('--log_steps', type=int, default=10,
-                    help="Inteval steps to print log")
-parser.add_argument("--train_set_file", type=str,
-                    default='./data/train.txt',
-                    help="The full path of train_set_file.")
-parser.add_argument("--margin", default=0.2, type=float,
-                    help="Margin between pos_sample and neg_samples")
-parser.add_argument("--scale", default=30, type=int,
-                    help="Scale for pair-wise margin_rank_loss")
-parser.add_argument("--corpus_file", type=str, default='./data/label.txt',
-                    help="The full path of input file")
-parser.add_argument("--similar_text_pair_file", type=str,
-                    default='./data/dev.txt',
-                    help="The full path of similar text pair file")
-parser.add_argument("--recall_result_dir", type=str, default='./recall_result_dir',
-                    help="The full path of recall result file to save")
-parser.add_argument("--recall_result_file", type=str,
-                    default='recall_result_init.txt', help="The file name of recall result")
-parser.add_argument("--recall_num", default=50, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_m", default=100, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_ef", default=100, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_max_elements", default=1000000,
-                    type=int, help="Recall number for each query from Ann index.")
-parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt',
-                    help="evaluate_result")
-parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
-                    help='whether evaluate while training')
-parser.add_argument("--model_name_or_path",default='rocketqa-zh-dureader-query-encoder',
-                    type=str,help='The pretrained model used for training')
-parser.add_argument("--threshold", default=0.5, type=float,
-                    help="The threshold for selection the labels")
+parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--max_seq_length", default=512, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--output_emb_size", default=256, type=int, help="output_embedding_size")
+parser.add_argument("--learning_rate", default=5E-5, type=float, help="The initial learning rate for Adam.")
+parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
+parser.add_argument('--log_steps', type=int, default=10, help="Inteval steps to print log")
+parser.add_argument("--train_set_file", type=str, default='./data/train.txt', help="The full path of train_set_file.")
+parser.add_argument("--margin", default=0.2, type=float, help="Margin between pos_sample and neg_samples")
+parser.add_argument("--scale", default=30, type=int, help="Scale for pair-wise margin_rank_loss")
+parser.add_argument("--corpus_file", type=str, default='./data/label.txt', help="The full path of input file")
+parser.add_argument("--similar_text_pair_file", type=str, default='./data/dev.txt', help="The full path of similar text pair file")
+parser.add_argument("--recall_result_dir", type=str, default='./recall_result_dir', help="The full path of recall result file to save")
+parser.add_argument("--recall_result_file", type=str, default='recall_result_init.txt', help="The file name of recall result")
+parser.add_argument("--recall_num", default=50, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_m", default=100, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_ef", default=100, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_max_elements", default=1000000, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt', help="evaluate_result")
+parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False], help='whether evaluate while training')
+parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder', type=str, help='The pretrained model used for training')
+parser.add_argument("--threshold", default=0.5, type=float, help="The threshold for selection the labels")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def set_seed(seed):

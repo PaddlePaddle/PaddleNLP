@@ -1333,6 +1333,7 @@ class BertForMaskedLM(BertPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
+        masked_positions: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1396,7 +1397,7 @@ class BertForMaskedLM(BertPretrainedModel):
             return_dict=return_dict,
         )
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output, masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:

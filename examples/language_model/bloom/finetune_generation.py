@@ -41,6 +41,7 @@ from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
@@ -179,7 +180,6 @@ def do_train(args):
     default_global_tokens_num = args.global_batch_size * args.max_seq_length
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    config = BloomConfig.from_pretrained(args.model_name_or_path)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -207,14 +207,15 @@ def do_train(args):
     if dp_rank == 0 and mp_rank == 0 and sharding_rank == 0:
         log_writer_path = os.path.join(args.output_dir, default_logdir())
         log_writer = LogWriter(logdir=log_writer_path)
-
+    # Load the model
+    config = BloomConfig.from_pretrained(args.model_name_or_path)
     WEIGHTS_NAME = "model_state.pdparams"
     OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
     if args.mp_degree > 1:
         WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
         BloomForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
         args.model_name_or_path = split_model_parallel(
-            args.model_name_or_path, None, args.mp_degree, args.sharding_degree
+            args.model_name_or_path, config, args.mp_degree, args.sharding_degree
         )
     config.mp_rank = mp_rank
     config.mp_degree = args.mp_degree
@@ -222,8 +223,20 @@ def do_train(args):
     config["hidden_dropout_prob"] = args.hidden_dropout_prob
     config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
     config["use_recompute"] = args.use_recompute
+    config["use_pure_fp16"] = args.use_pure_fp16
     config["enable_fuse_transformer"] = False
     model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
+
+    if args.lora:
+        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
+        model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
@@ -500,7 +513,10 @@ def do_train(args):
                     else:
                         model_to_save = model_to_save._layer
 
-                output_dir = os.path.join(args.output_dir, "{}_{}".format(model_path, global_step))
+                if config.mp_degree == 1 and config.pp_degree == 1:
+                    output_dir = os.path.join(args.output_dir, str(global_step))
+                else:
+                    output_dir = os.path.join(args.output_dir, str(global_step), model_path)
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Save model to %s" % output_dir)
 
