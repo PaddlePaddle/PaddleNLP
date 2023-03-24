@@ -14,6 +14,7 @@
 
 import paddle
 import paddle.nn as nn
+
 from paddlenlp.transformers import ElectraPretrainedModel
 
 
@@ -118,7 +119,7 @@ class ElectraForSPO(ElectraPretrainedModel):
         cls_output = paddle.unsqueeze(sequence_outputs[:, 0, :], axis=1)
         subject_output = subject_output + cls_output
 
-        output_size = self.num_classes + self.electra.config["hidden_size"]
+        output_size = self.num_classes + self.electra.config["hidden_size"]  # noqa:F841
         rel_logits = self.span_attention(sequence_outputs, subject_output)
 
         return ent_logits, rel_logits

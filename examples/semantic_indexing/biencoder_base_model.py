@@ -30,7 +30,7 @@ class BiEncoder(nn.Layer):
     def __init__(self, question_encoder, context_encoder, state=None):
         super(BiEncoder, self).__init__()
         self.state = state
-        if self.state == None:
+        if self.state is None:
             self.question_encoder = question_encoder
             self.context_encoder = context_encoder
         elif self.state == "FORQUESTION":
@@ -89,7 +89,6 @@ class BiEncoderNllLoss(object):
 
         loss = F.nll_loss(softmax_scorces, paddle.to_tensor(positive_idx_per_question))
 
-        max_score = paddle.max(softmax_scorces, axis=1)
         correct_predictions_count = None
 
         if loss_scale:

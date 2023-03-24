@@ -41,7 +41,7 @@ __all__ = [
 
 def _no_grad_uniform_(tensor, a, b):
     with paddle.no_grad():
-        tensor.set_value(paddle.uniform(shape=tensor.shape, dtype=tensor.dtype, min=a, max=b))
+        tensor.uniform_(min=a, max=b)
     return tensor
 
 
@@ -53,7 +53,7 @@ def _no_grad_normal_(tensor, mean=0.0, std=1.0):
 
 def _no_grad_fill_(tensor, value=0.0):
     with paddle.no_grad():
-        tensor.set_value(paddle.full_like(tensor, value, dtype=tensor.dtype))
+        tensor.fill_(value)
     return tensor
 
 

@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-import numpy as np
-import gzip
 from glob import glob
-from contextlib import contextmanager
-from collections import defaultdict
+
+import numpy as np
 import paddle.distributed as dist
 from paddle.io import IterableDataset
 
@@ -64,7 +61,6 @@ class DialogueDataset(IterableDataset):
                     tgt_start_idx = len(cols[0])
                 else:
                     tgt_start_idx = token_ids.index(self.bos_id, 1)
-                data_id = i
                 sample = [token_ids, type_ids, pos_ids, tgt_start_idx]
                 yield sample
 
@@ -137,7 +133,6 @@ class DialogueDataset(IterableDataset):
         tgt_pos = []
         for sent_index, sent in enumerate(batch_token_ids):
             sent_b_index = batch_tgt_start_idx[sent_index]
-            need_cal = True
             tgt_label.extend(sent[sent_b_index + 1 :])
             tgt_pos.extend([sent_index * max_len + i for i in range(sent_b_index, len(sent) - 1)])
         tgt_label = np.array(tgt_label).astype("int64")

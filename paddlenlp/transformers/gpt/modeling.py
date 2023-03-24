@@ -285,7 +285,7 @@ class TransformerDecoder(nn.Layer):
             output = self.norm(output)
 
         if not return_dict:
-            temp_list = [output, all_hidden_states, new_caches, all_self_attentions]
+            temp_list = [output, new_caches, all_hidden_states, all_self_attentions]
 
             if not (use_cache or output_attentions or output_hidden_states):
                 return output
@@ -321,7 +321,7 @@ class TransformerDecoderLayer(nn.Layer):
     It contains multiheadattention and some linear layers.
     """
 
-    def __init__(self, config, normalize_before=True):
+    def __init__(self, config):
 
         d_model = config.hidden_size
         nhead = config.num_attention_heads
@@ -330,7 +330,7 @@ class TransformerDecoderLayer(nn.Layer):
         activation = config.hidden_act
         attn_dropout = config.attention_probs_dropout_prob
         act_dropout = config.hidden_dropout_prob
-        # normalize_before = config.normalize_before if config.normalize_before else True
+        normalize_before = getattr(config, "normalize_before", True)
 
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range))
         bias_attr = None
@@ -802,7 +802,7 @@ class GPTModel(GPTPretrainedModel):
             else:  # outputs is a tuple
                 idx = 2 if use_cache else 1
                 all_hidden_states = (embedding_output,) + outputs[idx]
-                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
+                outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
 
         self.checkpoints.extend(self.decoder.checkpoints)
 

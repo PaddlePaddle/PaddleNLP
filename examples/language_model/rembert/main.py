@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import argparse
+import logging
+import random
 
+import numpy as np
 import paddle
+import paddle.distributed as dist
+from data_processor import DataGenerator, MrpcProcessor, XNLIProcessor
 from paddle.io import DataLoader, DistributedBatchSampler
+from paddle.metric import Accuracy
 from tqdm import tqdm
 from trainer import Trainer
-import numpy as np
+
 from paddlenlp.transformers import RemBertForSequenceClassification
-from data_processor import MrpcProcessor, tokenization, XNLIProcessor, DataGenerator
-import paddle.distributed as dist
-import random
-from paddle.metric import Accuracy
 
 logger = logging.getLogger(__name__)
 

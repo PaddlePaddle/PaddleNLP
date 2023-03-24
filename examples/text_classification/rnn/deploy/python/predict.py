@@ -16,29 +16,21 @@ import argparse
 
 import numpy as np
 import paddle
-from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
 from scipy.special import softmax
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_file", type=str, required=True,
-    default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
-parser.add_argument("--params_file", type=str, required=True,
-    default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
+from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
-parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru',
-    'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'], default="bilstm",
-    help="Select which network to train, defaults to bilstm.")
-parser.add_argument("--vocab_path", type=str, default="./vocab.json",
-    help="The file path to save vocabulary.")
-parser.add_argument("--max_seq_length",
-    default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+# fmt: off
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
+parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
+parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'], default="bilstm", help="Select which network to train, defaults to bilstm.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to save vocabulary.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'],
-    default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def preprocess_prediction_data(text, tokenizer):

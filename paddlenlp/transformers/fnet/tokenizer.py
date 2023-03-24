@@ -15,10 +15,12 @@
 
 import os
 import unicodedata
-import sentencepiece as spm
-from shutil import copyfile
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from shutil import copyfile
+from typing import Any, Dict, List, Optional
+
+import sentencepiece as spm
+
 from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ["FNetTokenizer"]

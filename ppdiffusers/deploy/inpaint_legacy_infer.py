@@ -16,9 +16,12 @@ import os
 import time
 from io import BytesIO
 
+# isort: split
+import paddle
+
+# isort: split
 import fastdeploy as fd
 import numpy as np
-import paddle
 import PIL
 import requests
 from fastdeploy import ModelFormat

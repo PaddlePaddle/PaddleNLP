@@ -13,31 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import math
 import argparse
+import os
 from functools import partial
 
-import numpy as np
 import paddle
-from paddle.static import InputSpec
-from paddlenlp.data import Pad, Tuple, Stack
-from paddlenlp.metrics import ChunkEvaluator
-
-from data import load_dataset, load_vocab, convert_example
+from data import convert_example, load_dataset, load_vocab
 from model import BiGruCrf
 
-# yapf: disable
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.metrics import ChunkEvaluator
+
+# fmt: off
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def evaluate(args):

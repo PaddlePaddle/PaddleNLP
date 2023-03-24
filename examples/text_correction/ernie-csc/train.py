@@ -12,25 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ErnieModel, ErnieTokenizer
-from paddlenlp.utils.log import logger
-from paddlenlp.metrics import DetectionF1, CorrectionF1
 from model import ErnieForCSC
 from utils import convert_example, create_dataloader, read_train_ds
+
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import MapDataset, load_dataset
+from paddlenlp.metrics import CorrectionF1, DetectionF1
+from paddlenlp.transformers import ErnieModel, ErnieTokenizer, LinearDecayWithWarmup
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()

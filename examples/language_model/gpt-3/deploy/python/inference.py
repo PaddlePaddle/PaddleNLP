@@ -19,6 +19,7 @@ import tempfile
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
+
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
@@ -29,16 +30,25 @@ MODEL_CLASSES = {
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # yapf: disable
-    parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
-    parser.add_argument("--model_path", default=None, type=str, required=True, help="The path prefix of inference model to be used.")
-    parser.add_argument("--tokenizer_name_or_path", default=None, type=str,
-                        help="Path to tokenizer or shortcut name selected in the list: "
-                             + ", ".join(sum([
-                                list(classes[-1].pretrained_init_configuration.keys())
-                                for classes in MODEL_CLASSES.values()], [])), )
-    # yapf: enable
-
+    parser.add_argument(
+        "--model_type",
+        default=None,
+        type=str,
+        required=True,
+        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+    )
+    parser.add_argument(
+        "--model_path", default=None, type=str, required=True, help="The path prefix of inference model to be used."
+    )
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        help="Path to tokenizer or shortcut name selected in the list: "
+        + ", ".join(
+            sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
+        ),
+    )
     args = parser.parse_args()
     return args
 
