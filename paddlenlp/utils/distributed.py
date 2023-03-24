@@ -18,7 +18,6 @@ from typing import Any, Union
 import numpy as np
 import paddle
 import paddle.distributed as distributed
-from paddle.distributed.communication.batch_isend_irecv import _with_batch_p2p_guard
 
 from . import device_guard
 
@@ -219,6 +218,8 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
     Returns:
         _type_: _description_
     """
+    from paddle.distributed.communication.batch_isend_irecv import _with_batch_p2p_guard
+
     rank = distributed.get_rank(group=group)
     nranks = distributed.get_world_size(group=group)
     task_list = []
