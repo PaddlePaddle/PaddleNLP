@@ -13,16 +13,17 @@
 # limitations under the License.
 
 import argparse
-import os, random, time
+import os
+import random
+import time
 
-import paddle
 import numpy as np
-
+import paddle
+from config import Config
 from data import load_data
+from eval import test
 from model import MemN2N
 from train import train
-from eval import test
-from config import Config
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--target", default=111.0, type=float, help="target perplexity")

@@ -20,12 +20,14 @@ from paddlenlp.metrics import Rouge1, RougeL
 class TestRouge(unittest.TestCase):
     def test_rogue1(self):
         rouge1 = Rouge1()
+        rouge1.reset()
         cand = ["The", "cat", "The", "cat", "on", "the", "mat"]
         ref_list = [["The", "cat", "is", "on", "the", "mat"], ["There", "is", "a", "cat", "on", "the", "mat"]]
         self.assertEqual(rouge1.score(cand, ref_list), 0.07692307692307693)
 
     def test_roguel(self):
         rougel = RougeL()
+        rougel.reset()
         cand = ["The", "cat", "The", "cat", "on", "the", "mat"]
         ref_list = [["The", "cat", "is", "on", "the", "mat"], ["There", "is", "a", "cat", "on", "the", "mat"]]
         rougel.add_inst(cand, ref_list)

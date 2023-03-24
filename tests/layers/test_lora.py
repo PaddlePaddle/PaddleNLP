@@ -20,8 +20,14 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 import paddle
+from parameterized import parameterized
 
-from paddlenlp.layers import LoRALinear, get_lora_model
+from paddlenlp.layers import (
+    LoRAConfig,
+    LoRALinear,
+    get_lora_model,
+    mark_only_lora_as_trainable,
+)
 from paddlenlp.transformers import AutoModel
 
 
@@ -33,7 +39,7 @@ class TestLoraLayer(unittest.TestCase):
         self.assertFalse(lora_layer.lora_A.stop_gradient)
         self.assertFalse(lora_layer.lora_B.stop_gradient)
         self.assertTrue(lora_layer.weight.stop_gradient)
-        self.assertTrue(lora_layer.bias.stop_gradient)
+        self.assertFalse(lora_layer.bias.stop_gradient)
         self.assertEqual(output.shape, [2, 8])
 
     def test_train_eval(self):
@@ -46,7 +52,7 @@ class TestLoraLayer(unittest.TestCase):
         eval_result = lora_layer(x)
         eval_weight = lora_layer.weight
         self.assertTrue(paddle.allclose(train_result, eval_result))
-        self.assertFalse(paddle.allclose(train_weight, eval_weight))
+        self.assertTrue(paddle.allclose(train_weight, eval_weight))
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
@@ -72,25 +78,37 @@ class TestLoraLayer(unittest.TestCase):
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
-            self.assertFalse(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
+            self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 
 class TestLoraModel(unittest.TestCase):
-    def test_get_lora_model(self):
-        lora_config = {"target_modules": [".*q_proj.*", ".*v_proj.*"], "r": 4, "lora_alpha": 8}
+    @parameterized.expand([(None,), ("all",), ("lora",)])
+    def test_get_lora_model(self, bias):
+        lora_config = LoRAConfig(
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
         # turn off plm dropout for to test train vs test
         model = AutoModel.from_pretrained(
             "__internal_testing__/tiny-random-bert", hidden_dropout_prob=0, attention_probs_dropout_prob=0
         )
         lora_model = get_lora_model(model, lora_config)
-        state_dict = lora_model.state_dict()
-        for weight_name in state_dict:
-            for target_module in lora_config["target_modules"]:
-                if re.fullmatch(target_module, weight_name):
-                    if "lora" in weight_name:
-                        self.assertFalse(state_dict[weight_name].stop_gradient)
-                    else:
-                        self.assertTrue(state_dict[weight_name].stop_gradient)
+        mark_only_lora_as_trainable(lora_model, bias)
+        for name, weight in lora_model.state_dict().items():
+            if any([re.fullmatch(target_module, name) for target_module in lora_config.target_modules]):
+                if "lora" in name:
+                    self.assertFalse(weight.stop_gradient)
+                elif "bias" in name and bias in ["lora", "all"]:
+                    self.assertFalse(weight.stop_gradient)
+                else:
+                    self.assertTrue(weight.stop_gradient)
+            else:
+                if "bias" in name and bias == "all":
+                    self.assertFalse(weight.stop_gradient)
+                else:
+                    self.assertTrue(weight.stop_gradient)
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
         model.train()
         train_forward_results = model(input_ids)
@@ -99,6 +117,13 @@ class TestLoraModel(unittest.TestCase):
         eval_forward_results = model(input_ids)
         self.assertIsNotNone(eval_forward_results)
         for i, j in zip(train_forward_results, eval_forward_results):
-            print(i[:2, :2])
-            print(j[:2, :2])
             self.assertTrue(paddle.allclose(i, j))
+
+
+class TestLoRAConfig(unittest.TestCase):
+    def test_save_load(self):
+        with TemporaryDirectory() as tempdir:
+            lora_config = LoRAConfig()
+            lora_config.save_pretrained(tempdir)
+            loaded_lora_config = LoRAConfig.from_pretrained(tempdir)
+            self.assertEqual(lora_config, loaded_lora_config)

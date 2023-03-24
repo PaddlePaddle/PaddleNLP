@@ -263,3 +263,4 @@ class GLMConfig(PretrainedConfig):
         self.layernorm_epsilon = layernorm_epsilon
         self.paddle_dtype = paddle_dtype
         self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights
+        self._fast_entry = None

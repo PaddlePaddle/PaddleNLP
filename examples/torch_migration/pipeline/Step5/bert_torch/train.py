@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
 import datetime
+import os
 import random
+import sys
 import time
 
-import paddle
 import numpy as np
 import torch
 import torch.utils.data
@@ -32,7 +31,7 @@ CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
 CONFIG_PATH = CURRENT_DIR.rsplit("/", 2)[0]
 sys.path.append(CONFIG_PATH)
 
-from models.pt_bert import BertConfig, BertForSequenceClassification
+from models.pt_bert import BertConfig, BertForSequenceClassification  # noqa: E402
 
 task_to_keys = {
     "cola": ("sentence", None),

@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import paddle
-
-from model import CrossEntropyWithKL, VAESeq2SeqModel, Perplexity, NegativeLogLoss, TrainCallback
 from args import parse_args
 from data import create_data_loader
+from model import (
+    CrossEntropyWithKL,
+    NegativeLogLoss,
+    Perplexity,
+    TrainCallback,
+    VAESeq2SeqModel,
+)
 
 
 def train(args):
     print(args)
-    device = paddle.set_device(args.device)
+    paddle.set_device(args.device)
     train_loader, dev_loader, test_loader, vocab, bos_id, pad_id, train_data_len = create_data_loader(args)
 
     net = VAESeq2SeqModel(

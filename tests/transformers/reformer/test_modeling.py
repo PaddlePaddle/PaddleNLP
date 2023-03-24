@@ -36,6 +36,7 @@ from tests.testing_utils import slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
+    ModelTesterPretrainedMixin,
     floats_tensor,
     ids_tensor,
     random_attention_mask,
@@ -754,3 +755,53 @@ class ReformerLSHAttnModelTest(ReformerTesterMixin, ModelTesterMixin, unittest.T
     def test_problem_types(self):
         # Fails because the sequence length is not a multiple of 4
         pass
+
+
+class ReformerModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
+    base_model_class = ReformerModel
+    hf_remote_test_model_path = "PaddleCI/tiny-random-reformer"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-reformer"
+
+    @slow
+    def test_inference_no_attention(self):
+        model = ReformerModel.from_pretrained("reformer-enwik8")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 2048]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [0.08537189, -0.01475962, 0.28183940],
+                    [0.11155435, 0.03538624, 0.37847346],
+                    [0.12673721, 0.07730877, 0.48841247],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_attention(self):
+        model = ReformerModel.from_pretrained("reformer-enwik8")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 2048]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [0.08537189, -0.01475962, 0.28183940],
+                    [0.11155435, 0.03538624, 0.37847346],
+                    [0.12673721, 0.07730877, 0.48841247],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))

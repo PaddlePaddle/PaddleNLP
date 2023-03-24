@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-import os
-import math
-import collections
 import base64
+import collections
+
+import cv2
+import numpy as np
+import paddle
+import scipy
+import six
+from paddleocr import PaddleOCR
 from PIL import Image
 from seqeval.metrics.sequence_labeling import get_entities
-import numpy as np
-import cv2
-import scipy
-import paddle
+
 from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.datasets import load_dataset
-from paddlenlp.utils.log import logger
-from paddleocr import PaddleOCR
 from paddlenlp.utils.image_utils import ppocr2example
+from paddlenlp.utils.log import logger
 
 
 class InferBackend(object):

@@ -218,7 +218,7 @@ class GLMModelTester:
         model = GLMForConditionalGeneration(config=config)
         model.eval()
         result = model(input_ids, attention_mask=attention_mask, position_ids=position_ids, return_dict=True)
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
         self.parent.assertEqual(len(result.past_key_values), self.num_layers + 1)
         self.parent.assertEqual(result.past_key_values[0].shape, [self.seq_length, self.seq_length, self.hidden_size])
 

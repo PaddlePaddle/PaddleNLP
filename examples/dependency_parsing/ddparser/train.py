@@ -14,21 +14,21 @@
 
 import argparse
 import os
-import time
 import random
+import time
 from functools import partial
 
 import numpy as np
 import paddle
+from criterion import ParserCriterion
+from data import build_vocab, convert_example, create_dataloader
+from metric import ParserEvaluator
+from model.dep import BiAffineParser
+from utils import decode, flat_words
+
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers.optimization import LinearDecayWithWarmup
-from paddlenlp.datasets import load_dataset
-
-from data import create_dataloader, build_vocab, convert_example
-from model.dep import BiAffineParser
-from metric import ParserEvaluator
-from criterion import ParserCriterion
-from utils import decode, flat_words
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -214,7 +214,6 @@ def do_train(args):
 
     # Data parallel for distributed training
     model = paddle.DataParallel(model)
-    trainer_num = paddle.distributed.get_world_size()
 
     num_training_steps = len(list(train_data_loader)) * args.epochs
 

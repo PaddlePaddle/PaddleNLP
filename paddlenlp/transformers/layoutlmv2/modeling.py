@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2021 Microsoft Research and The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,16 +19,19 @@ import math
 
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
 import paddle.nn.functional as F
-from paddle import ParamAttr
-from paddle.nn import Layer
-from paddle.nn import CrossEntropyLoss
+from paddle.nn import CrossEntropyLoss, Layer
 
 from paddlenlp.utils.log import logger
+
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
-from ..layoutxlm.visual_backbone import build_resnet_fpn_backbone
-from ..layoutxlm.visual_backbone import read_config
+from ..layoutxlm.visual_backbone import build_resnet_fpn_backbone, read_config
+from .configuration import (
+    LAYOUTLMV2_PRETRAINED_INIT_CONFIGURATION,
+    LAYOUTLMV2_PRETRAINED_RESOURCE_FILES_MAP,
+    LayoutLMv2Config,
+)
 
 __all__ = [
     "LayoutLMv2Model",
@@ -91,17 +94,17 @@ class LayoutLMv2Embeddings(Layer):
 
     def __init__(self, config):
         super(LayoutLMv2Embeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(config["vocab_size"], config["hidden_size"], padding_idx=0)
-        self.position_embeddings = nn.Embedding(config["max_position_embeddings"], config["hidden_size"])
-        self.x_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.y_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.h_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.w_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.x_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.y_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.h_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.w_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def _cal_spatial_position_embeddings(self, bbox):
         try:
@@ -171,107 +174,14 @@ class LayoutLMv2Embeddings(Layer):
 
 
 class LayoutLMv2PretrainedModel(PretrainedModel):
-    pretrained_init_configuration = {
-        "layoutlmv2-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "coordinate_size": 128,
-            "fast_qkv": True,
-            "gradient_checkpointing": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 0,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "has_relative_attention_bias": True,
-            "has_spatial_attention_bias": True,
-            "has_visual_segment_embedding": False,
-        },
-        "layoutlmv2-large-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "coordinate_size": 171,
-            "fast_qkv": False,
-            "gradient_checkpointing": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "output_past": True,
-            "pad_token_id": 0,
-            "shape_size": 170,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "has_relative_attention_bias": True,
-            "has_spatial_attention_bias": True,
-            "has_visual_segment_embedding": False,
-        },
-        "vi-layoutlmv2-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "coordinate_size": 128,
-            "fast_qkv": True,
-            "gradient_checkpointing": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 0,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "has_relative_attention_bias": True,
-            "has_spatial_attention_bias": True,
-            "has_visual_segment_embedding": False,
-            "use_visual_backbone": False,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "layoutlmv2-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-base-uncased/model_state.pdparams",
-            "layoutlmv2-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-large-uncased/model_state.pdparams",
-            "vi-layoutlmv2-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/vi-layoutlmv2-base-uncased/model_state.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = LayoutLMv2Config
+    resource_files_names = {"model_state": "model_state.pdparams"}
+
     base_model_prefix = "layoutlmv2"
+
+    pretrained_init_configuration = LAYOUTLMV2_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LAYOUTLMV2_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -280,9 +190,7 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.pretrained_init_configuration["initializer_range"]
-                        if "initializer_range" in self.pretrained_init_configuration
-                        else 0.02,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -292,9 +200,9 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
 class LayoutLMv2SelfOutput(nn.Layer):
     def __init__(self, config):
         super(LayoutLMv2SelfOutput, self).__init__()
-        self.dense = nn.Linear(config["hidden_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -307,21 +215,21 @@ class LayoutLMv2SelfOutput(nn.Layer):
 class LayoutLMv2SelfAttention(nn.Layer):
     def __init__(self, config):
         super(LayoutLMv2SelfAttention, self).__init__()
-        if config["hidden_size"] % config["num_attention_heads"] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size {} is not a multiple of the number of attention "
-                "heads {}".format(config["hidden_size"], config["num_attention_heads"])
+                "heads {}".format(config.hidden_size, config.num_attention_heads)
             )
-        self.fast_qkv = config["fast_qkv"]
-        self.num_attention_heads = config["num_attention_heads"]
-        self.attention_head_size = int(config["hidden_size"] / config["num_attention_heads"])
+        self.fast_qkv = config.fast_qkv
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.has_relative_attention_bias = config["has_relative_attention_bias"]
-        self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
+        self.has_relative_attention_bias = config.has_relative_attention_bias
+        self.has_spatial_attention_bias = config.has_spatial_attention_bias
 
-        if config["fast_qkv"]:
-            self.qkv_linear = nn.Linear(config["hidden_size"], 3 * self.all_head_size, bias_attr=False)
+        if self.fast_qkv:
+            self.qkv_linear = nn.Linear(config.hidden_size, 3 * self.all_head_size, bias_attr=False)
             self.q_bias = self.create_parameter(
                 shape=[1, 1, self.all_head_size], default_initializer=nn.initializer.Constant(0.0)
             )
@@ -329,11 +237,11 @@ class LayoutLMv2SelfAttention(nn.Layer):
                 shape=[1, 1, self.all_head_size], default_initializer=nn.initializer.Constant(0.0)
             )
         else:
-            self.query = nn.Linear(config["hidden_size"], self.all_head_size)
-            self.key = nn.Linear(config["hidden_size"], self.all_head_size)
-            self.value = nn.Linear(config["hidden_size"], self.all_head_size)
+            self.query = nn.Linear(config.hidden_size, self.all_head_size)
+            self.key = nn.Linear(config.hidden_size, self.all_head_size)
+            self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
         new_x_shape = list(x.shape[:-1]) + [self.num_attention_heads, self.attention_head_size]
@@ -455,27 +363,23 @@ class LayoutLMv2Encoder(nn.Layer):
     def __init__(self, config):
         super(LayoutLMv2Encoder, self).__init__()
         self.config = config
-        self.layer = nn.LayerList([LayoutLMv2Layer(config) for _ in range(config["num_hidden_layers"])])
+        self.layer = nn.LayerList([LayoutLMv2Layer(config) for _ in range(config.num_hidden_layers)])
 
-        self.has_relative_attention_bias = config["has_relative_attention_bias"]
-        self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
+        self.has_relative_attention_bias = config.has_relative_attention_bias
+        self.has_spatial_attention_bias = config.has_spatial_attention_bias
 
         if self.has_relative_attention_bias:
-            self.rel_pos_bins = config["rel_pos_bins"]
-            self.max_rel_pos = config["max_rel_pos"]
-            self.rel_pos_onehot_size = config["rel_pos_bins"]
-            self.rel_pos_bias = nn.Linear(self.rel_pos_onehot_size, config["num_attention_heads"], bias_attr=False)
+            self.rel_pos_bins = config.rel_pos_bins
+            self.max_rel_pos = config.max_rel_pos
+            self.rel_pos_onehot_size = config.rel_pos_bins
+            self.rel_pos_bias = nn.Linear(self.rel_pos_onehot_size, config.num_attention_heads, bias_attr=False)
 
         if self.has_spatial_attention_bias:
-            self.max_rel_2d_pos = config["max_rel_2d_pos"]
-            self.rel_2d_pos_bins = config["rel_2d_pos_bins"]
-            self.rel_2d_pos_onehot_size = config["rel_2d_pos_bins"]
-            self.rel_pos_x_bias = nn.Linear(
-                self.rel_2d_pos_onehot_size, config["num_attention_heads"], bias_attr=False
-            )
-            self.rel_pos_y_bias = nn.Linear(
-                self.rel_2d_pos_onehot_size, config["num_attention_heads"], bias_attr=False
-            )
+            self.max_rel_2d_pos = config.max_rel_2d_pos
+            self.rel_2d_pos_bins = config.rel_2d_pos_bins
+            self.rel_2d_pos_onehot_size = config.rel_2d_pos_bins
+            self.rel_pos_x_bias = nn.Linear(self.rel_2d_pos_onehot_size, config.num_attention_heads, bias_attr=False)
+            self.rel_pos_y_bias = nn.Linear(self.rel_2d_pos_onehot_size, config.num_attention_heads, bias_attr=False)
 
     def _cal_1d_pos_emb(self, hidden_states, position_ids):
         rel_pos_mat = position_ids.unsqueeze(-2) - position_ids.unsqueeze(-1)
@@ -566,11 +470,11 @@ class LayoutLMv2Encoder(nn.Layer):
 class LayoutLMv2Intermediate(nn.Layer):
     def __init__(self, config):
         super(LayoutLMv2Intermediate, self).__init__()
-        self.dense = nn.Linear(config["hidden_size"], config["intermediate_size"])
-        if config["hidden_act"] == "gelu":
+        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+        if config.hidden_act == "gelu":
             self.intermediate_act_fn = nn.GELU()
         else:
-            assert False, "hidden_act is set as: {}, please check it..".format(config["hidden_act"])
+            assert False, "hidden_act is set as: {}, please check it..".format(config.hidden_act)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -582,9 +486,9 @@ class LayoutLMv2Intermediate(nn.Layer):
 class LayoutLMv2Output(nn.Layer):
     def __init__(self, config):
         super(LayoutLMv2Output, self).__init__()
-        self.dense = nn.Linear(config["intermediate_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -659,10 +563,10 @@ class VisualBackbone(nn.Layer):
         self.register_buffer("pixel_std", paddle.to_tensor(self.cfg.MODEL.PIXEL_STD).reshape([num_channels, 1, 1]))
         self.out_feature_key = "p2"
         # is_deterministic is disabled here.
-        self.pool = nn.AdaptiveAvgPool2D(config["image_feature_pool_shape"][:2])
-        if len(config["image_feature_pool_shape"]) == 2:
-            config["image_feature_pool_shape"].append(self.backbone.output_shape()[self.out_feature_key].channels)
-        assert self.backbone.output_shape()[self.out_feature_key].channels == config["image_feature_pool_shape"][2]
+        self.pool = nn.AdaptiveAvgPool2D(config.image_feature_pool_shape[:2])
+        if len(config.image_feature_pool_shape) == 2:
+            config.image_feature_pool_shape.append(self.backbone.output_shape()[self.out_feature_key].channels)
+        assert self.backbone.output_shape()[self.out_feature_key].channels == config.image_feature_pool_shape[2]
 
     def forward(self, images):
         images_input = (paddle.to_tensor(images) - self.pixel_mean) / self.pixel_std
@@ -714,35 +618,29 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
             Defaults to ``0.02``.
     """
 
-    def __init__(
-        self,
-        with_pool="tanh",
-        use_visual_backbone=True,
-        **kwargs,
-    ):
-        super(LayoutLMv2Model, self).__init__()
-        config = kwargs
-        self.config = kwargs
-        self.use_visual_backbone = use_visual_backbone
-        self.has_visual_segment_embedding = config["has_visual_segment_embedding"]
+    def __init__(self, config):
+        super(LayoutLMv2Model, self).__init__(config)
+        self.use_visual_backbone = config.use_visual_backbone
+        self.has_visual_segment_embedding = config.has_visual_segment_embedding
         self.embeddings = LayoutLMv2Embeddings(config)
 
         if self.use_visual_backbone is True:
             self.visual = VisualBackbone(config)
             self.visual.stop_gradient = True
-            self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1], config["hidden_size"])
+            self.visual_proj = nn.Linear(config.image_feature_pool_shape[-1], config.hidden_size)
         if self.has_visual_segment_embedding:
             self.visual_segment_embedding = self.create_parameter(
                 shape=[
-                    config["hidden_size"],
+                    config.hidden_size,
                 ],
                 dtype=paddle.float32,
             )
-        self.visual_LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.visual_dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.visual_LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.visual_dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.encoder = LayoutLMv2Encoder(config)
-        self.pooler = LayoutLMv2Pooler(config["hidden_size"], with_pool)
+        self.pooler = LayoutLMv2Pooler(config.hidden_size, config.with_pool)
+        self.config = config
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids, token_type_ids):
         words_embeddings = self.embeddings.word_embeddings(input_ids)
@@ -778,19 +676,19 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        num_position_embeds_diff = new_num_position_embeddings - self.config["max_position_embeddings"]
+        num_position_embeds_diff = new_num_position_embeddings - self.config.max_position_embeddings
 
         # no resizing needs to be done if the length stays the same
         if num_position_embeds_diff == 0:
             return
 
         logger.info(f"Setting `config.max_position_embeddings={new_num_position_embeddings}`...")
-        self.config["max_position_embeddings"] = new_num_position_embeddings
+        self.config.max_position_embeddings = new_num_position_embeddings
 
         old_position_embeddings_weight = self.embeddings.position_embeddings.weight
 
         self.embeddings.position_embeddings = nn.Embedding(
-            self.config["max_position_embeddings"], self.config["hidden_size"]
+            self.config.max_position_embeddings, self.config.hidden_size
         )
 
         with paddle.no_grad():
@@ -814,28 +712,28 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         input_shape = paddle.shape(input_ids)
 
         visual_shape = list(input_shape)
-        visual_shape[1] = self.config["image_feature_pool_shape"][0] * self.config["image_feature_pool_shape"][1]
+        visual_shape[1] = self.config.image_feature_pool_shape[0] * self.config.image_feature_pool_shape[1]
 
         visual_bbox_x = (
             paddle.arange(
                 0,
-                1000 * (self.config["image_feature_pool_shape"][1] + 1),
+                1000 * (self.config.image_feature_pool_shape[1] + 1),
                 1000,
                 dtype=bbox.dtype,
             )
-            // self.config["image_feature_pool_shape"][1]
+            // self.config.image_feature_pool_shape[1]
         )
         visual_bbox_y = (
             paddle.arange(
                 0,
-                1000 * (self.config["image_feature_pool_shape"][0] + 1),
+                1000 * (self.config.image_feature_pool_shape[0] + 1),
                 1000,
                 dtype=bbox.dtype,
             )
-            // self.config["image_feature_pool_shape"][0]
+            // self.config.image_feature_pool_shape[0]
         )
 
-        expand_shape = self.config["image_feature_pool_shape"][0:2]
+        expand_shape = self.config.image_feature_pool_shape[0:2]
 
         visual_bbox = paddle.stack(
             [
@@ -896,12 +794,12 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         if head_mask is not None:
             if head_mask.dim() == 1:
                 head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.config["num_hidden_layers"], -1, -1, -1, -1)
+                head_mask = head_mask.expand(self.config.num_hidden_layers, -1, -1, -1, -1)
             elif head_mask.dim() == 2:
                 head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
             head_mask = head_mask.to(dtype=next(self.parameters()).dtype)
         else:
-            head_mask = [None] * self.config["num_hidden_layers"]
+            head_mask = [None] * self.config.num_hidden_layers
 
         encoder_outputs = self.encoder(
             final_emb,
@@ -920,23 +818,23 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
 
 # Copied from paddlenlp.transformers.layoutxlm.modeling.LayoutXLMForTokenClassification with XLM->LMv2
 class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
-    def __init__(self, layoutlmv2, num_classes=2, dropout=None):
-        super(LayoutLMv2ForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(layoutlmv2, dict):
-            self.layoutlmv2 = LayoutLMv2Model(**layoutlmv2)
-        else:
-            self.layoutlmv2 = layoutlmv2
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutlmv2.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutlmv2.config["hidden_size"], num_classes)
+    def __init__(self, config):
+        super(LayoutLMv2ForTokenClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.layoutlmv2 = LayoutLMv2Model(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.classifier.apply(self.init_weights)
+        self.num_hidden_layers = config.num_hidden_layers
 
     def get_input_embeddings(self):
         return self.layoutlmv2.embeddings.word_embeddings
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
-        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+        Resizes position embeddings of the model if `new_num_position_embeddings != config.max_position_embeddings`.
 
         Arguments:
             new_num_position_embeddings (`int`):
@@ -968,11 +866,11 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
         )
         seq_length = input_ids.shape[1]
         # sequence out and image out
-        sequence_output, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output, _ = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        hidden_states = {f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(12)}
+        hidden_states = {f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(self.num_hidden_layers)}
 
         if self.training:
             outputs = logits, hidden_states
@@ -1056,19 +954,19 @@ class LayoutLMv2PretrainingHeads(Layer):
 
 # Copied from paddlenlp.transformers.layoutxlm.modeling.LayoutXLMForPretraining with XLM->LMv2
 class LayoutLMv2ForPretraining(LayoutLMv2PretrainedModel):
-    def __init__(self, layoutlmv2):
-        super(LayoutLMv2ForPretraining, self).__init__()
-        self.layoutlmv2 = layoutlmv2
+    def __init__(self, config):
+        super(LayoutLMv2ForPretraining, self).__init__(config)
+        self.layoutlmv2 = LayoutLMv2Model(config)
         self.cls = LayoutLMv2PretrainingHeads(
-            self.layoutlmv2.config["hidden_size"],
-            self.layoutlmv2.config["vocab_size"],
-            self.layoutlmv2.config["hidden_act"],
+            self.layoutlmv2.config.hidden_size,
+            self.layoutlmv2.config.vocab_size,
+            self.layoutlmv2.config.hidden_act,
             embedding_weights=self.layoutlmv2.embeddings.word_embeddings.weight,
         )
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
-        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+        Resizes position embeddings of the model if `new_num_position_embeddings != config.max_position_embeddings`.
 
         Arguments:
             new_num_position_embeddings (`int`):
@@ -1229,16 +1127,15 @@ class REDecoder(nn.Layer):
 
 # Copied from paddlenlp.transformers.layoutxlm.modeling.LayoutXLMForRelationExtraction with XLM->LMv2
 class LayoutLMv2ForRelationExtraction(LayoutLMv2PretrainedModel):
-    def __init__(self, layoutlmv2, hidden_size=768, hidden_dropout_prob=0.1, dropout=None):
-        super(LayoutLMv2ForRelationExtraction, self).__init__()
-        if isinstance(layoutlmv2, dict):
-            self.layoutlmv2 = LayoutLMv2Model(**layoutlmv2)
-        else:
-            self.layoutlmv2 = layoutlmv2
+    def __init__(self, config):
+        super(LayoutLMv2ForRelationExtraction, self).__init__(config)
+        self.layoutlmv2 = LayoutLMv2Model(config)
 
-        self.extractor = REDecoder(hidden_size, hidden_dropout_prob)
+        self.extractor = REDecoder(config.hidden_size, config.hidden_dropout_prob)
 
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutlmv2.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
 
     def init_weights(self, layer):
         """Initialize the weights"""
@@ -1258,7 +1155,7 @@ class LayoutLMv2ForRelationExtraction(LayoutLMv2PretrainedModel):
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
-        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+        Resizes position embeddings of the model if `new_num_position_embeddings != config.max_position_embeddings`.
 
         Arguments:
             new_num_position_embeddings (`int`):
@@ -1292,7 +1189,7 @@ class LayoutLMv2ForRelationExtraction(LayoutLMv2PretrainedModel):
         )
 
         seq_length = input_ids.shape[1]
-        sequence_output, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output, _ = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
         sequence_output = self.dropout(sequence_output)
         loss, pred_relations = self.extractor(sequence_output, entities, relations)
 
