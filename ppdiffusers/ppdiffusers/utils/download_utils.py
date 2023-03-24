@@ -155,6 +155,7 @@ ALLOW_PATTERNS_MAPPING = {
         "model_state.pdparams",
         "config.json",
     ],
+    "mel": ["mel_config.json"],
     "others": [
         "model_state.pdparams",
         "model_config.json",
