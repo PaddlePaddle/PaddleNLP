@@ -87,6 +87,7 @@ from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
+from .ernie_ctm.configuration import *
 from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
 from .ernie_doc.configuration import *
@@ -139,6 +140,7 @@ from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
+from .roformer.configuration import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
 from .skep.configuration import *
