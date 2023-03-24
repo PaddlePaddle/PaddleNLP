@@ -12,27 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import time
-import random
-import argparse
-import numpy as np
-from scipy import stats
 from functools import partial
 
+import numpy as np
 import paddle
-import paddle.nn.functional as F
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from data import convert_example, create_dataloader, read_text_pair, read_text_single
+from model import DiffCSE, Encoder
+from utils import eval_metric, set_seed
 from visualdl import LogWriter
 
-from model import DiffCSE, Encoder
-from utils import set_seed, eval_metric
-from data import read_text_single, read_text_pair, convert_example, create_dataloader
+import paddlenlp as ppnlp
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import LinearDecayWithWarmup
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["train", "eval", "infer"], default="infer", help="Select which mode to run model, defaults to infer.")
 parser.add_argument("--encoder_name", type=str, help="The sentence_encoder name or path that you wanna train based on.")
@@ -61,7 +58,7 @@ parser.add_argument("--lambda_weight", default=0.15, type=float, help="The weigh
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def do_infer(model, tokenizer, data_loader):

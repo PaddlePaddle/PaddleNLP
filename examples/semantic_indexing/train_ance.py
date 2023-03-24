@@ -13,34 +13,32 @@
 # limitations under the License.
 
 import argparse
-import sys
 import os
 import random
 import time
-import logging
 from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
+from ance.model import SemanticIndexANCE
+from data import (
+    convert_example,
+    create_dataloader,
+    get_latest_ann_data,
+    get_latest_checkpoint,
+    read_text_triplet,
+)
 
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 
-from ance.model import SemanticIndexANCE
-from data import read_text_pair, read_text_triplet
-from data import convert_example, create_dataloader
-from data import get_latest_checkpoint, get_latest_ann_data
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoints', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--ann_data_dir", default='./ann_data', type=str, help="The output directory where the ann generated training data will be saved.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--max_training_steps", default=1000000, type=int, help="The maximum total steps for training")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
@@ -54,10 +52,8 @@ parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Sel
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file")
 parser.add_argument("--margin", default=0.3, type=float, help="Margin for pair-wise margin_rank_loss")
-
-
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def set_seed(seed):

@@ -19,14 +19,15 @@
 # an end-to-end way. This technique can economize on manpower and reduce
 # error rates.
 
-import os
-import sys
-import json
 import argparse
+import json
+import os
 import pprint
+
 from tqdm import tqdm
-from paddlenlp import Taskflow
 from utils import mandarin_asr_api
+
+from paddlenlp import Taskflow
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
