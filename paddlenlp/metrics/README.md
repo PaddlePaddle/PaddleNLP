@@ -12,3 +12,4 @@
 | Mcc(Matthews correlation coefficient)                    | 马修斯相关系数，用以测量二分类的分类性能的指标。可用于GLUE中的CoLA任务 | `paddlenlp.metrics.Mcc`                                      |
 | ChunkEvaluator                                           | 计算了块检测的精确率、召回率和F1-score。常用于序列标记任务，如命名实体识别（NER） | `paddlenlp.metrics.ChunkEvaluator`                           |
 | Squad                                                    | 用于SQuAD和DuReader-robust的评价指标                         | `paddlenlp.metrics.compute_predictions`, `paddlenlp.metrics.squad_evaluate` |
+| MRR(Mean Reciprocal Rank)                                                    | 是一个国际上通用的对搜索算法进行评价的机制                         | `paddlenlp.metrics.MRR` |
