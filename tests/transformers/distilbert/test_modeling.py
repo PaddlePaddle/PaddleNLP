@@ -293,48 +293,46 @@ class DistilBertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCa
 
     @slow
     def test_inference_no_attention(self):
-        model = DistilBertModel.from_pretrained("distilbert-base-uncased")
+        model = DistilBertModel.from_pretrained("__internal_testing__/tiny-random-distilbert")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)
-        expected_shape = [1, 11, 768]
+        expected_shape = [1, 11, 8]
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [-0.16389611, 0.32992917, 0.16476534],
-                    [-0.17464690, 0.32893252, 0.17102842],
-                    [-0.18842840, 0.33565634, 0.18097782],
+                    [0.50366199, -1.33068442, -1.73558784],
+                    [1.72435653, 1.08600891, -0.28388503],
+                    [-0.19172087, -0.56781638, 0.51192915],
                 ]
             ]
         )
-        print(output[:, 1:4, 1:4])
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
-        model = DistilBertModel.from_pretrained("distilbert-base-uncased")
+        model = DistilBertModel.from_pretrained("__internal_testing__/tiny-random-distilbert")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)
-        expected_shape = [1, 11, 768]
+        expected_shape = [1, 11, 8]
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [-0.16389611, 0.32992917, 0.16476534],
-                    [-0.17464690, 0.32893252, 0.17102842],
-                    [-0.18842840, 0.33565634, 0.18097782],
+                    [0.50366199, -1.33068442, -1.73558784],
+                    [1.72435653, 1.08600891, -0.28388503],
+                    [-0.19172087, -0.56781638, 0.51192915],
                 ]
             ]
         )
-        print(output[:, 1:4, 1:4])
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
