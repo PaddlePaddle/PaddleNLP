@@ -209,6 +209,7 @@ from .gptj.tokenizer import *
 from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .pegasus.configuration import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
