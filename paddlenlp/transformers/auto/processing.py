@@ -33,6 +33,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
         ("ChineseCLIPProcessor", "chineseclip"),
         ("CLIPProcessor", "clip"),
         ("ErnieViLProcessor", "ernie_vil"),
+        ("CLIPSegProcessor", "clipseg"),
     ]
 )
 
@@ -40,7 +41,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.procesing")
+        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
