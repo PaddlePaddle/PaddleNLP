@@ -14,14 +14,8 @@
 # limitations under the License.
 
 import os
-import pickle
-import six
-import shutil
 
-from paddle.utils import try_import
-from paddlenlp.utils.env import MODEL_HOME
-
-from .. import BasicTokenizer, PretrainedTokenizer
+from .. import PretrainedTokenizer
 
 __all__ = ["ErnieCtmTokenizer"]
 
