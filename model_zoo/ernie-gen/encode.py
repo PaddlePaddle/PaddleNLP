@@ -52,7 +52,7 @@ def convert_example(
             (pos,) = np.where(np.ones_like(tgt_ids))
             np.random.shuffle(pos)
             pos = pos[: int(noise_prob * len(pos))]
-            tgt_ids[pos,] = noice_ids[
+            tgt_ids[pos] = noice_ids[
                 pos,
             ]
         else:
@@ -112,12 +112,12 @@ def after_padding(args):
     src_len = src_ids.shape[1]
     tgt_len = tgt_ids.shape[1]
     mask_00 = gen_mask(src_ids, "bidi", query_len=src_len)
-    mask_01 = gen_mask(tgt_ids, "empty", query_len=src_len)
-    mask_02 = gen_mask(attn_ids, "empty", query_len=src_len)
+    # mask_01 = gen_mask(tgt_ids, "empty", query_len=src_len)
+    # mask_02 = gen_mask(attn_ids, "empty", query_len=src_len)
 
     mask_10 = gen_mask(src_ids, "bidi", query_len=tgt_len)
     mask_11 = gen_mask(tgt_ids, "causal", query_len=tgt_len)
-    mask_12 = gen_mask(attn_ids, "empty", query_len=tgt_len)
+    # mask_12 = gen_mask(attn_ids, "empty", query_len=tgt_len)
 
     mask_20 = gen_mask(src_ids, "bidi", query_len=tgt_len)
     mask_21 = gen_mask(tgt_ids, "causal_without_diag", query_len=tgt_len)
