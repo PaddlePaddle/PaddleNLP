@@ -139,6 +139,7 @@ from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
+from .roformer.configuration import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
 from .skep.configuration import *
