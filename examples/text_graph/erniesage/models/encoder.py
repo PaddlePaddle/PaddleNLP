@@ -15,9 +15,7 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import numpy as np
-
-from models.conv import GraphSageConv, ErnieSageV2Conv
+from models.conv import ErnieSageV2Conv, GraphSageConv
 
 
 class Encoder(nn.Layer):
@@ -72,7 +70,6 @@ class ErnieSageV2Encoder(Encoder):
         # Don't add ernie to self, oterwise, there will be more copies of ernie weights
         # self.ernie = ernie
         self.convs = nn.LayerList()
-        initializer = None
         fc_lr = self.config.lr / 0.001
         erniesage_conv = ErnieSageV2Conv(
             ernie,

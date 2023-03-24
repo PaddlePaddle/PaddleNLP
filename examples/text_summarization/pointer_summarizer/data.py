@@ -1,24 +1,35 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # This file is adapted from https://github.com/abisee/pointer-generator/blob/master/data.py
 
-import glob
-import struct
 import csv
-import queue
-import time
-import re
-import json
+import glob
 import io
-
-from threading import Thread
-import numpy as np
-
+import json
+import queue
 import random
+import time
 from random import shuffle
-
-random.seed(123)
+from threading import Thread
 
 import config
 import data
+import numpy as np
+
+random.seed(123)
+
 
 # <s> and </s> are used in the data files to segment the abstracts into sentences. They don't receive vocab ids.
 SENTENCE_START = "<s>"
@@ -436,14 +447,14 @@ def outputids2words(id_list, vocab, article_oovs):
     for i in id_list:
         try:
             w = vocab.id2word(i)  # might be [UNK]
-        except ValueError as e:  # w is OOV
+        except ValueError:  # w is OOV
             assert (
                 article_oovs is not None
             ), "Error: model produced a word ID that isn't in the vocabulary. This should not happen in baseline (no pointer-generator) mode"
             article_oov_idx = i - vocab.size()
             try:
                 w = article_oovs[article_oov_idx]
-            except ValueError as e:  # i doesn't correspond to an article oov
+            except ValueError:  # i doesn't correspond to an article oov
                 raise ValueError(
                     "Error: model produced word ID %i which corresponds to article OOV %i but this example only has %i article OOVs"
                     % (i, article_oov_idx, len(article_oovs))
@@ -461,7 +472,7 @@ def abstract2sents(abstract):
             end_p = abstract.index(SENTENCE_END, start_p + 1)
             cur = end_p + len(SENTENCE_END)
             sents.append(abstract[start_p + len(SENTENCE_START) : end_p])
-        except ValueError as e:  # no more sentences
+        except ValueError:  # no more sentences
             return sents
 
 

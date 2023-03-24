@@ -111,7 +111,6 @@ class LoRALinear(nn.Linear):
 
 
 class ColumnParallelLoRALinear(ColumnParallelLinear):
-    # LoRA implemented in a dense layer
     def __init__(
         self,
         in_features: int,
@@ -137,8 +136,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         # compatible
         self.name = self._name
 
-        out_features = out_features // self.world_size
-
         # Actual trainable parameters
         if r > 0:
             self.lora_A = self.create_parameter(
@@ -150,7 +147,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 ),
             )
             self.lora_B = self.create_parameter(
-                shape=[r, out_features],
+                shape=[r, self.output_size_per_partition],
                 dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
@@ -179,15 +176,18 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        result_mp = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+        input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
+        result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
         if self.r > 0 and not self.merged:
-            input_a = self.lora_dropout(input) @ self.lora_A
-            input_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-            delta_mp = (input_mp @ self.lora_B) * self.scaling
+            input_a = self.lora_dropout(input_mp) @ self.lora_A
+            delta_mp = (input_a @ self.lora_B) * self.scaling
             result_mp += delta_mp
 
-        result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
+        if self.gather_output and self.is_mp:
+            result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
+        else:
+            result = result_mp
         return result
 
     def extra_repr(self):
@@ -202,27 +202,37 @@ def _find_and_replace_module(model, module_name, lora_config):
     for name in attribute_chain[:-1]:
         parent_module = getattr(parent_module, name)
     module = getattr(parent_module, attribute_chain[-1])
-    lora_module = LoRALinear(
-        # lora_module = ColumnParallelLoRALinear(
-        in_features=module.weight.shape[0],
-        out_features=module.weight.shape[1],
-        r=lora_config.r,
-        lora_alpha=lora_config.lora_alpha,
-        lora_dropout=lora_config.lora_dropout,
-        merge_weights=lora_config.merge_weights,
-    )
+    if isinstance(module, nn.Linear):
+        lora_module = LoRALinear(
+            in_features=module.weight.shape[0],
+            out_features=module.weight.shape[1],
+            r=lora_config.r,
+            lora_alpha=lora_config.lora_alpha,
+            lora_dropout=lora_config.lora_dropout,
+            merge_weights=lora_config.merge_weights,
+        )
+    elif isinstance(module, ColumnParallelLinear):
+        # recover the original output_features
+        output_features_mp = module.weight.shape[1] * module.world_size
+        lora_module = ColumnParallelLoRALinear(
+            in_features=module.weight.shape[0],
+            out_features=output_features_mp,
+            gather_output=module.gather_output,
+            has_bias=module.bias is not None,
+            r=lora_config.r,
+            lora_alpha=lora_config.lora_alpha,
+            lora_dropout=lora_config.lora_dropout,
+            merge_weights=lora_config.merge_weights,
+        )
     lora_module.weight = module.weight
     if module.bias is not None:
         lora_module.bias = module.bias
-    # tmp_weight = module.weight.cpu()
-    # lora_module.weight.set_value(tmp_weight[:,:768]) # slice based on mp world size
     setattr(parent_module, attribute_chain[-1], lora_module)
 
 
 def mark_only_lora_as_trainable(model: nn.Layer, trainable_bias: Optional[str] = None) -> None:
     for _, layer in model.named_sublayers():
-        # if isinstance(layer, ColumnParallelLoRALinear):
-        if isinstance(layer, LoRALinear):
+        if isinstance(layer, LoRALinear) or isinstance(layer, ColumnParallelLoRALinear):
             for name, weight in layer.state_dict().items():
                 if trainable_bias in ["lora", "all"] and "bias" in name:
                     weight.stop_gradient = False

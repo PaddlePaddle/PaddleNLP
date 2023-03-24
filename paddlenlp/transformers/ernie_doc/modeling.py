@@ -300,9 +300,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.config.initializer_range,
+                        std=self.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -539,19 +537,19 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        ernie_doc (:class:`ErnieDocModel`):
-            An instance of :class:`ErnieDocModel`.
-        num_classes (int):
-            The number of classes.
-        dropout (float, optional)
-            The dropout ratio of last output. Default to `0.1`.
+        config (:class:`ErnieDocConfig`):
+            An instance of ErnieDocConfig used to construct ErnieDocForSequenceClassification.
     """
 
-    def __init__(self, config: ErnieDocConfig, num_classes=2, dropout=0.1):
+    def __init__(self, config: ErnieDocConfig):
         super(ErnieDocForSequenceClassification, self).__init__(config)
         self.ernie_doc = ErnieDocModel(config)
-        self.linear = nn.Linear(config.hidden_size, num_classes)
-        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob,
+            mode="upscale_in_train",
+        )
+        self.linear = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
@@ -577,7 +575,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
             - `logits` (Tensor):
                 A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, num_classes].
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, num_labels].
 
             - `mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
@@ -599,7 +597,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                     return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
 
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
-                model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
+                model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_labels=2)
 
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
@@ -630,20 +628,19 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        ernie_doc (:class:`ErnieDocModel`):
-            An instance of :class:`ErnieDocModel`.
-        num_classes (int):
-            The number of classes.
-        dropout (float, optional)
-            The dropout ratio of last output. Default to 0.1.
+        config (:class:`ErnieDocConfig`):
+            An instance of ErnieDocConfig used to construct ErnieDocForTokenClassification.
     """
 
-    def __init__(self, config: ErnieDocConfig, num_classes=2, dropout=0.1):
+    def __init__(self, config: ErnieDocConfig):
         super(ErnieDocForTokenClassification, self).__init__(config)
-        self.num_classes = num_classes
-        self.ernie_doc = ErnieDocModel(config)  # allow ernie_doc to be config
-        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
-        self.linear = nn.Linear(config.hidden_size, num_classes)
+        self.num_labels = config.num_labels
+        self.ernie_doc = ErnieDocModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob,
+            mode="upscale_in_train",
+        )
+        self.linear = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
@@ -724,16 +721,17 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
     designed for question-answering tasks like SQuAD.
 
     Args:
-        ernie_doc (:class:`ErnieDocModel`):
-            An instance of :class:`ErnieDocModel`.
-        dropout (float, optional)
-            The dropout ratio of last output. Default to 0.1.
+        config (:class:`ErnieDocConfig`):
+            An instance of ErnieDocConfig used to construct ErnieDocForQuestionAnswering.
     """
 
-    def __init__(self, config: ErnieDocConfig, dropout=0.1):
+    def __init__(self, config: ErnieDocConfig):
         super(ErnieDocForQuestionAnswering, self).__init__(config)
         self.ernie_doc = ErnieDocModel(config)  # allow ernie_doc to be config
-        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob,
+            mode="upscale_in_train",
+        )
         self.linear = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 

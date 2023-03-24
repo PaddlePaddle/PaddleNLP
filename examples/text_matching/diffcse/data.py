@@ -14,10 +14,6 @@
 
 import paddle
 
-import os
-import random
-import numpy as np
-
 
 def get_special_tokens():
     return ["[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"]
