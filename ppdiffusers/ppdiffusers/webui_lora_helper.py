@@ -206,11 +206,17 @@ def apply_lora(
 
     if lora_weight_or_path is not None:
         if isinstance(pipe_or_module, nn.Layer):
+            if paddle_dtype is not None:
+                pipe_or_module.to(dtype=paddle_dtype)
             pipe_or_module.set_dict(lora_weight_or_path)
         else:
             if hasattr(pipe_or_module, "text_encoder"):
+                if paddle_dtype is not None:
+                    pipe_or_module.text_encoder.to(dtype=paddle_dtype)
                 pipe_or_module.text_encoder.set_dict(lora_weight_or_path)
             if hasattr(pipe_or_module, "unet"):
+                if paddle_dtype is not None:
+                    pipe_or_module.unet.to(dtype=paddle_dtype)
                 pipe_or_module.unet.set_dict(lora_weight_or_path)
 
         del lora_weight_or_path
