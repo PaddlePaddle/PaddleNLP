@@ -26,7 +26,7 @@ import paddle
 from datasets import load_dataset
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from tqdm import tqdm
-from utils import compute_metrics, convert_example, main_process_first
+from utils import compute_metrics, convert_example, main_process_first, save_ckpt
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.trainer.argparser import strtobool
@@ -50,7 +50,7 @@ def parse_args():
     parser.add_argument("--train_file", type=str, required=False, default="data/train.json", help="Train data path.")
     parser.add_argument("--eval_file", type=str, required=False, default="data/test.json", help="Eval data path.")
     parser.add_argument(
-        "--output_dir",
+        "--save_dir",
         default="output",
         type=str,
         required=True,
@@ -61,7 +61,7 @@ def parse_args():
         default=128,
         type=int,
         help="The maximum total input sequence length after "
-        "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
+             "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
         "--min_target_length",
@@ -74,8 +74,8 @@ def parse_args():
         default=64,
         type=int,
         help="The maximum total sequence length for target text after "
-        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
-        "during ``evaluate`` and ``predict``.",
+             "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+             "during ``evaluate`` and ``predict``.",
     )
     parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument(
@@ -85,7 +85,8 @@ def parse_args():
         help="Total number of training epochs to perform.",
     )
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
+    parser.add_argument("--save_epoch", type=int, default=1, help="Save checkpoint every X epoch.")
+    parser.add_argument("--eval_epoch", type=int, default=1, help="Eval model every X epoch.")
     parser.add_argument(
         "--train_batch_size",
         default=2,
@@ -124,9 +125,16 @@ def parse_args():
         help="The device to select to train the model, is must be cpu/gpu/xpu.",
     )
     parser.add_argument("--use_amp", default=False, type=strtobool, help="Enable mixed precision training.")
-    parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
+    parser.add_argument("--scale_loss", default=2 ** 15, type=float, help="The value of scale_loss for fp16.")
     parser.add_argument("--use_SSTIA", action="store_true", help="Whether to use SSTIA.")
     parser.add_argument("--mix_ratio", default=0, type=float, help="Mixture ratio for TSDASG synthetic input.")
+    parser.add_argument("--do_lower_case", default=1, type=int, choices=[0, 1], help="For tokenizer.")
+    parser.add_argument("--vocab_path", default="./vocab/vocab_for_uppercase", type=str,
+                        help="Custom vocab for supporting to tokenize and generate uppercase letters.")
+    parser.add_argument("--remove_columns", default=["content", "title"], type=str, nargs='*',
+                        help="Remove attributes to input tensor")
+    parser.add_argument("--text_column", default="content", type=str, help="column name of input source")
+    parser.add_argument("--summary_column", default="title", type=str, help="column name of summary")
     args = parser.parse_args()
     return args
 
@@ -176,15 +184,18 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args)
-
-    tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
+    if not args.do_lower_case:
+        tokenizer = PegasusChineseTokenizer.from_pretrained(args.vocab_path,
+                                                            do_lower_case=args.do_lower_case)
+    else:
+        tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path, do_lower_case=args.do_lower_case)
     train_set = load_dataset("json", data_files=args.train_file, split="train")
     dev_set = load_dataset("json", data_files=args.eval_file, split="train")
-    remove_columns = ["content", "title"]
+    remove_columns = args.remove_columns
     trans_func = partial(
         convert_example,
-        text_column="content",
-        summary_column="title",
+        text_column=args.text_column,
+        summary_column=args.summary_column,
         tokenizer=tokenizer,
         max_source_length=args.max_source_length,
         max_target_length=args.max_target_length,
@@ -239,6 +250,8 @@ def do_train(args):
 
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+    save_steps = int(len(train_data_loader)*args.save_epoch)
+    eval_steps = int(len(train_data_loader)*args.eval_epoch)
     global_step = 0
     best_rougel = 0
     tic_train = time.time()
@@ -271,7 +284,10 @@ def do_train(args):
                     )
                 )
                 tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+            if global_step % save_steps == 0 or global_step == num_training_steps:
+                save_ckpt(model, tokenizer, args.save_dir, global_step)
+                logger.info("Saved step {} model.\n".format(global_step))
+            if global_step % eval_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 rougel = evaluate(
                     model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length, args.use_SSTIA
@@ -279,13 +295,9 @@ def do_train(args):
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0 and best_rougel < rougel:
                     best_rougel = rougel
-                    output_dir = args.output_dir
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
+                    save_ckpt(model, tokenizer, args.save_dir, "model_best")
+                    logger.info("Saved step {} model as best.\n".format(global_step))
             if global_step >= num_training_steps:
                 return
 

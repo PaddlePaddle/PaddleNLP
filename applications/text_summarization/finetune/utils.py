@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import contextlib
+import os
 
 import numpy as np
 import paddle
@@ -83,3 +84,13 @@ def main_process_first(desc="work"):
                 paddle.distributed.barrier()
     else:
         yield
+
+
+def save_ckpt(model, tokenizer, save_dir, name):
+    output_dir = os.path.join(save_dir, "model_{}".format(name))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    # Need better way to get inner model of DataParallel
+    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
+    model_to_save.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
