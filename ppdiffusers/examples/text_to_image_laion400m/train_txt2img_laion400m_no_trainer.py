@@ -81,9 +81,6 @@ def main():
     model.set_recompute(training_args.recompute)
     params_to_train = itertools.chain(model.text_encoder.parameters(), model.unet.parameters())
 
-    if num_processes > 1:
-        model = paddle.DataParallel(model)
-
     lr_scheduler = get_scheduler(
         training_args.lr_scheduler_type,
         learning_rate=training_args.learning_rate,
@@ -111,6 +108,9 @@ def main():
         interpolation="lanczos",
         tokenizer=model.tokenizer,
     )
+
+    if num_processes > 1:
+        model = paddle.DataParallel(model)
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -143,7 +143,9 @@ def main():
             break
 
         for step, batch in enumerate(train_dataloader):
-            if num_processes > 1 and ((step + 1) % training_args.gradient_accumulation_steps != 0):
+            if (
+                num_processes > 1 and ((step + 1) % training_args.gradient_accumulation_steps != 0)
+            ) or training_args.recompute:
                 # grad acc, no_sync when (step + 1) % training_args.gradient_accumulation_steps != 0:
                 ctx_manager = model.no_sync()
             else:

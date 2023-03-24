@@ -189,6 +189,7 @@ def parse_args():
         "--adam_weight_decay", type=float, default=1e-6, help="Weight decay magnitude for the Adam optimizer."
     )
     parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer.")
+    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
         "--use_ema",
         action="store_true",
@@ -227,18 +228,6 @@ def parse_args():
             " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
         ),
     )
-    parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
-    parser.add_argument(
-        "--mixed_precision",
-        type=str,
-        default="no",
-        choices=["no", "fp16", "bf16"],
-        help=(
-            "Whether to use mixed precision. Choose"
-            "between fp16 and bf16 (bfloat16). Bf16 requires Pypaddle >= 1.10."
-            "and an Nvidia Ampere GPU."
-        ),
-    )
     parser.add_argument(
         "--prediction_type",
         type=str,
@@ -268,20 +257,8 @@ def parse_args():
             " for more docs"
         ),
     )
-    parser.add_argument(
-        "--resume_from_checkpoint",
-        type=str,
-        default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
-    )
     parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
     args = parser.parse_args()
-    env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
-    if env_local_rank != -1 and env_local_rank != args.local_rank:
-        args.local_rank = env_local_rank
 
     if args.dataset_name is None and args.train_data_dir is None:
         raise ValueError("You must specify either a dataset name from the hub or a train data directory.")
@@ -477,7 +454,7 @@ def main():
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
         epsilon=args.adam_epsilon,
-        grad_clip=nn.ClipGradByGlobalNorm(1.0),
+        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
 
     if is_main_process:

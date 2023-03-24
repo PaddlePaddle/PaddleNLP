@@ -17,7 +17,7 @@ pip install -U ppdiffusers visualdl
 
 ### 1.2 Cat toy 训练 object 的例子
 
-在训练开始之前，我们需要准备需要训练的 3-5 张图片，在这里我们可以从[这里](https://huggingface.co/sd-dreambooth-library/cat-toy) 下载到所需要的图片，然后将里面的内容保存到一个文件夹`cat_toy_images`中。
+在训练开始之前，我们需要准备需要训练的 3-5 张图片，在这里我们可以从[这里](https://huggingface.co/sd-dreambooth-library/cat-toy/tree/main/concept_images) 下载到所需要的图片，然后将里面的内容保存到一个文件夹`cat_toy_images`中。
 <p align="center">
     <img src="https://user-images.githubusercontent.com/50394665/196325636-3ad872b2-4e84-4169-9831-8c8aa6d72a94.png" height=40% width=40%>
 </p>
@@ -148,6 +148,7 @@ image.save("cat-backpack.png")
 （2）加载已有的`learned_embeds.pdparams`权重
 
 ```python
+import paddle
 from ppdiffusers import StableDiffusionPipeline
 # 我们所需加载的模型地址，这里我们加载了我们微调模型所使用的权重
 model_path = "CompVis/stable-diffusion-v1-4"
@@ -251,6 +252,7 @@ image.save("huang-guang-jian-girl.png")
 （2）加载已有的`learned_embeds.pdparams`权重
 
 ```python
+import paddle
 from ppdiffusers import StableDiffusionPipeline
 # 我们所需加载的模型地址，这里我们加载了我们微调模型所使用的权重
 model_path = "CompVis/stable-diffusion-v1-4"

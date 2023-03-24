@@ -96,10 +96,10 @@ def set_recompute(model, value=False):
         if hasattr(layer, "enable_recompute"):
             layer.enable_recompute = value
             print("Set", layer.__class__, "recompute", layer.enable_recompute)
-        # unet
-        if hasattr(layer, "gradient_checkpointing"):
-            layer.gradient_checkpointing = value
-            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+        # # unet
+        # if hasattr(layer, "gradient_checkpointing"):
+        #     layer.gradient_checkpointing = value
+        #     print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
     model.apply(fn)
 
@@ -632,7 +632,7 @@ def main():
     unfreeze_params(text_encoder.get_input_embeddings().parameters())
 
     if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
+        # unet.enable_gradient_checkpointing()
         set_recompute(text_encoder, True)
 
     if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
@@ -739,6 +739,7 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = unwrap_model(text_encoder).get_input_embeddings().weight.clone()
+    index_no_updates = (paddle.arange(len(tokenizer)) != placeholder_token_id).cast(paddle.int64).sum()
 
     # Keep vae and unet in eval model as we don't train these
     vae.eval()
@@ -802,16 +803,14 @@ def main():
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
-                    fused_allreduce_gradients(text_encoder.get_input_embeddings().parameters(), None)
+                    fused_allreduce_gradients(unwrap_model(text_encoder).get_input_embeddings().parameters(), None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 # Let's make sure we don't update any embedding weights besides the newly added token
                 with paddle.no_grad():
-                    index_no_updates = paddle.arange(len(tokenizer)) != placeholder_token_id
-                    index_no_updates = paddle.nonzero(index_no_updates).reshape([-1])
-                    unwrap_model(text_encoder).get_input_embeddings().weight[index_no_updates] = orig_embeds_params[
-                        index_no_updates
+                    unwrap_model(text_encoder).get_input_embeddings().weight[:index_no_updates] = orig_embeds_params[
+                        :index_no_updates
                     ]
 
                 progress_bar.update(1)

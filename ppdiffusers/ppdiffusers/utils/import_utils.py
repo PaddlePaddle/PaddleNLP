@@ -127,7 +127,7 @@ if _fastdeploy_available:
             break
         except importlib_metadata.PackageNotFoundError:
             pass
-    _fastdeploy_available = _fastdeploy_version is not None
+    _fastdeploy_available = _fastdeploy_version != "N/A"
     if _fastdeploy_available:
         logger.debug(f"Successfully imported fastdeploy version {_fastdeploy_version}")
 
