@@ -79,6 +79,7 @@ from .ctrl.tokenizer import *
 from .dpt.modeling import *
 from .dpt.configuration import *
 from .dpt.image_processing import *
+from .distilbert.configuration import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
 from .ernie.configuration import *
