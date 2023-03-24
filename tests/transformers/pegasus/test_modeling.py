@@ -31,30 +31,6 @@ from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
-def prepare_pegasus_inputs_dict(
-    config,
-    input_ids,
-    decoder_input_ids,
-    attention_mask=None,
-    decoder_attention_mask=None,
-):
-    if attention_mask is None:
-        attention_mask = (
-            paddle.cast(input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        )
-    if decoder_attention_mask is None:
-        decoder_attention_mask = (
-            paddle.cast(decoder_input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
-            * -1e4
-        )
-    return {
-        "input_ids": input_ids,
-        "decoder_input_ids": decoder_input_ids,
-        "attention_mask": attention_mask,
-        "decoder_attention_mask": attention_mask,
-    }
-
-
 class PegasusModelTester:
     def __init__(
         self,
@@ -108,26 +84,20 @@ class PegasusModelTester:
         decoder_input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         config = self.get_config()
-        inputs_dict = prepare_pegasus_inputs_dict(config, input_ids, decoder_input_ids)
-        return config, inputs_dict
-
-    def get_pipeline_config(self):
-        return PegasusConfig(
-            vocab_size=200,
-            d_model=self.hidden_size,
-            encoder_layers=self.num_hidden_layers,
-            decoder_layers=self.num_hidden_layers,
-            encoder_attention_heads=self.num_attention_heads,
-            decoder_attention_heads=self.num_attention_heads,
-            encoder_ffn_dim=self.intermediate_size,
-            decoder_ffn_dim=self.intermediate_size,
-            dropout=self.hidden_dropout_prob,
-            attention_dropout=self.attention_probs_dropout_prob,
-            max_position_embeddings=200,
-            eos_token_id=self.eos_token_id,
-            bos_token_id=self.bos_token_id,
-            pad_token_id=self.pad_token_id,
+        attention_mask = (
+            paddle.cast(input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
+        decoder_attention_mask = (
+            paddle.cast(decoder_input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+            * -1e4
+        )
+        inputs_dict = {
+            "input_ids": input_ids,
+            "decoder_input_ids": decoder_input_ids,
+            "attention_mask": attention_mask,
+            "decoder_attention_mask": decoder_attention_mask,
+        }
+        return config, inputs_dict
 
     def get_config(self):
         return PegasusConfig(
@@ -301,26 +271,3 @@ class PegasusModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
                 early_stopping=False,
                 num_return_sequences=3,
             )
-
-
-def assert_tensors_close(a, b, atol=1e-12, prefix=""):
-    """If tensors have different shapes, different values or a and b are not both tensors, raise a nice Assertion error."""
-    if a is None and b is None:
-        return True
-    try:
-        if paddle.allclose(a.astype("float32"), b.astype("float32"), atol=atol):
-            return True
-        raise
-    except Exception:
-        pct_different = ((a - b).abs() > atol).astype("float").mean().item()
-        if a.numel() > 100:
-            msg = f"tensor values are {pct_different:.1%} percent different."
-        else:
-            msg = f"{a} != {b}"
-        if prefix:
-            msg = prefix + ": " + msg
-        raise AssertionError(msg)
-
-
-def _long_tensor(tok_lst):
-    return paddle.to_tensor(tok_lst, dtype="int64")

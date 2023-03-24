@@ -27,11 +27,7 @@ from rouge import Rouge
 
 from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import Seq2SeqTrainer
-from paddlenlp.utils.import_utils import is_datasets_available
 from paddlenlp.utils.log import logger
-
-if is_datasets_available():
-    import datasets
 
 rouge = Rouge()
 
@@ -342,9 +338,6 @@ class PegasusTrainer(Seq2SeqTrainer):
             raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
-        if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
-            train_dataset = self._remove_unused_columns(train_dataset, description="training")
-
         train_sampler = self._get_train_sampler()
 
         stopwords_dict = load_stopwords(self.args.stop_words)
@@ -388,6 +381,7 @@ class PegasusTrainer(Seq2SeqTrainer):
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        # pegasus output is lm_logits, new_cache, masked_lm_loss
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs[2]
 
         return (loss, outputs) if return_outputs else loss
