@@ -12,30 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import sys
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-
 from batch_negative.model import SemanticIndexBatchNeg
-from data import read_text_pair, convert_example, create_dataloader
+from data import convert_example, create_dataloader, read_text_pair
 
-# yapf: disable
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
+
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
@@ -51,10 +46,8 @@ parser.add_argument("--margin", default=0.3, type=float, help="Margin between po
 parser.add_argument("--scale", default=30, type=int, help="Scale for pair-wise margin_rank_loss")
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
 parser.add_argument("--amp_loss_scale", default=32768, type=float, help="The value of scale_loss for fp16. This is only used for AMP training.")
-
-
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def set_seed(seed):

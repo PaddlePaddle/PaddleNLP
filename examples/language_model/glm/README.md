@@ -2,7 +2,7 @@
 
 [General Language Model (GLM)](https://arxiv.org/abs/2103.10360) 是以自回归填空作为训练目标的通用语言模型，可用于各类理解和生成任务。
 
-本示例提供了 GLM 模型的生成任务微调流程，适用于 GLM-2B, GLM-10B 模型。
+本示例提供了 GLM 模型的生成任务微调流程，适用于 GLM-Large-Chinese, GLM-10B-Chinese 模型。
 
 ## 摘要
 
@@ -15,7 +15,7 @@
 
 ```
 python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
---model_name_or_path THUDM/glm-2b \
+--model_name_or_path THUDM/glm-large-chinese \
 --num_train_epochs 4 \
 --learning_rate 3e-5 \
 --warmup_ratio 0.06 \
@@ -24,7 +24,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --save_steps 10000 \
 --logging_steps 1 \
 --eval_steps 4 \
---output_dir ./checkpoints/glm-2b-cnn_dm \
+--output_dir ./checkpoints/glm-large-chinese \
 --src_length 608 \
 --tgt_length 160 \
 --min_tgt_length 55 \
@@ -44,7 +44,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 
 其中参数释义如下：
 
-- `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`THUDM/glm-2b`。
+- `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`THUDM/glm-large-chinese`。
 - `src_length`: 上下文的最大输入长度，默认为608.
 - `tgt_length`: 生成文本的最大长度，默认为160.
 - `min_tgt_length`: 生成文本的最小长度，默认为55.

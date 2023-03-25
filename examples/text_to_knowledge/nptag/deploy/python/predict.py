@@ -12,30 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import sys
-import argparse
 
-import numpy as np
 import paddle
+
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmTokenizer
 
 sys.path.append("./")
 
-from data import convert_example, create_dataloader, read_custom_data
-from utils import construct_dict_map, decode, search, find_topk
+from data import convert_example  # noqa: E402
+from utils import construct_dict_map, decode, find_topk, search  # noqa: E402
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
 parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain name_category_map.json.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=3, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 class Predictor(object):

@@ -12,191 +12,110 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import argparse
-import distutils.util
-import math
-import os
-import random
-import time
+from dataclasses import dataclass, field
 from functools import partial
-from pprint import pprint
+from typing import Optional
 
 import numpy as np
 import paddle
 from datasets import load_dataset
-from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
-from tqdm import tqdm
-from utils import (
-    FakeAbstractCollator,
-    compute_correct,
-    compute_metrics,
-    convert_example,
-    load_stopwords,
-    main_process_first,
-)
+from utils import PegasusTrainer, compute_metrics, convert_example, main_process_first
 
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, set_seed
 from paddlenlp.transformers import (
-    LinearDecayWithWarmup,
     PegasusChineseTokenizer,
+    PegasusConfig,
     PegasusForConditionalGeneration,
-    PegasusModel,
 )
-from paddlenlp.utils.log import logger
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    # Required parameters
-    parser.add_argument(
-        "--model_name_or_path",
+@dataclass
+class ModelArguments:
+    model_name_or_path: Optional[str] = field(
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
-        type=str,
-        help="Path to pre-trained model. ",
+        metadata={"help": ("Path to pre-trained model.")},
     )
-    parser.add_argument("--train_file", type=str, required=False, default="data/train.json", help="Train data path.")
-    parser.add_argument("--eval_file", type=str, required=False, default="data/test.json", help="Eval data path.")
-    parser.add_argument(
-        "--output_dir",
-        default="output",
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+    max_source_length: Optional[int] = field(
+        default=128,
+        metadata={
+            "help": (
+                "The maximum total input sequence length after "
+                "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded."
+            )
+        },
     )
-    parser.add_argument(
-        "--max_source_length",
-        default=512,
-        type=int,
-        help="The maximum total input sequence length after "
-        "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
-    )
-    parser.add_argument(
-        "--min_target_length",
+    min_target_length: Optional[int] = field(
         default=0,
-        type=int,
-        help="The minimum total sequence length for target text when generating. ",
+        metadata={"help": ("The minimum total sequence length for target text when generating. ")},
     )
-    parser.add_argument(
-        "--max_target_length",
+    max_target_length: Optional[int] = field(
         default=64,
-        type=int,
-        help="The maximum total sequence length for target text after "
-        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
-        "during ``evaluate`` and ``predict``.",
+        metadata={
+            "help": (
+                "The maximum total sequence length for target text after "
+                "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+                "during ``evaluate`` and ``predict``."
+            )
+        },
     )
-    parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--epoch",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.",
+    num_beams: Optional[int] = field(
+        default=1,
+        metadata={"help": ("The number of beams to use in beam search.")},
     )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--train_batch_size",
-        default=2,
-        type=int,
-        help="Batch size per GPU/CPU for training.",
+    predict_with_generate: Optional[bool] = field(
+        default=True,
+        metadata={"help": ("Whether to generate in predcit.")},
     )
-    parser.add_argument(
-        "--eval_batch_size",
-        default=2,
-        type=int,
-        help="Batch size per GPU/CPU for evaluation.",
-    )
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion",
-    )
-    parser.add_argument(
-        "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps."
-    )
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override epoch.",
-    )
-    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
-    )
-    parser.add_argument(
-        "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
-    )
-    parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
-    parser.add_argument("--stop_words", default="stopwords.txt", type=str, help="The stop words vocab.")
-    args = parser.parse_args()
-    return args
 
 
-def set_seed(args):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(args.seed)
+@dataclass
+class DataArguments:
+    train_file: Optional[str] = field(
+        default="data/train.json",
+        metadata={"help": ("Train data path.")},
+    )
+    eval_file: Optional[str] = field(
+        default="data/test.json",
+        metadata={"help": ("Eval data path.")},
+    )
+    stop_words: Optional[str] = field(
+        default="stopwords.txt",
+        metadata={"help": ("The stop words vocab.")},
+    )
 
 
-@paddle.no_grad()
-def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length):
-    model.eval()
+def compute_metrics_trainer(eval_preds, tokenizer):
     all_preds = []
     all_labels = []
-    batch_num = 0
-    total_pre = 0
-    total_correct = 0
-    total_loss = 0
-    model = model._layers if isinstance(model, paddle.DataParallel) else model
-    for batch in tqdm(data_loader, total=len(data_loader), desc="Eval step"):
-        batch_num += 1
-        total_pre += batch["labels"].shape[0]
-        lm_logits, new_cache, loss = model(**batch)
-        total_correct += compute_correct(lm_logits, batch["labels"])
-        total_loss += loss.item()
-        labels = batch.pop("labels").numpy()
-        preds = model.generate(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            min_length=min_target_length,
-            max_length=max_target_length,
-            use_cache=True,
-        )[0]
-        all_preds.extend(
-            tokenizer.batch_decode(preds.numpy(), skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        )
-        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+    labels = eval_preds.label_ids
+    preds = eval_preds.predictions
+    all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+    all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
     rougel = compute_metrics(all_preds, all_labels)
-    logger.info("Accuracy: %.4f " % (total_correct / total_pre))
-    logger.info("loss: %.4f " % (total_loss / batch_num))
-    model.train()
-    return rougel
+    return {"RougeL": rougel}
 
 
-def do_train(args):
-    paddle.set_device(args.device)
+def do_train():
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    set_seed(args)
+    set_seed(training_args.seed)
 
-    tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
-    stopwords_dict = load_stopwords(args.stop_words)
-    train_set = load_dataset("json", data_files=args.train_file, split="train")
-    dev_set = load_dataset("json", data_files=args.eval_file, split="train")
+    training_args.generation_max_length = model_args.max_target_length
+    training_args.max_source_length = model_args.max_source_length
+    training_args.generation_num_beams = model_args.num_beams
+    training_args.predict_with_generate = model_args.predict_with_generate
+    training_args.stop_words = data_args.stop_words
+
+    tokenizer = PegasusChineseTokenizer.from_pretrained(model_args.model_name_or_path)
+    train_set = load_dataset("json", data_files=data_args.train_file, split="train")
+    dev_set = load_dataset("json", data_files=data_args.eval_file, split="train")
 
     # train_set needn't map
     remove_columns = ["title", "content"]
@@ -205,111 +124,44 @@ def do_train(args):
         text_column="content",
         summary_column="title",
         tokenizer=tokenizer,
-        max_source_length=args.max_source_length,
-        max_target_length=args.max_target_length,
+        max_source_length=model_args.max_source_length,
+        max_target_length=model_args.max_target_length,
     )
     with main_process_first(desc="dev dataset map pre-processing"):
         dev_set = dev_set.map(trans_func, batched=True, load_from_cache_file=True, remove_columns=remove_columns)
 
-    # TODO: use config to init
-    model = PegasusForConditionalGeneration(PegasusModel(vocab_size=50000))
+    config = PegasusConfig()
+    model = PegasusForConditionalGeneration(config=config)
 
-    train_batchify_fn = FakeAbstractCollator(tokenizer, stopwords_dict, args.max_source_length)
     dev_batchify_fn = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
-    train_batch_sampler = DistributedBatchSampler(train_set, batch_size=args.train_batch_size, shuffle=True)
-
-    train_data_loader = DataLoader(
-        dataset=train_set,
-        batch_sampler=train_batch_sampler,
-        num_workers=0,
-        collate_fn=train_batchify_fn,
-        return_list=True,
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
     )
 
-    dev_batch_sampler = BatchSampler(dev_set, batch_size=args.eval_batch_size, shuffle=False)
-    dev_data_loader = DataLoader(
-        dataset=dev_set, batch_sampler=dev_batch_sampler, num_workers=0, collate_fn=dev_batchify_fn, return_list=True
-    )
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    if args.max_steps > 0:
-        num_training_steps = args.max_steps
-        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
-    else:
-        num_training_steps = len(train_data_loader) * args.epoch
-        num_train_epochs = args.epoch
-
-    warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
-
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        beta1=0.9,
-        beta2=0.999,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
+    trainer = PegasusTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_set if training_args.do_train else None,
+        eval_dataset=dev_set if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        data_collator=dev_batchify_fn,
+        compute_metrics=compute_metrics_func,
     )
 
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-    global_step = 0
-    best_rougel = 0
-    tic_train = time.time()
-    for epoch in range(num_train_epochs):
-        for step, batch in enumerate(train_data_loader):
-            global_step += 1
-            with paddle.amp.auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax", "gelu"]):
-                lm_logits, new_cache, loss = model(**batch)
-            if args.use_amp:
-                scaled_loss = scaler.scale(loss)
-                scaled_loss.backward()
-                scaler.minimize(optimizer, scaled_loss)
-            else:
-                loss.backward()
-                optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                logger.info(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (
-                        global_step,
-                        num_training_steps,
-                        epoch,
-                        step,
-                        paddle.distributed.get_rank(),
-                        loss,
-                        optimizer.get_lr(),
-                        args.logging_steps / (time.time() - tic_train),
-                    )
-                )
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                tic_eval = time.time()
-                rougel = evaluate(model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length)
-                logger.info("eval done total : %s s" % (time.time() - tic_eval))
-                if paddle.distributed.get_rank() == 0 and best_rougel < rougel:
-                    best_rougel = rougel
-                    output_dir = args.output_dir
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-            if global_step >= num_training_steps:
-                return
+    if training_args.do_train:
+        train_results = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        metrics = train_results.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    pprint(args)
-    do_train(args)
+    do_train()
