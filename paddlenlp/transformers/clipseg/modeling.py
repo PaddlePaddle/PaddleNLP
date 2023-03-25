@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The OpenAI Team Authors and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +71,7 @@ def contrastive_loss(logits: paddle.Tensor) -> paddle.Tensor:
     return F.cross_entropy(logits, paddle.arange(len(logits)))
 
 
-# Copied from transformers.models.clip.modeling_clip.clip_loss with clip->clipseg
+# Copied from paddlenlp.transformers.clip.modeling.clip_loss with clip->clipseg
 def clipseg_loss(similarity: paddle.Tensor) -> paddle.Tensor:
     caption_loss = contrastive_loss(similarity)
     image_loss = contrastive_loss(similarity.t())
@@ -78,7 +79,7 @@ def clipseg_loss(similarity: paddle.Tensor) -> paddle.Tensor:
 
 
 @dataclass
-# Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPOutput with CLIP->CLIPSeg
 class CLIPSegOutput(ModelOutput):
     """
     Args:
@@ -162,7 +163,7 @@ class CLIPSegImageSegmentationOutput(ModelOutput):
 
 
 class CLIPSegVisionEmbeddings(nn.Layer):
-    # Copied from transformers.models.clip.modeling_clip.CLIPVisionEmbeddings.__init__
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPVisionEmbeddings.__init__
     def __init__(self, config: CLIPSegVisionConfig):
         super().__init__()
         self.config = config
@@ -226,7 +227,7 @@ class CLIPSegVisionEmbeddings(nn.Layer):
         return embeddings
 
 
-# Copied from transformers.models.clip.modeling_clip.CLIPTextEmbeddings with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPTextEmbeddings with CLIP->CLIPSeg
 class CLIPSegTextEmbeddings(nn.Layer):
     def __init__(self, config: CLIPSegTextConfig):
         super().__init__()
@@ -258,7 +259,7 @@ class CLIPSegTextEmbeddings(nn.Layer):
         return embeddings
 
 
-# Copied from transformers.models.clip.modeling_clip.CLIPAttention with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPAttention with CLIP->CLIPSeg
 class CLIPSegAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -363,7 +364,7 @@ class CLIPSegAttention(nn.Layer):
         return attn_output, attn_weights_reshaped
 
 
-# Copied from transformers.models.clip.modeling_clip.CLIPMLP with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPMLP with CLIP->CLIPSeg
 class CLIPSegMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -379,7 +380,7 @@ class CLIPSegMLP(nn.Layer):
         return hidden_states
 
 
-# Copied from transformers.models.clip.modeling_clip.CLIPEncoderLayer with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPEncoderLayer with CLIP->CLIPSeg
 class CLIPSegEncoderLayer(nn.Layer):
     def __init__(self, config: CLIPSegConfig):
         super().__init__()
@@ -496,7 +497,7 @@ class CLIPSegPreTrainedModel(PretrainedModel):
             module.enable_recompute = value
 
 
-# Copied from transformers.models.clip.modeling_clip.CLIPEncoder with CLIP->CLIPSeg
+# Copied from paddlenlp.transformers.clip.modeling.CLIPEncoder with CLIP->CLIPSeg
 class CLIPSegEncoder(nn.Layer):
     """
     Transformer encoder consisting of `config.num_hidden_layers` self attention layers. Each layer is a
@@ -596,7 +597,7 @@ class CLIPSegEncoder(nn.Layer):
 
 
 class CLIPSegTextTransformer(nn.Layer):
-    # Copied from transformers.models.clip.modeling_clip.CLIPTextTransformer.__init__ with CLIP->CLIPSeg
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPTextTransformer.__init__ with CLIP->CLIPSeg
     def __init__(self, config: CLIPSegTextConfig):
         super().__init__()
         self.config = config
@@ -605,7 +606,7 @@ class CLIPSegTextTransformer(nn.Layer):
         self.encoder = CLIPSegEncoder(config)
         self.final_layer_norm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
-    # Copied from transformers.models.clip.modeling_clip.CLIPTextTransformer.forward with clip->clipseg, CLIP->CLIPSeg
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPTextTransformer.forward with clip->clipseg, CLIP->CLIPSeg
     def forward(
         self,
         input_ids: Optional[paddle.Tensor] = None,
@@ -713,7 +714,7 @@ class CLIPSegTextModel(CLIPSegPreTrainedModel):
         >>> from paddlenlp.transformers import AutoTokenizer, CLIPSegTextModel
         >>> tokenizer = AutoTokenizer.from_pretrained("CIDAS/clipseg-rd64-refined")
         >>> model = CLIPSegTextModel.from_pretrained("CIDAS/clipseg-rd64-refined")
-        >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pt")
+        >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pd")
         >>> outputs = model(**inputs)
         >>> last_hidden_state = outputs.last_hidden_state
         >>> pooled_output = outputs.pooler_output  # pooled (EOS token) states
@@ -729,7 +730,7 @@ class CLIPSegTextModel(CLIPSegPreTrainedModel):
 
 
 class CLIPSegVisionTransformer(nn.Layer):
-    # Copied from transformers.models.clip.modeling_clip.CLIPVisionTransformer.__init__ with CLIP->CLIPSeg
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPVisionTransformer.__init__ with CLIP->CLIPSeg
     def __init__(self, config: CLIPSegVisionConfig):
         super().__init__()
         self.config = config
@@ -740,7 +741,7 @@ class CLIPSegVisionTransformer(nn.Layer):
         self.encoder = CLIPSegEncoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
-    # Copied from transformers.models.clip.modeling_clip.CLIPVisionTransformer.forward
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPVisionTransformer.forward
     def forward(
         self,
         pixel_values: Optional[paddle.Tensor] = None,
@@ -886,7 +887,7 @@ class CLIPSegModel(CLIPSegPreTrainedModel):
         >>> from paddlenlp.transformers import AutoTokenizer, CLIPSegModel
         >>> tokenizer = AutoTokenizer.from_pretrained("CIDAS/clipseg-rd64-refined")
         >>> model = CLIPSegModel.from_pretrained("CIDAS/clipseg-rd64-refined")
-        >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pt")
+        >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pd")
         >>> text_features = model.get_text_features(**inputs)
         ```"""
         # Use CLIPSEG model's config for some fields (if specified) instead of those of vision & text components.
@@ -975,7 +976,7 @@ class CLIPSegModel(CLIPSegPreTrainedModel):
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> inputs = processor(
-        ...     text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pt", padding=True
+        ...     text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pd", padding=True
         ... )
         >>> outputs = model(**inputs)
         >>> logits_per_image = outputs.logits_per_image  # this is the image-text similarity score
@@ -1044,7 +1045,7 @@ class CLIPSegDecoderLayer(nn.Layer):
     self-attention/MLP, rather than before.
     """
 
-    # Copied from transformers.models.clip.modeling_clip.CLIPEncoderLayer.__init__ with CLIP->CLIPSeg
+    # Copied from paddlenlp.transformers.clip.modeling.CLIPEncoderLayer.__init__ with CLIP->CLIPSeg
     def __init__(self, config: CLIPSegConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
@@ -1271,7 +1272,7 @@ class CLIPSegForImageSegmentation(CLIPSegPreTrainedModel):
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> texts = ["a cat", "a remote", "a blanket"]
-        >>> inputs = processor(text=texts, images=[image] * len(texts), padding=True, return_tensors="pt")
+        >>> inputs = processor(text=texts, images=[image] * len(texts), padding=True, return_tensors="pd")
         >>> outputs = model(**inputs)
         >>> logits = outputs.logits
         >>> print(logits.shape)
