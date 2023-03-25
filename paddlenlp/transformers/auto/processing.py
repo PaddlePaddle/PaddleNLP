@@ -80,7 +80,7 @@ class AutoProcessor:
 
         if init_class:
             class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.procesing")
+            import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
             processor_class = getattr(import_class, init_class)
             return processor_class
         # If no `init_class`, we use pattern recognition to recognize the processor class.
