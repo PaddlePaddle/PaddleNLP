@@ -272,7 +272,7 @@ class Blip2Config(PretrainedConfig):
             Dictionary of keyword arguments.
     Example:
     ```python
-    >>> from transformers import (
+    >>> from paddlenlp.transformers import (
     ...     Blip2VisionConfig,
     ...     Blip2QFormerConfig,
     ...     OPTConfig,

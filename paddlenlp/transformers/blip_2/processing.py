@@ -47,13 +47,13 @@ class Blip2Processor(ProcessorMixin):
     image_processor_class = "BlipImageProcessor"
     tokenizer_class = "AutoTokenizer"
 
-    # Copied from transformers.models.blip.processing_blip.BlipProcessor.__init__
+    # Copied from paddlenlp.transformers.blip.processing.BlipProcessor.__init__
     def __init__(self, image_processor, tokenizer):
         tokenizer.return_token_type_ids = False
         super().__init__(image_processor, tokenizer)
         self.current_processor = self.image_processor
 
-    # Copied from transformers.models.blip.processing_blip.BlipProcessor.__call__
+    # Copied from paddlenlp.transformers.blip.processing.BlipProcessor.__call__
     def __call__(
         self,
         images=None,
@@ -96,7 +96,7 @@ class Blip2Processor(ProcessorMixin):
 
         return encoding_image_processor
 
-    # Copied from transformers.models.blip.processing_blip.BlipProcessor.batch_decode with BertTokenizerFast->PreTrainedTokenizer
+    # Copied from paddlenlp.transformers.blip.processing.BlipProcessor.batch_decode with BertTokenizerFast->PreTrainedTokenizer
     def batch_decode(self, *args, **kwargs):
         """
         This method forwards all its arguments to PreTrainedTokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
@@ -104,7 +104,7 @@ class Blip2Processor(ProcessorMixin):
         """
         return self.tokenizer.batch_decode(*args, **kwargs)
 
-    # Copied from transformers.models.blip.processing_blip.BlipProcessor.decode with BertTokenizerFast->PreTrainedTokenizer
+    # Copied from paddlenlp.transformers.blip.processing.BlipProcessor.decode with BertTokenizerFast->PreTrainedTokenizer
     def decode(self, *args, **kwargs):
         """
         This method forwards all its arguments to PreTrainedTokenizer's [`~PreTrainedTokenizer.decode`]. Please refer
@@ -113,7 +113,7 @@ class Blip2Processor(ProcessorMixin):
         return self.tokenizer.decode(*args, **kwargs)
 
     @property
-    # Copied from transformers.models.blip.processing_blip.BlipProcessor.model_input_names
+    # Copied from paddlenlp.transformers.blip.processing.BlipProcessor.model_input_names
     def model_input_names(self):
         tokenizer_input_names = self.tokenizer.model_input_names
         image_processor_input_names = self.image_processor.model_input_names

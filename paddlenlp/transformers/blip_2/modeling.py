@@ -97,7 +97,7 @@ class Blip2ForConditionalGenerationModelOutput(ModelOutput):
         )
 
 
-# Copied from transformers.models.blip.modeling_blip.BlipVisionEmbeddings with Blip->Blip2
+# Copied from paddlenlp.transformers.blip.modeling.BlipVisionEmbeddings with Blip->Blip2
 class Blip2VisionEmbeddings(nn.Layer):
     def __init__(self, config: Blip2VisionConfig):
         super().__init__()
@@ -220,7 +220,7 @@ class Blip2Attention(nn.Layer):
         return outputs
 
 
-# Copied from transformers.models.blip.modeling_blip.BlipMLP
+# Copied from paddlenlp.transformers.blip.modeling.BlipMLP
 class Blip2MLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -236,7 +236,7 @@ class Blip2MLP(nn.Layer):
         return hidden_states
 
 
-# Copied from transformers.models.blip.modeling_blip.BlipEncoderLayer with Blip->Blip2
+# Copied from paddlenlp.transformers.blip.modeling.BlipEncoderLayer with Blip->Blip2
 class Blip2EncoderLayer(nn.Layer):
     def __init__(self, config: Blip2Config):
         super().__init__()
@@ -337,7 +337,7 @@ class Blip2PretrainedModel(PretrainedModel):
             module.gradient_checkpointing = value
 
 
-# Copied from transformers.models.blip.modeling_blip.BlipEncoder with Blip->Blip2
+# Copied from paddlenlp.transformers.blip.modeling.BlipEncoder with Blip->Blip2
 class Blip2Encoder(nn.Layer):
     """
     Transformer encoder consisting of `config.num_hidden_layers` self attention layers. Each layer is a
@@ -429,7 +429,7 @@ class Blip2Encoder(nn.Layer):
         )
 
 
-# Copied from transformers.models.blip.modeling_blip.BlipVisionModel with Blip->Blip2, BLIP->BLIP_2
+# Copied from paddlenlp.transformers.blip.modeling.BlipVisionModel with Blip->Blip2, BLIP->BLIP_2
 class Blip2VisionModel(Blip2PretrainedModel):
     main_input_name = "pixel_values"
     config_class = Blip2VisionConfig
@@ -627,7 +627,7 @@ class Blip2QFormerMultiHeadAttention(nn.Layer):
         return outputs
 
 
-# Copied from transformers.models.bert.modeling_bert.BertSelfOutput with Bert->Blip2QFormer
+# Copied from paddlenlp.transformers.bert.modeling.BertSelfOutput with Bert->Blip2QFormer
 class Blip2QFormerSelfOutput(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -691,7 +691,7 @@ class Blip2QFormerAttention(nn.Layer):
         return outputs
 
 
-# Copied from transformers.models.bert.modeling_bert.BertIntermediate with Bert->Blip2QFormer
+# Copied from paddlenlp.transformers.bert.modeling.BertIntermediate with Bert->Blip2QFormer
 class Blip2QFormerIntermediate(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -707,7 +707,7 @@ class Blip2QFormerIntermediate(nn.Layer):
         return hidden_states
 
 
-# Copied from transformers.models.bert.modeling_bert.BertOutput with Bert->Blip2QFormer
+# Copied from paddlenlp.transformers.bert.modeling.BertOutput with Bert->Blip2QFormer
 class Blip2QFormerOutput(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -1219,7 +1219,7 @@ class Blip2Model(Blip2PretrainedModel):
         Examples:
         ```python
         >>> import paddle
-        >>> from transformers import AutoTokenizer, Blip2Model
+        >>> from paddlenlp.transformers import AutoTokenizer, Blip2Model
         >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model.to(device)  # doctest: +IGNORE_RESULT
         >>> tokenizer = AutoTokenizer.from_pretrained("Salesforce/blip2-flan-t5-xl")
@@ -1274,7 +1274,7 @@ class Blip2Model(Blip2PretrainedModel):
         >>> import paddle
         >>> from PIL import Image
         >>> import requests
-        >>> from transformers import AutoProcessor, Blip2Model
+        >>> from paddlenlp.transformers import AutoProcessor, Blip2Model
         >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model.to(device)  # doctest: +IGNORE_RESULT
         >>> processor = AutoProcessor.from_pretrained("Salesforce/blip2-flan-t5-xl")
@@ -1316,7 +1316,7 @@ class Blip2Model(Blip2PretrainedModel):
         >>> import paddle
         >>> from PIL import Image
         >>> import requests
-        >>> from transformers import Blip2Processor, Blip2Model
+        >>> from paddlenlp.transformers import Blip2Processor, Blip2Model
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model.to(device)  # doctest: +IGNORE_RESULT
@@ -1373,7 +1373,7 @@ class Blip2Model(Blip2PretrainedModel):
         ```python
         >>> from PIL import Image
         >>> import requests
-        >>> from transformers import Blip2Processor, Blip2Model
+        >>> from paddlenlp.transformers import Blip2Processor, Blip2Model
         >>> import paddle
         >>> processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
         >>> model = Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xl")
