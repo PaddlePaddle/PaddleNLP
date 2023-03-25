@@ -190,7 +190,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         z = z.cast(self.dtype)
         if self.use_slicing and z.shape[0] > 1:
             # split、chunk paddle vs pytorch may have some difference
-            decoded_slices = [self._decode(z_slice).sample for z_slice in z.split(1)]
+            decoded_slices = [self._decode(z_slice).sample for z_slice in z.chunk(z.shape[0])]
             decoded = paddle.concat(decoded_slices)
         else:
             decoded = self._decode(z).sample

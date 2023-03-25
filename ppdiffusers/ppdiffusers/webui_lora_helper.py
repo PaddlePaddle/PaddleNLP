@@ -160,12 +160,14 @@ def apply_lora(
                 for _, child_module in module.named_sublayers(include_self=True):
                     if not getattr(child_module, "is_lora_linear", False) and (
                         child_module.__class__.__name__ == "Linear"
-                        or (child_module.__class__.__name__ == "Conv2D" and child_module._kernel_size == [1, 1])
+                        or (child_module.__class__.__name__ == "Conv2D" and list(child_module._kernel_size) == [1, 1])
                     ):
                         in_features, out_features = child_module.weight.shape[0], child_module.weight.shape[1]
-                        is_conv = False
+                        child_module.is_conv = False
+                        child_module.merged = False
+
                         if child_module.weight.ndim == 4:
-                            is_conv = True
+                            child_module.is_conv = True
                             in_features, out_features = out_features, in_features
 
                         if rank > min(in_features, out_features):
@@ -173,7 +175,7 @@ def apply_lora(
                                 f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}"
                             )
 
-                        if is_conv:
+                        if child_module.is_conv:
                             child_module.lora_down = nn.Conv2D(in_features, rank, [1, 1], bias_attr=False)
                             child_module.lora_up = nn.Conv2D(rank, out_features, [1, 1], bias_attr=False)
                         else:
@@ -198,11 +200,57 @@ def apply_lora(
                             child_module.raw_forward = child_module.forward
 
                         def forward_lora(self, x):
-                            # if not self.training and self.lora_up.weight.sum().item() == 0:
-                            #     return self.raw_forward(x)
-                            return self.raw_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
+                            if self.training:
+                                if self.merged:
+                                    with paddle.no_grad():
+                                        if self.is_conv:
+                                            new_weight = (
+                                                self.weight.squeeze([-1, -2])
+                                                - self.lora_up.weight.squeeze([-1, -2])
+                                                @ self.lora_down.weight.squeeze([-1, -2])
+                                                * self.multiplier
+                                                * self.scale
+                                            ).unsqueeze([-1, -2])
+                                        else:
+                                            new_weight = (
+                                                self.weight
+                                                - self.lora_down.weight
+                                                @ self.lora_up.weight
+                                                * self.multiplier
+                                                * self.scale
+                                            )
+                                        self.weight.set_value(new_weight)
+                                        self.merged = False
+                                return (
+                                    self.raw_forward(x)
+                                    + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
+                                )
+                            else:
+                                if not self.merged:
+                                    with paddle.no_grad():
+                                        if self.is_conv:
+                                            new_weight = (
+                                                self.weight.squeeze([-1, -2])
+                                                + self.lora_up.weight.squeeze([-1, -2])
+                                                @ self.lora_down.weight.squeeze([-1, -2])
+                                                * self.multiplier
+                                                * self.scale
+                                            ).unsqueeze([-1, -2])
+                                        else:
+                                            new_weight = (
+                                                self.weight
+                                                + self.lora_down.weight
+                                                @ self.lora_up.weight
+                                                * self.multiplier
+                                                * self.scale
+                                            )
+                                        self.weight.set_value(new_weight)
+                                        self.merged = True
+                                return self.raw_forward(x)
 
                         child_module.forward = MethodType(forward_lora, child_module)
+                        child_module.lora_down.training = child_module.training
+                        child_module.lora_up.training = child_module.training
 
     if lora_weight_or_path is not None:
         if isinstance(pipe_or_module, nn.Layer):
@@ -214,10 +262,12 @@ def apply_lora(
                 if paddle_dtype is not None:
                     pipe_or_module.text_encoder.to(dtype=paddle_dtype)
                 pipe_or_module.text_encoder.set_dict(lora_weight_or_path)
+                pipe_or_module.text_encoder.eval()
             if hasattr(pipe_or_module, "unet"):
                 if paddle_dtype is not None:
                     pipe_or_module.unet.to(dtype=paddle_dtype)
                 pipe_or_module.unet.set_dict(lora_weight_or_path)
+                pipe_or_module.unet.eval()
 
         del lora_weight_or_path
         print("Loading lora_weights successfully!")
