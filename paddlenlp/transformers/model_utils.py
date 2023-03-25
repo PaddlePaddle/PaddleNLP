@@ -1124,7 +1124,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
 
-            # 4. download from community or hf-hub
+        # 4. download from community or hf-hub
+        else:
             # assume that the community-based models, name format: community/model-name
             community_model_file_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]]
