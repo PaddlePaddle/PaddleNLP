@@ -41,7 +41,9 @@ def append_attrs(data, item, label_id, relation_id, default_relation_type):
                     "id": relation_id,
                     "from_id": mapp[anno["from_id"]],
                     "to_id": mapp[anno["to_id"]],
-                    "type": anno["labels"][0] if len(anno["labels"]) else default_relation_type,
+                    "type": anno["labels"][0]
+                    if len(anno["labels"])
+                    else default_relation_type,
                 }
             )
 
@@ -56,9 +58,19 @@ def convert(dataset, task_type):
         relation_id = 0
         for data in dataset:
             outer_id += 1
-            item = {"id": outer_id, "text": data["data"]["text"], "entities": [], "relations": []}
-            item, label_id, relation_id = append_attrs(data, item, label_id, relation_id,
-                                                       default_relation_type=args.default_relation_type)
+            item = {
+                "id": outer_id,
+                "text": data["data"]["text"],
+                "entities": [],
+                "relations": [],
+            }
+            item, label_id, relation_id = append_attrs(
+                data,
+                item,
+                label_id,
+                relation_id,
+                default_relation_type=args.default_relation_type,
+            )
             results.append(item)
     # for the classification task
     else:
@@ -92,9 +104,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--labelstudio_file", type=str, help="The export file path of label studio, only support the JSON format."
+        "--labelstudio_file",
+        type=str,
+        help="The export file path of label studio, only support the JSON format.",
     )
-    parser.add_argument("--doccano_file", type=str, default="doccano_ext.json", help="Saving path in doccano format.")
+    parser.add_argument(
+        "--doccano_file",
+        type=str,
+        default="doccano_ext.json",
+        help="Saving path in doccano format.",
+    )
     parser.add_argument(
         "--task_type",
         type=str,
@@ -103,8 +122,10 @@ if __name__ == "__main__":
         help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.",
     )
     parser.add_argument(
-        '--default_relation_type', type=str, default="relation",
-        help="The default relation type for missing relation type, defaults to relation."
+        "--default_relation_type",
+        type=str,
+        default="relation",
+        help="The default relation type for missing relation type, defaults to relation.",
     )
 
     args = parser.parse_args()
