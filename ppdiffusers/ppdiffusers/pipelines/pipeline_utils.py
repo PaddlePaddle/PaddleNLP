@@ -416,15 +416,15 @@ class DiffusionPipeline(ConfigMixin):
                 create_pr=create_pr,
             )
 
-    def to(self, paddle_device: Optional[str] = None):
-        if paddle_device is None:
+    def to(self, paddle_device: Optional[str] = None, paddle_dtype: Optional[paddle.dtype] = None):
+        if paddle_device is None and paddle_dtype is None:
             return self
 
         module_names, _, _ = self.extract_init_dict(dict(self.config))
         for name in module_names.keys():
             module = getattr(self, name)
             if isinstance(module, nn.Layer):
-                if module.dtype == paddle.float16 and str(paddle_device) in ["cpu"]:
+                if paddle_device is not None and module.dtype == paddle.float16 and str(paddle_device) in ["cpu"]:
                     logger.warning(
                         "Pipelines loaded with `paddle_dtype=paddle.float16` cannot run with `cpu` device. It"
                         " is not recommended to move them to `cpu` as running them will fail. Please make"
@@ -432,7 +432,12 @@ class DiffusionPipeline(ConfigMixin):
                         " support for`float16` operations on this device in Paddle. Please, remove the"
                         " `paddle_dtype=paddle.float16` argument, or use another device for inference."
                     )
-                module.to(paddle_device)
+                kwargs = {}
+                if paddle_device is not None:
+                    kwargs["device"] = paddle_device
+                if paddle_dtype is not None:
+                    kwargs["dtype"] = paddle_dtype
+                module.to(**kwargs)
         return self
 
     @property
