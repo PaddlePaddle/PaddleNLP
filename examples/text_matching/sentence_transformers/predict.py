@@ -12,29 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import random
-import time
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-
 from model import SentenceTransformer
 
-# yapf: disable
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, default='./checkpoint/model_2700/model_state.pdparams', help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=50, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=50, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def convert_example(example, tokenizer, max_seq_length=512):

@@ -1,5 +1,18 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
-import os
 
 import paddle
 from paddle.io import DataLoader
@@ -7,21 +20,15 @@ from tqdm import tqdm
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration
+from paddlenlp.transformers.prophetnet.modeling import (
+    ProphetNetForConditionalGeneration,
+)
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
+# fmt: off
 parser = argparse.ArgumentParser()
-# Required parameters
-parser.add_argument(
-    "--dataset", default="gigaword", choices=["cnndm", "gigaword"], type=str, help="Path to tokenizer vocab file. "
-)
-parser.add_argument(
-    "--model_name_or_path",
-    default="prophetnet-large-uncased",
-    type=str,
-    required=True,
-    help="Path to pre-trained model. ",
-)
+parser.add_argument("--dataset", default="gigaword", choices=["cnndm", "gigaword"], type=str, help="Path to tokenizer vocab file.")
+parser.add_argument("--model_name_or_path", default="prophetnet-large-uncased", type=str, required=True, help="Path to pre-trained model.")
 parser.add_argument("--batch_size", default=24, type=int)
 parser.add_argument("--epochs", default=3, type=int)
 parser.add_argument("--lr", default=0.0001, type=float)
@@ -31,8 +38,8 @@ parser.add_argument("--warmup_steps", default=1000, type=int)
 parser.add_argument("--clip_norm", default=0.1, type=float)
 parser.add_argument("--num_workers", default=4, type=int)
 parser.add_argument("--output_dir", default="./ckpt/gigaword", type=str)
-
 args = parser.parse_args()
+# fmt: on
 
 
 def read(data_path):
@@ -59,7 +66,7 @@ train_dataset = load_dataset(read, data_path=[train_data_src, train_data_tgt], l
 
 dev_dataset = load_dataset(read, data_path=[dev_data_src, dev_data_tgt], lazy=False)
 
-t = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
+tokenizer = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
 
 
 class InverseSquareRootSchedule(paddle.optimizer.lr.LRScheduler):
@@ -106,11 +113,11 @@ train_dataset = train_dataset.map(trunc)
 dev_dataset = dev_dataset.map(trunc)
 
 batchify_fn = lambda samples, fn=Tuple(
-    Pad(axis=0, pad_val=t.pad_token_id),  # src_ids
+    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
     Pad(axis=0, pad_val=0),  # src_pids
-    Pad(axis=0, pad_val=t.pad_token_id),  # tgt_ids
+    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_ids
     Pad(axis=0, pad_val=0),  # tgt_pids
-    Pad(axis=0, pad_val=t.pad_token_id),  # label
+    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # label
 ): fn(samples)
 
 batch_size = args.batch_size
@@ -247,7 +254,6 @@ def train():
                 global_step += 1
 
         valid_loss = valid(dev_data_loader)
-        best_ckpt_path = os.path.join(output_dir, "model_best.pdparams")
         if best_valid_loss is None:
             best_valid_loss = valid_loss
             model.save_pretrained(output_dir)

@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers import AutoTokenizer, AutoModel, ErnieForMaskedLM
-
-from data import mask_tokens
 from custom_ernie import ErnieModel as CustomErnie
+from data import mask_tokens
+
+from paddlenlp.transformers import AutoModel, ErnieForMaskedLM
 
 
 class ProjectionMLP(nn.Layer):
@@ -28,7 +26,6 @@ class ProjectionMLP(nn.Layer):
         super(ProjectionMLP, self).__init__()
         hidden_dim = in_dim * 2
         out_dim = in_dim
-        affine = False
         list_layers = [nn.Linear(in_dim, hidden_dim, bias_attr=False), nn.BatchNorm1D(hidden_dim), nn.ReLU()]
         list_layers += [nn.Linear(hidden_dim, out_dim, bias_attr=False), nn.BatchNorm1D(out_dim)]
         self.net = nn.Sequential(*list_layers)

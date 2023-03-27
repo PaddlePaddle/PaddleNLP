@@ -164,7 +164,7 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
-            if(args.dup_rate > 0.0):
+            if args.dup_rate > 0.0:
                 query_input_ids, query_token_type_ids = word_repetition(query_input_ids, query_token_type_ids, args.dup_rate)
                 title_input_ids, title_token_type_ids = word_repetition(title_input_ids, title_token_type_ids, args.dup_rate)
 

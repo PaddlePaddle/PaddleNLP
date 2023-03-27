@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import os
 
 import paddle
+from model import ErnieForCSC
 from paddle.static import InputSpec
+
 from paddlenlp.data import Vocab
 from paddlenlp.transformers import ErnieModel
-from model import ErnieForCSC
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
