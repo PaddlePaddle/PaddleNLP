@@ -33,11 +33,7 @@ from .configuration import (
     OPTConfig,
 )
 
-__all__ = [
-    "OPTModel",
-    "OPTPretrainedModel",
-    "OPTForCausalLM",
-]
+__all__ = ["OPTModel", "OPTPretrainedModel", "OPTForCausalLM", "OPTForConditionalGeneration"]
 
 
 class TransformerDecoder(Layer):
@@ -653,3 +649,6 @@ class OPTForCausalLM(OPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+OPTForConditionalGeneration = OPTForCausalLM
