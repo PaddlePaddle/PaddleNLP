@@ -35,4 +35,9 @@ ftfy
 unidecode
 onnxruntime
 sacremoses
+requests==2.25.1
+omegaconf==2.2.2
+numpy>=1.19.5,<=1.21.6
+Pillow==9.3.0
+blobfile==1.3.3
 

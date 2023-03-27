@@ -1278,4 +1278,8 @@ ernie_doc(){
 ernie_health(){
     ernie-health
 }
+# 4 gpt-3
+gpt-3() {
+    bash ./ci_gpt-3.sh
+}
 $1
