@@ -150,6 +150,7 @@ except OptionalDependencyNotAvailable:
 else:
     from .pipelines import (
         FastDeployCycleDiffusionPipeline,
+        FastDeployStableDiffusionControlNetPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,

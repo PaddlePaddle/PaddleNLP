@@ -19,14 +19,15 @@ import importlib
 import inspect
 import os
 import warnings
-from typing import TYPE_CHECKING, Optional, Type
-
-import paddle
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
+import paddle
 from paddle.nn import Layer
+import tqdm
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
@@ -435,3 +436,25 @@ def paddlenlp_load(path, return_numpy=False):
             return paddle.load(path)
     else:
         return paddle.load(path, return_numpy=return_numpy)
+
+
+def is_paddle_support_lazy_init():
+    return hasattr(paddle, "LazyGuard")
+
+
+class ContextManagers:
+    """
+    Wrapper for `contextlib.ExitStack` which enters a collection of context managers. Adaptation of `ContextManagers`
+    in the `fastcore` library.
+    """
+
+    def __init__(self, context_managers: List[ContextManager]):
+        self.context_managers = context_managers
+        self.stack = ExitStack()
+
+    def __enter__(self):
+        for context_manager in self.context_managers:
+            self.stack.enter_context(context_manager)
+
+    def __exit__(self, *args, **kwargs):
+        self.stack.__exit__(*args, **kwargs)

@@ -11,33 +11,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
 import argparse
 import os
-import sys
 import random
+from functools import partial
 
 import numpy as np
 import paddle
-from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
+from model import BiLSTMAttentionModel, SelfInteractiveAttention
+from utils import CharTokenizer, convert_example
+
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
-from model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
-from utils import convert_example, CharTokenizer
-from ernie.tokenizing_ernie import ErnieTokenizer
-
-# yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
-parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--save_dir", type=str, default="checkpoints/", help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--vocab_path", type=str, default=None)
-parser.add_argument('--language', choices=['ch', 'en'], default=None, help="Language that the model is built for")
+parser.add_argument("--language", choices=["ch", "en"], default=None, help="Language that the model is built for")
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed=1000):

@@ -13,33 +13,28 @@
 # limitations under the License.
 
 import argparse
-import requests
 import json
-import numpy as np
 
-# yapf: disable
+import requests
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization.")
+parser.add_argument(
+    "--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization."
+)
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for predicting.")
 args = parser.parse_args()
-# yapf: disable
 
 url = "http://0.0.0.0:8189/models/cblue_ner"
 headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
-    texts = ["研究证实，细胞减少与肺内病变程度及肺内炎性病变吸收程度密切相关。",
-                 "可为不规则发热、稽留热或弛张热，但以不规则发热为多，可能与患儿应用退热药物导致热型不规律有关。"]
+    texts = ["研究证实，细胞减少与肺内病变程度及肺内炎性病变吸收程度密切相关。", "可为不规则发热、稽留热或弛张热，但以不规则发热为多，可能与患儿应用退热药物导致热型不规律有关。"]
     texts = [[x.lower() for x in text] for text in texts]
     data = {
-        'data': {
-             'text': texts,
-         },
-        'parameters': {
-             'max_seq_len': args.max_seq_len,
-             'batch_size': args.batch_size,
-             'is_split_into_words': True
-        }
+        "data": {
+            "text": texts,
+        },
+        "parameters": {"max_seq_len": args.max_seq_len, "batch_size": args.batch_size, "is_split_into_words": True},
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     print(r.text)

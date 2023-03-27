@@ -16,15 +16,14 @@ import io
 
 import numpy as np
 import paddle
-
-from model import VAESeq2SeqInferModel
 from args import parse_args
 from data import create_data_loader
+from model import VAESeq2SeqInferModel
 
 
 def infer(args):
     print(args)
-    device = paddle.set_device(args.device)
+    paddle.set_device(args.device)
     _, _, _, vocab, bos_id, eos_id, _ = create_data_loader(args)
 
     net = VAESeq2SeqInferModel(args.embed_dim, args.hidden_size, args.latent_size, len(vocab) + 2)

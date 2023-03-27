@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-from paddle import nn
-from paddle.nn import functional as F
-from biencoder_base_model import BiEncoder, BiEncoderNllLoss
-from NQdataset import BiEncoderPassage, BiEncoderSample, BiENcoderBatch, BertTensorizer, NQdataSetForDPR, DataUtil
-from paddlenlp.transformers.bert.modeling import BertModel
-import numpy as np
-import os
 import argparse
+
+import numpy as np
+import paddle
+from biencoder_base_model import BiEncoder, BiEncoderNllLoss
+from NQdataset import DataUtil, NQdataSetForDPR
 from paddle.optimizer.lr import LambdaDecay
+
+from paddlenlp.transformers.bert.modeling import BertModel
 
 parser = argparse.ArgumentParser()
 
@@ -54,7 +53,7 @@ def dataLoader_for_DPR(batch_size, source_data: list, epochs):
                 yield batch_data
                 batch_data = []
 
-        except Exception as e:
+        except Exception:
             import traceback
 
             traceback.print_exc()
@@ -112,8 +111,6 @@ def train():
             if len(batch_data) == batch_size:
                 all_questions = []
                 all_contexts = []
-                all_CUDA_rnd_state = []
-
                 all_batch_input = util.create_biencoder_input(batch_data, inserted_title=True)
 
                 all_positions = all_batch_input.is_positive
@@ -131,7 +128,6 @@ def train():
 
                 all_questions = []
                 all_contexts = []
-                all_CUDA_rnd_state = []
                 all_CUDA_rnd_state_question = []
                 all_CUDA_rnd_state_context = []
 
@@ -204,7 +200,6 @@ def train():
                 optimizer.step()
                 scheduler.step()
                 optimizer.clear_grad()
-                all_CUDA_rnd_state = []
 
                 batch_data = []
 

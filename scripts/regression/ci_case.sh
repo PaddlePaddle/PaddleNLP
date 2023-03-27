@@ -234,7 +234,7 @@ fast_gpt(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 cd ${nlp_dir}/paddlenlp/ops
 export CC=/usr/local/gcc-8.2/bin/gcc
@@ -328,8 +328,8 @@ cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
 }
-# 9 ernie-1.0
-ernie-1.0 (){
+# 9 ernie
+ernie(){
 #data process
 cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
 sed -i "s/python3/python/g" Makefile
@@ -362,7 +362,7 @@ python -u -m paddle.distributed.launch \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
     --max_steps 2 \
-    --save_steps 2\
+    --save_steps 2 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
@@ -429,7 +429,7 @@ cd ${nlp_dir}/examples/model_compression/ofa/
 cd ../../benchmark/glue/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 # finetuing
-time (python -u ./run_glue.py \
+time (python -u run_glue.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --task_name SST-2 \
@@ -691,7 +691,8 @@ print_info $? ernie-ctm_eval
 # 20 distilbert
 distilbert (){
 cd ${nlp_dir}/examples/model_compression/distill_lstm/
-mv ${nlp_dir}/examples/benchmark/glue/SST-2/* ./
+wget -q https://paddle-qa.bj.bcebos.com/SST-2_GLUE.tar
+tar -xzvf SST-2_GLUE.tar 
 time (
     python small.py \
     --task_name sst-2 \
@@ -715,7 +716,7 @@ time (
     --batch_size 128 \
     --model_name bert-base-uncased \
     --output_dir distilled_models/SST-2 \
-    --teacher_dir ./sst-2_ft_model_1.pdparams/ \
+    --teacher_dir ./SST-2/sst-2_ft_model_1.pdparams/ \
     --save_steps 1000 \
     --n_iter 1 \
     --embedding_name w2v.google_news.target.word-word.dim300.en >${log_path}/distilbert_teacher_train) >>${log_path}/distilbert_teacher_train 2>&1
@@ -743,7 +744,7 @@ fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 export CC=/usr/local/gcc-8.2/bin/gcc
 export CXX=/usr/local/gcc-8.2/bin/g++
@@ -884,7 +885,9 @@ print_info $? ernie-doc_dureader_robust
 #26 transformer-xl
 transformer-xl (){
 cd ${nlp_dir}/examples/language_model/transformer-xl/
-cp -r /ssd1/paddlenlp/download/transformer-xl/* ./
+mkdir gen_data && cd gen_data
+wget https://paddle-qa.bj.bcebos.com/paddlenlp/enwik8.tar.gz && tar -zxvf enwik8.tar.gz
+cd ../
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 time (sed -i 's/print_step: 100/print_step: 1/g' configs/enwik8.yaml
 sed -i 's/save_step: 10000/save_step: 3/g' configs/enwik8.yaml
@@ -910,7 +913,8 @@ print_info $? pointer_summarizer_train
 #28 question_matching
 question_matching() {
 cd ${nlp_dir}/examples/text_matching/question_matching/
-cp -r /ssd1/paddlenlp/download/question_matching/* ./
+wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/data_v4.tar.gz
+tar -xvzf data_v4.tar.gz
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 #train
 time (
@@ -1242,5 +1246,36 @@ cd ${nlp_dir}/model_zoo/ernie-layout/deploy/python
 wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
 python infer.py --model_path_prefix ../../ner_export/inference --task_type ner --lang "en" --batch_size 8 >${log_path}/ernie-layout_deploy>>${log_path}/ernie-layout_deploy 2>&1
 print_info $? ernie-layout_deploy
+}
+ernie-1.0(){
+    ernie
+}
+
+ernie-3.0(){
+    ernie
+}
+
+ernie_m(){
+    ernie-m
+}
+
+ernie_layout(){
+ernie-layout
+}
+
+ernie_csc(){
+    ernie-csc
+}
+
+ernie_ctm(){
+    ernie-ctm
+}
+
+ernie_doc(){
+    ernie-doc
+}
+
+ernie_health(){
+    ernie-health
 }
 $1

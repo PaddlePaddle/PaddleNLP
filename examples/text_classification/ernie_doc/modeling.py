@@ -15,8 +15,9 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers.attention_utils import _convert_param_attr_to_list
+
 from paddlenlp.transformers import PretrainedModel, register_base_model
+from paddlenlp.transformers.attention_utils import _convert_param_attr_to_list
 
 __all__ = [
     "ErnieDocModel",
@@ -251,7 +252,7 @@ class ErnieDocEncoder(nn.Layer):
         if self.mem_len is None or self.mem_len == 0:
             return None
         if prev_mem is None:
-            new_mem = curr[:, -self.mem_len :, :]
+            new_mem = curr_out[:, -self.mem_len :, :]
         else:
             new_mem = paddle.concat([prev_mem, curr_out], 1)[:, -self.mem_len :, :]
         new_mem.stop_gradient = True

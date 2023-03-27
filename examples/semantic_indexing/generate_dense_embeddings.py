@@ -24,22 +24,23 @@
  Command line tool that produces embeddings for a large documents base based on the pretrained ctx & question encoders
  Supposed to be used in a 'sharded' way to speed up the process.
 """
-import os
-import pathlib
 import argparse
 import csv
 import logging
+import os
+import pathlib
 import pickle
 from typing import List, Tuple
-from tqdm import tqdm
-import pickle
+
 import numpy as np
-from paddlenlp.transformers.bert.modeling import BertModel
-from biencoder_base_model import BiEncoder
 import paddle
-from paddle.io import Dataset, DataLoader
-from paddle import nn
+from biencoder_base_model import BiEncoder
 from NQdataset import BertTensorizer
+from paddle import nn
+from paddle.io import DataLoader, Dataset
+from tqdm import tqdm
+
+from paddlenlp.transformers.bert.modeling import BertModel
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

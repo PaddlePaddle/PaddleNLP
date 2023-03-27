@@ -19,7 +19,8 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
+from paddlenlp.transformers import (  # XLNetForCausalLM,
+    XLNetConfig,
     XLNetForMultipleChoice,
     XLNetForQuestionAnswering,
     XLNetForSequenceClassification,
@@ -63,7 +64,7 @@ class XLNetModelTester:
         self.eos_token_id = 2
         self.pad_token_id = 5
         self.num_choices = 4
-        self.num_classes = 3
+        self.num_classes = 2
 
     def prepare_config_and_inputs(self):
         input_ids_1 = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -109,22 +110,24 @@ class XLNetModelTester:
         )
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "d_model": self.hidden_size,
-            "n_head": self.num_attention_heads,
-            "d_inner": self.d_inner,
-            "n_layer": self.num_hidden_layers,
-            "mem_len": self.mem_len,
-            "clamp_len": self.clamp_len,
-            "same_length": self.same_length,
-            "reuse_len": self.reuse_len,
-            "bi_data": self.bi_data,
-            "initializer_range": self.initializer_range,
-            # "bos_token_id": self.bos_token_id,
-            # "pad_token_id": self.pad_token_id,
-            # "eos_token_id": self.eos_token_id,
-        }
+        return XLNetConfig(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            n_head=self.num_attention_heads,
+            d_inner=self.d_inner,
+            n_layer=self.num_hidden_layers,
+            mem_len=self.mem_len,
+            clamp_len=self.clamp_len,
+            same_length=self.same_length,
+            reuse_len=self.reuse_len,
+            bi_data=self.bi_data,
+            initializer_range=self.initializer_range,
+            bos_token_id=self.bos_token_id,
+            pad_token_id=self.pad_token_id,
+            eos_token_id=self.eos_token_id,
+            num_classes=self.num_classes,
+            num_choices=self.num_choices,
+        )
 
     def set_seed(self):
         random.seed(self.seed)
@@ -144,7 +147,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetModel(**config)
+        model = XLNetModel(config)
         model.eval()
 
         result = model(input_ids_1, input_mask=input_mask)
@@ -153,7 +156,7 @@ class XLNetModelTester:
         result = model(input_ids_1, return_dict=self.parent.return_dict)
 
         config["mem_len"] = 0
-        model = XLNetModel(**config)
+        model = XLNetModel(config)
         model.eval()
         model(input_ids_1, return_dict=self.parent.return_dict)
 
@@ -173,7 +176,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetForSequenceClassification(XLNetModel(**config))
+        model = XLNetForSequenceClassification(config)
         model.train()
 
         train_size = input_ids_1.shape[0]
@@ -198,7 +201,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetModel(**config)
+        model = XLNetModel(config)
         model.eval()
 
         outputs = model(
@@ -231,7 +234,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetLMHeadModel(XLNetModel(**config))
+        model = XLNetLMHeadModel(config)
         model.eval()
 
         result = model(
@@ -271,7 +274,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetForQuestionAnswering(XLNetModel(**config))
+        model = XLNetForQuestionAnswering(config)
         model.eval()
 
         results = []
@@ -317,7 +320,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetForTokenClassification(XLNetModel(**config), num_classes=self.num_classes)
+        model = XLNetForTokenClassification(config)
         model.eval()
 
         result = model(input_ids_1, labels=token_labels, return_dict=self.parent.return_dict)
@@ -347,7 +350,7 @@ class XLNetModelTester:
         token_labels,
         choice_labels,
     ):
-        model = XLNetForSequenceClassification(XLNetModel(**config))
+        model = XLNetForSequenceClassification(config)
         model.eval()
 
         result = model(input_ids_1, labels=sequence_labels, return_dict=self.parent.return_dict)
@@ -520,7 +523,7 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
 class XLNetModelLanguageGenerationTest(unittest.TestCase):
     @slow
     def test_lm_generate_xlnet_base_cased(self):
-        return
+
         model = XLNetLMHeadModel.from_pretrained("xlnet-base-cased")
         # fmt: off
         input_ids = paddle.to_tensor([[
@@ -915,3 +918,7 @@ class XLNetModelLanguageGenerationTest(unittest.TestCase):
 
         output_ids, _ = model.generate(input_ids, max_length=39, decode_strategy="greedy_search")
         self.assertListEqual(output_ids[0].tolist(), expected_output_ids)
+
+
+if __name__ == "__main__":
+    unittest.main()

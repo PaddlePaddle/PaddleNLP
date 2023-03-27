@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-import argparse
-import os
 import sys
-import random
 import time
 
-sys.path.append("utils")
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from paddle_serving_server.pipeline import PipelineClient
 from data import gen_id2corpus
-from utils.milvus_util import RecallByMilvus
-from utils.config import collection_name, partition_tag
+from paddle_serving_server.pipeline import PipelineClient
+
+sys.path.append("utils")
+from utils.config import collection_name, partition_tag  # noqa: E402
+from utils.milvus_util import RecallByMilvus  # noqa: E402
 
 
 def search_in_milvus(text_embedding, corpus_file, query_text):

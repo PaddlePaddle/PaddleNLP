@@ -15,10 +15,6 @@
 The file_reader converts raw corpus to input.
 """
 
-import os
-
-import numpy as np
-import paddle
 from paddlenlp.datasets import MapDataset
 
 # We use "\002" to separate sentence characters and sequence labels,
@@ -60,7 +56,7 @@ def load_vocab(dict_path):
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
-                if reverse == None:
+                if reverse is None:
                     reverse = True if terms[0].isdigit() else False
                 if reverse:
                     value, key = terms

@@ -33,7 +33,7 @@ from pipelines.pipelines.config import (
     read_pipeline_config_from_yaml,
 )
 from pipelines.pipelines.utils import generate_code
-from pipelines.schema import Document, MultiLabel
+from pipelines.schema import ContentTypes, Document, MultiLabel
 
 try:
     import ray
@@ -489,6 +489,7 @@ class Pipeline(BasePipeline):
     def run_batch(  # type: ignore
         self,
         queries: List[str] = None,
+        queries_type: Optional[ContentTypes] = None,
         file_paths: Optional[List[str]] = None,
         labels: Optional[Union[MultiLabel, List[MultiLabel]]] = None,
         documents: Optional[Union[List[Document], List[List[Document]]]] = None,

@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
 from ..model_outputs import (
@@ -34,6 +35,11 @@ from ..model_outputs import (
     SequenceClassifierOutput,
     TokenClassifierOutput,
     tuple_output,
+)
+from .configuration import (
+    ALBERT_PRETRAINED_INIT_CONFIGURATION,
+    ALBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    AlbertConfig,
 )
 
 __all__ = [
@@ -88,27 +94,18 @@ class AlbertEmbeddings(Layer):
     Constructs the embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embedding_size,
-        hidden_dropout_prob,
-        max_position_embeddings,
-        type_vocab_size,
-        layer_norm_eps,
-        pad_token_id,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, embedding_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, embedding_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.embedding_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # Position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(
         self,
@@ -145,34 +142,27 @@ class AlbertEmbeddings(Layer):
 
 
 class AlbertAttention(Layer):
-    def __init__(
-        self,
-        hidden_size,
-        num_attention_heads,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        layer_norm_eps,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertAttention, self).__init__()
-        if hidden_size % num_attention_heads != 0:
+        if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
-                "heads (%d)" % (hidden_size, num_attention_heads)
+                "heads (%d)" % (config.hidden_size, config.num_attention_heads)
             )
 
-        self.num_attention_heads = num_attention_heads
-        self.hidden_size = hidden_size
-        self.attention_head_size = hidden_size // num_attention_heads
+        self.num_attention_heads = config.num_attention_heads
+        self.hidden_size = config.hidden_size
+        self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(self.hidden_size, self.all_head_size)
         self.key = nn.Linear(self.hidden_size, self.all_head_size)
         self.value = nn.Linear(self.hidden_size, self.all_head_size)
 
-        self.attention_dropout = nn.Dropout(attention_probs_dropout_prob)
-        self.output_dropout = nn.Dropout(hidden_dropout_prob)
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.attention_dropout = nn.Dropout(config.attention_probs_dropout_prob)
+        self.output_dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
     # Copied from transformers.models.bert.modeling_bert.BertSelfAttention.transpose_for_scores
     def transpose_for_scores(self, x):
@@ -227,30 +217,15 @@ class AlbertAttention(Layer):
 
 
 class AlbertLayer(Layer):
-    def __init__(
-        self,
-        hidden_size,
-        num_attention_heads,
-        intermediate_size,
-        hidden_act,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        layer_norm_eps,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
-        self.full_layer_layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.attention = AlbertAttention(
-            hidden_size,
-            num_attention_heads,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps,
-        )
-        self.ffn = nn.Linear(hidden_size, intermediate_size)
-        self.ffn_output = nn.Linear(intermediate_size, hidden_size)
-        self.activation = ACT2FN[hidden_act]
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.attention = AlbertAttention(config)
+        self.ffn = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.ffn_output = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.activation = ACT2FN[config.hidden_act]
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
         self,
@@ -276,33 +251,10 @@ class AlbertLayer(Layer):
 
 
 class AlbertLayerGroup(Layer):
-    def __init__(
-        self,
-        hidden_size,
-        num_attention_heads,
-        intermediate_size,
-        inner_group_num,
-        hidden_act,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        layer_norm_eps,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertLayerGroup, self).__init__()
 
-        self.albert_layers = nn.LayerList(
-            [
-                AlbertLayer(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    hidden_act,
-                    hidden_dropout_prob,
-                    attention_probs_dropout_prob,
-                    layer_norm_eps,
-                )
-                for _ in range(inner_group_num)
-            ]
-        )
+        self.albert_layers = nn.LayerList([AlbertLayer(config) for _ in range(config.inner_group_num)])
 
     def forward(
         self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False, output_hidden_states=False
@@ -339,41 +291,14 @@ class AlbertLayerGroup(Layer):
 
 
 class AlbertTransformer(Layer):
-    def __init__(
-        self,
-        embedding_size,
-        hidden_size,
-        num_hidden_layers,
-        num_hidden_groups,
-        num_attention_heads,
-        intermediate_size,
-        inner_group_num,
-        hidden_act,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        layer_norm_eps,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertTransformer, self).__init__()
 
-        self.num_hidden_layers = num_hidden_layers
-        self.num_hidden_groups = num_hidden_groups
+        self.num_hidden_layers = config.num_hidden_layers
+        self.num_hidden_groups = config.num_hidden_groups
 
-        self.embedding_hidden_mapping_in = nn.Linear(embedding_size, hidden_size)
-        self.albert_layer_groups = nn.LayerList(
-            [
-                AlbertLayerGroup(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    inner_group_num,
-                    hidden_act,
-                    hidden_dropout_prob,
-                    attention_probs_dropout_prob,
-                    layer_norm_eps,
-                )
-                for _ in range(num_hidden_groups)
-            ]
-        )
+        self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
+        self.albert_layer_groups = nn.LayerList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
 
     def forward(
         self,
@@ -425,308 +350,14 @@ class AlbertPretrainedModel(PretrainedModel):
     loading pretrained models. See `PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "albert-base-v1": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-large-v1": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-xlarge-v1": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 2048,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 8192,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-xxlarge-v1": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 4096,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 16384,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 64,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-base-v2": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu_new",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-large-v2": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu_new",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-xlarge-v2": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu_new",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 2048,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 8192,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-xxlarge-v2": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu_new",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 4096,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 16384,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 64,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30000,
-        },
-        "albert-chinese-tiny": {
-            "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "hidden_size": 312,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 1248,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 4,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "albert-chinese-small": {
-            "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "hidden_size": 384,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 1536,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 6,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "albert-chinese-base": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "albert-chinese-large": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "inner_group_num": 1,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "albert-chinese-xlarge": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 2048,
-            "initializer_range": 0.014,
-            "inner_group_num": 1,
-            "intermediate_size": 8192,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "albert-chinese-xxlarge": {
-            "attention_probs_dropout_prob": 0,
-            "bos_token_id": 2,
-            "embedding_size": 128,
-            "eos_token_id": 3,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0,
-            "hidden_size": 4096,
-            "initializer_range": 0.01,
-            "inner_group_num": 1,
-            "intermediate_size": 16384,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_groups": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-    }
+    model_config_file = CONFIG_NAME
+    config_class = AlbertConfig
 
-    pretrained_resource_files_map = {
-        "model_state": {
-            "albert-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.pdparams",
-            "albert-large-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.pdparams",
-            "albert-xlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.pdparams",
-            "albert-xxlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.pdparams",
-            "albert-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.pdparams",
-            "albert-large-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.pdparams",
-            "albert-xlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.pdparams",
-            "albert-xxlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.pdparams",
-            "albert-chinese-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.pdparams",
-            "albert-chinese-small": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.pdparams",
-            "albert-chinese-base": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.pdparams",
-            "albert-chinese-large": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.pdparams",
-            "albert-chinese-xlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.pdparams",
-            "albert-chinese-xxlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.pdparams",
-        }
-    }
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "transformer"
+
+    pretrained_init_configuration = ALBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ALBERT_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self):
         # Initialize weights
@@ -738,9 +369,7 @@ class AlbertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.transformer.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -750,9 +379,7 @@ class AlbertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.transformer.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -776,114 +403,23 @@ class AlbertModel(AlbertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `AlbertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `AlbertModel`.
-            Defaults to `30000`.
-        embedding_size (int, optional):
-            Dimensionality of the embedding layer. Defaults to `128`.
-        hidden_size (int, optional):
-            Dimensionality of the encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        inner_group_num (int, optional):
-            Number of hidden groups in the Transformer encoder. Defaults to `1`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-        inner_group_num (int, optional):
-            Number of inner groups in a hidden group. Default to `1`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`. Defaults to `12`.
-
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to `0.02`.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
-
-        layer_norm_eps(float, optional):
-            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
-            A small value to the variance added to the normalization layer to prevent division by zero.
-            Default to `1e-12`.
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary. Defaults to `0`.
-        add_pooling_layer(bool, optional):
-            Whether or not to add the pooling layer. Default to `False`.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
     """
 
-    def __init__(
-        self,
-        vocab_size=30000,
-        embedding_size=128,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_hidden_groups=1,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        inner_group_num=1,
-        hidden_act="gelu",
-        hidden_dropout_prob=0,
-        attention_probs_dropout_prob=0,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        layer_norm_eps=1e-12,
-        pad_token_id=0,
-        bos_token_id=2,
-        eos_token_id=3,
-        add_pooling_layer=True,
-    ):
-        super(AlbertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.bos_token_id = bos_token_id
-        self.eos_token_id = eos_token_id
-        self.initializer_range = initializer_range
-        self.num_hidden_layers = num_hidden_layers
-        self.embeddings = AlbertEmbeddings(
-            vocab_size,
-            embedding_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
-            layer_norm_eps,
-            pad_token_id,
-        )
+    def __init__(self, config: AlbertConfig):
+        super(AlbertModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.bos_token_id = config.bos_token_id
+        self.eos_token_id = config.eos_token_id
+        self.initializer_range = config.initializer_range
+        self.num_hidden_layers = config.num_hidden_layers
+        self.embeddings = AlbertEmbeddings(config)
+        self.encoder = AlbertTransformer(config)
+        self.config = config
 
-        self.encoder = AlbertTransformer(
-            embedding_size,
-            hidden_size,
-            num_hidden_layers,
-            num_hidden_groups,
-            num_attention_heads,
-            intermediate_size,
-            inner_group_num,
-            hidden_act,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps,
-        )
-
-        if add_pooling_layer:
-            self.pooler = nn.Linear(hidden_size, hidden_size)
+        if config.add_pooling_layer:
+            self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
             self.pooler_activation = nn.Tanh()
         else:
             self.pooler = None
@@ -1079,25 +615,20 @@ class AlbertForPretraining(AlbertPretrainedModel):
     on top.
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of :class:`AlbertModel`.
-        lm_head (:class:`AlbertMLMHead`):
-            An instance of :class:`AlbertSOPHead`.
-        sop_head (:class:`AlbertSOPHead`):
-            An instance of :class:`AlbertSOPHead`.
-        vocab_size (int):
-            See :class:`AlbertModel`.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
 
     """
 
-    def __init__(self, albert, lm_head, sop_head, vocab_size):
-        super(AlbertForPretraining, self).__init__()
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForPretraining, self).__init__(config)
 
-        self.transformer = albert
-        self.predictions = lm_head
-        self.sop_classifier = sop_head
+        self.transformer = AlbertModel(config)
+        self.predictions = AlbertMLMHead(config)
+        self.sop_classifier = AlbertSOPHead(config)
+        self.config = config
         self.init_weights()
-        self.vocab_size = vocab_size
+        self.vocab_size = config.vocab_size
 
     def get_output_embeddings(self):
         return self.predictions.decoder
@@ -1222,22 +753,16 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
 
 class AlbertMLMHead(Layer):
-    def __init__(
-        self,
-        embedding_size,
-        vocab_size,
-        hidden_size,
-        hidden_act,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertMLMHead, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(embedding_size)
+        self.layer_norm = nn.LayerNorm(config.embedding_size)
         self.bias = self.create_parameter(
-            [vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
+            [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
-        self.dense = nn.Linear(hidden_size, embedding_size)
-        self.decoder = nn.Linear(embedding_size, vocab_size)
-        self.activation = ACT2FN[hidden_act]
+        self.dense = nn.Linear(config.hidden_size, config.embedding_size)
+        self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
+        self.activation = ACT2FN[config.hidden_act]
 
         # link bias
         self.decoder.bias = self.bias
@@ -1253,15 +778,10 @@ class AlbertMLMHead(Layer):
 
 
 class AlbertSOPHead(Layer):
-    def __init__(
-        self,
-        classifier_dropout_prob,
-        hidden_size,
-        num_labels,
-    ):
+    def __init__(self, config: AlbertConfig):
         super(AlbertSOPHead, self).__init__()
-        self.dropout = nn.Dropout(classifier_dropout_prob)
-        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.dropout = nn.Dropout(config.classifier_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
     def forward(self, pooled_output):
         dropout_pooled_output = self.dropout(pooled_output)
@@ -1274,21 +794,17 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
     Albert Model with a `masked language modeling` head on top.
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of :class:`AlbertModel`.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
 
     """
 
-    def __init__(self, albert):
-        super(AlbertForMaskedLM, self).__init__()
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForMaskedLM, self).__init__(config)
 
-        self.transformer = albert
-        self.predictions = AlbertMLMHead(
-            embedding_size=self.transformer.config["embedding_size"],
-            vocab_size=self.transformer.config["vocab_size"],
-            hidden_size=self.transformer.config["hidden_size"],
-            hidden_act=self.transformer.config["hidden_act"],
-        )
+        self.transformer = AlbertModel(config)
+        self.predictions = AlbertMLMHead(config)
+        self.config = config
         self.init_weights()
 
     def get_output_embeddings(self):
@@ -1405,24 +921,21 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of AlbertModel.
-        classifier_dropput_prob (float, optional):
-            The dropout probability for the classifier.
-            Defaults to `0`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
 
     """
 
-    def __init__(self, albert, classifier_dropout_prob=0, num_classes=2):
-        super(AlbertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForSequenceClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.config = config
 
-        self.transformer = albert
-        self.dropout = nn.Dropout(classifier_dropout_prob)
-        self.classifier = nn.Linear(self.transformer.config["hidden_size"], self.num_classes)
+        self.transformer = AlbertModel(config)
+        self.dropout = nn.Dropout(config.classifier_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 
+        # Initialize weights and apply final processing
         self.init_weights()
 
     def forward(
@@ -1456,8 +969,8 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -1476,7 +989,7 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
             - `logits` (Tensor):
                 A tensor of the input text classification logits.
-                Shape as `[batch_size, num_classes]` and dtype as float32.
+                Shape as `[batch_size, num_labels]` and dtype as float32.
 
             - `hidden_states` (Tensor):
                 Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
@@ -1520,12 +1033,12 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -1548,20 +1061,17 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of AlbertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
     """
 
-    def __init__(self, albert, num_classes=2):
-        super(AlbertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-
-        self.transformer = albert
-        self.dropout = nn.Dropout(self.transformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.transformer.config["hidden_size"], self.num_classes)
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForTokenClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.config = config
+        self.transformer = AlbertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
 
         self.init_weights()
 
@@ -1595,7 +1105,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -1613,7 +1123,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
             - `logits` (Tensor):
                 A tensor of the input token classification logits.
-                Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+                Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
             - `hidden_states` (Tensor):
                 Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
@@ -1658,7 +1168,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
         if not return_dict:
             output = (logits,) + transformer_outputs[2:]
             return tuple_output(output, loss)
@@ -1677,19 +1187,16 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of AlbertModel.
-        num_classes (int):
-            The number of classes.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
 
     """
 
-    def __init__(self, albert, num_labels=2):
-        super(AlbertForQuestionAnswering, self).__init__()
-        self.num_labels = num_labels
-        self.transformer = albert
-
-        self.qa_outputs = nn.Linear(self.transformer.config["hidden_size"], num_labels)
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForQuestionAnswering, self).__init__(config)
+        self.config = config
+        self.transformer = AlbertModel(config)
+        self.qa_outputs = nn.Linear(config.hidden_size, 2)
         self.init_weights()
 
     def forward(
@@ -1833,16 +1340,17 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
     designed for multiple choice tasks like SWAG tasks .
 
     Args:
-        albert (:class:`AlbertModel`):
-            An instance of AlbertModel.
+        config (:class:`AlbertConfig`):
+            An instance of AlbertConfig used to construct AlbertModel.
 
     """
 
-    def __init__(self, albert):
-        super(AlbertForMultipleChoice, self).__init__()
-        self.transformer = albert
-        self.dropout = nn.Dropout(self.transformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.transformer.config["hidden_size"], 1)
+    def __init__(self, config: AlbertConfig):
+        super(AlbertForMultipleChoice, self).__init__(config)
+        self.transformer = AlbertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
+        self.config = config
         self.init_weights()
 
     def forward(
@@ -1896,7 +1404,7 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
 
             - `reshaped_logits` (Tensor):
                 A tensor of the input multiple choice classification logits.
-                Shape as `[batch_size, num_classes]` and dtype as `float32`.
+                Shape as `[batch_size, num_labels]` and dtype as `float32`.
 
             - `hidden_states` (Tensor):
                 Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.

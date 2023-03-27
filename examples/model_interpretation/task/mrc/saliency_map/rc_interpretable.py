@@ -13,28 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import sys
-import json
+import argparse
 import collections
-from tqdm import tqdm
+import json
+import logging
+import os
+import sys
 from functools import partial
 from pathlib import Path
-import logging
-import argparse
 
 import paddle
-from paddle.io import DataLoader
-from paddlenlp.data import Stack, Pad, Dict
-from paddlenlp.transformers import ErnieTokenizer
-from squad import RCInterpret
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-
 from roberta.modeling import RobertaForQuestionAnswering
+from squad import RCInterpret
+from tqdm import tqdm
+
+from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+    match,
+)
 
 sys.path.remove("../../..")
 
@@ -125,8 +128,6 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_example["token_type_ids"]
-
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = tokenized_example["overflow_to_sample"]
         tokenized_examples[i]["example_id"] = examples[sample_index]["id"]

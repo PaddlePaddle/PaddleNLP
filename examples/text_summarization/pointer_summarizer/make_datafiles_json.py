@@ -1,10 +1,23 @@
-import sys
-import os
-import hashlib
-import struct
-import subprocess
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
+import hashlib
 import json
+import os
+import subprocess
+import sys
 
 dm_single_close_quote = "\u2019"  # unicode
 dm_double_close_quote = "\u201d"
@@ -200,13 +213,13 @@ def write_to_bin(url_file, out_file, makevocab=False):
                     % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir, s)
                 )
 
-            ### Get the strings to write to .json file
+            # Get the strings to write to .json file
             article, abstract = get_art_abs(story_file)
 
-            ### Write to json
+            # Write to json
             writer.write(json.dumps({"article": article, "abstract": abstract}) + "\n")
 
-            ### Write the vocab to file, if applicable
+            # Write the vocab to file, if applicable
             if makevocab:
                 art_tokens = article.split(" ")
                 abs_tokens = abstract.split(" ")
@@ -244,11 +257,11 @@ if __name__ == "__main__":
     cnn_stories_dir = sys.argv[1]
     dm_stories_dir = sys.argv[2]
 
-    ### Check the stories directories contain the correct number of .story files
+    # Check the stories directories contain the correct number of .story files
     check_num_stories(cnn_stories_dir, num_expected_cnn_stories)
     check_num_stories(dm_stories_dir, num_expected_dm_stories)
 
-    ### Create some new directories
+    # Create some new directories
     if not os.path.exists(cnn_tokenized_stories_dir):
         os.makedirs(cnn_tokenized_stories_dir)
     if not os.path.exists(dm_tokenized_stories_dir):
@@ -256,7 +269,7 @@ if __name__ == "__main__":
     if not os.path.exists(finished_files_dir):
         os.makedirs(finished_files_dir)
 
-    ### Run stanford tokenizer on both stories dirs, outputting to tokenized stories directories
+    # Run stanford tokenizer on both stories dirs, outputting to tokenized stories directories
     tokenize_stories(cnn_stories_dir, cnn_tokenized_stories_dir)
     tokenize_stories(dm_stories_dir, dm_tokenized_stories_dir)
 

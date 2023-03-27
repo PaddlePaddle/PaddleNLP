@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_tokenizer import BaseFastTokenizer
-
+from fast_tokenizer import Tokenizer, decoders
+from fast_tokenizer.models import FastWordPiece, WordPiece
 from fast_tokenizer.normalizers import BertNormalizer
-from fast_tokenizer.pretokenizers import BertPreTokenizer
-from fast_tokenizer.models import WordPiece, FastWordPiece
 from fast_tokenizer.postprocessors import BertPostProcessor
-from fast_tokenizer import decoders
-from fast_tokenizer import Tokenizer
+from fast_tokenizer.pretokenizers import BertPreTokenizer
+
+from .base_tokenizer import BaseFastTokenizer
 
 __all__ = ["ErnieFastTokenizer"]
 
@@ -89,7 +88,7 @@ class ErnieFastTokenizer(BaseFastTokenizer):
             tokenizer.postprocessor = BertPostProcessor((str(sep_token), sep_token_id), (str(cls_token), cls_token_id))
 
         tokenizer.decoder = decoders.WordPiece(prefix=wordpieces_prefix)
-        if max_sequence_len == None:
+        if max_sequence_len is None:
             tokenizer.disable_truncation()
         else:
             tokenizer.enable_truncation(max_sequence_len)

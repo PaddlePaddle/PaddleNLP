@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
-import os
 import csv
 import json
-import pandas as pd
-from typing import Optional, Union, List
-from dataclasses import dataclass, field
+import os
+from abc import abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass, field
 
 import paddle
+import pandas as pd
 from paddle.metric import Accuracy
 
-import paddlenlp
-from paddle.fluid.reader import default_collate_fn
-from paddlenlp.utils.log import logger
 from paddlenlp.datasets import MapDataset
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 

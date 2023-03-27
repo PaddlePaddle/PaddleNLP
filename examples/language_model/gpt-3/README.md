@@ -16,9 +16,10 @@ GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.
 - sentencepiece >= 0.1.94
 - tqdm
 - visualdl
+- tool_helpers
 - paddlepaddle-gpu >= 2.2rc
 
-安装命令 `pip install regex sentencepiece tqdm visualdl`。
+安装命令 `pip install regex sentencepiece tqdm visualdl tool_helpers`。
 注：需要PaddlePaddle版本大于等于2.2rc，或者使用最新develop版本，安装方法请参见Paddle[官网](https://www.paddlepaddle.org.cn)。
 
 

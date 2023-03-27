@@ -16,9 +16,9 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ElectraForSequenceClassification
 from model import ElectraForBinaryTokenClassification, ElectraForSPO
+
+from paddlenlp.transformers import ElectraForSequenceClassification
 
 NUM_CLASSES = {
     "CHIP-CDN-2C": 2,
@@ -31,15 +31,27 @@ NUM_CLASSES = {
     "CMeIE": 44,
 }
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument('--train_dataset', required=True, type=str, help='The name of dataset used for training.')
-parser.add_argument('--params_path', type=str, required=True, default='./checkpoint/', help='The path to model parameters to be loaded.')
-parser.add_argument('--output_path', type=str, default='./export', help='The path of model parameter in static graph to be saved.')
-args = parser.parse_args()
-# yapf: enable
 
-if __name__ == "__main__":
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_dataset", required=True, type=str, help="The name of dataset used for training.")
+    parser.add_argument(
+        "--params_path",
+        type=str,
+        required=True,
+        default="./checkpoint/",
+        help="The path to model parameters to be loaded.",
+    )
+    parser.add_argument(
+        "--output_path", type=str, default="./export", help="The path of model parameter in static graph to be saved."
+    )
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+
     # Load the model parameters.
     if args.train_dataset not in NUM_CLASSES:
         raise ValueError(f"Please modify the code to fit {args.dataset}")
@@ -68,3 +80,7 @@ if __name__ == "__main__":
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)
+
+
+if __name__ == "__main__":
+    main()
