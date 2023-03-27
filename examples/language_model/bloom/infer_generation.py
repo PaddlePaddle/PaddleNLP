@@ -19,7 +19,11 @@ import os
 import fastdeploy as fd
 import numpy as np
 
-from paddlenlp.transformers import AutoTokenizer
+# TODO(wj-Mcat): use paddlenlp tokenizer later
+from transformers import AutoTokenizer
+
+# from paddlenlp.transformers import AutoTokenizer
+
 
 # from utils import left_padding
 
@@ -162,7 +166,7 @@ class Predictor(object):
         return output
 
 
-if __name__ == "__main__":
+def main():
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
@@ -174,3 +178,7 @@ if __name__ == "__main__":
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
             print("{} \n {}".format(text, result))
+
+
+if __name__ == "__main__":
+    main()

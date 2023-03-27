@@ -25,6 +25,9 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
 from paddle.metric import Accuracy
+
+# TODO(wj-Mcat): use paddlenlp tokenizer later
+from transformers import AutoTokenizer
 from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorWithPadding
@@ -33,8 +36,7 @@ from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import (
-    AutoTokenizer,
+from paddlenlp.transformers import (  # AutoTokenizer,
     BloomConfig,
     BloomForSequenceClassification,
     CosineAnnealingWithWarmupDecay,

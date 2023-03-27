@@ -27,6 +27,9 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
+
+# TODO(wj-Mcat): use paddlenlp tokenizer later
+from transformers import AutoTokenizer
 from utils import (
     _rotate_checkpoints,
     all_gather,
@@ -41,8 +44,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import (
-    AutoTokenizer,
+from paddlenlp.transformers import (  # AutoTokenizer,
     BloomConfig,
     BloomForCausalLM,
     CosineAnnealingWithWarmupDecay,
