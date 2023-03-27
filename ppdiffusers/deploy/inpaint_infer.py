@@ -258,9 +258,9 @@ if __name__ == "__main__":
 
     unet_dynamic_shape = {
         "sample": {
-            "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "min_shape": [1, 9, 64, 64],
+            "max_shape": [2, 9, 64, 64],
+            "opt_shape": [2, 9, 64, 64],
         },
         "timestep": {
             "min_shape": [1],
