@@ -17,7 +17,7 @@
 
 ## 1. 零样本文本分类应用
 
-本项目提供基于通用文本分类 UTC（Universial Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
+本项目提供基于通用文本分类 UTC（Universal Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
 
 <div align="center">
     <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/211755652-dac155ca-649e-470c-ac8b-06156b444b58.png">

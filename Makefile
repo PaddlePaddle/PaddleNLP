@@ -37,6 +37,7 @@ test: unit-test
 unit-test:
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
+		--durations 20 \
 		--cov paddlenlp \
 		--cov-report xml:coverage.xml
 
