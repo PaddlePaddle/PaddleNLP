@@ -116,7 +116,7 @@ class BloomConfig(PretrainedConfig):
         attention_dropout=0.0,
         attention_softmax_in_fp32=True,
         pretraining_tp=1,  # TP rank used when training with megatron
-        dtype="bfloat16",
+        dtype="float16",
         slow_but_exact=False,
         mp_degree=1,
         pp_degree=1,

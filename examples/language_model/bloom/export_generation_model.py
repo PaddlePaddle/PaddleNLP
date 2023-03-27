@@ -79,6 +79,7 @@ def main():
     config.use_cache = True
     config.top_k = 1
     config.use_recompute = False
+    config.use_pure_fp16 = False
 
     args.model_name_or_path = merge_model_parallel(args.model_name_or_path, config)
 

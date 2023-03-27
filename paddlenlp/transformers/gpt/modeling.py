@@ -285,7 +285,7 @@ class TransformerDecoder(nn.Layer):
             output = self.norm(output)
 
         if not return_dict:
-            temp_list = [output, all_hidden_states, new_caches, all_self_attentions]
+            temp_list = [output, new_caches, all_hidden_states, all_self_attentions]
 
             if not (use_cache or output_attentions or output_hidden_states):
                 return output
@@ -802,7 +802,7 @@ class GPTModel(GPTPretrainedModel):
             else:  # outputs is a tuple
                 idx = 2 if use_cache else 1
                 all_hidden_states = (embedding_output,) + outputs[idx]
-                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
+                outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
 
         self.checkpoints.extend(self.decoder.checkpoints)
 

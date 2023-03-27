@@ -12,23 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-from tqdm import tqdm
+import os
 from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
+from data import METRIC_MAPPING, TASK_MAPPING, InputFeatures, load_dataset
+from template import ManualTemplate
+from tokenizer import MLMTokenizerWrapper
+from utils import (
+    LinearSchedulerWarmup,
+    check_args,
+    convert_example,
+    create_dataloader,
+    set_seed,
+)
+from verbalizer import ManualVerbalizer
 from visualdl import LogWriter
 
-from template import ManualTemplate
-from verbalizer import ManualVerbalizer
-from tokenizer import MLMTokenizerWrapper
-from data import load_dataset, InputFeatures, TASK_MAPPING, METRIC_MAPPING
-from utils import set_seed, check_args, convert_example, create_dataloader, LinearSchedulerWarmup
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser('Implementation of RGL paper.')
@@ -52,7 +57,7 @@ parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight deca
 parser.add_argument('--warmup_steps', type=int, default=0, help='The warmup steps for leanring rate scheduler.')
 parser.add_argument('--logging_step', type=int, default=100, help='Print logs every logging_step steps.')
 parser.add_argument('--eval_step', type=int, default=100, help='Evaluate model every eval_step steps.')
-parser.add_argument('--save_best', action='store_true', help= 'Save the best model according to evaluation results. Save the last checkpoint if False.')
+parser.add_argument('--save_best', action='store_true', help='Save the best model according to evaluation results. Save the last checkpoint if False.')
 parser.add_argument('--output_dir', type=str, default='./checkpoints/', help='The path to save checkpoints.')
 parser.add_argument('--overwrite_output', action='store_true', help='Whether overwrite the output_dir.')
 args = parser.parse_args()
@@ -70,8 +75,6 @@ def evaluate(model, dataloader, metric, verbalizer, task_type, bound=(0, 5)):
         lb, ub = bound
     model.eval()
     metric.reset()
-    logits_list = []
-    labels_list = []
     for batch in dataloader:
         logits = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
         label_logits = verbalizer.process_logits(logits, batch["mask_ids"])
@@ -215,8 +218,8 @@ def main():
                         save_path = os.path.join(args.output_dir, "model_best")
                         if not os.path.exists(save_path):
                             os.makedirs(save_path)
-                        model.save_pretrained(model_path)
-                        tokenizer.save_pretrained(model_path)
+                        model.save_pretrained(save_path)
+                        tokenizer.save_pretrained(save_path)
 
                 global_step += 1
                 if global_step > max_steps:

@@ -12,34 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import ast
-import time
 import argparse
-import logging
+import os
+import time
 
 import paddle
-from tqdm import tqdm
 import paddle.nn as nn
+from decode import beam_search_infilling, post_process
+from encode import after_padding, convert_example
+from model import StackModel
 from paddle.io import DataLoader
+from tqdm import tqdm
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.transformers import (
-    ErnieForGeneration,
-    ErnieTokenizer,
-    ErnieTinyTokenizer,
     BertTokenizer,
     ElectraTokenizer,
-    RobertaTokenizer,
+    ErnieForGeneration,
+    ErnieTinyTokenizer,
+    ErnieTokenizer,
     LinearDecayWithWarmup,
+    RobertaTokenizer,
 )
-from paddlenlp.datasets import load_dataset
-
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
-
-from encode import convert_example, after_padding
-from decode import post_process, beam_search_infilling
-from model import StackModel
 
 parser = argparse.ArgumentParser("seq2seq model with ERNIE-GEN")
 parser.add_argument(

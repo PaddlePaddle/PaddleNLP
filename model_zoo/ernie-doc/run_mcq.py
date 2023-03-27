@@ -13,31 +13,29 @@
 # limitations under the License.
 
 import argparse
-import collections
-from collections import namedtuple, defaultdict
-
 import os
 import random
-from functools import partial
 import time
+from collections import defaultdict
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.optimizer import AdamW
+from data import MCQIterator
 from paddle.metric import Accuracy
-from paddle.io import DataLoader
-from paddlenlp.transformers import ErnieDocModel
-from paddlenlp.transformers import ErnieDocForSequenceClassification
-from paddlenlp.transformers import ErnieDocTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+from paddle.optimizer import AdamW
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddlenlp.transformers import (
+    ErnieDocForSequenceClassification,
+    ErnieDocTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
-from data import MCQIterator
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
@@ -56,9 +54,9 @@ parser.add_argument("--layerwise_decay", default=0.8, type=float, help="Layerwis
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="Number of updates steps to accumualte before performing a backward/update pass.")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-
-# yapf: enable
 args = parser.parse_args()
+# fmt: on
+
 
 DATASET_INFO = {
     "c3": (ErnieDocTokenizer, "dev", "test", Accuracy()),
@@ -86,7 +84,6 @@ def evaluate(model, metric, data_loader, memories0, choice_num):
 
     probs_dict = defaultdict(list)
     label_dict = dict()
-    global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
         input_ids, position_ids, token_type_ids, attn_mask, labels, qids, gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids, position_ids, attn_mask)
