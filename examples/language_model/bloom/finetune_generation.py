@@ -38,7 +38,6 @@ from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
@@ -148,8 +147,10 @@ def run_evaluate(args, data_loader, model, iter_steps, log_writer, global_step, 
     model.train()
 
 
-def do_train(args):
+def do_train():
+    args = parse_args()
     paddle.set_device(args.device)
+
     nranks = paddle.distributed.get_world_size()
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
@@ -207,6 +208,7 @@ def do_train(args):
     if dp_rank == 0 and mp_rank == 0 and sharding_rank == 0:
         log_writer_path = os.path.join(args.output_dir, default_logdir())
         log_writer = LogWriter(logdir=log_writer_path)
+
     # Load the model
     config = BloomConfig.from_pretrained(args.model_name_or_path)
     WEIGHTS_NAME = "model_state.pdparams"
@@ -225,18 +227,7 @@ def do_train(args):
     config["use_recompute"] = args.use_recompute
     config["use_pure_fp16"] = args.use_pure_fp16
     config["enable_fuse_transformer"] = False
-    model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
-
-    if args.lora:
-        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
-        lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
-            r=4,
-            lora_alpha=8,
-            merge_weights=True,
-        )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
+    model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
@@ -553,5 +544,4 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    do_train(args)
+    do_train()

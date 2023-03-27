@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
 import time
 from pprint import pprint as print
@@ -23,13 +22,11 @@ from pprint import pprint as print
 import numpy as np
 import paddle
 from args import get_parser
-from paddle import LazyGuard
-from paddle.distributed import fleet
 from paddle.io import DataLoader
-from utils import set_hyrbid_parallel_seed
+from utils import load_model
 
 from paddlenlp.data import Stack, Tuple
-from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForPretraining
+from paddlenlp.transformers import AutoTokenizer, BloomForPretraining
 from paddlenlp.utils.log import logger
 
 
@@ -247,69 +244,6 @@ def create_eval_dataset(args):
     return val_dataloader
 
 
-def load_model(args):
-    config: BloomConfig = BloomConfig.from_pretrained(args.model_name_or_path)
-    paddle.set_default_dtype(config.dtype)
-
-    # Detecting last checkpoint.
-    config["hidden_dropout_prob"] = args.hidden_dropout_prob
-    config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-    config["use_recompute"] = args.use_recompute
-    config["enable_fuse_transformer"] = False
-    config["use_cache"] = True
-    config.use_pure_fp16 = False
-
-    world_size = paddle.distributed.get_world_size()
-    args.mp_degree = world_size
-    if world_size == 1:
-        return BloomForPretraining.from_pretrained(args.model_name_or_path, config=config)
-
-    # start to init distributed env
-    strategy = fleet.DistributedStrategy()
-
-    strategy.hybrid_configs = {
-        "dp_degree": args.dp_degree,
-        "mp_degree": args.mp_degree,
-        "pp_degree": 1,
-        "sharding_degree": args.sharding_degree,
-    }
-
-    # Set control in tensor parallel
-    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
-
-    fleet.init(is_collective=True, strategy=strategy)
-
-    # Obtain rank message of hybrid parallel
-    hcg = fleet.get_hybrid_communicate_group()
-    mp_rank = hcg.get_model_parallel_rank()
-    dp_rank = hcg.get_data_parallel_rank()
-    sharding_rank = hcg.get_sharding_parallel_rank()
-
-    sharding_size = hcg.get_sharding_parallel_world_size()
-    data_world_rank = dp_rank * sharding_size + sharding_rank
-
-    # Seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
-
-    config.mp_degree = args.mp_degree
-
-    with LazyGuard():
-        # init the model without initialized parameters
-        model = BloomForPretraining(config=config)
-
-    weight_file = os.path.join(args.model_name_or_path, f"auto_dist{mp_rank}.pdparams")
-    logger.info(f"start to loading sharding model weight file<{weight_file}>")
-
-    if not os.path.exists(weight_file):
-        raise FileNotFoundError(
-            f"sharding model weight file<auto_dist{mp_rank}.pdparams> not found under <{args.model_name_or_path}>"
-        )
-
-    state_dict = paddle.load(weight_file, return_numpy=True)
-    model.set_state_dict(state_dict)
-    return model
-
-
 @paddle.no_grad()
 def do_generation():
     parser = get_eval_parser()
@@ -317,7 +251,7 @@ def do_generation():
 
     eval_data_loader = create_eval_dataset(args)
     tic_eval = time.time()
-    model = load_model(args)
+    model = load_model(args, model_class=BloomForPretraining)
     model.eval()
     total_score = 0
     score_name = "loss" if not args.cloze_eval else "number correct"
@@ -328,7 +262,7 @@ def do_generation():
             tokens, loss_mask = batch[:2]
             labels = batch[-1]
 
-            with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype="float16"):
+            with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype=model.config.dtype):
                 preds = paddle.cast(model(tokens).detach(), dtype=paddle.float32)
 
                 if not args.cloze_eval:

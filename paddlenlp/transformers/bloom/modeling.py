@@ -69,8 +69,9 @@ BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True, mp_degree: int = 1):
-    if mp_degree > 1:
+def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+    world_size = paddle.distributed.get_world_size()
+    if world_size > 1:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
@@ -648,9 +649,7 @@ class BloomPreTrainedModel(PretrainedModel):
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
             if getattr(module, "bias", None) is not None:
-                module.weight.set_value(
-                    paddle.tensor.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype())
-                )
+                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, BloomModel):
@@ -998,9 +997,7 @@ class BloomLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        logits = parallel_matmul(
-            hidden_states, self.decoder_weight, parallel_output=False, mp_degree=self.config.mp_degree
-        )
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
         return logits
 
 
@@ -1068,7 +1065,6 @@ class BloomForPretraining(BloomPreTrainedModel):
             encoder_outputs[0],
             self.bloom.word_embeddings.weight,
             parallel_output=False,
-            mp_degree=self.config.mp_degree,
         )
         if labels is None:
             return logits
@@ -1146,9 +1142,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         hidden_states = transformer_outputs[0]
 
         # TODO(wj-Mcat): to enable lm_head
-        lm_logits = parallel_matmul(
-            hidden_states, self.bloom.word_embeddings.weight, parallel_output=False, mp_degree=self.config.mp_degree
-        )
+        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
 
         # lm_logits = self.lm_head(hidden_states)
 
