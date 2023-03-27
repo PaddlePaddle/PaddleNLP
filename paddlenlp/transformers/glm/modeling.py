@@ -412,27 +412,16 @@ class GLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = GLM_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config):
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
-        import numpy as np
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
-        from paddlenlp.transformers.conversion_utils import (
-            naive_merged_qkv_to_tensor_parallel_qkv,
-            split_tensor_parallel_weight,
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
         )
-
-        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
-            if transpose:
-                x = np.transpose(x, [1, 0])
-            if is_old_qkv:
-                assert is_column, "QKV vectors should be column parallel linear."
-                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
-            return split_tensor_parallel_weight(
-                x,
-                tensor_parallel_degree=config.tensor_parallel_degree,
-                tensor_parallel_rank=config.tensor_parallel_rank,
-                is_column=is_column,
-            )
 
         def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
@@ -457,12 +446,9 @@ class GLMPretrainedModel(PretrainedModel):
 
             return final_actions
 
-        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
-        # prefix = ""
-        prefix = "glm."
-
-        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+        return mappings
 
     @classmethod
     def _get_name_mappings(cls, config):

@@ -184,6 +184,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
@@ -214,7 +215,6 @@ from .pegasus.configuration import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
-from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
@@ -222,6 +222,9 @@ from .clipseg.configuration import *
 from .clipseg.modeling import *
 from .clipseg.processing import *
 from .clipseg.image_processing import *
+from .blip_2.modeling import *
+from .blip_2.configuration import *
+from .blip_2.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
