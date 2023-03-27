@@ -22,7 +22,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients_with_group,
 )
 from paddle.fluid import core
-from paddle.fluid.dygraph.layers import Layer
+from paddle.nn import Layer
 from paddle.nn import functional as F
 from ppfleetx.distributed.apis import env
 
@@ -301,6 +301,17 @@ class ColumnSequenceParallelLinear(Layer):
         return output
 
 
+class MPScale(PyLayer):
+    @staticmethod
+    def forward(ctx, x, mp_degree):
+        out = paddle.scale(x, 1.0 / mp_degree)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        return dout
+
+
 class RowSequenceParallelLinear(Layer):
     def __init__(
         self,
@@ -375,6 +386,7 @@ class RowSequenceParallelLinear(Layer):
 
         self.linear = F.linear
 
+        self.mp_scale = None
         if fuse_matmul_bias:
             if not is_fused_matmul_bias_supported():
                 raise NotImplementedError(
@@ -386,15 +398,24 @@ class RowSequenceParallelLinear(Layer):
             from paddle.incubate.nn.functional import fused_linear
 
             self.linear = fused_linear
+            if self.is_mp and has_bias:
+                self.mp_scale = MPScale.apply
 
     def forward(self, x):
         input_parallel = x
         if self.is_mp:
-            output_parallel = self.linear(input_parallel, self.weight, name=self._name)
+            if self.mp_scale is not None:
+                bias = self.mp_scale(self.bias, self.world_size)
+            else:
+                bias = None
+            output_parallel = self.linear(input_parallel, self.weight, bias, name=self._name)
             output_ = ReduceScatterOp.apply(output_parallel)
             # if self.bias is not none, sequence parallel will use
             # register_hook to all_reduce self.bias
-            output = output_ + self.bias if self.bias is not None else output_
+            if bias is None and self.bias is not None:
+                output = output_ + self.bias
+            else:
+                output = output_
         else:
             output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         return output

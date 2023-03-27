@@ -172,15 +172,17 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
     --output_dir pegasus_out \
     --max_source_length 128 \
     --max_target_length 64 \
-    --epoch 20 \
+    --num_train_epochs 20 \
     --logging_steps 1 \
     --save_steps 10000 \
-    --train_batch_size 128 \
-    --eval_batch_size 128 \
+    --per_device_train_batch_size 128 \
+    --per_device_eval_batch_size 128 \
     --learning_rate 5e-5 \
-    --warmup_proportion 0.02 \
+    --warmup_ratio 0.02 \
     --weight_decay=0.01 \
-    --device=gpu \
+    --do_train \
+    --do_eval \
+    --device=gpu
 ```
 
 关键参数释义如下：
@@ -202,19 +204,21 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `seed` 表示随机数生成器的种子。
 - `num_train_epochs` 表示训练轮数。
-- `train_batch_size` 表示每次巡礼哪**每张卡**上的样本数目。
-- `eval_batch_size` 表示每次验证**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示每次训练**每张卡**上的样本数目。
+- `per_device_eval_batch_size` 表示每次验证**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
-- `warmup_proportion`
+- `warmup_ratio`
   表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)
   。
 - `max_source_length` 模型输入序列的最大长度。
 - `max_target_length` 模型训练时标签的最大长度。
+- `do_train` 是否进行训练。
+- `do_eval` 是否进行预测。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
   除此之外，我们提供了一种可选的解码端输入增强策略。该策略在解码过程中，基于标准摘要和模型输出构造了新的解码输入数据，以此实现解码端的数据增强。具体详情可以参考[SSTIA论文](https://openreview.net/pdf?id=pz1euXohm4H)。如果想使用该策略，可以设置参数：
-- `use_SSTIA` 表示使用该策略。以及，
+- `use_SSTIA` 为True表示使用该策略。以及，
 - `mix_ratio` 表示构造输入和原始输入的权重。
 
   该策略在Pegasus-238M和Pegasus-523M模型上均有大幅度提升，具体效果见后文实验结果表格。

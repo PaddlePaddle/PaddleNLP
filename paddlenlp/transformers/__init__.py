@@ -79,6 +79,7 @@ from .ctrl.tokenizer import *
 from .dpt.modeling import *
 from .dpt.configuration import *
 from .dpt.image_processing import *
+from .distilbert.configuration import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
 from .ernie.configuration import *
@@ -86,6 +87,7 @@ from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
+from .ernie_ctm.configuration import *
 from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
 from .ernie_doc.configuration import *
@@ -138,6 +140,7 @@ from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
+from .roformer.configuration import *
 from .roformer.tokenizer import *
 from .semantic_search.modeling import *
 from .skep.configuration import *
@@ -158,7 +161,7 @@ from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
-from .ernie_vil.procesing import *
+from .ernie_vil.processing import *
 from .ernie_vil.image_processing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
@@ -181,6 +184,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
@@ -194,12 +198,12 @@ from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
-from .clip.procesing import *
+from .clip.processing import *
 from .clip.image_processing import *
 from .chineseclip.modeling import *
 from .chineseclip.configuration import *
 from .chineseclip.feature_extraction import *
-from .chineseclip.procesing import *
+from .chineseclip.processing import *
 from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
@@ -207,13 +211,20 @@ from .gptj.tokenizer import *
 from .gptj.configuration import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
+from .pegasus.configuration import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
-from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
+from .clipseg.configuration import *
+from .clipseg.modeling import *
+from .clipseg.processing import *
+from .clipseg.image_processing import *
+from .blip_2.modeling import *
+from .blip_2.configuration import *
+from .blip_2.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

@@ -12,22 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import io
 import os
-import sys
-import argparse
-import logging
-import multiprocessing
 from functools import partial
 from io import open
 
 import numpy as np
-import yaml
-import tqdm
-from easydict import EasyDict as edict
 import pgl
+import yaml
+from easydict import EasyDict as edict
 from pgl.graph_kernel import alias_sample_build_table
 from pgl.utils.logger import log
+
 from paddlenlp.transformers import ErnieTinyTokenizer, ErnieTokenizer
 
 TOKENIZER_CLASSES = {
@@ -116,7 +113,7 @@ def dump_graph(config):
 
     log.info("Building graph...")
     graph = pgl.graph.Graph(num_nodes=num_nodes, edges=edges)
-    indegree = graph.indegree()
+    # indegree = graph.indegree()
     graph.indegree()
     graph.outdegree()
     graph.dump(config.graph_work_path)

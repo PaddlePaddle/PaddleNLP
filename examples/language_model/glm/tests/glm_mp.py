@@ -12,38 +12,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import tempfile
+
+import numpy as np
 import paddle
 
 from paddlenlp.transformers import GLMModel
 
-tensor_parallel_degree = paddle.distributed.get_world_size()
-tensor_parallel_rank = paddle.distributed.get_rank()
-strategy = paddle.distributed.fleet.DistributedStrategy()
-strategy.hybrid_configs = {
-    "dp_degree": 1,
-    "mp_degree": tensor_parallel_degree,
-    "pp_degree": 1,
-    "sharding_degree": 1,
-}
-paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
+GLMModel.init_weights = lambda *_: None
 
 
-# def func(self, *args, **kwargs):
-#     return
+def main():
+    world_size = paddle.distributed.get_world_size()
+    dp_degree = 2 if world_size >= 4 else 1
+    tensor_parallel_degree = world_size // dp_degree
 
-# # 屏蔽init_weights
-# GLMModel.init_weights = func
-# paddle.set_default_dtype("float16")
+    strategy = paddle.distributed.fleet.DistributedStrategy()
+    strategy.hybrid_configs = {
+        "dp_degree": dp_degree,
+        "mp_degree": tensor_parallel_degree,
+        "pp_degree": 1,
+        "sharding_degree": 1,
+    }
+    paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
 
-model = GLMModel.from_pretrained(
-    "THUDM/glm-large-chinese",
-    tensor_parallel_degree=tensor_parallel_degree,
-    tensor_parallel_rank=tensor_parallel_rank,
-    # dtype="float16",
-    low_cpu_mem_usage=True,
-)
+    hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+    mp_group = hcg.get_model_parallel_group()
+    tensor_parallel_rank = mp_group.rank
 
-model.eval()
-ret = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+    model = GLMModel.from_pretrained(
+        "THUDM/glm-large-chinese",
+        tensor_parallel_degree=tensor_parallel_degree,
+        tensor_parallel_rank=tensor_parallel_rank,
+        dtype="float16",
+        low_cpu_mem_usage=True,
+    )
 
-print("paddle mp", ret.logits.abs().mean().item())
+    model.eval()
+    loss = model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+    ret = loss.logits.abs().mean().item()
+    np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=False)
+        paddle.distributed.barrier()
+        print(os.listdir(tempdir))
+        load_model = GLMModel.from_pretrained(
+            tempdir,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+            dtype="float16",
+            low_cpu_mem_usage=True,
+        )
+        load_model.eval()
+        loss = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        object_list = []
+        paddle.distributed.all_gather_object(object_list, tempdir, group=mp_group)
+        tempdir = object_list[0]
+        model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=True)
+        paddle.distributed.barrier()
+        print(os.listdir(tempdir))
+        load_model = GLMModel.from_pretrained(
+            tempdir,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+            dtype="float16",
+            low_cpu_mem_usage=True,
+        )
+        load_model.eval()
+        loss = load_model(input_ids=paddle.arange(100, 110, dtype="int64").reshape([1, -1]))
+        ret = loss.logits.abs().mean().item()
+        np.testing.assert_allclose(ret, 2.109375, rtol=1e-4)
+
+
+if __name__ == "__main__":
+    main()

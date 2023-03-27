@@ -16,12 +16,8 @@ import os
 
 import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.io import Dataset, IterableDataset
-from paddlenlp.utils.log import logger
 import pgl
-from pgl import Graph
+from paddle.io import Dataset
 from pgl.sampling import graphsage_sample
 
 __all__ = [

@@ -144,6 +144,13 @@ MAPPING_TASKS = OrderedDict(
     ]
 )
 
+MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
+    [
+        # Model for Causal LM mapping
+        ("opt", "OPTForCausalLM"),
+    ]
+)
+
 
 def get_name_mapping(task="Model"):
     """

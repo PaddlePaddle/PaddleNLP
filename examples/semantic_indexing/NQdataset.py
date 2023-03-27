@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
+import json
 import random
+from typing import List
 
+import numpy as np
 import paddle
 from paddle.io import Dataset
-import json
+
 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
-import collections
-from typing import Dict, List, Tuple
-import numpy as np
 
 BiEncoderPassage = collections.namedtuple("BiEncoderPassage", ["text", "title"])
 
