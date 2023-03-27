@@ -30,6 +30,8 @@ from paddle.fluid.dygraph.base import in_declarative_mode
 
 from paddlenlp.utils.log import logger
 
+from .model_outputs import ModelOutput
+
 __all__ = ["GenerationMixin"]
 
 
@@ -393,6 +395,9 @@ class GenerationMixin(object):
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
+        if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
+            model_kwargs["cache"] = outputs.past_key_values
+
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
             token_type_ids = model_kwargs["token_type_ids"]
@@ -457,9 +462,11 @@ class GenerationMixin(object):
                     argument.startswith("decoder_") or argument.startswith("cross_attn") or argument == "use_cache"
                 )
             }
-
-            model_kwargs["encoder_output"] = encoder(input_ids, **encoder_kwargs)
-
+            # Use inputs_embeds as the priority if inputs_embeds exists
+            if "inputs_embeds" in encoder_kwargs:
+                model_kwargs["encoder_output"] = encoder(**encoder_kwargs)
+            else:
+                model_kwargs["encoder_output"] = encoder(input_ids=input_ids, **encoder_kwargs)
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self, input_ids, decoder_start_token_id=None, bos_token_id=None):
@@ -870,7 +877,6 @@ class GenerationMixin(object):
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
             else None,
         )
-
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
 
@@ -987,19 +993,24 @@ class GenerationMixin(object):
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+
             outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+
             # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
+            next_token_logits = logits[:, -1, :]
+
             # pre-process distribution
-            logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
+            next_token_logits = self.adjust_logits_during_generation(next_token_logits)
+            next_tokens_scores = logits_processors(input_ids, next_token_logits)
             # greedy
-            probs = F.softmax(logits)
+            probs = F.softmax(next_tokens_scores)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
@@ -1022,6 +1033,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
+
         return input_ids[:, origin_len:], scores
 
     def sample(
@@ -1049,7 +1061,10 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1240,7 +1255,10 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1311,7 +1329,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
                     lambda x: paddle.index_select(x, beam_idx), model_kwargs["cache"]
@@ -1377,8 +1395,11 @@ class GenerationMixin(object):
                     )
 
                 group_input_ids = input_ids[batch_group_indices]
-                logits = outputs[0] if isinstance(outputs, tuple) else outputs
+                outputs = outputs[0] if isinstance(outputs, tuple) else outputs
                 # select outputs of beams of current group only
+
+                # To hundle the logits is a ModelOutput
+                logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
 
                 logits = logits[:, -1, :]
                 logits = paddle.index_select(logits, paddle.to_tensor(batch_group_indices))
@@ -1434,7 +1455,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
                     lambda x: paddle.index_select(x, reordering_indices), model_kwargs["cache"]
