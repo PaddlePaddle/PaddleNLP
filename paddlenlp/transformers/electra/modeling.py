@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import Optional
 
 import paddle
@@ -25,11 +26,17 @@ from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
     MaskedLMOutput,
+    ModelOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
     tuple_output,
+)
+from .configuration import (
+    ELECTRA_PRETRAINED_INIT_CONFIGURATION,
+    ELECTRA_PRETRAINED_RESOURCE_FILES_MAP,
+    ElectraConfig,
 )
 
 __all__ = [
@@ -55,16 +62,14 @@ __all__ = [
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(
-        self, vocab_size, embedding_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size, layer_norm_eps
-    ):
+    def __init__(self, config: ElectraConfig):
         super(ElectraEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, embedding_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, embedding_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.embedding_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
         self, input_ids, token_type_ids=None, position_ids=None, inputs_embeds=None, past_key_values_length=None
@@ -99,12 +104,12 @@ class ElectraEmbeddings(nn.Layer):
 class ElectraDiscriminatorPredictions(nn.Layer):
     """Prediction layer for the discriminator, made up of two dense layers."""
 
-    def __init__(self, hidden_size, hidden_act):
+    def __init__(self, config: ElectraConfig):
         super(ElectraDiscriminatorPredictions, self).__init__()
 
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.dense_prediction = nn.Linear(hidden_size, 1)
-        self.act = get_activation(hidden_act)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense_prediction = nn.Linear(config.hidden_size, 1)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, discriminator_hidden_states):
         hidden_states = self.dense(discriminator_hidden_states)
@@ -117,12 +122,12 @@ class ElectraDiscriminatorPredictions(nn.Layer):
 class ElectraGeneratorPredictions(nn.Layer):
     """Prediction layer for the generator, made up of two dense layers."""
 
-    def __init__(self, embedding_size, hidden_size, hidden_act):
+    def __init__(self, config: ElectraConfig):
         super(ElectraGeneratorPredictions, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(embedding_size)
-        self.dense = nn.Linear(hidden_size, embedding_size)
-        self.act = get_activation(hidden_act)
+        self.layer_norm = nn.LayerNorm(config.embedding_size)
+        self.dense = nn.Linear(config.hidden_size, config.embedding_size)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, generator_hidden_states):
         hidden_states = self.dense(generator_hidden_states)
@@ -151,109 +156,9 @@ class ElectraPretrainedModel(PretrainedModel):
     use_softmax_sample = True
 
     # model init configuration
-    pretrained_init_configuration = {
-        "electra-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 1024,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "chinese-electra-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "chinese-electra-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "ernie-health-chinese": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 22608,
-            "layer_norm_eps": 1e-5,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "electra-small": "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-small.pdparams",
-            "electra-base": "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-base.pdparams",
-            "electra-large": "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-large.pdparams",
-            "chinese-electra-small": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
-            "chinese-electra-base": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
-            "ernie-health-chinese": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/ernie-health-chinese.pdparams",
-        }
-    }
+    pretrained_init_configuration = ELECTRA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ELECTRA_PRETRAINED_RESOURCE_FILES_MAP
+    config_class = ElectraConfig
 
     def init_weights(self):
         """
@@ -279,9 +184,7 @@ class ElectraPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.electra.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -369,45 +272,26 @@ class ElectraModel(ElectraPretrainedModel):
             The index of padding token in the token vocabulary.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embedding_size,
-        hidden_size,
-        num_hidden_layers,
-        num_attention_heads,
-        intermediate_size,
-        hidden_act,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        max_position_embeddings,
-        type_vocab_size,
-        initializer_range,
-        pad_token_id,
-        layer_norm_eps=1e-12,
-        **kwargs
-    ):
-        super(ElectraModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.layer_norm_eps = layer_norm_eps
-        self.embeddings = ElectraEmbeddings(
-            vocab_size, embedding_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size, layer_norm_eps
-        )
+    def __init__(self, config: ElectraConfig):
+        super(ElectraModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.layer_norm_eps = config.layer_norm_eps
+        self.embeddings = ElectraEmbeddings(config)
 
-        if embedding_size != hidden_size:
-            self.embeddings_project = nn.Linear(embedding_size, hidden_size)
+        if config.embedding_size != config.hidden_size:
+            self.embeddings_project = nn.Linear(config.embedding_size, config.hidden_size)
 
         encoder_layer = TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            d_model=config.hidden_size,
+            nhead=config.num_attention_heads,
+            dim_feedforward=config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
         )
-        self.encoder = TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = TransformerEncoder(encoder_layer, config.num_hidden_layers)
 
         self.init_weights()
 
@@ -555,16 +439,21 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
     """
 
-    def __init__(self, electra):
-        super(ElectraDiscriminator, self).__init__()
+    def __init__(self, config: ElectraConfig):
+        super(ElectraDiscriminator, self).__init__(config)
 
-        self.electra = electra
-        self.discriminator_predictions = ElectraDiscriminatorPredictions(
-            self.electra.config["hidden_size"], self.electra.config["hidden_act"]
-        )
+        self.electra = ElectraModel(config)
+        self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
         self.init_weights()
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+    ):
         r"""
 
         Args:
@@ -575,6 +464,8 @@ class ElectraDiscriminator(ElectraPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`ElectraModel`.
 
         Returns:
@@ -596,7 +487,13 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+        )
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
         return logits
@@ -612,23 +509,17 @@ class ElectraGenerator(ElectraPretrainedModel):
              An instance of :class:`ElectraModel`.
     """
 
-    def __init__(self, electra):
-        super(ElectraGenerator, self).__init__()
+    def __init__(self, config: ElectraConfig):
+        super(ElectraGenerator, self).__init__(config)
 
-        self.electra = electra
-        self.generator_predictions = ElectraGeneratorPredictions(
-            self.electra.config["embedding_size"],
-            self.electra.config["hidden_size"],
-            self.electra.config["hidden_act"],
-        )
+        self.electra = ElectraModel(config)
+        self.generator_predictions = ElectraGeneratorPredictions(config)
 
         if not self.tie_word_embeddings:
-            self.generator_lm_head = nn.Linear(
-                self.electra.config["embedding_size"], self.electra.config["vocab_size"]
-            )
+            self.generator_lm_head = nn.Linear(config.embedding_size, config.vocab_size)
         else:
             self.generator_lm_head_bias = self.create_parameter(
-                shape=[self.electra.config["vocab_size"]], dtype=paddle.get_default_dtype(), is_bias=True
+                shape=[config.vocab_size], dtype=paddle.get_default_dtype(), is_bias=True
             )
         self.init_weights()
 
@@ -744,12 +635,12 @@ class ElectraClassificationHead(nn.Layer):
 
     """
 
-    def __init__(self, hidden_size, hidden_dropout_prob, num_classes, activation):
+    def __init__(self, config: ElectraConfig):
         super(ElectraClassificationHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.out_proj = nn.Linear(hidden_size, num_classes)
-        self.act = get_activation(activation)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_classes)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, features, **kwargs):
         r"""
@@ -786,24 +677,17 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
     """
 
-    def __init__(self, electra):
-        super(ErnieHealthDiscriminator, self).__init__()
+    def __init__(self, config: ElectraConfig):
+        super(ErnieHealthDiscriminator, self).__init__(config)
 
-        self.electra = electra
-        self.discriminator_rtd = ElectraDiscriminatorPredictions(
-            self.electra.config["hidden_size"], self.electra.config["hidden_act"]
-        )
+        self.electra = ElectraModel(config)
+        self.discriminator_rtd = ElectraDiscriminatorPredictions(config)
 
-        self.discriminator_mts = nn.Linear(self.electra.config["hidden_size"], self.electra.config["hidden_size"])
-        self.activation_mts = get_activation(self.electra.config["hidden_act"])
-        self.bias_mts = nn.Embedding(self.electra.config["vocab_size"], 1)
+        self.discriminator_mts = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation_mts = get_activation(config.hidden_act)
+        self.bias_mts = nn.Embedding(config.vocab_size, 1)
 
-        self.discriminator_csp = ElectraClassificationHead(
-            self.electra.config["hidden_size"],
-            self.electra.config["hidden_dropout_prob"],
-            num_classes=128,
-            activation="gelu",
-        )
+        self.discriminator_csp = ElectraClassificationHead(config)
 
         self.init_weights()
 
@@ -834,7 +718,12 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         """
 
-        discriminator_sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
 
         logits_rtd = self.discriminator_rtd(discriminator_sequence_output)
 
@@ -871,16 +760,10 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             Defaults to 1e-12.
     """
 
-    def __init__(self, electra, num_classes=2, dropout=None, activation="gelu"):
-        super(ElectraForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.electra = electra
-        self.classifier = ElectraClassificationHead(
-            hidden_size=self.electra.config["hidden_size"],
-            hidden_dropout_prob=dropout if dropout is not None else self.electra.config["hidden_dropout_prob"],
-            num_classes=self.num_classes,
-            activation=activation,
-        )
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForSequenceClassification, self).__init__(config)
+        self.electra = ElectraModel(config)
+        self.classifier = ElectraClassificationHead(config)
         self.init_weights()
 
     def forward(
@@ -992,12 +875,14 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_classes=2, dropout=None):
-        super(ElectraForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.electra.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.electra.config["hidden_size"], self.num_classes)
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForTokenClassification, self).__init__(config)
+        self.electra = ElectraModel(config)
+
+        dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
+        self.dropout = nn.Dropout(dropout_p)
+
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.init_weights()
 
     def forward(
@@ -1102,105 +987,11 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "electra-small-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-base-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-large-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 1024,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-small-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-base-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-        "electra-large-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 1024,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-        },
-    }
-
-    def __init__(self, generator, discriminator):
-        super(ElectraForTotalPretraining, self).__init__()
-
-        self.generator = generator
-        self.discriminator = discriminator
-        self.initializer_range = discriminator.electra.initializer_range
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForTotalPretraining, self).__init__(config)
+        self.generator = ElectraGenerator(config)
+        self.discriminator = ElectraDiscriminator(config)
+        self.initializer_range = config.initializer_range
         self.init_weights()
 
     def get_input_embeddings(self):
@@ -1326,11 +1117,11 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPooler(nn.Layer):
-    def __init__(self, hidden_size, pool_act="gelu"):
+    def __init__(self, config: ElectraConfig):
         super(ElectraPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.activation = get_activation(pool_act)
-        self.pool_act = pool_act
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = get_activation(config.hidden_act)
+        self.pool_act = config.hidden_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -1339,6 +1130,23 @@ class ElectraPooler(nn.Layer):
         pooled_output = self.dense(first_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
+
+
+@dataclass
+class ErnieHealthForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`ErnieHealthForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss of the ELECTRA objective.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    gen_loss: Optional[paddle.Tensor] = None
+    disc_rtd_loss: Optional[paddle.Tensor] = None
+    disc_mts_loss: Optional[paddle.Tensor] = None
+    disc_csp_loss: Optional[paddle.Tensor] = None
 
 
 class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
@@ -1352,40 +1160,12 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
             An instance of :class:`ErnieHealthDiscriminator`.
     """
 
-    pretrained_init_configuration = {
-        "ernie-health-chinese-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 22608,
-            "layer_norm_eps": 1e-12,
-        },
-        "ernie-health-chinese-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 22608,
-            "layer_norm_eps": 1e-12,
-        },
-    }
+    def __init__(self, config: ElectraConfig):
+        super(ErnieHealthForTotalPretraining, self).__init__(config)
+        self.generator = ElectraGenerator(config)
+        self.discriminator = ErnieHealthDiscriminator(config)
+        self.initializer_range = config.initializer_range
+        self.init_weights()
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample
@@ -1441,8 +1221,11 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         attention_mask=None,
         raw_input_ids=None,
         generator_labels=None,
+        return_dict: Optional[bool] = None,
     ):
         assert generator_labels is not None, "generator_labels should not be None, please check DataCollator"
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         generator_logits = self.generator(input_ids, token_type_ids, position_ids, attention_mask)
 
@@ -1461,7 +1244,23 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         else:
             attention_mask = attention_mask.astype("bool")
 
-        return generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+        total_loss = None
+        gen_loss = None
+        disc_rtd_loss = None
+        disc_mts_loss = None
+        disc_csp_loss = None
+
+        if generator_labels is not None and disc_labels is not None:
+            loss_fct = ErnieHealthPretrainingCriterion(self.config)
+            total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss = loss_fct(
+                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+            )
+
+        if not return_dict:
+            # return total_loss
+            return total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss
+
+        return ErnieHealthForPreTrainingOutput(total_loss, gen_loss, disc_rtd_loss, disc_mts_loss, disc_csp_loss)
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
@@ -1480,13 +1279,14 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_choices=2, dropout=None):
-        super(ElectraForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.electra = electra
-        self.sequence_summary = ElectraPooler(self.electra.config["hidden_size"], pool_act="gelu")
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.electra.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.electra.config["hidden_size"], 1)
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForMultipleChoice, self).__init__(config)
+        self.num_choices = config.num_choices
+        self.electra = ElectraModel(config)
+        self.sequence_summary = ElectraPooler(config)
+        dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
+        self.dropout = nn.Dropout(dropout_p)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.init_weights()
 
     def forward(
@@ -1644,12 +1444,12 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self, vocab_size, gen_weight, disc_weight):
+    def __init__(self, config: ElectraConfig):
         super(ElectraPretrainingCriterion, self).__init__()
 
-        self.vocab_size = vocab_size
-        self.gen_weight = gen_weight
-        self.disc_weight = disc_weight
+        self.vocab_size = config.vocab_size
+        self.gen_weight = config.gen_weight
+        self.disc_weight = config.disc_weight
         self.gen_loss_fct = nn.CrossEntropyLoss(reduction="none")
         self.disc_loss_fct = nn.BCEWithLogitsLoss(reduction="none")
 
@@ -1730,11 +1530,11 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self, vocab_size, gen_weight):
+    def __init__(self, config: ElectraConfig):
         super(ErnieHealthPretrainingCriterion, self).__init__()
 
-        self.vocab_size = vocab_size
-        self.gen_weight = gen_weight
+        self.vocab_size = config.vocab_size
+        self.gen_weight = config.gen_weight
         self.rtd_weight = 50.0
         self.mts_weight = 20.0
         self.csp_weight = 1.0
@@ -1867,10 +1667,10 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
 
     """
 
-    def __init__(self, electra):
-        super(ElectraForQuestionAnswering, self).__init__()
-        self.electra = electra
-        self.classifier = nn.Linear(self.electra.config["hidden_size"], 2)
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForQuestionAnswering, self).__init__(config)
+        self.electra = ElectraModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.init_weights()
 
     def forward(

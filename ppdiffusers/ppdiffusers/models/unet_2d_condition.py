@@ -416,6 +416,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         class_labels: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        down_block_additional_residuals: Optional[Tuple[paddle.Tensor]] = None,
+        mid_block_additional_residual: Optional[paddle.Tensor] = None,
         return_dict: bool = True,
     ):
         r"""
@@ -509,6 +511,17 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
             down_block_res_samples += res_samples
 
+        if down_block_additional_residuals is not None:
+            new_down_block_res_samples = ()
+
+            for down_block_res_sample, down_block_additional_residual in zip(
+                down_block_res_samples, down_block_additional_residuals
+            ):
+                down_block_res_sample += down_block_additional_residual
+                new_down_block_res_samples += (down_block_res_sample,)
+
+            down_block_res_samples = new_down_block_res_samples
+
         # 4. mid
         sample = self.mid_block(
             sample,
@@ -517,6 +530,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_mask=attention_mask,
             cross_attention_kwargs=cross_attention_kwargs,
         )
+
+        if mid_block_additional_residual is not None:
+            sample += mid_block_additional_residual
+
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
@@ -546,6 +563,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                     res_hidden_states_tuple=res_samples,
                     upsample_size=upsample_size,
                 )
+
         # 6. post-process
         sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)

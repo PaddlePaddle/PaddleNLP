@@ -1,5 +1,6 @@
-paddlenlp>=2.5.1
+paddlenlp>=2.5.2
 paddleocr
+pdf2image>1.14
 requests
 pydantic
 mmh3

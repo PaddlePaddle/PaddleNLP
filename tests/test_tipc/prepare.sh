@@ -324,10 +324,7 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     if [[ ${model_name} == "gpt2" ]]; then
-        cd ../examples/language_model/gpt/data_tools/
-        sed -i "s/python3/python/g" Makefile
-        sed -i "s/python-config/python3.7m-config/g" Makefile
-        cd -
+        python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
         mkdir -p data && cd data
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
@@ -335,10 +332,7 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     if [[ ${model_name} == "gpt3" ]]; then
-        cd ../examples/language_model/gpt-3/data_tools/
-        sed -i "s/python3/python/g" Makefile
-        sed -i "s/python-config/python3.7m-config/g" Makefile
-        cd -
+        python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
         mkdir -p data && cd data
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
@@ -409,4 +403,6 @@ elif [ ${MODE} = "benchmark_train" ];then
     python -m pip install -e ../
     # python -m pip install paddlenlp    # PDC 镜像中安装失败
     python -m pip list
+    python -m pip install -e ../ppdiffusers
+
 fi

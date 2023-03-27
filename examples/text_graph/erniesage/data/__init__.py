@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from data.dataset import *
-from data.graph_reader import *
+from data import dataset, graph_reader
 
 __all__ = []
 __all__ += dataset.__all__

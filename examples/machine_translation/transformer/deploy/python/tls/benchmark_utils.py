@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import os
-import time
 import logging
+import os
+from pathlib import Path
 
 import paddle
 import paddle.inference as paddle_infer
-
-from pathlib import Path
 
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_PATH_ROOT = f"{CUR_DIR}/../../output"
@@ -224,7 +221,7 @@ class PaddleInferBenchmark(object):
         print function help
         """
         print(
-            """Usage: 
+            """Usage:
             ==== Print inference benchmark logs. ====
             config = paddle.inference.Config()
             model_info = {'model_name': 'resnet50'

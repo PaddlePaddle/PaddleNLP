@@ -15,7 +15,7 @@
 # !/usr/bin/env python3
 import collections
 import json
-import os
+
 import numpy as np
 
 from paddlenlp.datasets import DatasetBuilder
@@ -160,7 +160,6 @@ def compute_prediction_checklist(
             start_logits = all_start_logits[feature_index]
             end_logits = all_end_logits[feature_index]
             cls_logits = all_cls_logits[feature_index]
-            input_ids = features[feature_index]["input_ids"]
             # This is what will allow us to map some the positions in our logits to span of texts in the original context.
             offset_mapping = features[feature_index][
                 "offset_mapping"

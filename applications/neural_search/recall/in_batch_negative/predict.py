@@ -12,22 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
-import sys
 import os
-import random
-import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-
-from data import read_text_pair, convert_example, create_dataloader
 from base_model import SemanticIndexBase
+from data import convert_example, create_dataloader, read_text_pair
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()

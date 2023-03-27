@@ -15,36 +15,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 import json
-import random
-import os
 import logging
-import tabulate
-import numpy as np
+import os
+import random
 from dataclasses import dataclass
-import paddle
-from paddlenlp.transformers import CosineDecayWithWarmup, LinearDecayWithWarmup, PolyDecayWithWarmup
+from typing import List
 
-from paddlenlp.datasets import load_dataset
-from paddle.io import (
-    DistributedBatchSampler,
-    BatchSampler,
-    DataLoader,
-)
+import numpy as np
+import paddle
+import tabulate
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from uie.evaluation import constants
-from uie.evaluation.sel2record import (
-    SEL2Record,
-    RecordSchema,
-    MapConfig,
-    merge_schema,
-)
-from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
+from uie.evaluation.sel2record import MapConfig, RecordSchema, SEL2Record, merge_schema
 from uie.seq2struct.data_collator import (
+    DataCollatorForMultiTaskSeq2Seq,
     DataCollatorForSeq2Seq,
     DynamicSSIGenerator,
-    DataCollatorForMultiTaskSeq2Seq,
     SpotAsocNoiser,
+)
+from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
+
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    CosineDecayWithWarmup,
+    LinearDecayWithWarmup,
+    PolyDecayWithWarmup,
 )
 
 logger = logging.getLogger("__main__")
@@ -85,10 +81,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate, total_steps=num_training_steps, warmup=num_warmup_steps, **scheduler_kwargs

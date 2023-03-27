@@ -42,7 +42,6 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |      ✅        |            | 代码生成大模型 |
-| [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
@@ -1249,13 +1248,14 @@ from paddlenlp import Taskflow
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese`                     | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-zh-dureader-cross-encoder`       | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese` (默认)               | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
   | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
+  | `rocketqav2-en-marco-cross-encoder`        | 12-layers, 768-hidden, 12-heads | 英文 |
 
 
 #### 可配置参数说明
@@ -1431,143 +1431,7 @@ from paddlenlp import Taskflow
 * `output_scores`：是否要输出解码得分，请默认为False。
 </div></details>
 
-### 文图生成
-<details><summary>&emsp; 通过文图生成模型来生成图片 </summary><div>
 
-#### 支持单条、批量预测
-
-```python
->>> from paddlenlp import Taskflow
-# 默认模型为 pai-painter-painting-base-zh
->>> text_to_image = Taskflow("text_to_image")
-# 单条输入， 默认返回2张图片。
->>> image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
-# [[<PIL.Image.Image image mode=RGB size=256x256>], [<PIL.Image.Image image mode=RGB size=256x256>]]
->>> image_list[0][0].save("painting-figure-1.png")
->>> image_list[0][1].save("painting-figure-2.png")
->>> image_list[0][0].argument
-# argument表示生成该图片所使用的参数
-# {'input': '风阁水帘今在眼，且来先看早梅红',
-#  'batch_size': 1,
-#  'seed': 2414128200,
-#  'temperature': 1.0,
-#  'top_k': 32,
-#  'top_p': 1.0,
-#  'condition_scale': 10.0,
-#  'num_return_images': 2,
-#  'use_fast': False,
-#  'use_fp16_decoding': False,
-#  'image_index_in_returned_images': 0}
-#
-# 多条输入， 返回值解释：[[第一个文本返回的第一张图片, 第一个文本返回的第二张图片], [第二个文本返回的第一张图片, 第二个文本返回的第二张图片]]
->>> image_list = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
-# [[<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>],
-#  [<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>]]
->>> for batch_index, batch_image in enumerate(image_list):
-# len(batch_image) == 2 (num_return_images)
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"painting-figure_{batch_index}_{image_index_in_returned_images}.png")
-```
-
-#### 支持多种模型
-
-##### EasyNLP仓库中的pai-painter模型
-```python
->>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
->>> image_list = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
->>> for batch_index, batch_image in enumerate(image_list):
-# len(batch_image) == 2 (num_return_images)
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"commercial-figure_{batch_index}_{image_index_in_returned_images}.png")
-```
-
-##### DALLE-mini模型
-```python
->>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
->>> image_list = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
->>> for batch_index, batch_image in enumerate(image_list):
-# len(batch_image) == 2 (num_return_images)
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"dalle-mini-figure_{batch_index}_{image_index_in_returned_images}.png")
-```
-
-##### Disco Diffusion模型
-```python
-# 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
->>> text_to_image = Taskflow("text_to_image", model="PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh")
->>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
->>> for batch_index, batch_image in enumerate(image_list):
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"disco_diffusion_ernie_vil-2.0-base-zh-figure_{batch_index}_{image_index_in_returned_images}.png")
-```
-
-##### Stable Diffusion模型
-```python
->>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
->>> prompt = [
-    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
-    "clouds surround the mountains and Chinese palaces,sunshine,lake,overlook,overlook,unreal engine,light effect,Dream，Greg Rutkowski,James Gurney,artstation"
-    ]
->>> image_list = text_to_image(prompt)
->>> for batch_index, batch_image in enumerate(image_list):
-# len(batch_image) == 2 (num_return_images)
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
-```
-
-#### 支持复现生成结果 (以Stable Diffusion模型为例)
-```python
->>> from paddlenlp import Taskflow
->>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
->>> prompt = [
-    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
-    ]
->>> image_list = text_to_image(prompt)
->>> for batch_index, batch_image in enumerate(image_list):
-# len(batch_image) == 2 (num_return_images)
->>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
->>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
-# 如果我们想复现promt[0]文本的第二张返回的结果，我们可以首先查看生成该图像所使用的参数信息。
->>> each_image.argument
-# {'mode': 'text2image',
-#  'seed': 2389376819,
-#  'height': 512,
-#  'width': 512,
-#  'num_inference_steps': 50,
-#  'guidance_scale': 7.5,
-#  'latents': None,
-#  'num_return_images': 1,
-#  'input': 'In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation'}
-# 通过set_argument设置该参数。
->>> text_to_image.set_argument(each_image.argument)
->>> new_image = text_to_image(each_image.argument["input"])
-# 查看生成图片的结果，可以发现最终结果与之前的图片相一致。
->>> new_image[0][0]
-```
-<p align="center">
- <img src="https://user-images.githubusercontent.com/50394665/188396018-284336c0-f85e-442b-a4ff-4238720de121.png" align="middle">
-<p align="center">
-
-
-#### 图片生成效果展示
-<p align="center">
- <img src="https://user-images.githubusercontent.com/50394665/183386146-9b265304-7294-46fa-896f-1dd90f44ba31.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/183386193-7a463852-f5f7-49e9-b3b0-3d8f4a9b2576.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/183386229-68374a39-6e14-4565-b2c6-cc547a729135.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
- <img src="https://user-images.githubusercontent.com/50394665/188397647-5c3e1804-82dc-4f6e-b7ec-befc15eb1910.png" align="middle" width="35%" height="35%">
- <img src="https://user-images.githubusercontent.com/50394665/188397725-d43f84e7-d9aa-4fe0-a16c-2be1dc8b5c1d.png" align="middle" width="35%" height="35%">
- <img src="https://user-images.githubusercontent.com/50394665/188397881-f2a76c5e-d853-4db0-be83-8ac0c2e0a634.png" align="middle" width="35%" height="35%">
- <img src="https://user-images.githubusercontent.com/50394665/188397927-281402f1-a7f5-404f-9e4c-dc0236ba45ed.png" align="middle" width="35%" height="35%">
-<p align="center">
-
-#### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh"]`。
-* `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
-
-</div></details>
 
 ### 文本摘要
 <details><summary>&emsp; 通过Pegasus模型来生成摘要 </summary><div>
@@ -1785,7 +1649,7 @@ from paddlenlp import Taskflow
 
 <details><summary>&emsp; 基于百度自研中文图文跨模态预训练模型ERNIE-ViL 2.0</summary><div>
 
-#### 支持单条、批量预测
+#### 多模态特征提取
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -1845,6 +1709,61 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `_static_mode`：静态图模式，默认开启。
 * `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
+#### 文本特征提取
+
+```python
+>>> from paddlenlp import Taskflow
+>>> import paddle.nn.functional as F
+>>> text_encoder = Taskflow("feature_extraction", model='rocketqa-zh-base-query-encoder')
+>>> text_embeds = text_encoder(['春天适合种什么花？','谁有狂三这张高清的?'])
+>>> text_features1 = text_embeds["features"]
+>>> text_features1
+Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.27640465, -0.13405125,  0.00612330, ..., -0.15600294,
+         -0.18932408, -0.03029604],
+        [-0.12041329, -0.07424965,  0.07895312, ..., -0.17068857,
+          0.04485796, -0.18887770]])
+>>> text_embeds = text_encoder('春天适合种什么菜？')
+>>> text_features2 = text_embeds["features"]
+>>> text_features2
+Tensor(shape=[1, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.32578075, -0.02398480, -0.18929179, -0.18639392, -0.04062131,
+       ......
+>>> probs = F.cosine_similarity(text_features1, text_features2)
+>>> probs
+Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [0.86455142, 0.41222256])
+```
+
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  层数| 维度  | 语言|
+  | :---: | :--------: | :--------: | :--------: |
+  | `rocketqa-zh-dureader-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-dureader-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-query-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-base-para-encoder`  | 12 | 768 | 中文|
+  | `rocketqa-zh-medium-query-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-medium-para-encoder`  | 6 | 768 | 中文|
+  | `rocketqa-zh-mini-query-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-mini-para-encoder`  | 6 | 384 | 中文|
+  | `rocketqa-zh-micro-query-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-micro-para-encoder`  | 4 | 384 | 中文|
+  | `rocketqa-zh-nano-query-encoder`  | 4 | 312 | 中文|
+  | `rocketqa-zh-nano-para-encoder`  | 4 | 312 | 中文|
+  | `rocketqav2-en-marco-query-encoder`  | 12 | 768 | 英文|
+  | `rocketqav2-en-marco-para-encoder`  | 12 | 768 | 英文|
+  | `ernie-search-base-dual-encoder-marco-en"`  | 12 | 768 | 英文|
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_seq_len`：文本序列的最大长度，默认为128。
+* `return_tensors`: 返回的类型，有pd和np，默认为pd。
+* `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
+
 
 </div></details>
 

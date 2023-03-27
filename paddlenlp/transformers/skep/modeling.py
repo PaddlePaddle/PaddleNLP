@@ -360,7 +360,7 @@ class SkepModel(SkepPretrainedModel):
             return_dict=return_dict,
         )
 
-        if isinstance(encoder_outputs, type(input_ids)):
+        if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = encoder_outputs
             pooled_output = self.pooler(sequence_output)
             return (sequence_output, pooled_output)
@@ -739,12 +739,11 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
         else:
             _, prediction = self.viterbi_decoder(emission, seq_lens)
 
-        # FIXME(wj-Mcat): the output of this old version model is single tensor when return_dict is False
         if not return_dict:
             # when loss is None, return prediction
             if labels is not None:
-                return loss
-            return prediction
+                return loss if len(outputs[2:]) == 0 else (loss,) + outputs[2:]
+            return prediction if len(outputs[2:]) == 0 else (prediction,) + outputs[2:]
 
         return TokenClassifierOutput(
             loss=loss,

@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
+
 import numpy as np
 
 g_open_value_predict = False
@@ -420,26 +417,24 @@ def decode_sqls(preds, header_lens, header_values_list, limit_nums_list):
 
 if __name__ == "__main__":
     """run some simple test"""
-    import json
+    # if len(sys.argv) > 2:
+    #    with open(sys.argv[1]) as ifs:
+    #        gold_sqls = [SQL.from_dict(json.loads(x)["sql"]) for x in ifs]
+    #    with open(sys.argv[2]) as ifs:
+    #        pred_sqls = [json.loads(x) for x in ifs]
 
-    ##if len(sys.argv) > 2:
-    ##    with open(sys.argv[1]) as ifs:
-    ##        gold_sqls = [SQL.from_dict(json.loads(x)["sql"]) for x in ifs]
-    ##    with open(sys.argv[2]) as ifs:
-    ##        pred_sqls = [json.loads(x) for x in ifs]
-
-    ##    print(f"acc of {sys.argv[1]} vs {sys.argv[2]}: ", get_acc(gold_sqls, pred_sqls))
-    ##else:
-    ##    gold_sqls = [{"sel": [5], "sel_num": 1, "cond_num": 2, "agg": [0],
-    ##                  "cond_conn_op": 1, "conds": [[0, 2, '123'], [1, 2, '444']],
-    ##                  "order_direction": "asc", "order_by": [[0, 1]]}]
-    ##    pred_sqls = [{"sel": [1, 0], "agg": [0, 4], "cond_conn_op": 0,
-    ##                 "conds": [], "having_conn_op": 0, "having": [], "order_by": [],
-    ##                 "order_direction": "", "limit": None, "group_by": [20]}]
-    ##    enc_out_names = ["sel_num_label", "cond_num_label", "cond_conn_op_label", "sel_agg_label",
-    ##                     "sel_label", "cond_op_label", "order_col_label", "order_agg_label",
-    ##                     "order_direction_label", "group_num_label", "group_col_label",
-    ##                     "having_agg_label"]
-    ##    enc_out = sql2label(SQL.from_dict(gold_sqls[0]), 8)
-    ##    for name, array in zip(enc_out_names, enc_out):
-    ##        print(name, array)
+    #    print(f"acc of {sys.argv[1]} vs {sys.argv[2]}: ", get_acc(gold_sqls, pred_sqls))
+    # else:
+    #    gold_sqls = [{"sel": [5], "sel_num": 1, "cond_num": 2, "agg": [0],
+    #                  "cond_conn_op": 1, "conds": [[0, 2, '123'], [1, 2, '444']],
+    #                  "order_direction": "asc", "order_by": [[0, 1]]}]
+    #    pred_sqls = [{"sel": [1, 0], "agg": [0, 4], "cond_conn_op": 0,
+    #                 "conds": [], "having_conn_op": 0, "having": [], "order_by": [],
+    #                 "order_direction": "", "limit": None, "group_by": [20]}]
+    #    enc_out_names = ["sel_num_label", "cond_num_label", "cond_conn_op_label", "sel_agg_label",
+    #                     "sel_label", "cond_op_label", "order_col_label", "order_agg_label",
+    #                     "order_direction_label", "group_num_label", "group_col_label",
+    #                     "having_agg_label"]
+    #    enc_out = sql2label(SQL.from_dict(gold_sqls[0]), 8)
+    #    for name, array in zip(enc_out_names, enc_out):
+    #        print(name, array)

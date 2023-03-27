@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any, List, Optional
-
 import json
-import pprint
 import logging
-import pandas as pd
+import pprint
 from collections import defaultdict
+from typing import Optional
 
-from pipelines.schema import Document, Answer
+import pandas as pd
+
 from pipelines.document_stores.sql import DocumentORM
+from pipelines.schema import Answer, Document
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def print_answers(results: dict, details: str = "all", max_text_len: Optional[in
     # Defines the fields to keep in the Answer for each detail level
     fields_to_keep_by_level = {"minimum": ["answer", "context"], "medium": ["answer", "context", "score"]}
 
-    if not "answers" in results.keys():
+    if "answers" not in results.keys():
         raise ValueError(
             "The results object does not seem to come from a Reader: "
             f"it does not contain the 'answers' key, but only: {results.keys()}.  "
@@ -161,7 +161,7 @@ def export_answers_to_csv(agg_results: list, output_file):
     assert "query" in agg_results[0], f"Wrong format used for {agg_results[0]}"
     assert "answers" in agg_results[0], f"Wrong format used for {agg_results[0]}"
 
-    data = {}  # type: Dict[str, List[Any]]
+    data = {}
     data["query"] = []
     data["prediction"] = []
     data["prediction_rank"] = []
@@ -193,7 +193,7 @@ def convert_labels_to_squad(labels_file: str):
     for label in labels:
         labels_grouped_by_documents[label["document_id"]].append(label)
 
-    labels_in_squad_format = {"data": []}  # type: Dict[str, Any]
+    labels_in_squad_format = {"data": []}
     for document_id, labels in labels_grouped_by_documents.items():
         qas = []
         for label in labels:

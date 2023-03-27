@@ -18,5 +18,6 @@ from .globalpointer import (
     GlobalPointerForEntityExtraction,
     GPLinkerForRelationExtraction,
 )
+from .lora import *
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock

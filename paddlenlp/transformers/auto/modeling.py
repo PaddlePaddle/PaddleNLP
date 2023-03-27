@@ -100,6 +100,8 @@ MAPPING_NAMES = OrderedDict(
         ("XLNet", "xlnet"),
         ("XLM", "xlm"),
         ("GPT", "gpt"),
+        ("GLM", "glm"),
+        ("MT5", "mt5"),
         ("T5", "t5"),
         ("Bert", "bert"),
         ("Bart", "bart"),
@@ -139,6 +141,13 @@ MAPPING_TASKS = OrderedDict(
         ("Discriminator", "AutoDiscriminator"),
         ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
         ("ForImageGeneration", "AutoModelForImageGeneration"),
+    ]
+)
+
+MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
+    [
+        # Model for Causal LM mapping
+        ("opt", "OPTForCausalLM"),
     ]
 )
 

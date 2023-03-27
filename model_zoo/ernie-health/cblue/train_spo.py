@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import distutils.util
 import os
 import random
 import time
@@ -32,30 +33,48 @@ from utils import (
 
 from paddlenlp.data import Dict, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import ElectraTokenizer
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument('--seed', default=1000, type=int, help='Random seed for initialization.')
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default='gpu', help='Select which device to train model, default to gpu.')
-parser.add_argument('--epochs', default=100, type=int, help='Total number of training epochs.')
-parser.add_argument('--max_steps', default=-1, type=int, help='If > 0: set total number of training steps to perform. Override epochs.')
-parser.add_argument('--batch_size', default=12, type=int, help='Batch size per GPU/CPU for training.')
-parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning sequence classification task.')
-parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay of optimizer if we apply some.')
-parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion of learning rate over the training process.')
-parser.add_argument('--max_seq_length', default=300, type=int, help='The maximum total input sequence length after tokenization.')
-parser.add_argument('--init_from_ckpt', default=None, type=str, help='The path of checkpoint to be loaded.')
-parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
-parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
-parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
-parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--use_amp', default=False, type=strtobool, help='Enable mixed precision training.')
-parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
+parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu", "npu"],
+    default="gpu",
+    help="Select which device to train model, default to gpu.",
+)
+parser.add_argument("--epochs", default=100, type=int, help="Total number of training epochs.")
+parser.add_argument(
+    "--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override epochs."
+)
+parser.add_argument("--batch_size", default=12, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--learning_rate", default=6e-5, type=float, help="Learning rate for fine-tuning sequence classification task."
+)
+parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay of optimizer if we apply some.")
+parser.add_argument(
+    "--warmup_proportion",
+    default=0.1,
+    type=float,
+    help="Linear warmup proportion of learning rate over the training process.",
+)
+parser.add_argument(
+    "--max_seq_length", default=300, type=int, help="The maximum total input sequence length after tokenization."
+)
+parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
+parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
+parser.add_argument(
+    "--save_dir",
+    default="./checkpoint",
+    type=str,
+    help="The output directory where the model checkpoints will be written.",
+)
+parser.add_argument("--save_steps", default=100, type=int, help="The interval steps to save checkpoints.")
+parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
+parser.add_argument("--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training.")
+parser.add_argument("--scale_loss", default=128, type=float, help="The value of scale_loss for fp16.")
 
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -122,7 +141,7 @@ def do_train():
     )
 
     def batchify_fn(data):
-        _batchify_fn = lambda samples, fn=Dict(
+        _batchify_fn = lambda samples, fn=Dict(  # noqa: E731
             {
                 "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
                 "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),

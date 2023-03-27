@@ -13,31 +13,19 @@
 # limitations under the License.
 """ Class for the Sequence to sequence model for ATIS."""
 
+import data_util.snippets as snippet_handler
+import data_util.vocabulary as vocab
 import numpy as np
-
 import paddle
 import paddle.nn.functional as F
+from data_util import sql_util
+from data_util.vocabulary import EOS_TOK
 
-from copy import deepcopy
-
-from . import model_utils
-
-import data_util.snippets as snippet_handler
-import data_util.sql_util
-import data_util.vocabulary as vocab
-from data_util.vocabulary import EOS_TOK, UNK_TOK
-import data_util.tokenizers
-
-from .token_predictor import construct_token_predictor
+from . import bert_utils, model_utils
 from .attention import Attention
-from .model import ATISModel, encode_snippets_with_states, get_token_indices
-from data_util.utterance import ANON_INPUT_KEY
-
 from .decoder import SequencePredictorWithSchema
-
-from . import bert_utils
-
-import data_util.atis_batch
+from .model import ATISModel, get_token_indices
+from .token_predictor import construct_token_predictor
 
 np.random.seed(0)
 
@@ -76,7 +64,6 @@ class GraphNN(paddle.nn.Layer):
     def forward(self, x, adj_matrix, previous_x=None):
         # x: [len_tokens, d]
         # adj_matrix: [len_tokens, len_tokens]
-        len_tokens = x.shape[0]
         if previous_x is not None:
             x_new = self.leakyReLU(self.fc(paddle.concat([previous_x, x], axis=0))).unsqueeze(0)
         else:
@@ -114,7 +101,6 @@ class SchemaInteractionATISModel(ATISModel):
 
         if self.params.use_schema_encoder:
             # Create the schema encoder
-            schema_encoder_num_layer = 1
             schema_encoder_input_size = params.input_embedding_size
             schema_encoder_state_size = params.encoder_state_size
             if params.use_bert:
@@ -514,12 +500,9 @@ class SchemaInteractionATISModel(ATISModel):
         previous_query_states = []
         previous_queries = []
 
-        decoder_states = []
-
         discourse_state = None
         if self.params.discourse_level_lstm:
             discourse_state, discourse_lstm_states = self._initialize_discourse_states()
-        discourse_states = []
 
         # Schema and schema embeddings
         input_schema = interaction.get_schema()
@@ -632,7 +615,6 @@ class SchemaInteractionATISModel(ATISModel):
                     training=True,
                 )
                 loss = prediction[1]
-                decoder_states = prediction[3]
                 total_gold_tokens += len(gold_query)
                 losses.append(loss)
             else:
@@ -696,7 +678,6 @@ class SchemaInteractionATISModel(ATISModel):
         discourse_state = None
         if self.params.discourse_level_lstm:
             discourse_state, discourse_lstm_states = self._initialize_discourse_states()
-        discourse_states = []
 
         # Schema and schema embeddings
         input_schema = interaction.get_schema()
@@ -855,12 +836,9 @@ class SchemaInteractionATISModel(ATISModel):
         previous_query_states = []
         previous_queries = []
 
-        decoder_states = []
-
         discourse_state = None
         if self.params.discourse_level_lstm:
             discourse_state, discourse_lstm_states = self._initialize_discourse_states()
-        discourse_states = []
 
         # Schema and schema embeddings
         input_schema = interaction.get_schema()
@@ -883,11 +861,10 @@ class SchemaInteractionATISModel(ATISModel):
         adjacent_matrix_cross = paddle.to_tensor(adjacent_matrix_cross)
         previous_schema_states = paddle.zeros([input_schema.num_col, self.params.encoder_state_size])
 
-        for utterance_index, utterance in enumerate(interaction.gold_utterances()):
+        for _, utterance in enumerate(interaction.gold_utterances()):
 
             input_sequence = utterance.input_sequence()
 
-            available_snippets = utterance.snippets()
             previous_query = utterance.previous_query()
 
             final_utterance_state, utterance_states, schema_states = self.get_bert_encoding(
@@ -954,7 +931,6 @@ class SchemaInteractionATISModel(ATISModel):
                 feed_gold_tokens=feed_gold_query,
             )
 
-            decoder_states = prediction[3]
             predictions.append(prediction)
 
         return predictions

@@ -12,27 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
+import json
+import math
 import os
 import random
 import time
-import math
-
 from functools import partial
+
 import numpy as np
 import paddle
-
-from paddle.io import DataLoader
 from args import parse_args
-import json
+from paddle.io import DataLoader
 
+from paddlenlp.data import Dict, Pad, Stack
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Pad, Stack, Dict
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGramTokenizer
-from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ErnieForSequenceClassification,
+    ErnieGramForSequenceClassification,
+    ErnieGramTokenizer,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+    RobertaForSequenceClassification,
+    RobertaTokenizer,
+)
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),

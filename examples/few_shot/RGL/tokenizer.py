@@ -14,11 +14,10 @@
 
 import itertools
 import warnings
-from functools import partial
 from collections import defaultdict
+from functools import partial
 
 import numpy as np
-from paddlenlp.utils.log import logger
 
 
 class TokenizerWrapper:
@@ -143,8 +142,8 @@ class TokenizerWrapper:
         for key, value in input_dict.items():
             if len(input_dict[key]) > max_len:
                 raise ValueError(
-                    f"""Truncated seq length of '{key}' still greater than 
-                    max length {max_len}. One possible reason is that 
+                    f"""Truncated seq length of '{key}' still greater than
+                    max length {max_len}. One possible reason is that
                     no enough shortenable parts in template. Try adding
                     {{"shortenable": "True"}} property.
                 """
@@ -207,10 +206,10 @@ class MLMTokenizerWrapper(TokenizerWrapper):
         return self._num_specials
 
     def get_token_type_ids(self, encoded_inputs):
-        token_type_ids = [0] * len(encode_inputs["input_ids"])
+        token_type_ids = [0] * len(encoded_inputs["input_ids"])
         sep_token = getattr(self.tokenizer, "sep_token", -1)
         if sep_token >= 0:
-            sep_index = np.where([x == sep_token for x in encode_inputs["input_ids"]])[0]
+            sep_index = np.where([x == sep_token for x in encoded_inputs["input_ids"]])[0]
             for i, x in enumerate(sep_index[1:]):
                 pre_x = sep_index[i - 1]
                 sep_index[pre_x + 1 : x + 1] = [i + 1] * (x - pre_x)
@@ -229,7 +228,7 @@ class MLMTokenizerWrapper(TokenizerWrapper):
                 if to_replace is not None:
                     part["text"] = to_replace
                 else:
-                    raise KeyError("This tokenizer doesn't specify {} token.".format(piece["prompt"]))
+                    raise KeyError("This tokenizer doesn't specify {} token.".format(part["prompt"]))
 
             if "soft_token_ids" in part and part["soft_token_ids"] == 1:
                 text = [self.soft_token_id]
@@ -249,7 +248,7 @@ class MLMTokenizerWrapper(TokenizerWrapper):
         encode_inputs = self.add_special_tokens(encode_inputs)
         encode_inputs["attention_mask"] = [1] * len(encode_inputs["input_ids"])
         if self.create_token_type_ids:
-            encode_inputs["token_type_ids"] = get_token_type_ids(encode_inputs)
+            encode_inputs["token_type_ids"] = self.get_token_type_ids(encode_inputs)
         encode_inputs = self.padding(
             encode_inputs, max_len=self.max_seq_length, pad_id_for_inputs=self.tokenizer.pad_token_id
         )

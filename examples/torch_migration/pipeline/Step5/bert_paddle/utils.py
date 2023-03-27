@@ -16,9 +16,10 @@ import datetime
 import errno
 import os
 import time
-from collections import OrderedDict, defaultdict, deque
+from collections import defaultdict, deque
 
 import paddle
+
 from paddlenlp.transformers import (
     CosineDecayWithWarmup,
     LinearDecayWithWarmup,
@@ -191,10 +192,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,

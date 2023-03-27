@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-import argparse
-import os
 import sys
-import random
 import time
 
-sys.path.append("./recall/milvus")
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from paddle_serving_server.pipeline import PipelineClient
-from milvus_util import RecallByMilvus
-from config import collection_name, partition_tag, embedding_name
+
+sys.path.append("./recall/milvus")  # noqa: E402
+from config import collection_name, embedding_name, partition_tag  # noqa: E402
+from milvus_util import RecallByMilvus  # noqa: E402
 
 
 def recall_result(list_data):
@@ -53,7 +49,7 @@ def search_in_milvus(embeddings, query_text):
     list_data = []
     for line in results:
         for item in line:
-            idx = item.id
+            # idx = item.id
             distance = item.distance
             text = item.entity.get("text")
             list_data.append([query_text, text, distance])

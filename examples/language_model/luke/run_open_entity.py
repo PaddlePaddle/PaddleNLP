@@ -12,25 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import argparse
-import os
 import json
+import logging
+import os
 
 import numpy as np
-
-from paddlenlp.transformers import LukeTokenizer
-from paddlenlp.transformers import LukeForEntityClassification
-from paddlenlp.transformers import LinearDecayWithWarmup
-
 import paddle
-from paddle.io import Dataset, DataLoader
-from paddle.optimizer import AdamW
 import paddle.nn.functional as F
-
+from open_entity_processor import DatasetProcessor, convert_examples_to_features
+from paddle.io import DataLoader, Dataset
+from paddle.optimizer import AdamW
 from tqdm import tqdm
 
-from open_entity_processor import convert_examples_to_features, DatasetProcessor
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    LukeForEntityClassification,
+    LukeTokenizer,
+)
 
 ENTITY_TOKEN = "[ENTITY]"
 
@@ -287,7 +286,7 @@ if __name__ == "__main__":
     model = LukeForEntityClassification.from_pretrained(args.model_type, num_classes=num_labels)
     trainer = Trainer(args, model=model, dataloader=train_dataloader, num_train_steps=num_train_steps)
     trainer.train()
-    output_file = os.path.join(args.output_dir, f"test_predictions.jsonl")
+    output_file = os.path.join(args.output_dir, "test_predictions.jsonl")
     results.update({f"test_{k}": v for k, v in evaluate(args, model, "test", output_file).items()})
 
     logging.info("Results: %s", json.dumps(results, indent=2, sort_keys=True))

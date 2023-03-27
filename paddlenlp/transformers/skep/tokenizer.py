@@ -15,13 +15,16 @@
 
 import json
 import os
-from typing import List, Optional, Dict
 import shutil
+from typing import Dict, List, Optional
 
 from paddle.utils import try_import
-from paddlenlp.transformers import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.env import MODEL_HOME
+
+from paddlenlp.transformers import (
+    BasicTokenizer,
+    PretrainedTokenizer,
+    WordpieceTokenizer,
+)
 
 __all__ = [
     "SkepTokenizer",
@@ -122,7 +125,7 @@ class BpeEncoder(object):
                     j = word.index(first, i)
                     new_word.extend(word[i:j])
                     i = j
-                except:
+                except Exception:
                     new_word.extend(word[i:])
                     break
 
