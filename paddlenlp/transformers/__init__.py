@@ -161,7 +161,7 @@ from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
-from .ernie_vil.procesing import *
+from .ernie_vil.processing import *
 from .ernie_vil.image_processing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
@@ -184,6 +184,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .codegen.configuration import *
@@ -197,12 +198,12 @@ from .clip.modeling import *
 from .clip.configuration import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
-from .clip.procesing import *
+from .clip.processing import *
 from .clip.image_processing import *
 from .chineseclip.modeling import *
 from .chineseclip.configuration import *
 from .chineseclip.feature_extraction import *
-from .chineseclip.procesing import *
+from .chineseclip.processing import *
 from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
 from .gptj.modeling import *
@@ -214,10 +215,12 @@ from .pegasus.configuration import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
-from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
+from .blip_2.modeling import *
+from .blip_2.configuration import *
+from .blip_2.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
