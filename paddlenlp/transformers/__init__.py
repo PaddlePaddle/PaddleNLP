@@ -218,6 +218,10 @@ from .glm.tokenizer import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
+from .clipseg.configuration import *
+from .clipseg.modeling import *
+from .clipseg.processing import *
+from .clipseg.image_processing import *
 from .blip_2.modeling import *
 from .blip_2.configuration import *
 from .blip_2.processing import *
