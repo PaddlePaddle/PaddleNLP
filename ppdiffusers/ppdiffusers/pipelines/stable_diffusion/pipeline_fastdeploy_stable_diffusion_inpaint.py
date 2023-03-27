@@ -456,13 +456,15 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 latent_model_input = paddle.concat([latent_model_input, mask, masked_image_latents], axis=1)
 
                 # predict the noise residual
-                noise_pred = self.unet.zero_copy_infer(
-                    sample=latent_model_input, timestep=t, encoder_hidden_states=text_embeddings
+                noise_pred_unet = self.unet(
+                    sample=latent_model_input.numpy(),
+                    timestep=t.cast("float32").numpy(),
+                    encoder_hidden_states=text_embeddings.numpy(),
                 )[0]
-
+                noise_pred_unet = paddle.to_tensor(noise_pred_unet)
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1

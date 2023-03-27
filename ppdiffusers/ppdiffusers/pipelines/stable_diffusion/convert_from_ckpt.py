@@ -342,7 +342,6 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     else:
         unet_key = "model.diffusion_model."
 
-    unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100 and extract_ema:
         print(f"Checkpoint {path} has both EMA and non-EMA weights.")
@@ -351,7 +350,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
             " weights (useful to continue fine-tuning), please make sure to remove the `--extract_ema` flag."
         )
         for key in keys:
-            if key.startswith("model.diffusion_model"):
+            if key.startswith(unet_key[:-1]):
                 flat_ema_key = "model_ema." + "".join(key.split(".")[1:])
                 unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(flat_ema_key)
     else:
@@ -1078,7 +1077,9 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             converted_ctrl_checkpoint = convert_ldm_unet_checkpoint(
                 checkpoint, ctrlnet_config, path=checkpoint_path, extract_ema=extract_ema, controlnet=True
             )
-            controlnet_model.load_dict(convert_diffusers_vae_unet_to_ppdiffusers(converted_ctrl_checkpoint))
+            controlnet_model.load_dict(
+                convert_diffusers_vae_unet_to_ppdiffusers(controlnet_model, converted_ctrl_checkpoint)
+            )
 
             if paddle_dtype is not None:
                 controlnet_model.to(dtype=paddle_dtype)

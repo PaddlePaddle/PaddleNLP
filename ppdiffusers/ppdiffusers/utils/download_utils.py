@@ -220,6 +220,7 @@ def ppdiffusers_bos_download(
     cache_dir: Union[str, Path, None] = None,
     force_download: bool = False,
     resume_download: bool = False,
+    file_lock_time_out: int = -1,
 ):
     if cache_dir is None:
         cache_dir = PPDIFFUSERS_CACHE
@@ -268,7 +269,7 @@ def ppdiffusers_bos_download(
         blob_path = "\\\\?\\" + os.path.abspath(blob_path)
 
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-    with FileLock(lock_path):
+    with FileLock(lock_path, time_out=file_lock_time_out):
         # If the download just completed while the lock was activated.
         if os.path.exists(pointer_path) and not force_download:
             # Even if returning early like here, the lock will be released.
@@ -322,6 +323,7 @@ def ppdiffusers_url_download(
     filename: Optional[str] = None,
     force_download: bool = False,
     resume_download: bool = False,
+    file_lock_time_out: int = -1,
 ):
     if cache_dir is None:
         cache_dir = PPDIFFUSERS_CACHE
@@ -341,7 +343,7 @@ def ppdiffusers_url_download(
         file_path = "\\\\?\\" + os.path.abspath(file_path)
 
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-    with FileLock(lock_path):
+    with FileLock(lock_path, timeout=file_lock_time_out):
         # If the download just completed while the lock was activated.
         if os.path.exists(file_path) and not force_download:
             # Even if returning early like here, the lock will be released.
@@ -522,6 +524,7 @@ def ppdiffusers_bos_dir_download(
     tqdm_class: Optional[base_tqdm] = None,
     variant: Optional[str] = None,
     is_fastdeploy_model: Optional[str] = False,
+    file_lock_time_out: int = -1,
 ) -> str:
     # update repo id must end with @fastdeploy
     if is_fastdeploy_model and not repo_id.endswith("@fastdeploy"):
@@ -559,6 +562,7 @@ def ppdiffusers_bos_dir_download(
             cache_dir=cache_dir,
             revision=revision,
             resume_download=resume_download,
+            file_lock_time_out=file_lock_time_out,
         )
 
     thread_map(

@@ -130,20 +130,21 @@ def apply_lora(
                     mayberanklist.append(v.shape[1])
 
             if "alpha" in k:
-                maybealphalist.append(v.item())
+                # we must cast it to float32
+                maybealphalist.append(v.astype("float32").item())
             if len(mayberanklist) > 20:
                 break
         if len(set(mayberanklist)) > 1:
-            print(f"Cant guess rank! Here are the rank list {mayberanklist}. We will use default rank {rank}.")
+            print(f"Can't guess rank! Here are the rank list {mayberanklist}. We will use default rank {rank}.")
         else:
             rank = mayberanklist[0]
-        print(f"|---------------当前的rank是 {rank}！")
+        print(f"|---------------Currently, rank is {rank}!")
 
         if len(set(maybealphalist)) > 1:
-            print(f"Cant guess alpha! Here are the rank list {maybealphalist}. We will use default alpha {alpha}")
+            print(f"Can't guess alpha! Here are the rank list {maybealphalist}. We will use default alpha {alpha}")
         else:
             alpha = maybealphalist[0]
-        print(f"|---------------当前的alpha是 {alpha}！")
+        print(f"|---------------Currently, alpha is {alpha}!")
 
     waitlist = []
     if isinstance(pipe_or_module, nn.Layer):

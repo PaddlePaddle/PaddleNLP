@@ -50,7 +50,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle --device gpu
+python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 参数说明
@@ -83,7 +83,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
@@ -99,7 +99,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm"
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 参数说明
@@ -150,7 +150,7 @@ python text_guided_img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --back
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_legacy_infer.py` 脚本，完成文本引导的图像编辑任务。
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-4/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-4/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，待变换的图像为：
@@ -169,15 +169,15 @@ mask 图像为：
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 正式版本
 
-下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_legacy_infer.py` 脚本，完成文本引导的图像编辑任务。
+下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_infer.py` 脚本，完成文本引导的图像编辑任务。
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，待变换的图像为：

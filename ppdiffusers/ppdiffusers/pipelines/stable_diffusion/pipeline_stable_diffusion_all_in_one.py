@@ -387,7 +387,7 @@ def get_weighted_text_embeddings(
         pipe.tokenizer.model_max_length,
         no_boseos_middle=no_boseos_middle,
     )
-    prompt_weights = paddle.to_tensor(prompt_weights, dtype=text_embeddings.dtype)
+    prompt_weights = paddle.to_tensor(prompt_weights, dtype=paddle.float32).cast(text_embeddings.dtype)
     if uncond_prompt is not None:
         uncond_embeddings = get_unweighted_text_embeddings(
             pipe,
@@ -395,7 +395,7 @@ def get_weighted_text_embeddings(
             pipe.tokenizer.model_max_length,
             no_boseos_middle=no_boseos_middle,
         )
-        uncond_weights = paddle.to_tensor(uncond_weights, dtype=uncond_embeddings.dtype)
+        uncond_weights = paddle.to_tensor(uncond_weights, dtype=paddle.float32).cast(uncond_embeddings.dtype)
 
     # assign weights to the prompts and normalize in the sense of mean
     # TODO: should we normalize by chunk or in a whole (current implementation)?

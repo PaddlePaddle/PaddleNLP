@@ -121,7 +121,8 @@ def create_paddle_inference_runtime(
         option.use_cpu()
     else:
         option.use_gpu(device_id)
-    if paddle_stream is not None:
+    # (TODO, junnyu) remove use_trt
+    if use_trt and paddle_stream is not None:
         option.set_external_raw_stream(paddle_stream)
     for pass_name in disable_paddle_pass:
         option.paddle_infer_option.delete_pass(pass_name)
@@ -416,4 +417,5 @@ if __name__ == "__main__":
     )
 
     images[0].save(args.image_path)
+
     print(f"Image saved in {args.image_path}!")
