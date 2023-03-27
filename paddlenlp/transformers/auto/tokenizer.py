@@ -92,7 +92,6 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ChineseCLIPTokenizer", "chineseclip"),
         ("ErnieViLTokenizer", "ernie_vil"),
         ("PegasusChineseTokenizer", "pegasus"),
-        ("GLM130BTokenizer", "glm_130b"),
         ("GLMBertTokenizer", "glm"),
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),

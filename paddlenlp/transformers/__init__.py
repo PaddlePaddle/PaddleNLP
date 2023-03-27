@@ -213,9 +213,6 @@ from .auto.configuration import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
-from .glm_130b.configuration import *
-from .glm_130b.modeling import *
-from .glm_130b.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

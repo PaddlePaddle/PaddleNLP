@@ -23,9 +23,11 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.env import CONFIG_NAME
-from .. import PretrainedModel, register_base_model
-from ..model_outputs import ModelOutput
+from paddlenlp.transformers import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.utils.env import CONFIG_NAME
+from paddlenlp.utils.initializer import normal_, ones_, zeros_
+
 from .configuration import (
     GLM130B_PRETRAINED_INIT_CONFIGURATION,
     GLM130B_PRETRAINED_RESOURCE_FILES_MAP,
@@ -126,31 +128,23 @@ class GLM130BAttention(nn.Layer):
         cache: Tensor = None,
         label_id=0,
     ):
-        query_length = hidden_states.shape[1]
+        batch_size, query_length = hidden_states.shape[:2]
         if cache is None:
             mixed_layer = self.query_key_value(hidden_states)
-            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
+            mixed_layer = mixed_layer.reshape(
+                [batch_size, query_length, self.num_attention_heads, self.attention_head_size * 3]
+            )
+            q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         else:
             concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
             mixed_layer = self.query_key_value(concat_hidden_states)
-            mixed_q_layer, mixed_k_layer, mixed_v_layer = paddle.split(mixed_layer, 3, axis=-1)
-            mixed_q_layer = mixed_q_layer[:, -query_length:]
+            mixed_layer = mixed_layer.reshape(
+                [batch_size, query_length, self.num_attention_heads, self.attention_head_size * 3]
+            )
+            q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
+            q_layer = q_layer[:, -query_length:]
 
-        print("=" * 20)
-        print(self.query_key_value.weight.mean())
-        print(self.query_key_value.weight)
-        print(hidden_states.mean())
-        print(mixed_layer.mean(), mixed_layer.shape)
-
-        q_layer = self._transpose_for_scores(mixed_q_layer)
-        k_layer = self._transpose_for_scores(mixed_k_layer)
-        v_layer = self._transpose_for_scores(mixed_v_layer)
-
-        print("#" * 20)
-        print(q_layer.mean(), q_layer.shape)
-        print(k_layer.mean(), k_layer.shape)
-        print(v_layer.mean(), v_layer.shape)
-
+        # Set store_true, position_encoding_2d=False by default.
         if self.config.position_encoding_2d:
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
@@ -193,8 +187,8 @@ class GLM130BAttention(nn.Layer):
         attention_scores = attention_scores.reshape(output_shape)
 
         ltor_mask = ltor_mask.astype(attention_scores.dtype)
-        attention_scores = paddle.multiply(attention_scores, ltor_mask)
-        attention_scores = attention_scores + (-10000.0) * (1.0 - ltor_mask)
+        attention_scores = paddle.multiply(attention_scores, 1.0 - ltor_mask)
+        attention_scores = attention_scores + (-10000.0) * ltor_mask
         attention_scores = attention_scores.astype("float32") * attention_scale_coeff
 
         attention_probs = F.softmax(attention_scores, axis=-1)
@@ -214,7 +208,6 @@ class GLM130BAttention(nn.Layer):
 
         output = self.dense(context_layer)
         output = self.output_dropout(output)
-
         return output
 
 
@@ -225,6 +218,7 @@ class GLM130BBlock(nn.Layer):
 
     def __init__(self, config: GLM130BConfig, layer_id: int):
         super(GLM130BBlock, self).__init__()
+        self.config = config
         self.layer_id = layer_id
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = GLM130BAttention(config)
@@ -326,22 +320,14 @@ class GLM130BStack(nn.Layer):
         attention_mask: Tensor,
         memory_states: Optional[Tensor] = None,
     ):
-        print(">" * 20)
-        print(self.word_embeddings.weight.mean())
-        print(self.word_embeddings.weight)
         batch_size, query_length = input_ids.shape
         word_embeddings = self.word_embeddings(input_ids).transpose([1, 0, 2])
         # memory_length = memory_states[0].shape[1] if memory_states is not None else 0
 
         if attention_mask is None:
             attention_mask = paddle.ones([1, 1])
-        print("+" * 20)
-        print(attention_mask)
 
         hidden_states = self.embedding_dropout(word_embeddings)
-        print("<" * 20)
-        print(word_embeddings.mean())
-        print(word_embeddings)
 
         memory_layers = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
@@ -393,20 +379,14 @@ class GLM130BPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
-            paddle.set_default_dtype("float32")
-            init_weight = paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=layer.weight.shape)
-            paddle.set_default_dtype(self.config.paddle_dtype)
-            layer.weight.set_value(init_weight.astype(self.config.paddle_dtype))
+            normal_(layer.weight, mean=0.0, std=self.config.initializer_range)
             if layer.bias is not None:
-                layer.bias.set_value(paddle.zeros_like(layer.bias))
+                zeros_(layer.bias)
         elif isinstance(layer, nn.Embedding):
-            paddle.set_default_dtype("float32")
-            init_weight = paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=layer.weight.shape)
-            paddle.set_default_dtype(self.config.paddle_dtype)
-            layer.weight.set_value(init_weight.astype(self.config.paddle_dtype))
+            normal_(layer.weight, mean=0.0, std=self.config.initializer_range)
         elif isinstance(layer, nn.LayerNorm):
-            layer.weight.set_value(paddle.ones_like(layer.weight))
-            layer.bias.set_value(paddle.zeros_like(layer.bias))
+            ones_(layer.weight)
+            zeros_(layer.bias)
 
 
 @register_base_model
@@ -462,7 +442,7 @@ class GLM130BModel(GLM130BPretrainedModel):
             memory_states=cache,
         )
         if self.output_predict:
-            logits = F.linear(logits, self.word_embeddings.weight.T).transpose([1, 0])
+            logits = F.linear(logits, self.transformer.word_embeddings.weight.T).transpose([1, 0, 2])
 
         if not return_dict:
             return (logits, hidden_layers)

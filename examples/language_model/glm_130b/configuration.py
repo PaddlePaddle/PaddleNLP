@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from ..configuration_utils import PretrainedConfig
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
     "GLM130BConfig",
