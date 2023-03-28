@@ -64,6 +64,7 @@ from .blenderbot.tokenizer import *
 from .blenderbot.configuration import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
+from .blenderbot_small.configuration import *
 from .blip.modeling import *
 from .blip.modeling_text import *
 from .blip.configuration import *
