@@ -77,6 +77,7 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
+from .ctrl.configuration import *
 from .dpt.modeling import *
 from .dpt.configuration import *
 from .dpt.image_processing import *
