@@ -33,7 +33,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "meta/tiny-random-llama",
+    "facebookresearch/tiny-random-llama",
 ]
 
 __all__ = [
@@ -151,7 +151,7 @@ class LlamaMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -168,7 +168,7 @@ class LlamaMLP(nn.Layer):
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.down_proj = fleet.meta_parallel.RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
@@ -189,26 +189,26 @@ class LlamaAttention(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
-        assert self.num_heads % config.mp_degree == 0
-        self.num_heads = self.num_heads // config.mp_degree
+        assert self.num_heads % config.tensor_parallel_degree == 0
+        self.num_heads = self.num_heads // config.tensor_parallel_degree
         self.head_dim = self.hidden_size // self.num_heads
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.mp_degree,
+                self.num_heads * self.head_dim * config.tensor_parallel_degree,
                 has_bias=False,
                 gather_output=False,
             )
             self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.mp_degree,
+                self.num_heads * self.head_dim * config.tensor_parallel_degree,
                 has_bias=False,
                 gather_output=False,
             )
             self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.mp_degree,
+                self.num_heads * self.head_dim * config.tensor_parallel_degree,
                 has_bias=False,
                 gather_output=False,
             )
@@ -229,16 +229,16 @@ class LlamaAttention(nn.Layer):
                 bias_attr=False,
             )
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.o_proj = fleet.meta_parallel.RowParallelLinear(
-                self.num_heads * self.head_dim * config.mp_degree,
+                self.num_heads * self.head_dim * config.tensor_parallel_degree,
                 self.hidden_size,
                 has_bias=False,
                 input_is_parallel=True,
             )
         else:
             self.o_proj = nn.Linear(
-                self.num_heads * self.head_dim * config.mp_degree,
+                self.num_heads * self.head_dim * config.tensor_parallel_degree,
                 self.hidden_size,
                 bias_attr=False,
             )
@@ -434,7 +434,7 @@ class LlamaModel(LlamaPretrainedModel):
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
@@ -602,9 +602,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, pad_token_id=None, mp_degree=1):
+    def __init__(self, pad_token_id=None, tensor_parallel_degree=1):
         super(LlamaPretrainingCriterion, self).__init__()
-        if mp_degree > 1:
+        if tensor_parallel_degree > 1:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
@@ -634,10 +634,30 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = LlamaModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-        self.criterion = LlamaPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
+        self.criterion = LlamaPretrainingCriterion(
+            pad_token_id=config.pad_token_id, tensor_parallel_degree=config.tensor_parallel_degree
+        )
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.llama.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.llama.embed_tokens = value
+
+    def get_output_embeddings(self):
+        return self.lm_head
+
+    def set_output_embeddings(self, new_embeddings):
+        self.lm_head = new_embeddings
+
+    def set_decoder(self, decoder):
+        self.llama = decoder
+
+    def get_decoder(self):
+        return self.llama
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
@@ -666,7 +686,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         labels=None,
-        use_cache=None,
+        use_cache=True,
         past_key_values=None,
         output_attentions=None,
         output_hidden_states=None,

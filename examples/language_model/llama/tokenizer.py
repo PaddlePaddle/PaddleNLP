@@ -45,7 +45,6 @@ class LlamaTokenizer(PretrainedTokenizer):
         unk_token="<unk>",
         bos_token="<s>",
         eos_token="</s>",
-        pad_token="<unk>",
         add_bos_token=True,
         add_eos_token=False,
         sp_model_kwargs=None,
