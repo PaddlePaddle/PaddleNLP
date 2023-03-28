@@ -15,17 +15,20 @@ from __future__ import annotations
 
 import paddle
 
-from paddlenlp.transformers import AutoTokenizer, BloomForGeneration
+# TODO(wj-Mcat): use paddlenlp tokenizer later
+from transformers import AutoTokenizer
+from utils import load_model
+
+from paddlenlp.transformers import BloomForGeneration
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="bigsicence/bloom-560m", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="bigscience/bloom-560m", help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
+    parser.add_argument("--max_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
     return parser.parse_args()
 
@@ -42,23 +45,24 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
         self.args = args
-        self.model = BloomForGeneration.from_pretrained(args.model_name_or_path)
+
+        self.model = load_model(args, BloomForGeneration)
+
+        self.model.config.dtype = self.model.config.dtype or "float16"
         self.model.eval()
 
     def preprocess(self, input_text):
-        input_text = [text.strip() + "[gMASK]" for text in input_text]
         inputs = self.tokenizer(
             input_text,
             return_tensors="np",
-            add_special_tokens=True,
             padding=True,
-            max_length=self.args.src_length,
-            truncation=True,
-            truncation_side="left",
+            max_length="max_length",
+            return_attention_mask=False,
+            return_token_type_ids=False,
         )
-        inputs = self.tokenizer.build_inputs_for_generation(inputs, max_gen_length=self.args.tgt_length)
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
@@ -66,13 +70,8 @@ class Predictor(object):
 
     def infer(self, inputs):
         with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
-            result = self.model.generate(
+            result = self.model(
                 **inputs,
-                decode_strategy="sampling",
-                top_k=1,
-                max_length=self.args.tgt_length,
-                eos_token_id=self.tokenizer.eop_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
             )
         result = result[0]
         return result

@@ -164,6 +164,7 @@ def load_model(args: str, model_class: Type[PretrainedModel]):
 
     # TODO(wj-Mcat): only support `mp_degree`, so world_size is equal to `world_size`
     world_size = paddle.distributed.get_world_size()
+
     if world_size == 1:
         return model_class.from_pretrained(args.model_name_or_path, config=config)
 
