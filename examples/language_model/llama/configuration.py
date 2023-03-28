@@ -36,9 +36,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 1,
         "eos_token_id": 2,
         "pad_token_id": 0,
-        "mp_degree": 1,
-        "pp_degree": 1,
-        "mp_rank": -1,
         "use_cache": False,
         "use_recompute": False,
         "use_pure_fp16": False,
@@ -157,9 +154,6 @@ class LlamaConfig(PretrainedConfig):
         num_attention_heads=2,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
-        mp_degree=1,
-        pp_degree=1,
-        mp_rank=-1,
         use_cache=True,
         use_pure_fp16=False,
         use_recompute=False,
@@ -176,9 +170,6 @@ class LlamaConfig(PretrainedConfig):
         self.num_attention_heads = num_attention_heads
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
-        self.mp_degree = mp_degree
-        self.pp_degree = pp_degree
-        self.mp_rank = mp_rank
         self.use_cache = use_cache
         self.use_pure_fp16 = use_pure_fp16
         self.use_recompute = use_recompute

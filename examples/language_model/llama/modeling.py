@@ -30,7 +30,6 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
-from paddlenlp.utils.log import logger
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "facebookresearch/tiny-random-llama",
@@ -347,8 +346,8 @@ class LlamaDecoderLayer(nn.Layer):
         self,
         hidden_states: paddle.Tensor,
         attention_mask: Optional[paddle.Tensor] = None,
-        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -477,6 +476,17 @@ class LlamaModel(LlamaPretrainedModel):
 
         return combined_attention_mask
 
+    @paddle.jit.not_to_static
+    def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs, output_attentions, None)
+
+            return custom_forward
+
+        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, attention_mask)
+        return hidden_states
+
     def forward(
         self,
         input_ids=None,
@@ -486,7 +496,7 @@ class LlamaModel(LlamaPretrainedModel):
         use_cache=None,
         past_key_values=None,
         output_attentions=False,
-        output_hidden_states=False,
+        output_hidden_states=None,
         return_dict=False,
         **kwargs,
     ):
@@ -528,44 +538,31 @@ class LlamaModel(LlamaPretrainedModel):
 
         hidden_states = inputs_embeds
 
-        if self.gradient_checkpointing and self.training:
-            if use_cache:
-                logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                )
-                use_cache = False
-
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
-        for idx, decoder_layer in enumerate(self.layers):
+        for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
             past_key_value = past_key_values[idx] if past_key_values is not None else None
-            if self.gradient_checkpointing and self.training:
 
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        # None for past_key_value
-                        return module(*inputs, output_attentions, None)
-
-                    return custom_forward
-
-                layer_outputs = recompute(
-                    create_custom_forward(decoder_layer),
+            has_gradient = not hidden_states.stop_gradient
+            if self.config.use_recompute and has_gradient:
+                layer_outputs = self.recompute_training(
+                    decoder_layer,
                     hidden_states,
                     attention_mask,
-                    None,
+                    output_attentions,
                 )
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask,
-                    past_key_value,
                     output_attentions,
+                    past_key_value,
                     use_cache,
                 )
 
@@ -676,7 +673,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         labels=None,
-        use_cache=True,
+        use_cache=False,
         past_key_values=None,
         output_attentions=None,
         output_hidden_states=None,
