@@ -805,6 +805,12 @@ class ModelTesterPretrainedMixin:
 
 
 class DistributedTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.gpus = "0,1"
+
+    def get_world_size(self):
+        return len(self.gpus.split(","))
+
     def run_on_gpu(
         self,
         training_script,
