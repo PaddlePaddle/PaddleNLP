@@ -11,120 +11,59 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-import numpy as np
+import paddle
 
 
-def custom_convert_example(example, tokenizer, data_args, is_test=True):
-    source = None
-    title = None
-    target = None
-    if "source" in example and "title" in example:
-        source = example["source"]
-        if "title" in example.keys():
-            title = example["title"]
-    elif "context" in example and "answer" in example:
-        source = example["context"]
-        if "answer" in example.keys():
-            title = example["answer"]
-    else:
-        assert False, "Source and title are not in the input dictionary, nor are context and answer."
-    if "target" in example.keys():
-        target = example["target"]
-    elif "question" in example.keys():
-        target = example["question"]
-    example["text_a"] = "答案：" + title + "，" + "上下文：" + source
-    example["text_b"] = "在已知答案的前提下，问题：" + target
-    inputs = tokenizer.encode(example["text_a"], max_length=data_args.src_length - 1, truncation=True)
-    inputs["input_ids"] = inputs["input_ids"][:-1] + [tokenizer.gmask_token_id] + inputs["input_ids"][-1:]
-    pad_length = data_args.src_length - len(inputs["input_ids"])
-    inputs["input_ids"] = np.array([inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
-    inputs["attention_mask"] = np.array([inputs["attention_mask"] + [1] + [0] * pad_length])
-    sep = inputs["input_ids"].shape[1]
-    inputs = tokenizer.build_inputs_for_generation(
-        inputs,
-        max_gen_length=data_args.tgt_length,
-        targets=" " + example["text_b"] if not is_test else None,
+def convert_example(
+    example,
+    tokenizer,
+    max_source_length,
+    max_target_length,
+    is_train=False,
+):
+    """
+    Convert an example into necessary features.
+    """
+    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    context = example["context"]
+    question = example["question"]
+    try:
+        answer = example["answers"][0]
+    except Exception:
+        print(example["context"])
+        print(example["question"])
+        print(example["answers"])
+        print(example["answer_starts"])
+        print(example["is_impossible"])
+
+    input_seq = f"answer: {answer} context: {context} </s>"
+    output_seq = f"question: {question} </s>"
+
+    outputs = tokenizer(
+        output_seq,
         padding="max_length",
+        max_length=max_target_length,
+        truncation_strategy="longest_first",
+        return_attention_mask=True,
+        return_token_type_ids=False,
     )
-
-    for input_name in inputs.keys():
-        inputs[input_name] = inputs[input_name].squeeze(0)
-    if is_test:
-        inputs["position_ids"] = inputs["position_ids"][:, : inputs["input_ids"].shape[-1]]
-        labels = tokenizer.encode(
-            " " + example["text_b"], add_special_tokens=False, max_length=data_args.tgt_length - 1
-        )["input_ids"]
-        loss_mask = [0] * sep + [1] * len(labels) + [0] * (data_args.tgt_length - len(labels))
-        labels = (
-            [0] * sep
-            + labels
-            + [tokenizer.eop_token_id]
-            + [tokenizer.pad_token_id] * (data_args.tgt_length - len(labels) - 1)
-        )
-        inputs["label_ids"] = labels
-        inputs["loss_mask"] = loss_mask
-    return inputs
-
-
-def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
-    def punctuation_standardization(string: str):
-        punctuation_dict = {"\u201c": '"', "\u201d": '"', "\u2019": "'", "\u2018": "'", "\u2013": "-"}
-        for key, value in punctuation_dict.items():
-            string = string.replace(key, value)
-        return string
-
-    def detokenize(string, is_target=False):
-        _tok_dict = {"(": "-LRB-", ")": "-RRB-", "[": "-LSB-", "]": "-RSB-", "{": "-LCB-", "}": "-RCB-"}
-        if not is_target:
-            string = string.replace("<S_SEP>", "")
-        else:
-            string = string.replace("<S_SEP>", "[SEP]")
-        for key, value in _tok_dict.items():
-            string = string.replace(value, key)
-        string = string.replace("''", '"')
-        string = string.replace("``", '"')
-        string = string.replace("`", "'")
-        string = string.replace(" n't", "n't")
-        string = string.replace(" 's", "'s")
-        string = string.replace(" 'd", "'d")
-        string = string.replace(" 'll", "'ll")
-        return string
-
-    def preprocess(string):
-        string = string.strip()
-        string = punctuation_standardization(string)
-        string = detokenize(string)
-        return string
-
-    example["article"] = preprocess(example["article"])
-    example["highlights"] = preprocess(example["highlights"])
-    prompt = [tokenizer.convert_tokens_to_ids(x) for x in ("[CLS]", "[sMASK]", "ĠContent", ":")]
     inputs = tokenizer(
-        " " + example["article"], add_special_tokens=False, max_length=data_args.src_length - len(prompt)
+        input_seq,
+        max_seq_len=max_source_length,
+        truncation_strategy="longest_first",
+        return_attention_mask=True,
+        return_length=False,
     )
-    pad_length = data_args.src_length - len(inputs["input_ids"]) - len(prompt)
-    inputs["input_ids"] = np.array([prompt + inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
-    inputs["attention_mask"] = np.array([[1] * len(prompt) + inputs["attention_mask"] + [0] * pad_length])
-    sep = inputs["input_ids"].shape[1]
-    inputs = tokenizer.build_inputs_for_generation(
-        inputs,
-        max_gen_length=data_args.tgt_length,
-        targets=" " + example["highlights"] if not is_test else None,
-        padding=True,
-    )
-    for input_name in inputs.keys():
-        inputs[input_name] = inputs[input_name].squeeze(0)
-    if is_test:
-        inputs["position_ids"] = inputs["position_ids"][:, : inputs["input_ids"].shape[-1]]
-        labels = tokenizer.encode(" " + example["highlights"], add_special_tokens=False)["input_ids"]
-        loss_mask = [0] * sep + [1] * len(labels) + [0] * (data_args.tgt_length - len(labels))
-        labels = (
-            [0] * sep
-            + labels
-            + [tokenizer.eop_token_id]
-            + [tokenizer.pad_token_id] * (data_args.tgt_length - len(labels) - 1)
-        )
-        inputs["label_ids"] = labels
-        inputs["loss_mask"] = loss_mask
-    return inputs
+
+    final = {}
+    for k in outputs.keys():
+        final[k] = inputs[k] + outputs[k]
+        if k == "input_ids":
+            final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+    return {k: paddle.to_tensor(v, dtype="int64") for k, v in final.items()}

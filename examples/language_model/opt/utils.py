@@ -28,7 +28,7 @@ from paddlenlp.transformers.generation_utils import (
 )
 
 
-class GLMTrainer(Trainer):
+class OPTTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
         super().__init__(**kwargs)
         self.do_generation = do_generation

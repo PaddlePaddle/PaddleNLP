@@ -17,15 +17,15 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from utils import GLMTrainer
+from utils import OPTTrainer
 
-from data import custom_convert_example
+from data import convert_example
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, OPTForConditionalGeneration
 from paddlenlp.utils.log import logger
 
 
@@ -93,15 +93,15 @@ def main():
             )
 
     # Load the pretrained language model.
-    model = AutoModelForConditionalGeneration.from_pretrained(
+    model = OPTForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
-        output_predict=True,
-        parallel_output=True,
+        # output_predict=True,
+        # parallel_output=True,
         load_state_as_np=True,
-        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
+        # low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
         # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        # tensor_parallel_degree=training_args.tensor_parallel_degree,
+        # tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
@@ -117,9 +117,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
-    trans_func = partial(custom_convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
+    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v2", "dev_v2"])
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_source_length=data_args.src_length,
+        max_target_length=data_args.tgt_length,
+    )
+    train_ds = train_ds.map(partial(trans_func, is_train=True))
     test_ds = dev_ds.map(trans_func)
 
     collate_fn = DefaultDataCollator()
@@ -143,7 +148,7 @@ def main():
             "rougel": rougel.score(),
         }
 
-    trainer = GLMTrainer(
+    trainer = OPTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
