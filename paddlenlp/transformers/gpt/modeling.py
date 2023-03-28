@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
+from paddle.fluid.dygraph.base import in_declarative_mode
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -433,10 +434,10 @@ class GPTEmbeddings(nn.Layer):
 
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape if in_declarative_mode() else paddle.shape(input_ids)
             inputs_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeddings)[:-1]
+            input_shape = inputs_embeddings.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeddings)[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")
@@ -746,8 +747,15 @@ class GPTModel(GPTPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
-            input_ids = input_ids.reshape((-1, input_shape[-1]))
+            input_shape = input_ids.shape if in_declarative_mode() else paddle.shape(input_ids)
+            if in_declarative_mode():
+                numel = 1
+                for i in input_shape:
+                    numel = numel * i
+                input_ids = input_ids.reshape((int(numel/input_shape[-1]), input_shape[-1]))
+            else:
+                input_ids = input_ids.reshape((-1, input_shape[-1]))
+            
         elif inputs_embeds is not None:
             input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
@@ -756,7 +764,7 @@ class GPTModel(GPTPretrainedModel):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
+                past_length = cache[0].k.shape[-2] if in_declarative_mode() else paddle.shape(cache[0].k)[-2]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -767,7 +775,7 @@ class GPTModel(GPTPretrainedModel):
         # TODO, use registered buffer
         length = input_shape[-1]
         if cache is not None:
-            cache_length = paddle.shape(cache[0].k)[2]
+            cache_length = cache[0].k.shape[2] if in_declarative_mode() else paddle.shape(cache[0].k)[2]
             length = length + cache_length
         else:
             cache_length = 0
@@ -1422,7 +1430,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         if input_ids is not None:
             sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
         else:
-            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            inputs_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeds)[:-1]
             sequence_lengths = paddle.ones(inputs_shape[:-1], dtype="int64") * (inputs_shape[1] - 1)
             logger.warning(
                 f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
@@ -1430,7 +1438,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             )
 
         pooled_logits = logits.gather_nd(
-            paddle.stack([paddle.arange(paddle.shape(logits)[0]), sequence_lengths], axis=-1)
+            paddle.stack([paddle.arange(logits.shape[0] if in_declarative_mode() else paddle.shape(logits)[0]), sequence_lengths], axis=-1)
         )
 
         loss = None
