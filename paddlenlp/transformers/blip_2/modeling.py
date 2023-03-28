@@ -1175,7 +1175,6 @@ class Blip2Model(Blip2PretrainedModel):
 
     def __init__(self, config: Blip2Config):
         super().__init__(config)
-        from paddlenlp.transformers import AutoModelForCausalLM
 
         self.vision_model = Blip2VisionModel(config.vision_config)
 
@@ -1184,9 +1183,11 @@ class Blip2Model(Blip2PretrainedModel):
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         if config.use_decoder_only_language_model:
-            language_model = AutoModelForCausalLM.from_config(config.text_config)
+            if isinstance(config.text_config, OPTConfig):
+                language_model = OPTForCausalLM(config.text_config)
+            else:
+                raise NotImplementedError
         else:
-            # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
             else:
@@ -1487,6 +1488,8 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
             # language_model = AutoModelForCausalLM.from_config(config.text_config)
             if isinstance(config.text_config, OPTConfig):
                 language_model = OPTForCausalLM(config.text_config)
+            else:
+                raise NotImplementedError
         else:
             # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):

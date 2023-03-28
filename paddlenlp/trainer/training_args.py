@@ -109,6 +109,10 @@ class TrainingArguments:
 
             </Tip>
 
+        eval_accumulation_steps (`int`, *optional*):
+            Number of predictions steps to accumulate the output tensors for, before moving the results to the CPU. If
+            left unset, the whole predictions are accumulated on GPU/TPU before being moved to the CPU (faster but
+            requires more memory).
         learning_rate (`float`, *optional*, defaults to 5e-5):
             The initial learning rate for [`AdamW`] optimizer.
         weight_decay (`float`, *optional*, defaults to 0):
@@ -301,6 +305,10 @@ class TrainingArguments:
     gradient_accumulation_steps: int = field(
         default=1,
         metadata={"help": "Number of updates steps to accumulate before performing a backward/update pass."},
+    )
+    eval_accumulation_steps: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of predictions steps to accumulate before moving the tensors to the CPU."},
     )
 
     learning_rate: float = field(default=5e-5, metadata={"help": "The initial learning rate for AdamW."})
