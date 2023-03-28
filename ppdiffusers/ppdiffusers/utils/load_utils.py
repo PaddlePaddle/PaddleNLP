@@ -47,6 +47,12 @@ if is_safetensors_available():
     np.bool = bool
     safetensors.numpy._TYPES.update({"BF16": np.uint16})
 
+if is_torch_available:
+    import torch
+
+    # patch torch.uint16
+    torch.uint16 = torch.bfloat16
+
 if is_paddle_available():
     import paddle
 
@@ -262,14 +268,23 @@ def convert_to_numpy(state_dict):
 
 def safetensors_load(path: str):
     if is_safetensors_available():
-        if is_torch_available():
-            from safetensors.torch import load_file
-        else:
+        try:
+            if is_torch_available():
+                from safetensors.torch import load_file
+
+                data = load_file(path)
+            else:
+                from safetensors.numpy import load_file
+
+                data = load_file(path)
+        except Exception:
             from safetensors.numpy import load_file
+
+            data = load_file(path)
     else:
         raise ImportError("`safetensors_load` requires the `safetensors library: `pip install safetensors`.")
 
-    return load_file(path)
+    return data
 
 
 def smart_load(path: str, map_location: str = "cpu", return_numpy=False):

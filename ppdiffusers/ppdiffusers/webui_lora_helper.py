@@ -19,12 +19,17 @@ from types import MethodType
 import paddle
 import paddle.nn as nn
 
+from .models.modeling_utils import convert_state_dict
 from .pipelines import DiffusionPipeline
 from .ppnlp_patch_utils import patch_to
+from .utils import is_safetensors_available, is_torch_available
 from .utils.constants import PPDIFFUSERS_CACHE
 from .utils.download_utils import ppdiffusers_url_download
 from .utils.initializer_utils import kaiming_uniform_, zeros_
 from .utils.load_utils import smart_load
+
+if is_safetensors_available():
+    import safetensors
 
 
 def convert_pt_to_pd(state, dtype):
@@ -48,11 +53,11 @@ def convert_pd_to_pt(state):
     new_state = {}
     for a, b in safetensors_weight_mapping:
         if b in state:
-            val = state[b].cast("float32").numpy()
+            val = state[b]
             if val.ndim == 2:
                 val = val.T
-            if ".alpha" in a:
-                val = val.squeeze()
+            # if ".alpha" in a:
+            #     val = val.squeeze()
 
             new_state[a] = val
     return new_state
@@ -67,9 +72,9 @@ def extract_lora_weights(model):
 
 
 @patch_to([DiffusionPipeline, nn.Layer])
-def save_lora_weights(pipe_or_module, save_directory, WEIGHT_NAME=None):
+def save_lora(pipe_or_module, save_directory, WEIGHT_NAME=None):
     if WEIGHT_NAME is None:
-        WEIGHT_NAME = "text_encoder_unet_lora.pdparams"
+        WEIGHT_NAME = "text_encoder_unet_lora.safetensors"
     outdict = {}
     if isinstance(pipe_or_module, nn.Layer):
         outdict.update(extract_lora_weights(pipe_or_module))
@@ -79,7 +84,15 @@ def save_lora_weights(pipe_or_module, save_directory, WEIGHT_NAME=None):
         if hasattr(pipe_or_module, "unet"):
             outdict.update(extract_lora_weights(pipe_or_module.unet))
     os.makedirs(save_directory, exist_ok=True)
-    paddle.save(outdict, os.path.join(save_directory, WEIGHT_NAME))
+
+    if is_torch_available():
+        save_function = safetensors.torch.save_file
+        outdict = convert_state_dict(convert_pd_to_pt(outdict), framework="torch")
+    else:
+        save_function = safetensors.numpy.save_file
+        outdict = convert_state_dict(convert_pd_to_pt(outdict), framework="numpy")
+
+    save_function(outdict, os.path.join(save_directory, WEIGHT_NAME))
     del outdict
     print(f"Model weights saved in {os.path.join(save_directory, WEIGHT_NAME)}")
 
@@ -189,6 +202,27 @@ def apply_lora(
                         child_module.__class__.__name__ == "Linear"
                         or (child_module.__class__.__name__ == "Conv2D" and list(child_module._kernel_size) == [1, 1])
                     ):
+                        # if we apply lora multi
+                        if hasattr(child_module, "merged") and child_module.merged:
+                            with paddle.no_grad():
+                                if child_module.is_conv:
+                                    new_weight = (
+                                        child_module.weight.squeeze([-1, -2])
+                                        - child_module.lora_up.weight.squeeze([-1, -2])
+                                        @ child_module.lora_down.weight.squeeze([-1, -2])
+                                        * child_module.multiplier
+                                        * child_module.scale
+                                    ).unsqueeze([-1, -2])
+                                else:
+                                    new_weight = (
+                                        child_module.weight
+                                        - child_module.lora_down.weight
+                                        @ child_module.lora_up.weight
+                                        * child_module.multiplier
+                                        * child_module.scale
+                                    )
+                                child_module.weight.set_value(new_weight)
+
                         in_features, out_features = child_module.weight.shape[0], child_module.weight.shape[1]
                         child_module.is_conv = False
                         child_module.merged = False
