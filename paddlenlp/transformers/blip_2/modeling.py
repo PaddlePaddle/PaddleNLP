@@ -1383,7 +1383,7 @@ class Blip2Model(Blip2PretrainedModel):
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> prompt = "Question: how many cats are there? Answer:"
         >>> inputs = processor(images=image, text=prompt, return_tensors="pd")
-        >>> outputs = model(**inputs)
+        >>> outputs = model(pixel_values=inputs["pixel_values"],input_ids=inputs["input_ids"])
         ```"""
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -1434,7 +1434,7 @@ class Blip2Model(Blip2PretrainedModel):
             loss = None
             # we compute the loss here since we need to take into account the sequence length of the query embeds
             if labels is not None:
-                logits = logits[:, -labels.size(1) :, :]
+                logits = logits[:, -labels.shape[1] :, :]
                 # Shift so that tokens < n predict n
                 shift_logits = logits[..., :-1, :]
                 shift_labels = labels[..., 1:]
