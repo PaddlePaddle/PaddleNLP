@@ -418,8 +418,6 @@ class TinyBertModelTester:
     ],
 )
 class TinyBertModelIntegrationTest(unittest.TestCase):
-    pass
-
     @slow
     def test_inference_no_attention(self):
         model = TinyBertModel.from_pretrained("tinybert-4l-312d")
