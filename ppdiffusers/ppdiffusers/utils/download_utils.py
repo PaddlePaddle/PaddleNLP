@@ -220,7 +220,7 @@ def ppdiffusers_bos_download(
     cache_dir: Union[str, Path, None] = None,
     force_download: bool = False,
     resume_download: bool = False,
-    file_lock_time_out: int = -1,
+    file_lock_timeout: int = -1,
 ):
     if cache_dir is None:
         cache_dir = PPDIFFUSERS_CACHE
@@ -269,7 +269,7 @@ def ppdiffusers_bos_download(
         blob_path = "\\\\?\\" + os.path.abspath(blob_path)
 
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-    with FileLock(lock_path, time_out=file_lock_time_out):
+    with FileLock(lock_path, timeout=file_lock_timeout):
         # If the download just completed while the lock was activated.
         if os.path.exists(pointer_path) and not force_download:
             # Even if returning early like here, the lock will be released.
@@ -323,7 +323,7 @@ def ppdiffusers_url_download(
     filename: Optional[str] = None,
     force_download: bool = False,
     resume_download: bool = False,
-    file_lock_time_out: int = -1,
+    file_lock_timeout: int = -1,
 ):
     if cache_dir is None:
         cache_dir = PPDIFFUSERS_CACHE
@@ -343,7 +343,7 @@ def ppdiffusers_url_download(
         file_path = "\\\\?\\" + os.path.abspath(file_path)
 
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-    with FileLock(lock_path, timeout=file_lock_time_out):
+    with FileLock(lock_path, timeout=file_lock_timeout):
         # If the download just completed while the lock was activated.
         if os.path.exists(file_path) and not force_download:
             # Even if returning early like here, the lock will be released.
@@ -404,6 +404,7 @@ def bos_hf_download(
     local_files_only=None,
     use_auth_token=None,
     user_agent=None,
+    file_lock_timeout=-1,
 ):
     if from_hf_hub:
         try:
@@ -470,6 +471,7 @@ def bos_hf_download(
                 resume_download=resume_download,
                 subfolder=subfolder,
                 revision=revision,
+                file_lock_timeout=file_lock_timeout,
             )
             return model_file
         except HTTPError as err:
@@ -524,7 +526,7 @@ def ppdiffusers_bos_dir_download(
     tqdm_class: Optional[base_tqdm] = None,
     variant: Optional[str] = None,
     is_fastdeploy_model: Optional[str] = False,
-    file_lock_time_out: int = -1,
+    file_lock_timeout: int = -1,
 ) -> str:
     # update repo id must end with @fastdeploy
     if is_fastdeploy_model and not repo_id.endswith("@fastdeploy"):
@@ -562,7 +564,7 @@ def ppdiffusers_bos_dir_download(
             cache_dir=cache_dir,
             revision=revision,
             resume_download=resume_download,
-            file_lock_time_out=file_lock_time_out,
+            file_lock_timeout=file_lock_timeout,
         )
 
     thread_map(

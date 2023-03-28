@@ -38,7 +38,7 @@ def convert_pt_to_pd(state, dtype):
                 val = val.T
             if val.ndim == 0:
                 val = val.reshape((1,))
-            new_state[b] = paddle.to_tensor(val).cast(dtype)
+            new_state[b] = val.cast(dtype)
         else:
             print(f"We find {a} not in state_dict and we will continue!")
     return new_state
@@ -85,6 +85,21 @@ def save_lora_weights(pipe_or_module, save_directory, WEIGHT_NAME=None):
 
 
 @patch_to([DiffusionPipeline, nn.Layer])
+def set_lora_enabled(pipe_or_module, enable=True):
+    def set_lora(self):
+        if hasattr(self, "enable_lora"):
+            self.enable_lora = enable
+
+    if isinstance(pipe_or_module, nn.Layer):
+        pipe_or_module.apply(set_lora)
+    else:
+        if hasattr(pipe_or_module, "text_encoder"):
+            pipe_or_module.text_encoder.apply(set_lora)
+        if hasattr(pipe_or_module, "unet"):
+            pipe_or_module.unet.apply(set_lora)
+
+
+@patch_to([DiffusionPipeline, nn.Layer])
 def apply_lora(
     pipe_or_module,
     lora_weight_or_path=None,
@@ -93,6 +108,7 @@ def apply_lora(
     multiplier=1.0,
     text_encoder_target_replace_modules=["TransformerEncoderLayer"],
     unet_target_replace_modules=["Transformer2DModel", "Attention"],
+    enable_lora=True,
     **kwargs,
 ):
     resume_download = kwargs.pop("resume_download", False)
@@ -185,6 +201,7 @@ def apply_lora(
                         child_module.lora_down.is_lora_linear = True
                         child_module.lora_up.is_lora_linear = True
                         child_module.rank = rank
+                        child_module.enable_lora = enable_lora
 
                         if paddle.is_tensor(alpha):
                             alpha = alpha.detach().cast("float32").numpy()
@@ -222,12 +239,14 @@ def apply_lora(
                                             )
                                         self.weight.set_value(new_weight)
                                         self.merged = False
+                                if not self.enable_lora:
+                                    return self.raw_forward(x)
                                 return (
                                     self.raw_forward(x)
                                     + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
                                 )
                             else:
-                                if not self.merged:
+                                if self.enable_lora and not self.merged:
                                     with paddle.no_grad():
                                         if self.is_conv:
                                             new_weight = (
@@ -247,6 +266,27 @@ def apply_lora(
                                             )
                                         self.weight.set_value(new_weight)
                                         self.merged = True
+
+                                if not self.enable_lora and self.merged:
+                                    with paddle.no_grad():
+                                        if self.is_conv:
+                                            new_weight = (
+                                                self.weight.squeeze([-1, -2])
+                                                - self.lora_up.weight.squeeze([-1, -2])
+                                                @ self.lora_down.weight.squeeze([-1, -2])
+                                                * self.multiplier
+                                                * self.scale
+                                            ).unsqueeze([-1, -2])
+                                        else:
+                                            new_weight = (
+                                                self.weight
+                                                - self.lora_down.weight
+                                                @ self.lora_up.weight
+                                                * self.multiplier
+                                                * self.scale
+                                            )
+                                        self.weight.set_value(new_weight)
+                                        self.merged = False
                                 return self.raw_forward(x)
 
                         child_module.forward = MethodType(forward_lora, child_module)
