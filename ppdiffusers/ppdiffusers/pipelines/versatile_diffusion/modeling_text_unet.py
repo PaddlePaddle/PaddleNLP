@@ -971,7 +971,7 @@ class DownBlockFlat(nn.Layer):
         output_states = ()
 
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if self.training and self.gradient_checkpointing and not hidden_states.stop_gradient:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):

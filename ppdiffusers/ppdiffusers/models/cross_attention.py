@@ -132,18 +132,21 @@ class CrossAttention(nn.Layer):
                     raise e
 
             if is_lora:
+                if self.head_dim > 128 and attention_op == "flash":
+                    attention_op = "cutlass"
                 processor = LoRAXFormersCrossAttnProcessor(
                     hidden_size=self.processor.hidden_size,
                     cross_attention_dim=self.processor.cross_attention_dim,
                     rank=self.processor.rank,
                     attention_op=attention_op,
                 )
+                # we must cust dtype
+                processor.to(dtype=self.dtype)
                 processor.load_dict(self.processor.state_dict())
             else:
                 if self.head_dim > 128 and attention_op == "flash":
-                    processor = CrossAttnProcessor()
-                else:
-                    processor = XFormersCrossAttnProcessor(attention_op=attention_op)
+                    attention_op = "cutlass"  # CrossAttnProcessor()
+                processor = XFormersCrossAttnProcessor(attention_op=attention_op)
         else:
             if is_lora:
                 processor = LoRACrossAttnProcessor(
@@ -151,6 +154,7 @@ class CrossAttention(nn.Layer):
                     cross_attention_dim=self.processor.cross_attention_dim,
                     rank=self.processor.rank,
                 )
+                processor.to(dtype=self.dtype)
                 processor.load_dict(self.processor.state_dict())
             else:
                 processor = CrossAttnProcessor()

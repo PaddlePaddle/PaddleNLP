@@ -300,7 +300,10 @@ if is_paddle_available() and is_paddlenlp_available():
     from paddlenlp.utils.log import logger as ppnlp_logger
 
     if is_ppxformers_available():
-        import paddle.incubate.nn as inn
+        from paddle.incubate.nn.memory_efficient_attention import (
+            memory_efficient_attention,
+        )
+        from paddle.nn.functional.flash_attention import flash_attention
 
         def scaled_dot_product_attention(
             query,
@@ -317,7 +320,7 @@ if is_paddle_available() and is_paddlenlp_available():
                 if scale is None:
                     scale = 1 / math.sqrt(query.shape[-1])
                 # support fp32, fp16, bfp16
-                output = inn.memory_efficient_attention.memory_efficient_attention(
+                output = memory_efficient_attention(
                     query,
                     key,
                     value,
@@ -334,9 +337,9 @@ if is_paddle_available() and is_paddlenlp_available():
                         key.cast(paddle.float16),
                         value.cast(paddle.float16),
                     )
-                output = inn.flash_attention.flash_attention(
-                    query, key, value, dropout=dropout_p, causal=is_causal, return_softmax=False
-                )[0]
+                output = flash_attention(query, key, value, dropout=dropout_p, causal=is_causal, return_softmax=False)[
+                    0
+                ]
                 if raw_dtype == paddle.float32:
                     output = output.cast(raw_dtype)
             else:
