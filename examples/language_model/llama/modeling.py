@@ -602,13 +602,12 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, pad_token_id=None, tensor_parallel_degree=1):
+    def __init__(self, tensor_parallel_degree=1):
         super(LlamaPretrainingCriterion, self).__init__()
         if tensor_parallel_degree > 1:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-        self.pad_token_id = pad_token_id
 
     def forward(self, prediction_scores, masked_lm_labels):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
@@ -627,9 +626,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = LlamaModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-        self.criterion = LlamaPretrainingCriterion(
-            pad_token_id=config.pad_token_id, tensor_parallel_degree=config.tensor_parallel_degree
-        )
+        self.criterion = LlamaPretrainingCriterion(tensor_parallel_degree=config.tensor_parallel_degree)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
