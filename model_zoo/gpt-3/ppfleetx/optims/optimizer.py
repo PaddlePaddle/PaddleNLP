@@ -30,10 +30,36 @@ __all__ = [
     "AdamW",
     "Momentum",
     "FusedAdamW",
+    "FusedOffloadAdamW",
 ]
 
 
 class FusedAdamW(paddle.optimizer.AdamW):
+    def __init__(self, learning_rate, parameters, grad_clip, **config):
+        tensor_fusion = config.pop("tensor_fusion", False)
+
+        if paddle.distributed.get_world_size() > 1:
+            hcg = env.get_hcg()
+            sharding_size = hcg.get_sharding_parallel_world_size()
+
+        if tensor_fusion:
+            self.decay_fused_tensors, self.all_fused_tensors = fused_parameters(parameters, sharding_size > 1)
+            decay_params = [p.name for p in self.decay_fused_tensors]
+        else:
+            decay_params = [p.name for p in parameters if not any(nd in p.name for nd in ["bias", "norm", "b_0"])]
+
+        apply_decay_param_fun = lambda x: x in decay_params
+
+        super().__init__(
+            learning_rate=learning_rate,
+            parameters=self.all_fused_tensors if tensor_fusion else parameters,
+            grad_clip=grad_clip,
+            apply_decay_param_fun=apply_decay_param_fun,
+            **config,
+        )
+
+
+class FusedOffloadAdamW(paddle.optimizer.AdamW):
     def __init__(self, learning_rate, parameters, grad_clip, **config):
         tensor_fusion = config.pop("tensor_fusion", False)
 
