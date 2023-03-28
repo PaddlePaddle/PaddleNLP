@@ -195,6 +195,132 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
+class LoRAMergedLinear(nn.Linear):
+    # LoRA implemented in a dense layer
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
+        enable_lora: List[bool] = [False],
+        **kwargs
+    ):
+        nn.Linear.__init__(self, in_features, out_features, **kwargs)
+        assert (
+            out_features % len(enable_lora) == 0
+        ), f"The length of enable_lora must divide out_features: {out_features} % {len(enable_lora)} != 0"
+        self.r = r
+        self.lora_alpha = lora_alpha
+        self.enable_lora = enable_lora
+        self.single_out_features = out_features // len(enable_lora)
+        self.out_features = out_features
+        self.in_features = in_features
+
+        # Optional dropout
+        if lora_dropout > 0.0 and any:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+        # Actual trainable parameters
+        if r > 0 and any(enable_lora):
+            self.lora_A = self.create_parameter(
+                shape=[in_features, r * sum(enable_lora)],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.KaimingUniform(
+                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                ),
+            )
+            self.lora_B = self.create_parameter(
+                shape=[self.single_out_features * sum(enable_lora), r],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
+            self.scaling = self.lora_alpha / self.r
+
+            # Freezing the pre-trained weight matrix
+            self.weight.stop_gradient = True
+
+            # Compute lora indices
+            self.enable_lora_indices = paddle.full(
+                shape=[len(enable_lora), self.single_out_features], fill_value=False, dtype="bool"
+            )
+            self.enable_lora_indices[enable_lora, :] = True
+            self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [out_features])
+
+    def zero_pad(self, x):
+        output_shape = x.shape
+        output_shape[-1] = self.out_features
+        result = paddle.zeros(output_shape, dtype=x.dtype).reshape([-1, output_shape[-1]]).transpose([1, 0])
+        result[self.enable_lora_indices, :] = x.reshape([-1, x.shape[-1]]).transpose([1, 0])
+        return result.transpose([1, 0]).reshape(output_shape)
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            if self.r > 0 and any(self.enable_lora):
+                delta_weight = (
+                    F.conv1d(
+                        self.lora_A.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
+                )
+                new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
+                self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            if self.r > 0 and any(self.enable_lora):
+                delta_weight = (
+                    F.conv1d(
+                        self.lora_A.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
+                )
+                new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
+                self.weight.set_value(new_weight)
+            self.merged = True
+
+    def forward(self, input: paddle.Tensor):
+        result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+        if self.r > 0 and any(self.enable_lora) and not self.merged:
+            after_A = self.lora_dropout(input) @ self.lora_A
+            after_B = (
+                F.conv1d(
+                    after_A.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                )
+                .squeeze(0)
+                .transpose([1, 0])
+            )
+            print("after_B", after_B.shape)
+            print("zero", self.zero_pad(after_B * self.scaling).shape)
+            result += self.zero_pad(after_B * self.scaling)
+        return result
+
+    def extra_repr(self):
+        name = f", name={self.name}" if self.name else ""
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
+
+
 # TODO (this is tmp API. will formalize before release)
 def _find_and_replace_module(model, module_name, lora_config):
     parent_module = model
