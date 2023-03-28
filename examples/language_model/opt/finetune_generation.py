@@ -19,8 +19,7 @@ from functools import partial
 import paddle
 from utils import OPTTrainer
 
-from data import convert_example
-from paddlenlp.data import DefaultDataCollator
+from data import DataCollatorForSupervisedDataset, convert_example
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
@@ -118,6 +117,9 @@ def main():
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v2", "dev_v2"])
+    dev_ds.data = dev_ds.data[:100]
+    dev_ds.new_data = dev_ds.new_data[:100]
+
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -125,9 +127,9 @@ def main():
         max_target_length=data_args.tgt_length,
     )
     train_ds = train_ds.map(partial(trans_func, is_train=True))
-    test_ds = dev_ds.map(trans_func)
+    dev_ds = dev_ds.map(partial(trans_func, is_train=True))
 
-    collate_fn = DefaultDataCollator()
+    collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
     def compute_metrics(eval_preds):
         rouge1 = Rouge1()
@@ -167,7 +169,7 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate(test_ds)
+        eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("test", eval_result)
 
 

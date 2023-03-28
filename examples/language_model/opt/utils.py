@@ -48,7 +48,6 @@ class OPTTrainer(Trainer):
         with paddle.no_grad():
             tokens = model.generate(
                 input_ids=inputs["input_ids"],
-                position_ids=inputs["position_ids"],
                 attention_mask=inputs["attention_mask"],
             )[0]
             all_preds = []
@@ -58,11 +57,7 @@ class OPTTrainer(Trainer):
             for index, preds in enumerate(all_preds):
                 all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
 
-            all_labels = []
-            for label, mask in zip(inputs["labels"].numpy(), inputs["loss_mask"].numpy()):
-                label = label[mask.astype("bool")]
-                label = [x for x in label[label != self.tokenizer.pad_token_id]]
-                all_labels.append(label)
+            all_labels = [label for label in inputs["labels"].tolist() if label != -100]
             max_label_length = max([len(x) for x in all_labels])
             for index, labels in enumerate(all_labels):
                 all_labels[index] = labels + [-100] * (max_label_length - len(labels))
