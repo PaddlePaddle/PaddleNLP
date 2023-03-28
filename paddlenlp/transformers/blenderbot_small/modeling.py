@@ -658,7 +658,7 @@ class BlenderbotSmallForCausalLM(BlenderbotSmallPretrainedModel):
     blenderbotSmall decoder without cross-attention.
     """
 
-    def __init__(self, config: BlenderbotSmallModel):
+    def __init__(self, config: BlenderbotSmallConfig):
         super().__init__(config)
         self.blenderbot_small = BlenderbotSmallModel(config)
         self.decoder = self.blenderbot_small.decoder
