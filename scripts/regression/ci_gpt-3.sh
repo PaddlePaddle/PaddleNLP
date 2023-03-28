@@ -817,6 +817,7 @@ function gpt_auto_export() {
 
 function before_hook() {
     # requirements
+    python -m pip install -r requirements.txt --force-reinstall
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 
     rm -rf ckpt
