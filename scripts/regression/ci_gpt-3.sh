@@ -88,7 +88,6 @@ function gpt_preprocess_data() {
 }
 
 function gpt_345M_single() {
-    cd ${fleetx_path}
     rm -rf log
     python tools/train.py \
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_345M_single_card.yaml \
@@ -99,7 +98,6 @@ function gpt_345M_single() {
 }
 
 function gpt_1.3B_dp() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_1.3B_dp8.yaml \
@@ -110,7 +108,6 @@ function gpt_1.3B_dp() {
 }
 
 function gpt_6.7B_stage2_dp2_sharding4() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" \
         tools/train.py -c ppfleetx/configs/nlp/gpt/pretrain_gpt_6.7B_sharding16.yaml \
@@ -124,7 +121,6 @@ function gpt_6.7B_stage2_dp2_sharding4() {
 }
 
 function gpt_6.7B_stage3_dp2_sharding4() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" \
         tools/train.py -c ppfleetx/configs/nlp/gpt/pretrain_gpt_6.7B_sharding16.yaml \
@@ -138,7 +134,6 @@ function gpt_6.7B_stage3_dp2_sharding4() {
 }
 
 function gpt_6.7B_stage2_sharding8() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" \
         tools/train.py -c ppfleetx/configs/nlp/gpt/pretrain_gpt_6.7B_sharding16.yaml \
@@ -152,7 +147,6 @@ function gpt_6.7B_stage2_sharding8() {
 }
 
 function gpt_175B_DP1_MP4_PP2() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -166,7 +160,6 @@ function gpt_175B_DP1_MP4_PP2() {
 }
 
 function gpt_175B_DP1_MP4_PP2_sp() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -179,7 +172,6 @@ function gpt_175B_DP1_MP4_PP2_sp() {
 }
 
 function gpt_175B_DP1_MP8_PP1() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -193,7 +185,6 @@ function gpt_175B_DP1_MP8_PP1() {
 }
 
 function gpt_175B_DP1_MP8_PP1_sp() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -206,7 +197,6 @@ function gpt_175B_DP1_MP8_PP1_sp() {
 }
 
 function gpt_175B_DP1_MP1_PP8() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -222,7 +212,6 @@ function gpt_175B_DP1_MP1_PP8() {
 }
 
 function gpt_345M_mp8_qat() {
-    cd ${fleetx_path}
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/qat_gpt_345M_mp8.yaml \
@@ -251,7 +240,6 @@ function gpt_generation_345M_hybrid() {
 }
 
 function gpt_export_345M_mp1() {
-    cd ${fleetx_path}
     log_dir=log_export
     rm -rf $log_dir
     rm -rf output
@@ -269,7 +257,6 @@ function gpt_export_345M_mp1() {
 }
 
 function gpt_export_345M_mp2() {
-    cd ${fleetx_path}
     log_dir=log_export
     rm -rf $log_dir
     rm -rf output
@@ -287,7 +274,6 @@ function gpt_export_345M_mp2() {
 }
 
 function gpt_export_qat_345M() {
-    cd ${fleetx_path}
     log_dir=log_export
     rm -rf $log_dir
     rm -rf output
@@ -303,7 +289,6 @@ function gpt_export_qat_345M() {
 }
 
 function gpt_inference_345M_single() {
-    cd ${fleetx_path}
     rm -rf log
     rm -rf output
     python tools/export.py \
@@ -315,7 +300,6 @@ function gpt_inference_345M_single() {
 }
 
 function gpt_inference_345M_dp8() {
-    cd ${fleetx_path}
     rm -rf log
     rm -rf output
     python -m paddle.distributed.launch --devices "0" tools/export.py \
@@ -328,7 +312,6 @@ function gpt_inference_345M_dp8() {
 }
 
 function gpt_345M_single_finetune() {
-    cd ${fleetx_path}
     rm -rf log
     python ./tools/train.py \
         -c ./ppfleetx/configs/nlp/gpt/finetune_gpt_345M_single_card_glue.yaml \
@@ -343,7 +326,6 @@ function gpt_345M_single_finetune() {
 }
 
 function gpt_eval_WikiText() {
-    cd ${fleetx_path}
     rm -rf log
     python ./tools/eval.py \
         -c ./ppfleetx/configs/nlp/gpt/eval_gpt_345M_single_card.yaml \
@@ -356,7 +338,6 @@ function gpt_eval_WikiText() {
 }
 
 function gpt_eval_LAMBADA() {
-    cd ${fleetx_path}
     rm -rf log
     python ./tools/eval.py \
         -c ./ppfleetx/configs/nlp/gpt/eval_gpt_345M_single_card.yaml \
@@ -369,7 +350,6 @@ function gpt_eval_LAMBADA() {
 }
 
 function gpt_save_ckpt() {
-    cd ${fleetx_path}
     rm -rf log
     python ./tools/train.py \
         -c ./ppfleetx/configs/nlp/gpt/pretrain_gpt_345M_single_card.yaml \
@@ -387,7 +367,6 @@ function gpt_save_ckpt() {
 }
 
 function gpt_auto_serial() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0" \
@@ -414,7 +393,6 @@ function gpt_auto_serial() {
 }
 
 function gpt_auto_dp2mp2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3" \
@@ -441,7 +419,6 @@ function gpt_auto_dp2mp2() {
 }
 
 function gpt_auto_mp2pp2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3" \
@@ -468,7 +445,6 @@ function gpt_auto_mp2pp2() {
 }
 
 function gpt_auto_dp2pp2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3" \
@@ -497,7 +473,6 @@ function gpt_auto_dp2pp2() {
 }
 
 function gpt_auto_dp2mp2pp2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -525,7 +500,6 @@ function gpt_auto_dp2mp2pp2() {
     check_result $FUNCNAME 10.9732 ${loss}
 }
 function gpt_auto_dp2mp2pp2_o2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir=$log_dir --devices="0,1,2,3,4,5,6,7" \
@@ -552,7 +526,6 @@ function gpt_auto_dp2mp2pp2_o2() {
 }
 
 function gpt_auto_dp2sharding2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1" \
@@ -579,7 +552,6 @@ function gpt_auto_dp2sharding2() {
 }
 
 function gpt_auto_dp2mp2sharding2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3" \
@@ -606,7 +578,6 @@ function gpt_auto_dp2mp2sharding2() {
 }
 
 function gpt_auto_dp2pp2sharding2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3" \
@@ -635,7 +606,6 @@ function gpt_auto_dp2pp2sharding2() {
 }
 
 function gpt_auto_dp2mp2pp2sharding2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -664,7 +634,6 @@ function gpt_auto_dp2mp2pp2sharding2() {
 }
 
 function gpt_auto_pass_o1_stage1() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -693,7 +662,6 @@ function gpt_auto_pass_o1_stage1() {
 }
 
 function gpt_auto_pass_o1_stage2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -722,7 +690,6 @@ function gpt_auto_pass_o1_stage2() {
 }
 
 function gpt_auto_pass_o2_stage1() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -751,7 +718,6 @@ function gpt_auto_pass_o2_stage1() {
 }
 
 function gpt_auto_pass_o2_stage2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -780,7 +746,6 @@ function gpt_auto_pass_o2_stage2() {
 }
 
 function gpt_auto_pass_o3_stage1() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -809,7 +774,6 @@ function gpt_auto_pass_o3_stage1() {
 }
 
 function gpt_auto_pass_o3_stage2() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
@@ -838,7 +802,6 @@ function gpt_auto_pass_o3_stage2() {
 }
 
 function gpt_auto_export() {
-    cd ${fleetx_path}
     log_dir=log_auto
     rm -rf $log_dir
 
@@ -925,13 +888,13 @@ function before_hook() {
         rm -rf ${data_path}/GPT_345M_QAT_wo_analysis.tar
     fi
 
-    ln -s ${data_path}/ckpt ${fleetx_path}/ckpt
-    cp -r ${data_path}/data ${fleetx_path}/
-    cp -r ${data_path}/dataset ${fleetx_path}/
-    ln -s ${data_path}/wikitext-103 ${fleetx_path}/wikitext-103
-    cp ${data_path}/lambada_test.jsonl ${fleetx_path}/
-    ln -s ${data_path}/pretrained ${fleetx_path}/pretrained
-    ln -s ${data_path}/GPT_345M_QAT_wo_analysis ${fleetx_path}/GPT_345M_QAT_wo_analysis
+    ln -s ${data_path}/ckpt ${case_path}/ckpt
+    cp -r ${data_path}/data ${case_path}/
+    cp -r ${data_path}/dataset ${case_path}/
+    ln -s ${data_path}/wikitext-103 ${case_path}/wikitext-103
+    cp ${data_path}/lambada_test.jsonl ${case_path}/
+    ln -s ${data_path}/pretrained ${case_path}/pretrained
+    ln -s ${data_path}/GPT_345M_QAT_wo_analysis ${case_path}/GPT_345M_QAT_wo_analysis
 }
 
 function check_result() {
