@@ -1,6 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2018 The HuggingFace Inc. team, Microsoft Corporation.
-# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +31,11 @@ __all__ = [
     "MPNetForTokenClassification",
     "MPNetForQuestionAnswering",
 ]
+
+from .configuration import (
+    MPNET_PRETRAINED_INIT_CONFIGURATION,
+    MPNET_PRETRAINED_RESOURCE_FILES_MAP,
+)
 
 
 def create_position_ids_from_input_ids(input_ids, padding_idx=1):
@@ -297,28 +300,8 @@ class MPNetPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "mpnet-base": {
-            "vocab_size": 30527,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 514,
-            "relative_attention_num_buckets": 32,
-            "layer_norm_eps": 1e-05,
-            "initializer_range": 0.02,
-            "pad_token_id": 1,
-        }
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "mpnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = MPNET_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = MPNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "mpnet"
 
     def init_weights(self, layer):
