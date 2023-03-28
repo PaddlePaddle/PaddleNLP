@@ -610,19 +610,12 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
         self.pad_token_id = pad_token_id
 
-    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
+    def forward(self, prediction_scores, masked_lm_labels):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
-            if loss_mask is not None:
-                loss_mask = loss_mask.reshape([-1])
-                masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-                loss = masked_lm_loss / loss_mask.sum()
-            else:
-                assert self.pad_token_id is not None
-                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
-                loss = paddle.mean(masked_lm_loss)
-
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != -100]
+            loss = paddle.mean(masked_lm_loss)
         return loss
 
 
