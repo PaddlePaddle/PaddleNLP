@@ -14,10 +14,13 @@
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.optimizer.lr import LambdaDecay
+from rouge import Rouge
 
+from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import Trainer
 
 
@@ -66,3 +69,34 @@ class LlamaTrainer(Trainer):
         if self.lr_scheduler is None:
             self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
         return self.lr_scheduler
+
+
+def compute_metrics(preds, targets):
+    assert len(preds) == len(targets), (
+        "The length of pred_responses should be equal to the length of "
+        "target_responses. But received {} and {}.".format(len(preds), len(targets))
+    )
+    rouge = Rouge()
+    bleu4 = BLEU(n_size=4)
+    scores = []
+    for pred, target in zip(preds, targets):
+        try:
+            score = rouge.get_scores(" ".join(pred), " ".join(target))
+            scores.append([score[0]["rouge-1"]["f"], score[0]["rouge-2"]["f"], score[0]["rouge-l"]["f"]])
+        except ValueError:
+            scores.append([0, 0, 0])
+        bleu4.add_inst(pred, [target])
+    rouge1 = np.mean([i[0] for i in scores])
+    rouge2 = np.mean([i[1] for i in scores])
+    rougel = np.mean([i[2] for i in scores])
+
+    rouge1 = round(rouge1, 4)
+    rouge2 = round(rouge2, 4)
+    rougel = round(rougel, 4)
+    bleu4 = round(bleu4.score(), 4)
+    return dict(
+        rouge1=rouge1,
+        rouge2=rouge2,
+        rougel=rougel,
+        bleu4=bleu4,
+    )

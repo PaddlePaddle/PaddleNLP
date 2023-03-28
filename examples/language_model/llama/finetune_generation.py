@@ -20,12 +20,11 @@ import paddle
 from data import DataCollatorForSupervisedDataset, convert_example
 from modeling import LlamaForCausalLM
 from tokenizer import LlamaTokenizer
-from utils import LlamaTrainer
+from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.layers.lora import print_trainable_parameters
-from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.utils.log import logger
 
@@ -155,22 +154,20 @@ def main():
 
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
-    def compute_metrics(eval_preds):
-        rouge1 = Rouge1()
-        rouge2 = Rouge2()
-        rougel = RougeL()
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = [x[x != -100] for x in eval_preds.predictions]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
 
-        rouge1_score = rouge1.score(predictions, references)
-        rouge2_score = rouge2.score(predictions, references)
-        for pred, ref in zip(predictions, references):
-            rougel.add_inst(pred, [ref])
-        return {
-            "rouge1": rouge1_score,
-            "rouge2": rouge2_score,
-            "rougel": rougel.score(),
-        }
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
+    )
 
     trainer = LlamaTrainer(
         model=model,
@@ -178,7 +175,7 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_func,
         do_generation=True,
         data_collator=collate_fn,
     )
