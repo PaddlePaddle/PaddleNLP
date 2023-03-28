@@ -21,7 +21,7 @@
 
 ## News 📢
 
-* 🔥 **2023.03.28 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
+* 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
 模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）</a>或SD等原库的Lightning权重进行推理，支持加载Civitai社区的LoRA权重；
 支持xformers（需安装develop版本paddle）训练与推理；
 新增用于超高分辨率生成的VAE tiling；
