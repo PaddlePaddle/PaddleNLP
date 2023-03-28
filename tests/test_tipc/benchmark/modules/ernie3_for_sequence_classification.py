@@ -156,7 +156,7 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
 
     def forward(self, model, args, input_data=None, **kwargs):
         loss = model(**input_data)[0]
-        return loss, paddle.sum((input_data["input_ids"] != self.pad_token_id)).numpy().astype("int64").item()
+        return loss, args.batch_size * args.max_seq_length
 
     def logger(
         self,
