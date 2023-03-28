@@ -228,10 +228,7 @@ def do_train(args):
         build_strategy = paddle.static.BuildStrategy()
         exec_strategy = paddle.static.ExecutionStrategy()
 
-        compiled_train_program = paddle.static.CompiledProgram(
-            train_program,
-            build_strategy=build_strategy
-        )
+        compiled_train_program = paddle.static.CompiledProgram(train_program, build_strategy=build_strategy)
     exe.run(startup_program)
 
     if args.use_amp:
