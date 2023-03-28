@@ -248,43 +248,8 @@ class CTRLModel(CTRLPreTrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `CTRLModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `CTRLModel`.
-            Defaults to `246534`.
-        max_position_embeddings (int, optional):
-            The maximum sequence length that this model might ever be used with. Typically set this to something large just in case (e.g., 512 or 1024 or 2048 or 50000).
-            Defaults to `50000`.
-        hidden_size (int, optional):
-            Dimensionality of the embeddings and hidden states.
-            Defaults to `1280`.
-        intermediate_size (int, optional):
-            Dimensionality of the inner dimension of the feed forward networks (FFN).
-            Defaults to `8192`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder.
-            Defaults to `48`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `16`.
-        resid_pdrop (float, optional):
-            The dropout ratio for all fully connected layers in the encoder.
-            Defaults to `0.1`.
-        embd_pdrop (float, optional):
-            The dropout ratio for the embeddings.
-            Defaults to `0.1`.
-        layer_norm_epsilon  (float, optional):
-            The epsilon to use in the layer normalization layers.
-            Defaults to `1e-6`.
-        tie_word_embeddings (bool, optional):
-            Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the model has a output word embedding layer.
-            Defaults to `True`.
-        pad_token_id (bool, optional):
-            The id of the `padding` token.
-            Defaults to `None`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
@@ -507,8 +472,8 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
     layer with weights tied to the input embeddings).
 
     Args:
-        ctrl (:class:`CTRLModel`):
-            An instance of :class:`CTRLModel`.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
     """
 
@@ -664,14 +629,8 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
     `pad_token_id` is defined, it simply takes the last value in each row of the batch.
 
     Args:
-        ctrl (:class:`CTRLModel`):
-            An instance of :class:`CTRLModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of CTRL.
-            If None, use the same value as `hidden_dropout_prob` of `CTRLModel`
-            instance `ctrl`. Defaults to None.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
     """
 
@@ -679,7 +638,6 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
         super().__init__(config)
         self.num_classes = config.num_classes
         self.ctrl = CTRLModel(config)
-        # self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes, bias_attr=False)
 
         self.init_weights()

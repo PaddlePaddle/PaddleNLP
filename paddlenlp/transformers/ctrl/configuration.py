@@ -105,7 +105,6 @@ class CTRLConfig(PretrainedConfig):
 
     pretrained_init_configuration = CTRL_PRETRAINED_INIT_CONFIGURATION
     model_type = "ctrl"
-    keys_to_ignore_at_inference = ["past_key_values"]
     attribute_map: Dict[str, str] = {
         "max_position_embeddings": "n_positions",
         "hidden_size": "n_embd",

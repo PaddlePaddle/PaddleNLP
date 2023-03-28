@@ -130,13 +130,13 @@ class CTRLModelTester:
             n_embd=self.hidden_size,
             n_layer=self.num_hidden_layers,
             n_head=self.num_attention_heads,
-            # intermediate_size=self.intermediate_size,
-            # hidden_act=self.hidden_act,
-            # hidden_dropout_prob=self.hidden_dropout_prob,
-            # attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
             n_positions=self.max_position_embeddings,
-            # type_vocab_size=self.type_vocab_size,
-            # initializer_range=self.initializer_range,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
             pad_token_id=self.pad_token_id,
         )
 
@@ -148,8 +148,6 @@ class CTRLModelTester:
         model(input_ids, token_type_ids=token_type_ids)
         result = model(input_ids)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
-        # self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
-        # self.parent.assertEqual(len(result.past_key_values), config.n_layer)
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, head_mask, token_type_ids, *args):
         model = CTRLLMHeadModel(config)
