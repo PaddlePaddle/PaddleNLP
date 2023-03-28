@@ -115,6 +115,16 @@ def apply_lora(
     force_download = kwargs.pop("force_download", False)
     paddle_dtype = kwargs.pop("paddle_dtype", None)
     cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+
+    if paddle_dtype is None:
+        if isinstance(pipe_or_module, nn.Layer):
+            paddle_dtype = pipe_or_module.dtype
+        else:
+            if hasattr(pipe_or_module, "text_encoder"):
+                paddle_dtype = pipe_or_module.text_encoder.dtype
+            if hasattr(pipe_or_module, "unet"):
+                paddle_dtype = pipe_or_module.unet.dtype
+
     if lora_weight_or_path is not None:
         lora_weight_or_path = str(lora_weight_or_path)
         if os.path.isfile(lora_weight_or_path):
@@ -170,11 +180,11 @@ def apply_lora(
             waitlist.append((pipe_or_module.text_encoder, text_encoder_target_replace_modules))
         if hasattr(pipe_or_module, "unet"):
             waitlist.append((pipe_or_module.unet, unet_target_replace_modules))
-
+    lora_modules = {}
     for each_module, target_replace_modules in waitlist:
-        for _, module in each_module.named_sublayers(include_self=True):
+        for name1, module in each_module.named_sublayers(include_self=True):
             if module.__class__.__name__ in target_replace_modules:
-                for _, child_module in module.named_sublayers(include_self=True):
+                for name2, child_module in module.named_sublayers(include_self=True):
                     if not getattr(child_module, "is_lora_linear", False) and (
                         child_module.__class__.__name__ == "Linear"
                         or (child_module.__class__.__name__ == "Conv2D" and list(child_module._kernel_size) == [1, 1])
@@ -292,26 +302,24 @@ def apply_lora(
                         child_module.forward = MethodType(forward_lora, child_module)
                         child_module.lora_down.training = child_module.training
                         child_module.lora_up.training = child_module.training
+                        child_module.to(dtype=paddle_dtype)
+                        # we will return lora_modules
+                        lora_modules[name1 + "." + name2] = child_module
 
     if lora_weight_or_path is not None:
         if isinstance(pipe_or_module, nn.Layer):
-            if paddle_dtype is not None:
-                pipe_or_module.to(dtype=paddle_dtype)
             pipe_or_module.set_dict(lora_weight_or_path)
         else:
             if hasattr(pipe_or_module, "text_encoder"):
-                if paddle_dtype is not None:
-                    pipe_or_module.text_encoder.to(dtype=paddle_dtype)
                 pipe_or_module.text_encoder.set_dict(lora_weight_or_path)
                 pipe_or_module.text_encoder.eval()
             if hasattr(pipe_or_module, "unet"):
-                if paddle_dtype is not None:
-                    pipe_or_module.unet.to(dtype=paddle_dtype)
                 pipe_or_module.unet.set_dict(lora_weight_or_path)
                 pipe_or_module.unet.eval()
 
         del lora_weight_or_path
         print("Loading lora_weights successfully!")
+    return lora_modules
 
 
 safetensors_weight_mapping = [
