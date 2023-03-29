@@ -85,6 +85,8 @@ class AttentionBlock(nn.Layer):
     def set_use_memory_efficient_attention_xformers(
         self, use_memory_efficient_attention_xformers: bool, attention_op: Optional[str] = None
     ):
+        if self.head_size > 128 and attention_op == "flash":
+            attention_op = "cutlass"
         if use_memory_efficient_attention_xformers:
             if not is_ppxformers_available():
                 raise NotImplementedError(
@@ -103,9 +105,6 @@ class AttentionBlock(nn.Layer):
 
         self._use_memory_efficient_attention_xformers = use_memory_efficient_attention_xformers
         self._attention_op = attention_op
-
-        if self.head_size > 128 and attention_op == "flash":
-            self._use_memory_efficient_attention_xformers = False
 
     def forward(self, hidden_states):
         residual = hidden_states
