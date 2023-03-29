@@ -228,11 +228,11 @@ class AlbertLayer(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        head_mask=None,
-        output_attentions=False,
+            self,
+            hidden_states,
+            attention_mask=None,
+            head_mask=None,
+            output_attentions=False,
     ):
         attention_output = self.attention(
             hidden_states,
@@ -257,7 +257,8 @@ class AlbertLayerGroup(Layer):
         self.albert_layers = nn.LayerList([AlbertLayer(config) for _ in range(config.inner_group_num)])
 
     def forward(
-        self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False, output_hidden_states=False
+            self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False,
+            output_hidden_states=False
     ):
 
         layer_attentions = () if output_attentions else None
@@ -301,13 +302,13 @@ class AlbertTransformer(Layer):
         self.albert_layer_groups = nn.LayerList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        head_mask=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+            self,
+            hidden_states,
+            attention_mask=None,
+            head_mask=None,
+            output_hidden_states=False,
+            output_attentions=False,
+            return_dict=False,
     ):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
@@ -323,7 +324,7 @@ class AlbertTransformer(Layer):
             layer_group_output = self.albert_layer_groups[group_idx](
                 hidden_states,
                 attention_mask,
-                head_mask[group_idx * layers_per_group : (group_idx + 1) * layers_per_group],
+                head_mask[group_idx * layers_per_group: (group_idx + 1) * layers_per_group],
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
@@ -455,16 +456,16 @@ class AlbertModel(AlbertPretrainedModel):
         return head_mask
 
     def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+            self,
+            input_ids,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            output_hidden_states=False,
+            output_attentions=False,
+            return_dict=False,
     ):
         r"""
         The AlbertModel forward method, overrides the `__call__()` special method.
@@ -640,18 +641,18 @@ class AlbertForPretraining(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        sentence_order_label=None,
-        labels=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
+            self,
+            input_ids,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            sentence_order_label=None,
+            labels=None,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=False,
     ):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
@@ -761,7 +762,15 @@ class AlbertMLMHead(Layer):
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-        self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
+
+        self.tie_status = getattr(self, "tie_word_embeddings", False) or self.config.get("tie_word_embeddings", False)
+        # tie_weights() will tie decoder weight with input embeddings
+        if self.tie_status:
+            self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
+        # use legacy decoder shape in order to load pretrained weights
+        else:
+            self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
+
         self.activation = ACT2FN[config.hidden_act]
 
         # link bias
@@ -771,7 +780,11 @@ class AlbertMLMHead(Layer):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
+
+        if self.tie_status:
+            hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
+        else:
+            hidden_states = self.decoder(hidden_states)
 
         prediction_scores = hidden_states
         return prediction_scores
