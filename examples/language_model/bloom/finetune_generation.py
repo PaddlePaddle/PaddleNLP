@@ -227,7 +227,7 @@ def do_train(args):
                 args.model_name_or_path, config, args.mp_degree, args.sharding_degree
             )
             paddle.distributed.barrier()
-            
+
     config.mp_rank = mp_rank
     config.mp_degree = args.mp_degree
 
