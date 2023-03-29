@@ -30,8 +30,8 @@ from ..model_outputs import (
     tuple_output,
 )
 from .configuration import (
-    TinyBERT_PRETRAINED_INIT_CONFIGURATION,
-    TinyBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    TINYBERT_PRETRAINED_INIT_CONFIGURATION,
+    TINYBERT_PRETRAINED_RESOURCE_FILES_MAP,
     TinyBertConfig,
 )
 
@@ -58,8 +58,8 @@ class TinyBertPretrainedModel(PretrainedModel):
     config_class = TinyBertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
 
-    pretrained_init_configuration = TinyBERT_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = TinyBERT_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = TINYBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = TINYBERT_PRETRAINED_RESOURCE_FILES_MAP
 
     base_model_prefix = "tinybert"
 
@@ -397,8 +397,9 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         super(TinyBertForSequenceClassification, self).__init__(config)
         self.tinybert = TinyBertModel(config)
         self.num_labels = config.num_labels
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.activation = nn.ReLU()
         self.apply(self.init_weights)
@@ -515,7 +516,7 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
 
     def __init__(self, config: TinyBertConfig):
         super(TinyBertForQuestionAnswering, self).__init__(config)
-        self.tinybert = TinyBertModel(config)  # allow tinybert to be config
+        self.tinybert = TinyBertModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
@@ -646,7 +647,9 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
         super(TinyBertForMultipleChoice, self).__init__(config)
         self.num_choices = config.num_choices
         self.tinybert = TinyBertModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 

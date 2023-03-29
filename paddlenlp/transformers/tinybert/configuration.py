@@ -18,9 +18,9 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["TinyBERT_PRETRAINED_INIT_CONFIGURATION", "TinyBertConfig", "TinyBERT_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["TINYBERT_PRETRAINED_INIT_CONFIGURATION", "TinyBertConfig", "TINYBERT_PRETRAINED_RESOURCE_FILES_MAP"]
 
-TinyBERT_PRETRAINED_INIT_CONFIGURATION = {
+TINYBERT_PRETRAINED_INIT_CONFIGURATION = {
     "tinybert-4l-312d": {
         "vocab_size": 30522,
         "hidden_size": 312,
@@ -107,7 +107,7 @@ TinyBERT_PRETRAINED_INIT_CONFIGURATION = {
     },
 }
 
-TinyBERT_PRETRAINED_RESOURCE_FILES_MAP = {
+TINYBERT_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "tinybert-4l-312d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams",
         "tinybert-6l-768d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d.pdparams",
@@ -188,7 +188,7 @@ class TinyBertConfig(PretrainedConfig):
     ```"""
     model_type = "tinybert"
     attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
-    pretrained_init_configuration = TinyBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = TINYBERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,

@@ -104,7 +104,6 @@ class TinyBertModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        print("!" * 30, config_and_inputs)
         self.model_tester.create_and_check_for_multiple_choice(*config_and_inputs)
 
     def test_for_question_answering(self):
