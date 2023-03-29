@@ -13,12 +13,10 @@
 # limitations under the License.
 """duee 1.0 data predict post-process"""
 
-import os
-import sys
-import json
 import argparse
+import json
 
-from utils import read_by_lines, write_by_lines, extract_result
+from utils import extract_result, read_by_lines, write_by_lines
 
 
 def predict_data_process(trigger_file, role_file, schema_file, save_path):

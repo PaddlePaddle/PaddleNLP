@@ -14,26 +14,19 @@
 
 # coding=UTF-8
 
-from functools import partial
 import argparse
 import os
-import sys
-import random
-import time
+from functools import partial
 
-import numpy as np
-import hnswlib
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-
-from base_model import SemanticIndexBase
-from data import convert_example, create_dataloader
-from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
+from base_model import SemanticIndexBase
+from data import convert_example, create_dataloader, gen_id2corpus, gen_text_file
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()

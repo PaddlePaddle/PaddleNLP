@@ -16,12 +16,13 @@ import argparse
 from functools import partial
 
 import paddle
-import paddleslim
 from data import convert_example_to_feature, load_dict
 from datasets import load_dataset
 
 from paddlenlp.data import Pad
 from paddlenlp.transformers import PPMiniLMTokenizer
+
+import paddleslim  # isort: skip  paddleslim needs to be imported last for some overrides to kick in
 
 
 def quant_post(args):

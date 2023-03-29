@@ -14,16 +14,14 @@
 
 import os
 import time
+
 import paddle
 import psutil
-
 from tls.benchmark_utils import PaddleInferBenchmark
 
-import paddle
-
 if paddle.is_compiled_with_cuda():
-    import pynvml
     import GPUtil
+    import pynvml
 
 
 class Recorder(object):

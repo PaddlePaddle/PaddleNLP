@@ -16,9 +16,12 @@ import os
 import time
 from io import BytesIO
 
+# isort: split
+import paddle
+
+# isort: split
 import fastdeploy as fd
 import numpy as np
-import paddle
 import requests
 from fastdeploy import ModelFormat
 from PIL import Image
@@ -82,7 +85,7 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="pndm",
+        default="euler_ancestral",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )

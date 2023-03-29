@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-import nltk
 import evaluate
+import nltk
+import numpy as np
+
 from paddlenlp.metrics import BLEU
 
 
@@ -127,7 +128,6 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
         labels = [label.strip() for label in labels]
         preds = [pred.strip("question:") for pred in preds]
         labels = [label.strip("question:") for label in labels]
-        spreds = [pred.strip() for pred in preds]
         labels = [label.strip() for label in labels]
 
         #  expects newline after each sentence

@@ -48,11 +48,8 @@ def mask(
             shift_len = 0
         for sent_index, sent in enumerate(batch_tokens):
             sent_b_index = sent_b_starts[sent_index] if sent_b_starts is not None else 0
-            need_cal = True
             if labels is not None:
                 label_pos.append(sent_index * max_len + len(sent) - 1 + shift_len)
-                if labels[sent_index] == 0:
-                    need_cal = False
             mask_label.extend(sent[sent_b_index + 1 :])
             mask_pos.extend([sent_index * max_len + i + shift_len for i in range(sent_b_index, len(sent) - 1)])
         mask_label = np.array(mask_label).astype("int64").reshape([-1, 1])
