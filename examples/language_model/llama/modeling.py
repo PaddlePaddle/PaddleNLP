@@ -189,55 +189,55 @@ class LlamaAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
         assert self.num_heads % config.tensor_parallel_degree == 0
-        self.num_heads = self.num_heads // config.tensor_parallel_degree
         self.head_dim = self.hidden_size // self.num_heads
+        self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.tensor_parallel_degree,
+                self.hidden_size,
                 has_bias=False,
                 gather_output=False,
             )
             self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.tensor_parallel_degree,
+                self.hidden_size,
                 has_bias=False,
                 gather_output=False,
             )
             self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
-                self.num_heads * self.head_dim * config.tensor_parallel_degree,
+                self.hidden_size,
                 has_bias=False,
                 gather_output=False,
             )
         else:
             self.q_proj = nn.Linear(
                 self.hidden_size,
-                self.num_heads * self.head_dim,
+                self.hidden_size,
                 bias_attr=False,
             )
             self.k_proj = nn.Linear(
                 self.hidden_size,
-                self.num_heads * self.head_dim,
+                self.hidden_size,
                 bias_attr=False,
             )
             self.v_proj = nn.Linear(
                 self.hidden_size,
-                self.num_heads * self.head_dim,
+                self.hidden_size,
                 bias_attr=False,
             )
 
         if config.tensor_parallel_degree > 1:
             self.o_proj = fleet.meta_parallel.RowParallelLinear(
-                self.num_heads * self.head_dim * config.tensor_parallel_degree,
+                self.hidden_size,
                 self.hidden_size,
                 has_bias=False,
                 input_is_parallel=True,
             )
         else:
             self.o_proj = nn.Linear(
-                self.num_heads * self.head_dim * config.tensor_parallel_degree,
+                self.hidden_size,
                 self.hidden_size,
                 bias_attr=False,
             )
@@ -323,7 +323,7 @@ class LlamaAttention(nn.Layer):
             )
 
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
+        attn_output = attn_output.reshape([bsz, q_len, self.head_dim * self.num_heads])
 
         attn_output = self.o_proj(attn_output)
 
