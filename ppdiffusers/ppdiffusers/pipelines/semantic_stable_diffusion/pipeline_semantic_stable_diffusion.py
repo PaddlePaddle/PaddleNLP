@@ -531,20 +531,27 @@ class SemanticStableDiffusionPipeline(DiffusionPipeline):
                 # noise_guidance = (noise_pred_text - noise_pred_edit_concepts[0])
 
                 if self.uncond_estimates is None:
-                    self.uncond_estimates = paddle.zeros((num_inference_steps + 1, *noise_pred_uncond.shape))
+                    self.uncond_estimates = paddle.zeros(
+                        (num_inference_steps + 1, *noise_pred_uncond.shape), dtype=noise_pred.dtype
+                    )
                 self.uncond_estimates[i] = noise_pred_uncond.detach()
 
                 if self.text_estimates is None:
-                    self.text_estimates = paddle.zeros((num_inference_steps + 1, *noise_pred_text.shape))
+                    self.text_estimates = paddle.zeros(
+                        (num_inference_steps + 1, *noise_pred_text.shape), dtype=noise_pred.dtype
+                    )
                 self.text_estimates[i] = noise_pred_text.detach()
 
                 if self.edit_estimates is None and enable_edit_guidance:
                     self.edit_estimates = paddle.zeros(
-                        (num_inference_steps + 1, len(noise_pred_edit_concepts), *noise_pred_edit_concepts[0].shape)
+                        (num_inference_steps + 1, len(noise_pred_edit_concepts), *noise_pred_edit_concepts[0].shape),
+                        dtype=noise_pred.dtype,
                     )
 
                 if self.sem_guidance is None:
-                    self.sem_guidance = paddle.zeros((num_inference_steps + 1, *noise_pred_text.shape))
+                    self.sem_guidance = paddle.zeros(
+                        (num_inference_steps + 1, *noise_pred_text.shape), dtype=noise_pred.dtype
+                    )
 
                 if edit_momentum is None:
                     edit_momentum = paddle.zeros_like(noise_guidance)
