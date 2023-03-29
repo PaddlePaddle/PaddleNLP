@@ -24,6 +24,7 @@ from ppdiffusers import (
     FastDeployStableDiffusionControlNetPipeline,
     StableDiffusionControlNetPipeline,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 
 
@@ -79,6 +80,9 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         feature_extractor=None,
         requires_safety_checker=False,
     )
+    if is_ppxformers_available():
+        # we must disable_xformers_memory_efficient_attention
+        pipeline.disable_xformers_memory_efficient_attention()
     output_path = Path(output_path)
     # calculate latent's H and W
     latent_height = height // 8 if height is not None else None
