@@ -95,6 +95,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMBertTokenizer", "glm"),
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
+        ("BloomTokenizer", "bloom"),
     ]
 )
 
