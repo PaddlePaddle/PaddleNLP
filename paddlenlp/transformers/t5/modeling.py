@@ -1456,6 +1456,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     def __init__(self, config: T5Config):
         super().__init__(config)
         self.t5 = T5Model(config)
+
         if not config.tie_word_embeddings:
             if config.tensor_parallel_degree > 1:
                 self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias_attr=False)
