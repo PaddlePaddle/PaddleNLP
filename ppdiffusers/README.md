@@ -361,7 +361,6 @@ image.save("ldm-super-resolution-image.png")
 
 <details><summary>&emsp; FastDeploy Demo </summary>
 
-**注意：当前导出的vae encoder带有随机因素！**
 ```python
 import paddle
 import fastdeploy as fd
