@@ -13,31 +13,28 @@
 # limitations under the License.
 
 import argparse
-import collections
-from collections import namedtuple, defaultdict
-
 import os
 import random
-from functools import partial
 import time
+from collections import namedtuple
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn as nn
+from data import MRCIterator
+from metrics import EM_AND_F1, compute_qa_predictions
 from paddle.optimizer import AdamW
-from paddle.io import DataLoader
-from paddlenlp.transformers import ErnieDocModel
-from paddlenlp.transformers import ErnieDocForQuestionAnswering
-from paddlenlp.transformers import ErnieDocTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddlenlp.transformers import (
+    ErnieDocForQuestionAnswering,
+    ErnieDocTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
-from data import MRCIterator
-from metrics import compute_qa_predictions, EM_AND_F1
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
@@ -60,9 +57,8 @@ parser.add_argument("--verbose", action='store_true', help="Whether to output ve
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
 parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-
-# yapf: enable
 args = parser.parse_args()
+# fmt: on
 
 # eval_dataset, test_dataset,
 DATASET_INFO = {

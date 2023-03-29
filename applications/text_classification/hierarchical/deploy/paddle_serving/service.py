@@ -14,9 +14,9 @@
 
 import argparse
 import logging
+
 import numpy as np
-from numpy import array
-from paddle_serving_server.web_service import WebService, Op
+from paddle_serving_server.web_service import Op, WebService
 
 from paddlenlp.transformers import AutoTokenizer
 
@@ -36,13 +36,13 @@ FETCH_NAME_MAP = {
     "ernie-m-large": "linear_291.tmp_1",
 }
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument('--model_name', default="ernie-3.0-medium-zh", help="Select model to train, defaults to ernie-3.0-medium-zh.",
-                    choices=["ernie-1.0-large-zh-cw", "ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"])
+                    choices=["ernie-1.0-large-zh-cw", "ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en", "ernie-m-base", "ernie-m-large"])
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 class Op(Op):

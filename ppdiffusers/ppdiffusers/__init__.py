@@ -115,6 +115,7 @@ else:
         LDMBertModel,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
+        StableDiffusionAttendAndExcitePipeline,
         StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
@@ -150,6 +151,7 @@ except OptionalDependencyNotAvailable:
 else:
     from .pipelines import (
         FastDeployCycleDiffusionPipeline,
+        FastDeployStableDiffusionControlNetPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,

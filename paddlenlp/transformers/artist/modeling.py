@@ -34,6 +34,7 @@ F.gelu_python = F.gelu
 
 
 class ArtistModel(GPTModel):
+    config_class = ArtistConfig
     pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 
@@ -48,6 +49,7 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     """
 
+    config_class = ArtistConfig
     pretrained_init_configuration = ARTIST_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ARTIST_PRETRAINED_RESOURCE_FILES_MAP
 

@@ -67,6 +67,7 @@ else:
     from .paint_by_example import PaintByExamplePipeline
     from .stable_diffusion import (
         CycleDiffusionPipeline,
+        StableDiffusionAttendAndExcitePipeline,
         StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
@@ -96,6 +97,7 @@ except OptionalDependencyNotAvailable:
 else:
     from .stable_diffusion import (
         FastDeployCycleDiffusionPipeline,
+        FastDeployStableDiffusionControlNetPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,

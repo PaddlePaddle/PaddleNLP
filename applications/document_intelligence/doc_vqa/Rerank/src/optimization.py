@@ -13,16 +13,8 @@
 # limitations under the License.
 """Optimization and learning rate scheduling."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
-import numpy as np
-
 import paddle.fluid as fluid
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+from paddle.fluid.incubate.fleet.collective import fleet
 
 
 def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):

@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import struct
 import logging
-import numpy as np
-import time
-import random
 from typing import Optional
 
-from tritonclient import utils as client_utils
-from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput, service_pb2_grpc, service_pb2
+import numpy as np
+from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput
 
 LOGGER = logging.getLogger("run_inference_on_triton")
 

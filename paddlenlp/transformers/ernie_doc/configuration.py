@@ -14,6 +14,8 @@
 """ DalleBart model configuration"""
 from __future__ import annotations
 
+from typing import Dict
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["ERNIE_DOC_PRETRAINED_INIT_CONFIGURATION", "ErnieDocConfig", "ERNIE_DOC_PRETRAINED_RESOURCE_FILES_MAP"]
@@ -121,6 +123,7 @@ class ErnieDocConfig(PretrainedConfig):
 
     model_type = "ernie_doc"
     pretrained_init_configuration = ERNIE_DOC_PRETRAINED_INIT_CONFIGURATION
+    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
 
     def __init__(
         self,

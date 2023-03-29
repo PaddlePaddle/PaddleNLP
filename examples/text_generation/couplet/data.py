@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-
 from functools import partial
-import numpy as np
 
+import numpy as np
 import paddle
-from paddlenlp.data import Vocab, Pad
-from paddlenlp.data import SamplerHelper
+
+from paddlenlp.data import Pad, SamplerHelper, Vocab
 from paddlenlp.datasets import load_dataset
 
 
 def convert_example(example, vocab):
-    pad_id = vocab[vocab.eos_token]
     bos_id = vocab[vocab.bos_token]
     eos_id = vocab[vocab.eos_token]
 

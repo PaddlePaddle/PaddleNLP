@@ -14,57 +14,43 @@
 
 # coding=UTF-8
 
-from functools import partial
 import argparse
 import os
-import sys
-import random
-import time
+from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-
 from base_model import SemanticIndexBase
-from data import convert_corpus_example, create_dataloader
-from data import gen_id2corpus, gen_text_file
-from data import build_index
+from data import (
+    build_index,
+    convert_corpus_example,
+    create_dataloader,
+    gen_id2corpus,
+    gen_text_file,
+)
 
-# yapf: disable
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.utils.log import logger
+
+# fmt: off
 parser = argparse.ArgumentParser()
-parser.add_argument("--corpus_file", type=str, required=True,
-                    help="The full path of input file")
-parser.add_argument("--similar_text_pair_file", type=str,
-                    required=True, help="The full path of similar text pair file")
-parser.add_argument("--recall_result_dir", type=str, default='recall_result',
-                    help="The full path of recall result file to save")
-parser.add_argument("--recall_result_file", type=str,
-                    default='recall_result_file', help="The file name of recall result")
-parser.add_argument("--params_path", type=str, required=True,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
-                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--output_emb_size", default=None,
-                    type=int, help="output_embedding_size")
-parser.add_argument("--recall_num", default=10, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_m", default=100, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_ef", default=100, type=int,
-                    help="Recall number for each query from Ann index.")
-parser.add_argument("--hnsw_max_elements", default=1000000,
-                    type=int, help="Recall number for each query from Ann index.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--corpus_file", type=str, required=True, help="The full path of input file")
+parser.add_argument("--similar_text_pair_file", type=str, required=True, help="The full path of similar text pair file")
+parser.add_argument("--recall_result_dir", type=str, default='recall_result', help="The full path of recall result file to save")
+parser.add_argument("--recall_result_file", type=str, default='recall_result_file', help="The file name of recall result")
+parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
+parser.add_argument("--recall_num", default=10, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_m", default=100, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_ef", default=100, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument("--hnsw_max_elements", default=1000000, type=int, help="Recall number for each query from Ann index.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder', type=str, help='The pretrained model used for training')
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
