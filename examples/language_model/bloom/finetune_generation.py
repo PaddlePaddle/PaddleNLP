@@ -100,8 +100,8 @@ def convert_example(
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
     return {
-        "input_ids": paddle.to_tensor(input_ids, dtype="int64"),
-        "labels": paddle.to_tensor(labels, dtype="int64"),
+        "input_ids": input_ids,
+        "labels": labels,
     }
 
 
