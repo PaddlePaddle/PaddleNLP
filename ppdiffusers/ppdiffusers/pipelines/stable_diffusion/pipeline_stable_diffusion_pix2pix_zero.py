@@ -587,15 +587,22 @@ class StableDiffusionPix2PixZeroPipeline(DiffusionPipeline):
     @paddle.no_grad()
     def generate_caption(self, images):
         """Generates caption for a given image."""
+        # make sure cast caption_generator position_ids dtype int64
+        try:
+            self.caption_generator.text_decoder.bert.embeddings.position_ids = (
+                self.caption_generator.text_decoder.bert.embeddings.position_ids.cast("int64")
+            )
+        except Exception:
+            pass
         text = "a photography of"
 
-        inputs = self.caption_processor(images, text, return_tensors="pd").cast(self.caption_generator.dtype)
-        outputs = self.caption_generator.generate(**inputs, max_new_tokens=128)
+        inputs = self.caption_processor(images=images, text=text, return_tensors="pd")
+        inputs["pixel_values"] = inputs["pixel_values"].cast(self.caption_generator.dtype)
+        outputs = self.caption_generator.generate(**inputs, max_length=128)[0]
 
         # offload caption generator
-
         caption = self.caption_processor.batch_decode(outputs, skip_special_tokens=True)[0]
-        return caption
+        return text + " " + caption
 
     def construct_direction(self, embs_source: paddle.Tensor, embs_target: paddle.Tensor):
         """Constructs the edit direction to steer the image generation process semantically."""
