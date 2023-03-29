@@ -47,7 +47,7 @@ if is_safetensors_available():
     np.bool = bool
     safetensors.numpy._TYPES.update({"BF16": np.uint16})
 
-if is_torch_available:
+if is_torch_available():
     import torch
 
     # patch torch.uint16
