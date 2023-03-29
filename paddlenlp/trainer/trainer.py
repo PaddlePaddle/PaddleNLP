@@ -213,7 +213,6 @@ class Trainer:
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
         if self.args.use_hybrid_parallel:
-
             set_hyrbid_parallel_seed(
                 basic_seed=self.args.seed,
                 dataset_rank=self.args.dataset_rank,
