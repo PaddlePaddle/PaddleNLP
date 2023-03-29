@@ -11,19 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import inspect
 import os
 import random
 import re
 import shutil
 from pathlib import Path
+from typing import Type
 
 import numpy as np
 import paddle
+from paddle import LazyGuard
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import TensorParallel, get_rng_state_tracker
 from paddle.distributed.sharding import group_sharded_parallel
 
+from paddlenlp.transformers import BloomConfig, PretrainedModel
 from paddlenlp.utils.log import logger
 
 try:
@@ -130,3 +135,81 @@ def wrap_sharding_2_3(model, optimizer, scaler, dist_config):
 
 def is_dp_group_support_in_group_sharded_parallel():
     return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
+
+
+def get_amp_black_list(dtype: str):
+    if dtype != "float16":
+        return []
+    return [
+        "reduce_sum",
+        "c_softmax_with_cross_entropy",
+        "elementwise_div",
+        "lookup_table",
+        "lookup_table_v2",
+        "layer_norm",
+        "set_value",
+        "fill_constant",
+        "softmax",
+    ]
+
+
+def load_model(args: str, model_class: Type[PretrainedModel]):
+    config: BloomConfig = BloomConfig.from_pretrained(args.model_name_or_path)
+    paddle.set_default_dtype(config.dtype or "float16")
+
+    # Detecting last checkpoint.
+    config["enable_fuse_transformer"] = False
+    config["use_cache"] = True
+    config.use_pure_fp16 = False
+
+    # TODO(wj-Mcat): only support `mp_degree`, so world_size is equal to `world_size`
+    world_size = paddle.distributed.get_world_size()
+
+    if world_size == 1:
+        return model_class.from_pretrained(args.model_name_or_path, config=config)
+
+    # start to init distributed env
+    strategy = fleet.DistributedStrategy()
+
+    strategy.hybrid_configs = {
+        "dp_degree": getattr(args, "dp_degree", 1),
+        "mp_degree": world_size,
+        "pp_degree": getattr(args, "pp_degree", 1),
+        "sharding_degree": getattr(args, "sharding_degree", 1),
+    }
+
+    # Set control in tensor parallel
+    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
+
+    fleet.init(is_collective=True, strategy=strategy)
+
+    # Obtain rank message of hybrid parallel
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_rank = hcg.get_model_parallel_rank()
+    dp_rank = hcg.get_data_parallel_rank()
+    sharding_rank = hcg.get_sharding_parallel_rank()
+
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+
+    # Seed control in hybrid parallel
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
+
+    config.mp_degree = world_size
+
+    with LazyGuard():
+        # init the model without initialized parameters
+        model = model_class(config=config)
+
+    weight_file = os.path.join(args.model_name_or_path, f"auto_dist{mp_rank}.pdparams")
+    logger.info(f"start to loading sharding model weight file<{weight_file}>")
+
+    # support shard state_dict
+    if not os.path.exists(weight_file):
+        raise FileNotFoundError(
+            f"sharding model weight file<auto_dist{mp_rank}.pdparams> not found under <{args.model_name_or_path}>"
+        )
+
+    state_dict = paddle.load(weight_file, return_numpy=True)
+    model.set_state_dict(state_dict)
+    return model
