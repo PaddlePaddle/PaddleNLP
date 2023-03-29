@@ -23,7 +23,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import GPTTokenizer, OPTConfig, OPTForCausalLM, OPTModel
-from tests.testing_utils import PaddleNLPModelTest, slow
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -32,7 +32,7 @@ from tests.transformers.test_modeling_common import (
 )
 
 OPT_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/opt-1.3b",
+    "facebook/opt-125m",
 ]
 
 
@@ -514,6 +514,46 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in OPT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = OPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class OPTCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-OPTModel"
+
+    @require_package("transformers", "torch")
+    def test_model_config_mapping(self):
+        # 1. define the input_ids
+        config = OPTConfig.from_pretrained(OPTCompatibilityTest.test_model_id, from_hf_hub=True)
+        paddle.set_default_dtype(config.dtype)
+
+        # 1. create commmon input
+        input_ids = np.random.randint(100, 200, [1, 20])
+
+        # 2. forward the torch model
+        import torch
+        import transformers
+
+        torch_model_class = getattr(transformers, "OPTModel")
+        torch_model = torch_model_class.from_pretrained(OPTCompatibilityTest.test_model_id)
+        torch_model.eval()
+
+        torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+        # 3. forward the paddle model
+        from paddlenlp import transformers
+
+        paddle_model_class = getattr(transformers, "OPTModel")
+        paddle_model = paddle_model_class.from_pretrained(OPTCompatibilityTest.test_model_id, from_hf_hub=True)
+        paddle_model.eval()
+
+        paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
+
+        self.assertTrue(
+            np.allclose(
+                paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                atol=1e-4,
+            )
+        )
 
 
 class OPTModelIntegrationTest(unittest.TestCase):
