@@ -127,6 +127,7 @@ from .prophetnet.tokenizer import *
 from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
+from .mpnet.configuration import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
