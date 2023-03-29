@@ -92,7 +92,7 @@ class AttentionBlock(nn.Layer):
                 )
             else:
                 try:
-                    _ = F.scaled_dot_product_attention(
+                    _ = F.scaled_dot_product_attention_(
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
@@ -132,7 +132,7 @@ class AttentionBlock(nn.Layer):
         )
 
         if self._use_memory_efficient_attention_xformers:
-            hidden_states = F.scaled_dot_product_attention(
+            hidden_states = F.scaled_dot_product_attention_(
                 query_proj,
                 key_proj,
                 value_proj,

@@ -94,10 +94,8 @@ class CrossAttention(nn.Layer):
 
         # set attention processor
         if processor is None:
-            processor = CrossAttnProcessor()
-            # processor = (
-            #     AttnProcessor2_5() if is_ppxformers_available() else CrossAttnProcessor()
-            # )
+            # processor = CrossAttnProcessor()
+            processor = AttnProcessor2_5() if is_ppxformers_available() else CrossAttnProcessor()
         self.set_processor(processor)
 
     def set_use_memory_efficient_attention_xformers(
@@ -122,7 +120,7 @@ class CrossAttention(nn.Layer):
                 )
             else:
                 try:
-                    _ = F.scaled_dot_product_attention(
+                    _ = F.scaled_dot_product_attention_(
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
                         paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
@@ -432,7 +430,7 @@ class XFormersCrossAttnProcessor:
         key = attn.head_to_batch_dim(key, transpose=False)
         value = attn.head_to_batch_dim(value, transpose=False)
 
-        hidden_states = F.scaled_dot_product_attention(
+        hidden_states = F.scaled_dot_product_attention_(
             query,
             key,
             value,
@@ -483,7 +481,7 @@ class LoRAXFormersCrossAttnProcessor(nn.Layer):
         key = attn.head_to_batch_dim(key, transpose=False)
         value = attn.head_to_batch_dim(value, transpose=False)
 
-        hidden_states = F.scaled_dot_product_attention(
+        hidden_states = F.scaled_dot_product_attention_(
             query,
             key,
             value,

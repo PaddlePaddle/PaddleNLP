@@ -305,7 +305,7 @@ if is_paddle_available() and is_paddlenlp_available():
         )
         from paddle.nn.functional.flash_attention import flash_attention
 
-        def scaled_dot_product_attention(
+        def scaled_dot_product_attention_(
             query,
             key,
             value,
@@ -346,7 +346,7 @@ if is_paddle_available() and is_paddlenlp_available():
                 raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash']")
             return output
 
-        paddle.nn.functional.scaled_dot_product_attention = scaled_dot_product_attention
+        paddle.nn.functional.scaled_dot_product_attention_ = scaled_dot_product_attention_
 
     @patch_to(nn.Layer, as_prop=True)
     def dtype(parameter: nn.Layer) -> paddle.dtype:
