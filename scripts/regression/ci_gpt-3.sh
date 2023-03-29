@@ -40,7 +40,7 @@ function case_list_chain(){
     gpt_345M_mp8_qat
     gpt_export_345M_mp1
     gpt_export_345M_mp2
-    # gpt_export_qat_345M
+    gpt_export_qat_345M
     gpt_inference_345M_single
     gpt_inference_345M_dp8
     gpt_345M_single_finetune
@@ -75,7 +75,8 @@ function gpt_preprocess_data() {
     rm -rf log
     python ppfleetx/data/data_tools/gpt/raw_trans_to_json.py  \
         --input_path ./dataset/wikitext_103_en \
-        --output_path ./dataset/wikitext_103_en/wikitext_103_en
+        --output_path ./dataset/wikitext_103_en/wikitext_103_en \
+        >>${log_path}/$FUNCNAME 2>&1
     python ppfleetx/data/data_tools/gpt/preprocess_data.py \
         --model_name gpt2 \
         --tokenizer_name GPTTokenizer \
@@ -84,7 +85,8 @@ function gpt_preprocess_data() {
         --append_eos \
         --output_prefix ./dataset/wikitext_103_en/wikitext_103_en  \
         --workers 40 \
-        --log_interval 1000
+        --log_interval 1000 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -96,7 +98,8 @@ function gpt_345M_single() {
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_345M_single_card.yaml \
         -o Model.num_layers=4 -o Model.num_attention_heads=4 \
         -o Engine.max_steps=10 -o Engine.eval_freq=10 \
-        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10
+        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -108,7 +111,8 @@ function gpt_1.3B_dp() {
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_1.3B_dp8.yaml \
         -o Model.num_layers=4 -o Model.num_attention_heads=4 \
         -o Engine.max_steps=10 -o Engine.eval_freq=10 \
-        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10
+        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -123,7 +127,8 @@ function gpt_6.7B_stage2_dp2_sharding4() {
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Distributed.sharding.sharding_degree=4 -o Distributed.sharding.sharding_stage=2 \
         -o Distributed.sharding.reduce_overlap=False -o Distributed.sharding.broadcast_overlap=False \
-        -o Engine.logging_freq=5
+        -o Engine.logging_freq=5 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -138,7 +143,8 @@ function gpt_6.7B_stage3_dp2_sharding4() {
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Distributed.sharding.sharding_degree=4 -o Distributed.sharding.sharding_stage=3 \
         -o Distributed.sharding.reduce_overlap=False -o Distributed.sharding.broadcast_overlap=False \
-        -o Engine.logging_freq=5
+        -o Engine.logging_freq=5 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -153,7 +159,8 @@ function gpt_6.7B_stage2_sharding8() {
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Distributed.sharding.sharding_degree=8 -o Distributed.sharding.sharding_stage=2 \
         -o Distributed.sharding.reduce_overlap=True -o Distributed.sharding.broadcast_overlap=True \
-        -o Engine.logging_freq=5
+        -o Engine.logging_freq=5 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -168,7 +175,8 @@ function gpt_175B_DP1_MP4_PP2() {
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Global.local_batch_size=16 -o Global.micro_batch_size=2 \
         -o Distributed.mp_degree=4 -o Distributed.pp_degree=2 \
-        -o Model.sequence_parallel=False
+        -o Model.sequence_parallel=False \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -182,7 +190,8 @@ function gpt_175B_DP1_MP4_PP2_sp() {
         -o Engine.max_steps=10 -o Engine.eval_freq=10 \
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Global.local_batch_size=16 -o Global.micro_batch_size=2 \
-        -o Distributed.mp_degree=4 -o Distributed.pp_degree=2 -o Model.sequence_parallel=True
+        -o Distributed.mp_degree=4 -o Distributed.pp_degree=2 -o Model.sequence_parallel=True \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -197,7 +206,8 @@ function gpt_175B_DP1_MP8_PP1() {
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Global.local_batch_size=16 -o Global.micro_batch_size=2 \
         -o Distributed.mp_degree=8 -o Distributed.pp_degree=1 \
-        -o Model.sequence_parallel=False
+        -o Model.sequence_parallel=False \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -211,7 +221,8 @@ function gpt_175B_DP1_MP8_PP1_sp() {
         -o Engine.max_steps=10 -o Engine.eval_freq=10 \
         -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
         -o Global.local_batch_size=16 -o Global.micro_batch_size=2 \
-        -o Distributed.mp_degree=8 -o Distributed.pp_degree=1 -o Model.sequence_parallel=True
+        -o Distributed.mp_degree=8 -o Distributed.pp_degree=1 -o Model.sequence_parallel=True \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -228,7 +239,8 @@ function gpt_175B_DP1_MP1_PP8() {
         -o Distributed.mp_degree=1 -o Distributed.pp_degree=8 \
         -o Model.virtual_pp_degree=2 -o Distributed.pp_recompute_interval=2 \
         -o Model.fused_linear=True -o Model.use_recompute=True \
-        -o Model.sequence_parallel=False
+        -o Model.sequence_parallel=False \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -240,7 +252,8 @@ function gpt_345M_mp8_qat() {
         -c ppfleetx/configs/nlp/gpt/qat_gpt_345M_mp8.yaml \
         -o Model.num_layers=4 -o Model.num_attention_heads=8 \
         -o Engine.max_steps=10 -o Engine.eval_freq=10 \
-        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10
+        -o Engine.eval_iters=5 -o Engine.save_load.save_steps=10 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -250,7 +263,8 @@ function gpt_generation_345M_single() {
     rm -rf log
     python tasks/gpt/generation.py \
         -c ppfleetx/configs/nlp/gpt/generation_gpt_345M_single_card.yaml \
-        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/
+        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/ \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -260,7 +274,8 @@ function gpt_generation_345M_hybrid() {
     rm -rf log
     python -m paddle.distributed.launch --devices "0" tasks/gpt/generation.py \
         -c ppfleetx/configs/nlp/gpt/generation_gpt_345M_dp8.yaml \
-        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/
+        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/ \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -271,14 +286,16 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/paddle/PaddleFleetX:$PYTHONPATH
+    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
         -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_single_card.yaml \
-        -o Engine.save_load.ckpt_dir=./pretrained/inference_model
+        -o Engine.save_load.ckpt_dir=./pretrained/inference_model \
+        >>${log_path}/$FUNCNAME 2>&1
     python -m paddle.distributed.launch --devices "1" \
-        projects/gpt/inference.py --mp_degree 1 --model_dir output
+        projects/gpt/inference.py --mp_degree 1 --model_dir output \
+        >>${log_path}/$FUNCNAME 2>&1
     unset CUDA_VISIBLE_DEVICES
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
@@ -290,14 +307,16 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/paddle/PaddleFleetX:$PYTHONPATH
+    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
         -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_mp2.yaml \
-        -o Engine.save_load.ckpt_dir=./pretrained/inference_model
-    # python -m paddle.distributed.launch --devices "0,1" \
-    #     projects/gpt/inference.py --mp_degree 2 --model_dir output
+        -o Engine.save_load.ckpt_dir=./pretrained/inference_model \
+        >>${log_path}/$FUNCNAME 2>&1
+    python -m paddle.distributed.launch --devices "0,1" \
+        projects/gpt/inference.py --mp_degree 2 --model_dir output \
+        >>${log_path}/$FUNCNAME 2>&1
     unset CUDA_VISIBLE_DEVICES
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
@@ -313,9 +332,11 @@ function gpt_export_qat_345M() {
         -c ./ppfleetx/configs/nlp/gpt/generation_qat_gpt_345M_single_card.yaml \
         -o Model.hidden_dropout_prob=0.0 \
         -o Model.attention_probs_dropout_prob=0.0 \
-        -o Engine.save_load.ckpt_dir='./GPT_345M_QAT_wo_analysis/'
+        -o Engine.save_load.ckpt_dir='./GPT_345M_QAT_wo_analysis/' \
+        >>${log_path}/$FUNCNAME 2>&1
     python -m paddle.distributed.launch --devices "0" \
-        projects/gpt/inference.py --mp_degree 1 --model_dir output
+        projects/gpt/inference.py --mp_degree 1 --model_dir output \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -326,9 +347,11 @@ function gpt_inference_345M_single() {
     rm -rf output
     python tools/export.py \
         -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml \
-        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/
+        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/ \
+        >>${log_path}/$FUNCNAME 2>&1
     python tasks/gpt/inference.py \
-        -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml
+        -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -339,10 +362,12 @@ function gpt_inference_345M_dp8() {
     rm -rf output
     python -m paddle.distributed.launch --devices "0" tools/export.py \
         -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml \
-        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/
+        -o Engine.save_load.ckpt_dir=./ckpt/PaddleFleetX_GPT_345M_220826/ \
+        >>${log_path}/$FUNCNAME 2>&1
     python -m paddle.distributed.launch --devices "0" \
         tasks/gpt/inference.py \
-        -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml
+        -c ppfleetx/configs/nlp/gpt/inference_gpt_345M_single_card.yaml \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -358,7 +383,8 @@ function gpt_345M_single_finetune() {
         -o Data.Eval.dataset.name=WNLI \
         -o Data.Eval.dataset.root=./dataset/WNLI/ \
         -o Data.Eval.dataset.split=dev \
-        -o Model.num_classes=2
+        -o Model.num_classes=2 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -372,7 +398,8 @@ function gpt_eval_WikiText() {
         -o Offline_Eval.eval_path=./wikitext-103/wiki.valid.tokens \
         -o Offline_Eval.overlapping_eval=32 \
         -o Offline_Eval.batch_size=16 \
-        -o Engine.max_steps=20
+        -o Engine.max_steps=20 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -386,7 +413,8 @@ function gpt_eval_LAMBADA() {
         -o Offline_Eval.eval_path=./lambada_test.jsonl \
         -o Offline_Eval.cloze_eval=True \
         -o Offline_Eval.batch_size=16 \
-        -o Engine.max_steps=20
+        -o Engine.max_steps=20 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -405,7 +433,8 @@ function gpt_save_ckpt() {
         -o Global.micro_batch_size=2 \
         -o Engine.max_steps=1 \
         -o Engine.save_load.save_steps=1 \
-        -o Engine.save_load.output_dir="./ckpt_dynamic"
+        -o Engine.save_load.output_dir="./ckpt_dynamic" \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -432,7 +461,8 @@ function gpt_auto_serial() {
         -o Distributed.pp_degree=1 \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
     check_result $FUNCNAME 10.9507 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
@@ -460,7 +490,8 @@ function gpt_auto_dp2mp2() {
         -o Distributed.pp_degree=1 \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
     check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
@@ -488,7 +519,8 @@ function gpt_auto_mp2pp2() {
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     check_result $FUNCNAME 10.9507 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
@@ -516,7 +548,8 @@ function gpt_auto_dp2pp2() {
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -546,7 +579,8 @@ function gpt_auto_dp2mp2pp2() {
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -577,7 +611,8 @@ function gpt_auto_dp2mp2pp2_o2() {
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.verbose=3 \
-        -o Model.type_vocab_size=1
+        -o Model.type_vocab_size=1 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -604,7 +639,8 @@ function gpt_auto_dp2sharding2() {
         -o Distributed.pp_degree=1 \
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
     check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
@@ -632,7 +668,8 @@ function gpt_auto_dp2mp2sharding2() {
         -o Distributed.pp_degree=1 \
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
     check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
@@ -660,7 +697,8 @@ function gpt_auto_dp2pp2sharding2() {
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -690,7 +728,8 @@ function gpt_auto_dp2mp2pp2sharding2() {
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
-        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
+        -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -720,7 +759,8 @@ function gpt_auto_pass_o1_stage1() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1
+        -o Distributed.sharding.sharding_stage=1 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -750,7 +790,8 @@ function gpt_auto_pass_o1_stage2() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2
+        -o Distributed.sharding.sharding_stage=2 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -780,7 +821,8 @@ function gpt_auto_pass_o2_stage1() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1
+        -o Distributed.sharding.sharding_stage=1 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -810,7 +852,8 @@ function gpt_auto_pass_o2_stage2() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2
+        -o Distributed.sharding.sharding_stage=2 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -840,7 +883,8 @@ function gpt_auto_pass_o3_stage1() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1
+        -o Distributed.sharding.sharding_stage=1 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -870,7 +914,8 @@ function gpt_auto_pass_o3_stage2() {
         -o Distributed.mp_degree=2 \
         -o Distributed.pp_degree=2 \
         -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2
+        -o Distributed.sharding.sharding_stage=2 \
+        >>${log_path}/$FUNCNAME 2>&1
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
@@ -887,7 +932,8 @@ function gpt_auto_export() {
         ./tools/auto_export.py \
         -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_mp2.yaml \
         -o Model.num_layers=4 \
-        -o Model.num_attention_heads=4
+        -o Model.num_attention_heads=4 \
+        >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -979,16 +1025,20 @@ function before_hook() {
 
 function check_result() {
     if [ $? -ne 0 ];then
-        echo -e "\033 $1 model runs failed! \033" | tee -a $log_path/result.log
+        mv ${log_path}/$1 ${log_path}/$1_FAIL.log
+        echo -e "\033[31m ${log_path}/$1_FAIL \033[0m"
+        tail -20 ${log_path}/$1_FAIL.log
         exit -1
     fi
 
     if [ $# -eq 1 ]; then
-        echo -e "\033 $1 model runs successfully! \033" | tee -a $log_path/result.log
+        echo -e "\033 $1 model runs successfully! \033"
     else
-        echo -e "loss_base: $2 loss_test: $3" | tee -a $log_path/result.log
+        echo -e "loss_base: $2 loss_test: $3" | tee -a ${log_path}/$1
         if [ $2 != $3 ];then
-            echo -e "\033 $1 loss diff check failed! \033" | tee -a $log_path/result.log
+            mv ${log_path}/$1 ${log_path}/$1_FAIL.log
+            echo -e "\033[31m ${log_path}/$1_loss_check_FAIL \033[0m"
+            tail ${log_path}/$1_FAIL.log
             exit -1
         else
             echo -e "\033 $1 loss diff check successfully! \033" | tee -a $log_path/result.log
@@ -1016,7 +1066,7 @@ main() {
 
     before_hook
     case_list_chain
-    # case_list_auto
+    case_list_auto
 }
 
 main$@
