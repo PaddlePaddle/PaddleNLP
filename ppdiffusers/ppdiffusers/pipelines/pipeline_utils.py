@@ -736,6 +736,11 @@ class DiffusionPipeline(ConfigMixin):
                     user_agent=user_agent,
                 )
             else:
+                if cls == DiffusionPipeline:
+                    is_fastdeploy_model = "fastdeploy" in config_dict.get("_class_name", "").lower()
+                else:
+                    is_fastdeploy_model = "fastdeploy" in cls.__name__.lower()
+
                 cached_folder = ppdiffusers_bos_dir_download(
                     pretrained_model_name_or_path,
                     revision=revision,
@@ -743,7 +748,7 @@ class DiffusionPipeline(ConfigMixin):
                     resume_download=resume_download,
                     folder_names=folder_names,
                     variant=variant,
-                    is_fastdeploy_model="fastdeploy" in cls.__name__.lower(),
+                    is_fastdeploy_model=is_fastdeploy_model,
                 )
         else:
             is_local_dir = True
