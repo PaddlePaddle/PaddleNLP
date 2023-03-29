@@ -15,6 +15,7 @@
 """Paddle Llama model"""
 
 import math
+from functools import partial
 from typing import Optional, Tuple
 
 import numpy as np
@@ -399,6 +400,43 @@ class LlamaPretrainedModel(PretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
     config_class = LlamaConfig
     base_model_prefix = "llama"
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "llama.layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
+                "llama.layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
+                "llama.layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
+                "llama.layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
+                "llama.layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                # Row Linear
+                "llama.layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
+                "llama.layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""

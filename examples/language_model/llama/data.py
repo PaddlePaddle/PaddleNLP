@@ -21,7 +21,7 @@ import paddle
 from paddlenlp.data import Pad
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-IGNORE_INDEX = 0  # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
+from .utils import IGNORE_INDEX
 
 
 def convert_example(example, tokenizer, data_args, is_test=True):
