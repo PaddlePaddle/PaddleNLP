@@ -1027,7 +1027,7 @@ function check_result() {
     if [ $? -ne 0 ];then
         mv ${log_path}/$1 ${log_path}/$1_FAIL.log
         echo -e "\033[31m ${log_path}/$1_FAIL \033[0m"
-        tail -20 ${log_path}/$1_FAIL.log
+        cat ${log_path}/$1_FAIL.log
         exit -1
     fi
 
@@ -1038,7 +1038,7 @@ function check_result() {
         if [ $2 != $3 ];then
             mv ${log_path}/$1 ${log_path}/$1_FAIL.log
             echo -e "\033[31m ${log_path}/$1_loss_check_FAIL \033[0m"
-            tail ${log_path}/$1_FAIL.log
+            cat ${log_path}/$1_FAIL.log
             exit -1
         else
             echo -e "\033 $1 loss diff check successfully! \033" | tee -a $log_path/result.log
