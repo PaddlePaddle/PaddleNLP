@@ -27,9 +27,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-
-# TODO(wj-Mcat): use paddlenlp tokenizer later
-from transformers import AutoTokenizer
 from utils import (
     _rotate_checkpoints,
     all_gather,
@@ -41,10 +38,12 @@ from visualdl import LogWriter
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (  # AutoTokenizer,
+    AutoTokenizer,
     BloomConfig,
     BloomForCausalLM,
     CosineAnnealingWithWarmupDecay,
@@ -81,30 +80,29 @@ def convert_example(
         target = example["target"]
     elif "question" in example.keys():
         target = example["question"]
-    source = "答案：" + title + "</s>" + "上下文：" + source + "</s>"
-    if target:
-        target = "在已知答案的前提下，问题：" + target + "</s>"
-    outputs = tokenizer(
-        target,
-        max_length=max_target_length,
-        truncation_strategy="longest_first",
-        return_attention_mask=True,
-        return_token_type_ids=False,
-    )
-    inputs = tokenizer(
-        source,
-        max_length=max_source_length,
-        truncation_strategy="longest_first",
-        return_attention_mask=True,
-        return_length=False,
-    )
 
-    final = {}
-    for k in outputs.keys():
-        final[k] = inputs[k] + outputs[k]
-        if k == "input_ids":
-            final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
-    return final
+    source = "答案：" + title + tokenizer.eos_token + "上下文：" + source + "。" + tokenizer.eos_token + "在已知答案的前提下，问题："
+
+    if target:
+        target += tokenizer.eos_token
+
+    # 1. tokenize input-tokens
+    input_tokens = tokenizer.tokenize(source)[:max_source_length]
+
+    # 2. tokenize output tokens
+    output_tokens = tokenizer.tokenize(target)[:max_target_length]
+
+    # 3. concat the inputs
+    tokens = input_tokens + output_tokens
+
+    labels = [tokenizer.pad_token_id] * len(input_tokens) + tokenizer.convert_tokens_to_ids(output_tokens)
+
+    input_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+    return {
+        "input_ids": paddle.to_tensor(input_ids, dtype="int64"),
+        "labels": paddle.to_tensor(labels, dtype="int64"),
+    }
 
 
 @paddle.no_grad()
@@ -231,6 +229,17 @@ def do_train():
     config["enable_fuse_transformer"] = False
     model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
+    if args.lora:
+        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
+        model = get_lora_model(model, lora_config)
+        mark_only_lora_as_trainable(model)
+
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
@@ -326,7 +335,8 @@ def do_train():
     )
 
     train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
-    train_ds = train_ds.map(trans_func, lazy=True)
+    # train_ds = train_ds.map(trans_func, lazy=True)
+    train_ds = train_ds.map(trans_func)
 
     train_batch_sampler = DistributedBatchSampler(
         train_ds,
@@ -390,7 +400,7 @@ def do_train():
 
     model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
     for epoch in range(sys.maxsize):
-        for step, batch in enumerate(train_data_loader()):
+        for step, batch in enumerate(train_data_loader):
             train_reader_cost += time.time() - reader_start
             train_start = time.time()
 

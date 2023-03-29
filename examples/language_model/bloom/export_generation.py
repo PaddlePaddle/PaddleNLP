@@ -19,10 +19,10 @@ import os
 import paddle
 from model_split_merge import merge_model_parallel
 
-# TODO(wj-Mcat): use paddlenlp tokenizer later
-from transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForGeneration
 
-from paddlenlp.transformers import BloomConfig, BloomForGeneration
+# TODO(wj-Mcat): use paddlenlp tokenizer later
+
 
 MODEL_CLASSES = {"bloom": (BloomForGeneration)}
 
