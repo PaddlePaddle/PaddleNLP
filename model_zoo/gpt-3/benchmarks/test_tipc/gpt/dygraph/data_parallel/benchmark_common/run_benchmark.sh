@@ -72,7 +72,13 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    train_cmd="-c ${yaml_path} \
+    if [ ${model_item} = "gpt_1024_flash" ];then
+        args="-o Model.use_flash_attn=True"
+    else
+        args=""
+    fi
+
+    train_cmd="-c ${yaml_path} ${args} \
                -o Engine.max_steps=${max_iter} \
                -o Engine.eval_freq=${eval_freq} \
                -o Engine.save_load.save_steps=100000 \
