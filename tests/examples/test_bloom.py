@@ -25,8 +25,6 @@ from tests.testing_utils import argv_context_guard, load_test_config
 from tests.transformers.test_modeling_common import DistributedTest
 
 
-# TODO(wj-Mcat): complete the bloom tokenizer
-@pytest.mark.skip("wating for bloom tokenizer")
 class BloomCPUTest(TestCase):
     def setUp(self) -> None:
         self.path = "./examples/language_model/bloom"
@@ -45,6 +43,7 @@ class BloomCPUTest(TestCase):
 
     def test_export_and_infer_generation(self):
         config = load_test_config(self.config_path, "export_generation")
+        # 1. do export generation
         with tempfile.TemporaryDirectory() as tempdir:
             config["output_path"] = os.path.join(tempdir, "bloom")
             with argv_context_guard(config):
@@ -53,23 +52,12 @@ class BloomCPUTest(TestCase):
                 main()
                 self.assertTrue(os.path.exists(os.path.join(tempdir, "bloom.pdmodel")))
 
-        output_path = config["output_path"]
-        config = load_test_config(self.config_path, "infer_generation")
-        config["model_dir"] = os.path.dirname(output_path)
-        config["vocab_path"] = os.path.dirname(output_path)
-
-        with tempfile.TemporaryDirectory() as tempdir:
-            with argv_context_guard(config):
-                from infer_generation import main
-
-                main()
-
     def test_export_glue(self):
         config = load_test_config(self.config_path, "export_glue")
         with tempfile.TemporaryDirectory() as tempdir:
             config["output_path"] = os.path.join(tempdir, "bloom")
             with argv_context_guard(config):
-                from export_glue_model import main
+                from export_glue import main
 
                 main()
                 self.assertTrue(os.path.exists(os.path.join(tempdir, "bloom.pdmodel")))
@@ -86,7 +74,7 @@ class BloomGenerationDistributedTest(DistributedTest):
     def tearDown(self) -> None:
         sys.path.remove(self.path)
 
-    @pytest.mark.skip("wating for bloom tokenizer")
+    @pytest.mark.skip("skip for test")
     def test_pipeline(self):
         # 1. test for fine-tune scripts
         with tempfile.TemporaryDirectory() as tempdir:

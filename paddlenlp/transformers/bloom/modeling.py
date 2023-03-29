@@ -55,20 +55,6 @@ __all__ = [
 ]
 
 
-BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "bigscience/bloom-560m",
-    "bigscience/bloom-1b1",
-    "bigscience/bloom-3b",
-    "bigscience/bloom-7b",
-    "bigscience/bloom",
-    "bigscience/bloomz-560m",
-    "bigscience/bloomz-1b1",
-    "bigscience/bloomz-3b",
-    "bigscience/bloomz-7b",
-    "bigscience/bloomz",
-]
-
-
 def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
     world_size = paddle.distributed.get_world_size()
     if world_size > 1:

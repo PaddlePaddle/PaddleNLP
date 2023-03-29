@@ -53,11 +53,7 @@ def split_tokenizer_json_file(tokenizer_file: str):
     # vocab.json
     save_to_file(os.path.join(base_dir, "vocab.json"), json.dumps(tokenizer["model"]["vocab"], ensure_ascii=False))
     # merge file
-    save_to_file(os.path.join(base_dir, "merges.txt"), "\t".join(tokenizer["model"]["merges"]))
-    # added tokens
-    save_to_file(
-        os.path.join(base_dir, "added_tokens.json"), json.dumps(tokenizer["added_tokens"], ensure_ascii=False)
-    )
+    save_to_file(os.path.join(base_dir, "merges.txt"), "\n".join(tokenizer["model"]["merges"]))
 
 
 @lru_cache()
@@ -146,16 +142,7 @@ class BloomTokenizer(PretrainedTokenizer):
 
     # TODO(wj-Mcat): disable max-model input size of bloom model
     max_model_input_sizes = {
-        "bigscience/bloom-560m": 1024,
-        "bigscience/bloom-1b1": 1024,
-        "bigscience/bloom-3b": 1024,
-        "bigscience/bloom-7b1": 1024,
-        "bigscience/bloom": 1024,
-        "bigscience/bloomz-560m": 1024,
-        "bigscience/bloomz-1b1": 1024,
-        "bigscience/bloomz-3b": 1024,
-        "bigscience/bloomz-7b1": 1024,
-        "bigscience/bloomz": 1024,
+        "bigscience/bloom-560m": 102400,
     }
     padding_side = "right"
 
@@ -165,9 +152,10 @@ class BloomTokenizer(PretrainedTokenizer):
         merges_file,
         errors="replace",
         max_len=None,
-        pad_token="<pad>",
-        eos_token="<s>",
         unk_token="<unk>",
+        bos_token="<s>",
+        eos_token="</s>",
+        pad_token="<pad>",
         eol_token="<s>",
         add_prefix_space=False,
         add_bos_token=False,
@@ -177,11 +165,13 @@ class BloomTokenizer(PretrainedTokenizer):
         pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
         eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
         unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
         self.eol_token = eol_token
         self._build_special_tokens_map_extended(
             bos_token=pad_token if getattr(self, "bos_token", None) is None else self.bos_token,
             eos_token=eos_token,
             unk_token=unk_token,
+            pad_token=pad_token,
         )
 
         self._vocab_file = vocab_file

@@ -21,9 +21,6 @@ from model_split_merge import merge_model_parallel
 
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForGeneration
 
-# TODO(wj-Mcat): use paddlenlp tokenizer later
-
-
 MODEL_CLASSES = {"bloom": (BloomForGeneration)}
 
 
