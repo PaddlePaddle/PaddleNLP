@@ -27,7 +27,7 @@ __all__ = [
 GLM130B_PRETRAINED_INIT_CONFIGURATION = {
     "glm-130b": {
         "hidden_size": 12288,
-        "inner_hidden_size": 12288 * 8 / 3,
+        "inner_hidden_size": 32768,  # 12288 * 8 / 3
         "num_hidden_layers": 70,
         "num_attention_heads": 96,
         "length_per_sample": 2000,
@@ -44,7 +44,7 @@ GLM130B_PRETRAINED_INIT_CONFIGURATION = {
         "output_predict": True,
         "position_encoding_2d": False,
         "recompute": False,
-        "vocab_size": 50304,
+        "vocab_size": 150528,
     }
 }
 
