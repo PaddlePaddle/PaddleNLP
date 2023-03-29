@@ -60,6 +60,8 @@ class DiTPipeline(DiffusionPipeline):
                 for label in value.split(","):
                     self.labels[label.lstrip().rstrip()] = int(key)
             self.labels = dict(sorted(self.labels.items()))
+            # register id2label
+            self.register_to_config(id2label=id2label)
 
     def get_label_ids(self, label: Union[str, List[str]]) -> List[int]:
         r"""
