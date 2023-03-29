@@ -610,7 +610,8 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != -100]
+            # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != 0]
             loss = paddle.mean(masked_lm_loss)
         return loss
 

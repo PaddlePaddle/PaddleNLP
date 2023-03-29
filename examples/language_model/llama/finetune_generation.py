@@ -28,8 +28,6 @@ from paddlenlp.layers.lora import print_trainable_parameters
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-DEFAULT_PAD_TOKEN = "[PAD]"
-
 
 @dataclass
 class DataArgument:
@@ -50,28 +48,6 @@ class DataArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
         },
     )
-
-
-def smart_tokenizer_and_embedding_resize(
-    special_tokens_dict,
-    tokenizer,
-    model,
-):
-    """Resize tokenizer and embedding.
-    Note: This is the unoptimized version that may make your embedding size not be divisible by 64.
-    """
-    num_new_tokens = tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
-
-    if num_new_tokens > 0:
-        input_embeddings = model.get_input_embeddings().weight
-        output_embeddings = model.get_output_embeddings().weight
-
-        input_embeddings_avg = input_embeddings[:-num_new_tokens].mean(axis=0, keepdim=True)
-        output_embeddings_avg = output_embeddings[:-num_new_tokens].mean(axis=0, keepdim=True)
-
-        input_embeddings[-num_new_tokens:].set_value(input_embeddings_avg)
-        output_embeddings[-num_new_tokens:].set_value(output_embeddings_avg)
 
 
 @dataclass
@@ -138,13 +114,7 @@ def main():
         print_trainable_parameters(model)
 
     tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
-
-    if tokenizer.pad_token is None:
-        smart_tokenizer_and_embedding_resize(
-            special_tokens_dict=dict(pad_token=DEFAULT_PAD_TOKEN),
-            tokenizer=tokenizer,
-            model=model,
-        )
+    tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
