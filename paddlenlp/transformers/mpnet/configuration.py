@@ -78,6 +78,9 @@ class MPNetConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "mpnet"
+    attribute_map = {
+        "num_classes": "num_labels",
+    }
 
     def __init__(
         self,
