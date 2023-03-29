@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
 import math
+from typing import Union
+
 import numpy as np
 import paddle
 from scipy import integrate
@@ -96,7 +97,6 @@ class SchedulerMixin:
             a tensor of shape [batch_size, 1, ...] where the shape has K dims.
         """
 
-        tensor_format = getattr(self, "tensor_format", "pd")
         values = values.flatten()
 
         while len(values.shape) < len(broadcast_array.shape):
