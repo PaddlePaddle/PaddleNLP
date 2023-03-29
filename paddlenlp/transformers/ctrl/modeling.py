@@ -480,7 +480,7 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
     def __init__(self, config: CTRLConfig):
         super().__init__(config)
         self.ctrl = CTRLModel(config)
-        if self.ctrl.config["tie_word_embeddings"]:
+        if config.tie_word_embeddings:
             self.lm_head = self.ctrl.w
             self.lm_head_bias = self.create_parameter(
                 shape=[config.vocab_size],
