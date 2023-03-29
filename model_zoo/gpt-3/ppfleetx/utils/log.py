@@ -13,19 +13,13 @@
 # limitations under the License.
 
 import contextlib
-import copy
 import datetime
 import functools
 import logging
-import os
-import sys
 import threading
 import time
-from typing import List
 
 import colorlog
-import paddle
-from colorama import Fore
 
 loggers = {}
 
@@ -155,14 +149,14 @@ def advertise():
     )
 
 
-from .device import synchronize
+from .device import synchronize  # noqa: E402
 
 
 def get_timestamp():
     if synchronize():
         return time.time()
     else:
-        logger.warning(f"Device synchronizing failed, which may result uncorrect time")
+        logger.warning("Device synchronizing failed, which may result uncorrect time")
     return time.time()
 
 

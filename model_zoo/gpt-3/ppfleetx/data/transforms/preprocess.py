@@ -20,7 +20,6 @@ from functools import partial
 import cv2
 import numpy as np
 from paddle.vision.transforms import ColorJitter as PPColorJitter
-from paddle.vision.transforms import Grayscale
 from paddle.vision.transforms import functional as F
 from PIL import Image, ImageFilter
 from ppfleetx.utils.log import logger

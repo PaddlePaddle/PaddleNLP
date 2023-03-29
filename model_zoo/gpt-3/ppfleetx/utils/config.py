@@ -42,13 +42,13 @@ def process_dist_config(configs):
     config.setdefault("hcg", "HybridCommunicateGroup")
     mp_degree = config.setdefault("mp_degree", 1)
     pp_degree = config.setdefault("pp_degree", 1)
-    pp_recompute_interval = config.setdefault("pp_recompute_interval", 1)
+    config.setdefault("pp_recompute_interval", 1)
 
     # sharding default
     sharding_config = config["sharding"]
     sharding_degree = sharding_config.setdefault("sharding_degree", 1)
-    sharding_stage = sharding_config.setdefault("sharding_stage", 2)
-    sharding_offload = sharding_config.setdefault("sharding_offload", False)
+    sharding_config.setdefault("sharding_stage", 2)
+    sharding_config.setdefault("sharding_offload", False)
     reduce_overlap = sharding_config.setdefault("reduce_overlap", False)
     broadcast_overlap = sharding_config.setdefault("broadcast_overlap", False)
 
@@ -240,7 +240,7 @@ def parse_config(cfg_file):
         base_dic = base_dic.copy()
         dic = dic.copy()
 
-        if dic.get("_inherited_", True) == False:
+        if dic.get("_inherited_", True) is False:
             dic.pop("_inherited_")
             return dic
 
@@ -350,12 +350,12 @@ def override(dl, ks, v):
         if len(ks) == 1:
             # assert ks[0] in dl, ('{} is not exist in {}'.format(ks[0], dl))
             if not ks[0] in dl:
-                print("A new field ({}) detected!".format(ks[0], dl))
+                print(f"A new field ({ks[0]}) detected!")
             dl[ks[0]] = str2num(v)
         else:
             if ks[0] not in dl.keys():
                 dl[ks[0]] = {}
-                print("A new Series field ({}) detected!".format(ks[0], dl))
+                print(f"A new Series field ({ks[0]}) detected!")
             override(dl[ks[0]], ks[1:], v)
 
 
@@ -578,10 +578,10 @@ def process_auto_ckpt_dir(config):
         return
 
     assert (
-        os.path.isdir(ckpt_dir) == False
+        os.path.isdir(ckpt_dir) is False
     ), "Wrong setting of ckpt_dir!ckpt_dir can't be a folder," "but {} is a folder".format(ckpt_dir)
 
-    assert os.path.exists(ckpt_dir) == False, (
+    assert os.path.exists(ckpt_dir) is False, (
         "Wrong setting of ckpt_dir,"
         "if you want to load weight,you should set ckpt_dir like this!"
         "for example:\ngpt_auto_model_save\n\t--auto_dist0.pdparams\n\t--auto_dist0.pdparams\n"
@@ -590,9 +590,9 @@ def process_auto_ckpt_dir(config):
 
     parent_path = os.path.split(ckpt_dir)[0]
 
-    if os.path.exists(parent_path) == False:
+    if os.path.exists(parent_path) is False:
         logging.warning("{} path is not existed!we will set ckpt_dir None.".format(parent_path))
-        configs["ckpt_dir"] == None
+        configs["ckpt_dir"] is None
 
 
 def get_auto_config(fname, overrides=None, show=False):

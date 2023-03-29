@@ -133,7 +133,7 @@ class MixPrecisionOptimizer:
                         )
                 params_grads.append((param, grad_var))
 
-            optimize_ops = self._inner_opt._apply_optimize(loss=None, startup_program=None, params_grads=params_grads)
+            self._inner_opt._apply_optimize(loss=None, startup_program=None, params_grads=params_grads)
         else:
             # optimize parameters in groups
             for param_group in self._inner_opt._param_groups:

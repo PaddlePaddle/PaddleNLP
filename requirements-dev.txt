@@ -9,4 +9,5 @@ pytest-xdist
 fast_tokenizer_python
 emoji
 ftfy
+yacs
 unidecode

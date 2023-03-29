@@ -173,6 +173,8 @@ def parse_args():
         "--use_recompute", type=strtobool, nargs="?", const=False, help="Using the recompute to save the memory."
     )
 
+    parser.add_argument("--lora", type=strtobool, nargs="?", const=False, help="Using LoRA or not.")
+
     # add sharding stage2/3
     parser.add_argument(
         "--sharding_stage",
