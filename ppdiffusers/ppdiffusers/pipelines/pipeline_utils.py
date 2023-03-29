@@ -617,6 +617,7 @@ class DiffusionPipeline(ConfigMixin):
         # 1. Download the checkpoints and configs
         # use snapshot download here to get it working from from_pretrained
         if not os.path.isdir(pretrained_model_name_or_path):
+            is_local_dir = False
             config_dict = cls.load_config(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
@@ -745,6 +746,7 @@ class DiffusionPipeline(ConfigMixin):
                     is_fastdeploy_model="fastdeploy" in cls.__name__.lower(),
                 )
         else:
+            is_local_dir = True
             cached_folder = pretrained_model_name_or_path
             config_dict = cls.load_config(cached_folder)
 
@@ -925,20 +927,28 @@ class DiffusionPipeline(ConfigMixin):
                     loading_kwargs["from_diffusers"] = from_diffusers
                     loading_kwargs["paddle_dtype"] = paddle_dtype
 
-                # check if the module is in a subdirectory
-                if os.path.isdir(os.path.join(cached_folder, name)):
-                    loaded_sub_model = load_method(os.path.join(cached_folder, name), **loading_kwargs)
-                else:
-                    # local file donot need from_hf_hub arguments!
-                    loading_kwargs["from_hf_hub"] = from_hf_hub
-                    # else load from the root directory
-                    loaded_sub_model = load_method(cached_folder, **loading_kwargs)
-
+                loaded_sub_model = None
+                try:
+                    # check if the module is in a subdirectory
+                    if os.path.isdir(os.path.join(cached_folder, name)):
+                        loaded_sub_model = load_method(os.path.join(cached_folder, name), **loading_kwargs)
+                    else:
+                        # else load from the root directory
+                        loaded_sub_model = load_method(cached_folder, **loading_kwargs)
+                except Exception:
+                    # (TODO, junnyu)
+                    # if we cant find this file, we will try to download this
+                    if not is_local_dir and not from_hf_hub:
+                        loaded_sub_model = load_method(
+                            pretrained_model_name_or_path + "/" + name, cache_dir=cache_dir, **loading_kwargs
+                        )
+                if loaded_sub_model is None:
+                    raise ValueError(f"We cant load '{name}' from {pretrained_model_name_or_path} or {cached_folder}!")
             # paddlenlp's model is in training mode not eval mode
-            if isinstance(loaded_sub_model, PretrainedModel):
-                # if paddle_dtype is not None and next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:
-                #     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
-                loaded_sub_model.eval()
+            # if isinstance(loaded_sub_model, PretrainedModel):
+            # if paddle_dtype is not None and next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:
+            #     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
+            # loaded_sub_model.eval()
 
             init_kwargs[name] = loaded_sub_model  # UNet(...), # DiffusionSchedule(...)
 
@@ -955,7 +965,16 @@ class DiffusionPipeline(ConfigMixin):
                 f"Pipeline {pipeline_class} expected {expected_modules}, but only {passed_modules} were passed."
             )
 
-        # 5. Instantiate the pipeline
+        # 5. (TODO, junnyu) make sure all modules are in eval mode
+        for name, _module in init_kwargs.items():
+            if isinstance(_module, nn.Layer):
+                _module.eval()
+            elif isinstance(_module, (tuple, list)):
+                if isinstance(_module[0], nn.Layer):
+                    for _submodule in _module:
+                        _submodule.eval()
+
+        # 6. Instantiate the pipeline
         model = pipeline_class(**init_kwargs)
 
         if return_cached_folder:
