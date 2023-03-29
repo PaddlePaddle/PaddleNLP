@@ -27,8 +27,8 @@ __all__ = [
 GLM130B_PRETRAINED_INIT_CONFIGURATION = {
     "glm-130b": {
         "hidden_size": 12288,
-        "mlp_hidden_size": 12288 * 8 / 3,
-        "num_layers": 70,
+        "inner_hidden_size": 12288 * 8 / 3,
+        "num_hidden_layers": 70,
         "num_attention_heads": 96,
         "length_per_sample": 2000,
         "max_length": 2048,
@@ -68,7 +68,7 @@ class GLM130BConfig(PretrainedConfig):
         max_length=2048,
         inner_hidden_size=12288 * 8 // 3,
         num_attention_heads=96,
-        num_layers=70,
+        num_hidden_layers=70,
         output_dropout_prob=0.1,
         output_predict=True,
         paddle_dtype="float16",
@@ -90,7 +90,7 @@ class GLM130BConfig(PretrainedConfig):
         self.max_length = max_length
         self.inner_hidden_size = inner_hidden_size
         self.num_attention_heads = num_attention_heads
-        self.num_layers = num_layers
+        self.num_hidden_layers = num_hidden_layers
         self.output_dropout_prob = output_dropout_prob
         self.output_predict = output_predict
         self.paddle_dtype = paddle_dtype

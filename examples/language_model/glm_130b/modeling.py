@@ -15,24 +15,26 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle import Tensor
-from paddle.distributed.fleet.utils import recompute
-
-from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.utils.env import CONFIG_NAME
-from paddlenlp.utils.initializer import normal_, ones_, zeros_
-
-from .configuration import (
+from configuration import (
     GLM130B_PRETRAINED_INIT_CONFIGURATION,
     GLM130B_PRETRAINED_RESOURCE_FILES_MAP,
     GLM130BConfig,
 )
+from paddle import Tensor
+from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.utils.converter import StateDictNameMapping
+from paddlenlp.utils.env import CONFIG_NAME
+from paddlenlp.utils.initializer import normal_, ones_, zeros_
 
 __all__ = [
     "GLM130BModel",
@@ -54,13 +56,18 @@ class RotaryEmbeddings(nn.Layer):
     def forward(self, x, seq_dim=1, seq_len=None):
         if seq_len is None:
             seq_len = x.shape[seq_dim]
+        # x.shape = [b, s, n, h/n/2]
         if self.max_seq_len_cached is None or (seq_len > self.max_seq_len_cached):
             self.max_seq_len_cached = seq_len
+            # [s]
             t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
+            # [s, h/n/2]
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
             if self.dtype == paddle.float16:
                 emb = emb.astype("float32")
+            # [s, 1, h/n]
             cos_cached = emb.cos().unsqueeze(1)
             sin_cached = emb.sin().unsqueeze(1)
 
@@ -69,6 +76,7 @@ class RotaryEmbeddings(nn.Layer):
                 sin_cached = sin_cached.astype(self.dtype)
 
             self.cos_cached, self.sin_cached = cos_cached, sin_cached
+
         return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
 
 
@@ -91,9 +99,19 @@ class GLM130BAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.attention_scale = config.attention_scale
 
-        self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+        if config.tensor_parallel_degree > 1:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, 3 * config.hidden_size, has_bias=True, gather_output=False
+            )
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+            self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
+        else:
+            self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+
         self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.output_dropout = nn.Dropout(config.output_dropout_prob)
 
     def _transpose_for_scores(self, inputs: Tensor):
@@ -112,12 +130,44 @@ class GLM130BAttention(nn.Layer):
         return paddle.concat([-x2, x1], axis=-1)
 
     def _apply_rotary_position_embed_index(self, q, k, cos, sin, position_ids):
+        # q.shape = [s, b, n, h/n/2], cos.shape = [s, 1, h/n], position_ids.shape = [s, b]
+        # [s, b, 1, h/n]
         cos, sin = F.embedding(position_ids, cos.squeeze(1)).unsqueeze(2), F.embedding(
             position_ids, sin.squeeze(1)
         ).unsqueeze(2)
+        # [s, b, n, h/n]
         q = q * cos + self._rotate_half(q) * sin
         k = k * cos + self._rotate_half(k) * sin
         return q, k
+
+    def _core_attention(
+        self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor, rotary_embeddings: RotaryEmbeddings = None
+    ):
+        # Set store_true, position_encoding_2d=False by default.
+        if self.config.position_encoding_2d:
+            # [s, b, n, h/n/2]
+            q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
+            k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
+            # [s, 1, h/n]
+            cos, sin = rotary_embeddings(q1, seq_len=position_ids.max() + 1)
+            # [s, b]
+            position_ids, block_position_ids = position_ids[:, 0, :].transpose([1, 0]), position_ids[
+                :, 1, :
+            ].transpose([1, 0])
+
+            # [s, b, n, h/n]
+            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
+            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, cos, sin, block_position_ids)
+            q_layer = paddle.concat([q1, q2], axis=-1)
+            k_layer = paddle.concat([k1, k2], axis=-1)
+        else:
+            # [s, b]
+            position_ids = position_ids.transpose([1, 0])
+            # [s, 1, h/n]
+            cos, sin = rotary_embeddings(q_layer, seq_len=position_ids.max() + 1)
+            # [s, b, n, h/n]
+            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
+        return q_layer, k_layer
 
     def forward(
         self,
@@ -128,39 +178,31 @@ class GLM130BAttention(nn.Layer):
         cache: Tensor = None,
         label_id=0,
     ):
-        batch_size, query_length = hidden_states.shape[:2]
+        # [s, b, h]
+        query_length, batch_size = hidden_states.shape[:2]
         if cache is None:
+            # [s, b, 3h]
             mixed_layer = self.query_key_value(hidden_states)
+            # [s, b, n, 3h//n]
             mixed_layer = mixed_layer.reshape(
-                [batch_size, query_length, self.num_attention_heads, self.attention_head_size * 3]
+                [query_length, batch_size, self.num_attention_heads, self.attention_head_size * 3]
             )
+            # [s, b, n, h//n]
             q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         else:
-            concat_hidden_states = paddle.concat([cache, hidden_states], axis=1)
+            # [s + c, b, h]
+            concat_hidden_states = paddle.concat([cache, hidden_states], axis=0)
+            # [s + c, b, 3h]
             mixed_layer = self.query_key_value(concat_hidden_states)
-            mixed_layer = mixed_layer.reshape(
-                [batch_size, query_length, self.num_attention_heads, self.attention_head_size * 3]
-            )
+            # [s + c, b, n, 3h//n]
+            mixed_layer = mixed_layer.reshape([-1, batch_size, self.num_attention_heads, self.attention_head_size * 3])
+            # [s + c, b, n, h//n]
             q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
-            q_layer = q_layer[:, -query_length:]
+            # [s + c, b, n, h//n]
+            q_layer = q_layer[-query_length:, :, :, :]
 
-        # Set store_true, position_encoding_2d=False by default.
-        if self.config.position_encoding_2d:
-            q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
-            k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
-            cos, sin = rotary_embeddings(q1, seq_len=position_ids.max() + 1)
-            position_ids, block_position_ids = position_ids[:, 0, :].transpose([1, 0]), position_ids[
-                :, 1, :
-            ].transpose([1, 0])
-            q1, k1 = self._appply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
-            q2, k2 = self._appply_rotary_position_embed_index(q2, k2, cos, sin, block_position_ids)
-            q_layer = paddle.concat([q1, q2], axis=-1)
-            k_layer = paddle.concat([k1, k2], axis=-1)
-        else:
-            position_ids = position_ids.transpose([1, 0])
-            cos, sin = rotary_embeddings(v_layer, seq_len=position_ids.max() + 1)
-            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
-
+        # [s, b, n, h/n]
+        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeddings)
         seq_length, batch_size, num_heads, hidden_size = k_layer.shape
         # cache_kv = (
         #    paddle.stack([k_layer, v_layer], axis=0)
@@ -169,21 +211,28 @@ class GLM130BAttention(nn.Layer):
         # )
         if cache is not None:
             cache = cache.expand([batch_size, -1, -1]).reshape([batch_size, cache.shape[1], 2, num_heads, hidden_size])
+            # [2, c, b, n, h/n]
             cache = cache.transpose([2, 1, 0, 3, 4])
             cache_k, cache_v = cache[0], cache[1]
+            # [s + c, b, n, h/n]
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
         attention_scale_coeff = float(label_id) + 1.0
         if self.attention_scale:
+            # [s, b, n, h/n]
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
 
+        # [b, n, s, s]
         output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
+        # [s, b * n, h/n]
         q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
         k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
 
+        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
         attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+        # [b, n, s, s]
         attention_scores = attention_scores.reshape(output_shape)
 
         ltor_mask = ltor_mask.astype(attention_scores.dtype)
@@ -194,8 +243,11 @@ class GLM130BAttention(nn.Layer):
         attention_probs = F.softmax(attention_scores, axis=-1)
         attention_probs = self.attention_dropout(attention_probs).astype(self.config.paddle_dtype)
 
+        # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+        # [s, b * n, h/n]
         v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+        # [b * n, s, s]
         attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
 
         context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
@@ -203,7 +255,7 @@ class GLM130BAttention(nn.Layer):
 
         context_layer = context_layer.transpose([0, 2, 1, 3])
 
-        new_context_shape = context_layer.shape[:-2] + [self.hidden_size]
+        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
         context_layer = context_layer.reshape(new_context_shape)
 
         output = self.dense(context_layer)
@@ -242,7 +294,7 @@ class GLM130BBlock(nn.Layer):
             layernorm_output, ltor_mask, position_ids, rotary_embeddings, cache, self.layer_id
         )
         # Residual connection
-        alpha = (2 * self.config.num_layers) ** 0.5
+        alpha = (2 * self.config.num_hidden_layers) ** 0.5
         layernorm_input = alpha * layernorm_output + attention_output
         # Layernorm after attention
         layernorm_output = self.post_attention_layernorm(layernorm_input)
@@ -257,8 +309,16 @@ class GLM130BMLP(nn.Layer):
     def __init__(self, config: GLM130BConfig):
         super(GLM130BMLP, self).__init__()
         inner_hidden_size = config.hidden_size * 4 // 3 * 2
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size * 2)
-        self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
+        if config.tensor_parallel_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, inner_hidden_size * 2, has_bias=True, gather_output=False
+            )
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                inner_hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+        else:
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size * 2)
+            self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.output_dropout_prob)
 
     def geglu(self, x):
@@ -281,19 +341,28 @@ class GLM130BStack(nn.Layer):
 
     def __init__(self, config: GLM130BConfig):
         super(GLM130BStack, self).__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.enable_recompute = config.recompute
         self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
-        self.word_embeddings = nn.Embedding(
-            config.vocab_size,
-            config.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-        )
+        if self.config.tensor_parallel_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+
         attention_head_size = config.hidden_size // config.num_attention_heads
         self.rotary_embeddings = RotaryEmbeddings(attention_head_size, base=10000, dtype=config.paddle_dtype)
         self.layers = nn.LayerList()
-        for index in range(config.num_layers):
+        for index in range(config.num_hidden_layers):
             self.layers.append(GLM130BBlock(config, index))
 
         self.final_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
@@ -388,6 +457,59 @@ class GLM130BPretrainedModel(PretrainedModel):
             ones_(layer.weight)
             zeros_(layer.bias)
 
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config):
+
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_old_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
+            return split_tensor_parallel_weight(
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
+            )
+
+        def get_tensor_parallel_split_mappings(num_hidden_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True),
+                # Row Linear
+                "transformer.word_embeddings.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.attention.dense.bias',
+                "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
+                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_hidden_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        prefix = ""
+        # prefix = "glm."
+
+        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+
 
 @register_base_model
 class GLM130BModel(GLM130BPretrainedModel):
@@ -416,13 +538,32 @@ class GLM130BModel(GLM130BPretrainedModel):
     def set_input_embeddings(self, value):
         self.word_embeddings = value
 
+    def parallel_matmul(self, lm_output, logit_weights, parallel_output):
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        world_size = hcg.get_model_parallel_world_size()
+
+        if world_size > 1:
+            # _c_identity is backwards is reduce
+            input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+
+            logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+
+            if parallel_output:
+                return logits
+
+            # _c_concat has not grad backwards
+            return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+        else:
+            logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+            return logits
+
     def forward(
         self,
         input_ids: Tensor = None,
         position_ids: Tensor = None,
         attention_mask: Tensor = None,
         cache: Tensor = None,
-        use_cache: bool = None,
         return_dict: bool = None,
     ):
         batch_size, seq_len = input_ids.shape[:2]
@@ -442,7 +583,15 @@ class GLM130BModel(GLM130BPretrainedModel):
             memory_states=cache,
         )
         if self.output_predict:
-            logits = F.linear(logits, self.transformer.word_embeddings.weight.T).transpose([1, 0, 2])
+            if self.config.tensor_parallel_degree > 1:
+                # FIXME: @ZHUI fix for jit_to_static
+                logits = self.parallel_matmul(
+                    logits, self.transformer.word_embeddings.weight, self.config.tensor_parallel_output
+                )
+            else:
+                logits = F.linear(logits, self.transformer.word_embeddings.weight.T)
+
+            logits = logits.transpose([1, 0, 2])
 
         if not return_dict:
             return (logits, hidden_layers)
