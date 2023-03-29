@@ -75,7 +75,7 @@ class PipelineTesterMixin:
 
     def get_dummy_inputs(self, seed=0):
         raise NotImplementedError(
-            "You need to implement `get_dummy_inputs(self, device, seed)` in the child test class. See existing pipeline tests for reference."
+            "You need to implement `get_dummy_inputs(self, seed)` in the child test class. See existing pipeline tests for reference."
         )
 
     @property

@@ -575,7 +575,7 @@ class StableDiffusionInstructPix2PixPipeline(DiffusionPipeline):
         return latents
 
     def prepare_image_latents(
-        self, image, batch_size, num_images_per_prompt, dtype, device, do_classifier_free_guidance, generator=None
+        self, image, batch_size, num_images_per_prompt, dtype, do_classifier_free_guidance, generator=None
     ):
         if not isinstance(image, (paddle.Tensor, PIL.Image.Image, list)):
             raise ValueError(
