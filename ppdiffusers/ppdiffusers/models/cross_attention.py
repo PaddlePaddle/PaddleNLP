@@ -94,8 +94,8 @@ class CrossAttention(nn.Layer):
 
         # set attention processor
         if processor is None:
-            # processor = CrossAttnProcessor()
-            processor = AttnProcessor2_5() if is_ppxformers_available() else CrossAttnProcessor()
+            processor = CrossAttnProcessor()
+            # processor = AttnProcessor2_5() if is_ppxformers_available() else CrossAttnProcessor()
         self.set_processor(processor)
 
     def set_use_memory_efficient_attention_xformers(
