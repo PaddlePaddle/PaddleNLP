@@ -19,9 +19,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import CrossEntropyLoss, MSELoss
+
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    CTRL_PRETRAINED_INIT_CONFIGURATION,
+    CTRL_PRETRAINED_RESOURCE_FILES_MAP,
+    CTRLConfig,
+)
 
 __all__ = [
+    "CTRLPreTrainedModel",
     "CTRLModel",
     "CTRLLMHeadModel",
     "CTRLForSequenceClassification",
@@ -185,43 +193,10 @@ class CTRLPreTrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "ctrl"
-
-    pretrained_init_configuration = {
-        "ctrl": {
-            "tie_word_embeddings": True,
-            "intermediate_size": 8192,
-            "embd_pdrop": 0.1,
-            "initializer_range": 0.02,
-            "layer_norm_epsilon": 1e-06,
-            "hidden_size": 1280,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 48,
-            "max_position_embeddings": 50000,
-            "resid_pdrop": 0.1,
-            "vocab_size": 246534,
-            "pad_token_id": None,
-        },
-        "sshleifer-tiny-ctrl": {
-            "tie_word_embeddings": True,
-            "intermediate_size": 2,
-            "embd_pdrop": 0.1,
-            "initializer_range": 0.02,
-            "layer_norm_epsilon": 1e-06,
-            "hidden_size": 16,
-            "num_attention_heads": 2,
-            "num_hidden_layers": 2,
-            "max_position_embeddings": 50000,
-            "resid_pdrop": 0.1,
-            "vocab_size": 246534,
-            "pad_token_id": None,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ctrl": "https://bj.bcebos.com/paddlenlp/models/transformers/ctrl/model_state.pdparams",
-            "sshleifer-tiny-ctrl": "https://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/model_state.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    pretrained_init_configuration = CTRL_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = CTRL_PRETRAINED_RESOURCE_FILES_MAP
+    config_class = CTRLConfig
 
     def init_weights(self):
         self.apply(self._init_weights)
@@ -273,43 +248,8 @@ class CTRLModel(CTRLPreTrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `CTRLModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `CTRLModel`.
-            Defaults to `246534`.
-        max_position_embeddings (int, optional):
-            The maximum sequence length that this model might ever be used with. Typically set this to something large just in case (e.g., 512 or 1024 or 2048 or 50000).
-            Defaults to `50000`.
-        hidden_size (int, optional):
-            Dimensionality of the embeddings and hidden states.
-            Defaults to `1280`.
-        intermediate_size (int, optional):
-            Dimensionality of the inner dimension of the feed forward networks (FFN).
-            Defaults to `8192`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder.
-            Defaults to `48`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `16`.
-        resid_pdrop (float, optional):
-            The dropout ratio for all fully connected layers in the encoder.
-            Defaults to `0.1`.
-        embd_pdrop (float, optional):
-            The dropout ratio for the embeddings.
-            Defaults to `0.1`.
-        layer_norm_epsilon  (float, optional):
-            The epsilon to use in the layer normalization layers.
-            Defaults to `1e-6`.
-        tie_word_embeddings (bool, optional):
-            Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the model has a output word embedding layer.
-            Defaults to `True`.
-        pad_token_id (bool, optional):
-            The id of the `padding` token.
-            Defaults to `None`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
@@ -317,39 +257,31 @@ class CTRLModel(CTRLPreTrainedModel):
 
     """
 
-    def __init__(
-        self,
-        vocab_size=246534,
-        max_position_embeddings=50000,
-        hidden_size=1280,
-        intermediate_size=8192,
-        num_hidden_layers=48,
-        num_attention_heads=16,
-        resid_pdrop=0.1,
-        embd_pdrop=0.1,
-        layer_norm_epsilon=1e-6,
-        tie_word_embeddings=True,
-        pad_token_id=None,
-        initializer_range=0.02,
-    ):
-        super().__init__()
+    def __init__(self, config: CTRLConfig):
+        super().__init__(config)
 
-        self.hidden_size = hidden_size
-        self.num_layers = num_hidden_layers
-        self.initializer_range = initializer_range
+        self.hidden_size = config.hidden_size
+        self.num_layers = config.num_hidden_layers
+        self.initializer_range = config.initializer_range
 
-        self.pos_encoding = SinusoidalPositionalEmbedding(max_position_embeddings, self.hidden_size)
+        self.pos_encoding = SinusoidalPositionalEmbedding(config.max_position_embeddings, self.hidden_size)
 
-        self.w = nn.Embedding(vocab_size, hidden_size)
+        self.w = nn.Embedding(config.vocab_size, config.hidden_size)
 
-        self.dropout = nn.Dropout(embd_pdrop)
+        self.dropout = nn.Dropout(config.embd_pdrop)
         self.h = nn.LayerList(
             [
-                EncoderLayer(hidden_size, num_attention_heads, intermediate_size, resid_pdrop, layer_norm_epsilon)
+                EncoderLayer(
+                    config.hidden_size,
+                    config.num_attention_heads,
+                    config.intermediate_size,
+                    config.resid_pdrop,
+                    config.layer_norm_epsilon,
+                )
                 for _ in range(self.num_layers)
             ]
         )
-        self.layernorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_epsilon)
+        self.layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_epsilon)
 
         self.init_weights()
 
@@ -540,23 +472,23 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
     layer with weights tied to the input embeddings).
 
     Args:
-        ctrl (:class:`CTRLModel`):
-            An instance of :class:`CTRLModel`.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
     """
 
-    def __init__(self, ctrl):
-        super().__init__()
-        self.ctrl = ctrl
-        if self.ctrl.config["tie_word_embeddings"]:
+    def __init__(self, config: CTRLConfig):
+        super().__init__(config)
+        self.ctrl = CTRLModel(config)
+        if config.tie_word_embeddings:
             self.lm_head = self.ctrl.w
             self.lm_head_bias = self.create_parameter(
-                shape=[self.ctrl.config["vocab_size"]],
+                shape=[config.vocab_size],
                 dtype=self.lm_head.weight.dtype,
                 is_bias=True,
             )
         else:
-            self.lm_head = nn.Linear(self.ctrl.config["hidden_size"], self.ctrl.config["vocab_size"])
+            self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
 
         self.init_weights()
 
@@ -697,23 +629,16 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
     `pad_token_id` is defined, it simply takes the last value in each row of the batch.
 
     Args:
-        ctrl (:class:`CTRLModel`):
-            An instance of :class:`CTRLModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of CTRL.
-            If None, use the same value as `hidden_dropout_prob` of `CTRLModel`
-            instance `ctrl`. Defaults to None.
+        config (:class:`CTRLConfig`):
+            An instance of :class:`CTRLConfig`.
 
     """
 
-    def __init__(self, ctrl, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.ctrl = ctrl
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ctrl.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ctrl.config["hidden_size"], num_classes, bias_attr=False)
+    def __init__(self, config: CTRLConfig):
+        super().__init__(config)
+        self.num_classes = config.num_classes
+        self.ctrl = CTRLModel(config)
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes, bias_attr=False)
 
         self.init_weights()
 
@@ -811,14 +736,20 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
         batch_size = input_ids.shape[0]
 
         assert (
-            self.ctrl.config["pad_token_id"] is not None or batch_size == 1
+            self.config.pad_token_id is not None or batch_size == 1
         ), "Cannot handle batch sizes > 1 if no padding token is defined."
 
-        if self.ctrl.config["pad_token_id"] is None:
+        if self.config.pad_token_id is None:
             sequence_lengths = -1
         else:
-            sequence_lengths = paddle.not_equal(
-                input_ids, self.ctrl.config["pad_token_id"].astype(paddle.int64).sum(-1) - 1
+            sequence_lengths = (
+                paddle.not_equal(
+                    input_ids,
+                    paddle.full(shape=input_ids.shape, fill_value=self.config.pad_token_id, dtype=input_ids.dtype),
+                )
+                .astype(paddle.int64)
+                .sum(-1)
+                - 1
             )
 
         pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(batch_size), sequence_lengths], axis=-1))
