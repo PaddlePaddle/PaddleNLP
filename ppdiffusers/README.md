@@ -23,7 +23,7 @@
 
 * 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
 模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）或 [SD等原库的Lightning权重进行推理](#加载原库的Lightning权重)，[支持加载Civitai社区的LoRA权重](#加载Civitai社区的LoRA权重)；
-[支持xformers](#XFofrmers加速) 训练与推理；
+[支持xformers](#XFormers加速) 训练与推理；
 新增用于超高分辨率生成的VAE tiling；
 新增Instruct Pix2Pix、Semantic guidance、Depth2image等模型。**
 
@@ -159,8 +159,8 @@ pipe = StableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix")
 pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
 ```
 
-### XFofrmers加速
-为了使用**XFofrmers加速**，我们需要安装`develop`版本的`paddle`，Linux系统的安装命令如下：
+### XFormers加速
+为了使用**XFormers加速**，我们需要安装`develop`版本的`paddle`，Linux系统的安装命令如下：
 ```sh
 python -m pip install paddlepaddle-gpu==0.0.0.post117 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
 ```
@@ -359,6 +359,9 @@ image.save("ldm-super-resolution-image.png")
 
 </details>
 
+<details><summary>&emsp; FastDeploy Demo </summary>
+
+**注意：当前导出的vae encoder带有随机因素！**
 ```python
 import paddle
 import fastdeploy as fd
@@ -419,6 +422,7 @@ image_inpaint_legacy = fd_pipe.inpaint_legacy(
 ).images[0]
 image_inpaint_legacy.save("image_inpaint_legacy.png")
 ```
+</details>
 <div align="center">
 <img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/205297240-46b80992-34af-40cd-91a6-ae76589d0e21.png">
 </div>
