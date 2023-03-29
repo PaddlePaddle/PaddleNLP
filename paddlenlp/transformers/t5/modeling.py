@@ -23,12 +23,13 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
 
 try:
     from paddle.amp.auto_cast import amp_state
 except ImportError:
     from paddle.fluid.dygraph.amp.auto_cast import amp_state
-from paddle.distributed.fleet.utils import recompute
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -107,8 +108,16 @@ class T5DenseReluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
@@ -126,9 +135,20 @@ class T5DenseGatedGeluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi_0 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wi_1 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
         self.gelu_act = ACT2FN["gelu_new"]
 
@@ -148,9 +168,20 @@ class T5DenseGatedSiluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi_0 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wi_1 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
@@ -199,10 +230,27 @@ class T5Attention(nn.Layer):
         self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
-        self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.k = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.v = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.o = nn.Linear(self.inner_dim, self.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            assert self.n_heads % config.tensor_parallel_degree == 0
+            self.q = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.k = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.v = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.o = fleet.meta_parallel.RowParallelLinear(
+                self.inner_dim, self.d_model, has_bias=False, input_is_parallel=True
+            )
+            self.n_heads = self.n_heads // config.tensor_parallel_degree
+            self.inner_dim = self.inner_dim // config.tensor_parallel_degree
+        else:
+            self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.k = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.v = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.o = nn.Linear(self.inner_dim, self.d_model, bias_attr=False)
 
         if self.has_relative_attention_bias:
             self.relative_attention_bias = nn.Embedding(self.relative_attention_num_buckets, self.n_heads)
@@ -1163,7 +1211,10 @@ class T5Model(T5PretrainedModel):
         self.d_kv = config.d_kv
         self.d_ff = config.d_ff
         self.tie_word_embeddings = config.tie_word_embeddings
-        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        if config.tensor_parallel_degree > 1:
+            self.shared = fleet.meta_parallel.VocabParallelEmbedding(config.vocab_size, config.d_model)
+        else:
+            self.shared = nn.Embedding(config.vocab_size, config.d_model)
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
@@ -1405,8 +1456,13 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     def __init__(self, config: T5Config):
         super().__init__(config)
         self.t5 = T5Model(config)
-        if not self.t5.config["tie_word_embeddings"]:
-            self.lm_head = nn.Linear(self.t5.config["d_model"], self.t5.config["vocab_size"], bias_attr=False)
+        if not config.tie_word_embeddings:
+            if config.tensor_parallel_degree > 1:
+                self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias_attr=False)
+            else:
+                self.lm_head = nn.Linear(
+                    config.d_model, config.vocab_size // config.tensor_parallel_degree, bias_attr=False
+                )
 
         self.init_weights()
 
