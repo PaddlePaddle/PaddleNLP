@@ -1527,6 +1527,8 @@ class Trainer:
                 unwrap_model(self.model).save_pretrained(output_dir, merge_tensor_parallel=merge_tensor_parallel)
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
+                if merge_tensor_parallel:
+                    logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 paddle.save(
