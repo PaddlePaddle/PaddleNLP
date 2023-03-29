@@ -453,7 +453,8 @@ class UniPCMultistepScheduler(SchedulerMixin, ConfigMixin):
         b = paddle.to_tensor(b)
 
         if len(D1s) > 0:
-            D1s = paddle.stack(D1s, axis=1)
+            # cast this  to float32
+            D1s = paddle.stack(D1s, axis=1).cast("float32")
         else:
             D1s = None
 

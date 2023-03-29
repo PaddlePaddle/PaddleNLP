@@ -735,8 +735,17 @@ if is_paddle_available() and is_paddlenlp_available():
 
         loaded_state_dict_keys = list(state_dict.keys())
 
-        if paddle_dtype is not None:
-            model.to(dtype=paddle_dtype)
+        dtype = set(v.dtype for v in state_dict.values())
+        if len(dtype) > 1 and paddle.float32 not in dtype:
+            raise ValueError(
+                f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
+                f" make sure that {model_file} weights have only one dtype."
+            )
+        elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        else:
+            dtype = dtype.pop()
+        model = model.to(dtype=dtype)
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
@@ -751,6 +760,14 @@ if is_paddle_available() and is_paddlenlp_available():
             "mismatched_keys": mismatched_keys,
             "error_msgs": "",
         }
+
+        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
+            raise ValueError(
+                f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
+            )
+        elif paddle_dtype is not None:
+            model = model.to(dtype=paddle_dtype)
+
         if len(unexpected_keys) > 0:
             logger.warning(
                 f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
@@ -857,6 +874,9 @@ if is_paddle_available() and is_paddlenlp_available():
             model_to_save.config.save_pretrained(save_directory)
 
         state_dict = model_to_save.state_dict()
+        # save ignore lora_weights
+        fn = lambda k: ".lora_" in k or ".alpha" in k
+        state_dict = {k: v for k, v in state_dict.items() if not fn(k)}
 
         # choose save_function
         if save_function is None:

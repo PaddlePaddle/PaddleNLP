@@ -245,6 +245,10 @@ class ModelMixin(nn.Layer):
         # Save the model
         state_dict = model_to_save.state_dict()
 
+        # save ignore lora_weights
+        fn = lambda k: ".lora_" in k or ".alpha" in k
+        state_dict = {k: v for k, v in state_dict.items() if not fn(k)}
+
         # choose save_function
         if save_function is None:
             if to_diffusers:
