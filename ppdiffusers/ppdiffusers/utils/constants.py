@@ -21,7 +21,8 @@ ppnlp_cache_home = os.path.expanduser(
 )
 
 ppdiffusers_default_cache_path = os.path.join(ppnlp_cache_home, "ppdiffusers")
-diffusers_default_cache_path = os.path.join(HUGGINGFACE_HUB_CACHE, "diffusers")
+# diffusers_default_cache_path = os.path.join(HUGGINGFACE_HUB_CACHE, "diffusers")
+diffusers_default_cache_path = HUGGINGFACE_HUB_CACHE
 
 CONFIG_NAME = "config.json"
 TORCH_WEIGHTS_NAME = "diffusion_pytorch_model.bin"
