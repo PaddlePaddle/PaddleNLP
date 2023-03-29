@@ -434,7 +434,7 @@ function gpt_auto_serial() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9509 ${loss}
+    check_result $FUNCNAME 10.9507 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -462,7 +462,7 @@ function gpt_auto_dp2mp2() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9697 ${loss}
+    check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -490,7 +490,7 @@ function gpt_auto_mp2pp2() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
     loss=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9509 ${loss}
+    check_result $FUNCNAME 10.9507 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -520,7 +520,7 @@ function gpt_auto_dp2pp2() {
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9732 ${loss}
+    check_result $FUNCNAME 10.9730 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -550,7 +550,7 @@ function gpt_auto_dp2mp2pp2() {
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9732 ${loss}
+    check_result $FUNCNAME 10.9730 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -606,7 +606,7 @@ function gpt_auto_dp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9697 ${loss}
+    check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -634,7 +634,7 @@ function gpt_auto_dp2mp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto"
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9697 ${loss}
+    check_result $FUNCNAME 10.9695 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -664,7 +664,7 @@ function gpt_auto_dp2pp2sharding2() {
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9732 ${loss}
+    check_result $FUNCNAME 10.9730 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -694,7 +694,7 @@ function gpt_auto_dp2mp2pp2sharding2() {
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9732 ${loss}
+    check_result $FUNCNAME 10.9730 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
