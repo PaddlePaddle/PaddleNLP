@@ -27,14 +27,10 @@ if TYPE_CHECKING:
 
 import paddle
 import tqdm
-from huggingface_hub import (
-    HUGGINGFACE_CO_RESOLVE_ENDPOINT,
-    EntryNotFoundError,
-    HTTPError,
-    hf_hub_download,
-    try_to_load_from_cache,
-)
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub.utils import EntryNotFoundError
 from paddle.nn import Layer
+from requests.exceptions import HTTPError
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
@@ -45,6 +41,9 @@ PT_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
 SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
 SAFE_WEIGHTS_NAME = "model.safetensors"
 WEIGHTS_NAME = "model_state.pdparams"
+
+
+HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
 def fn_args_to_dict(func, *args, **kwargs):
