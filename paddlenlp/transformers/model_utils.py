@@ -90,6 +90,7 @@ __all__ = [
 
 
 if is_safetensors_available():
+
     from safetensors import safe_open
     from safetensors.paddle import load_file as safe_load_file
     from safetensors.paddle import save_file as safe_save_file
@@ -347,6 +348,28 @@ def _find_weight_file_path(
     )
 
 
+def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
+    """
+    Reads a PyTorch checkpoint file, returning properly formatted errors if they arise.
+    """
+    if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
+        # Check format of the archive
+        with safe_open(checkpoint_file, framework="pt") as f:
+            metadata = f.metadata()
+        if metadata.get("format") not in ["pt", "pd", "np"]:
+            raise OSError(
+                f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
+                "you save your model with the `save_pretrained` method."
+            )
+        elif metadata["format"] != "pd":
+            raise NotImplementedError(
+                f"Conversion from a {metadata['format']} safetensors archive to PaddlePaddle is not implemented yet."
+            )
+        return safe_load_file(checkpoint_file)
+
+    return paddlenlp_load(checkpoint_file, return_numpy=True)
+
+
 def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
     """find the suitable weight file name
 
@@ -427,7 +450,7 @@ def dtype_byte_size(dtype):
     Example:
 
     ```py
-    >>> dtype_byte_size(torch.float32)
+    >>> dtype_byte_size(paddle.float32)
     4
     ```
     """

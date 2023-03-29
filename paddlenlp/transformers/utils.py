@@ -26,8 +26,15 @@ if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
 import paddle
-from paddle.nn import Layer
 import tqdm
+from huggingface_hub import (
+    HUGGINGFACE_CO_RESOLVE_ENDPOINT,
+    EntryNotFoundError,
+    HTTPError,
+    hf_hub_download,
+    try_to_load_from_cache,
+)
+from paddle.nn import Layer
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
@@ -348,7 +355,7 @@ def get_checkpoint_shard_files(
     - download and cache all the shards of a sharded checkpoint if `pretrained_model_name_or_path` is a model ID on the
       Hub
     - returns the list of paths to all the shards, as well as some metadata.
-    For the description of each arg, see [`PreTrainedModel.from_pretrained`]. `index_filename` is the full path to the
+    For the description of each arg, see [`PretrainedModel.from_pretrained`]. `index_filename` is the full path to the
     index (downloaded and cached if `pretrained_model_name_or_path` is a model ID on the Hub).
     """
 
@@ -377,24 +384,40 @@ def get_checkpoint_shard_files(
     last_shard = try_to_load_from_cache(
         pretrained_model_name_or_path, shard_filenames[-1], cache_dir=cache_dir, revision=_commit_hash
     )
+
     show_progress_bar = last_shard is None or force_download
     for shard_filename in tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
             # Load from URL
-            cached_filename = cached_file(
+            # cached_filename = cached_file(
+            #     pretrained_model_name_or_path,
+            #     shard_filename,
+            #     cache_dir=cache_dir,
+            #     force_download=force_download,
+            #     proxies=proxies,
+            #     resume_download=resume_download,
+            #     local_files_only=local_files_only,
+            #     use_auth_token=use_auth_token,
+            #     user_agent=user_agent,
+            #     revision=revision,
+            #     subfolder=subfolder,
+            #     _commit_hash=_commit_hash,
+            # )
+
+            cached_filename = hf_hub_download(
                 pretrained_model_name_or_path,
                 shard_filename,
+                subfolder=None if len(subfolder) == 0 else subfolder,
+                revision=revision,
                 cache_dir=cache_dir,
+                user_agent=user_agent,
                 force_download=force_download,
                 proxies=proxies,
                 resume_download=resume_download,
-                local_files_only=local_files_only,
                 use_auth_token=use_auth_token,
-                user_agent=user_agent,
-                revision=revision,
-                subfolder=subfolder,
-                _commit_hash=_commit_hash,
+                local_files_only=local_files_only,
             )
+
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:
