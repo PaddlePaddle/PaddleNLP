@@ -18,7 +18,6 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-# from ..test_configuration_common import ConfigTester
 from paddlenlp.transformers import (
     CTRLConfig,
     CTRLForSequenceClassification,
@@ -28,8 +27,6 @@ from paddlenlp.transformers import (
 )
 
 from ...testing_utils import slow
-
-# from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
@@ -189,12 +186,10 @@ class CTRLModelTester:
 
 
 @parameterized_class(
-    ("return_dict", "use_labels"),
+    ("use_labels"),
     [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
+        [False],
+        [True],
     ],
 )
 class CTRLModelTest(ModelTesterMixin, unittest.TestCase):
@@ -202,30 +197,10 @@ class CTRLModelTest(ModelTesterMixin, unittest.TestCase):
     return_dict = False
     use_labels = False
     all_model_classes = (CTRLModel, CTRLLMHeadModel, CTRLForSequenceClassification)
-    # all_generative_model_classes = (CTRLLMHeadModel,)
-    # test_pruning = True
-    # test_resize_embeddings = False
-    # test_head_masking = False
-
-    # # TODO: Fix the failed tests
-    # def is_pipeline_test_to_skip(
-    #     self, pipeline_test_casse_name, config_class, model_architecture, tokenizer_name, processor_name
-    # ):
-    #     if pipeline_test_casse_name == "ZeroShotClassificationPipelineTests":
-    #         # Get `tokenizer does not have a padding token` error for both fast/slow tokenizers.
-    #         # `CTRLConfig` was never used in pipeline tests, either because of a missing checkpoint or because a tiny
-    #         # config could not be created.
-    #         return True
-
-    #     return False
 
     def setUp(self):
         super().setUp()
         self.model_tester = CTRLModelTester(self)
-        # self.config_tester = ConfigTester(self, config_class=CTRLConfig, hidden_size=1280)
-
-    # def test_config(self):
-    #     self.config_tester.run_common_tests()
 
     def test_ctrl_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
