@@ -415,9 +415,9 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
         # 8. Denoising loop
+        text_embeddings = paddle.to_tensor(text_embeddings, dtype=paddle.float32)
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            text_embeddings = paddle.to_tensor(text_embeddings)
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents

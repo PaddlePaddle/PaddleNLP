@@ -627,8 +627,8 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         else:
             noise_pred_unet_batch_size = batch_size * num_images_per_prompt
 
+        prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)
             for i, t in enumerate(timesteps):
                 noise_pred_unet = paddle.zeros(
                     [noise_pred_unet_batch_size, 4, height // 8, width // 8], dtype=paddle.float32

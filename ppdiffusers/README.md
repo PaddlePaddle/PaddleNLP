@@ -5,7 +5,7 @@
 <p align="center">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/pyversions/paddlenlp"></a>
     <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg"></a>
-    <a href="../../LICENSE"><img src="https://img.shields.io/github/license/paddlepaddle/paddlenlp"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/blob/develop/LICENSE"><img src="https://img.shields.io/github/license/paddlepaddle/paddlenlp"></a>
 </p>
 
 <h4 align="center">
@@ -22,8 +22,8 @@
 ## News 📢
 
 * 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
-模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）</a>或SD等原库的Lightning权重进行推理，支持加载Civitai社区的LoRA权重；
-支持xformers（需安装develop版本paddle）训练与推理；
+模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）或 [SD等原库的Lightning权重进行推理](#加载原库的Lightning权重)，[支持加载Civitai社区的LoRA权重](#加载Civitai社区的LoRA权重)；
+[支持xformers](#XFofrmers加速) 训练与推理；
 新增用于超高分辨率生成的VAE tiling；
 新增Instruct Pix2Pix、Semantic guidance、Depth2image等模型。**
 
@@ -138,13 +138,42 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 
 
 ### 加载HF Diffusers权重
-PPDiffusers支持加载所有适用于HuggingFace Diffusers的扩散模型权重，加载方式如下所示：
-```
+```python
 from ppdiffusers import StableDiffusionPipeline
-pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2",from_hf_hub=True, from_diffusers=True)
+# 设置from_hf_hub为True，表示从huggingface hub下载，from_diffusers为True表示加载的是diffusers版Pytorch权重
+pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2", from_hf_hub=True, from_diffusers=True)
 ```
 
+### 加载原库的Lightning权重
+```python
+from ppdiffusers import StableDiffusionPipeline
+# 可输入网址 或 本地ckpt、safetensors文件
+pipe = StableDiffusionPipeline.from_pretrained_original_ckpt("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/chilloutmix_NiPrunedFp32Fix.safetensors")
+```
 
+### 加载Civitai社区的LoRA权重
+```python
+from ppdiffusers import StableDiffusionPipeline
+pipe = StableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix")
+# 加载lora权重
+pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
+```
+
+### XFofrmers加速
+为了使用**XFofrmers加速**，我们需要安装`develop`版本的`paddle`，Linux系统的安装命令如下：
+```sh
+python -m pip install paddlepaddle-gpu==0.0.0.post117 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
+```
+
+```python
+import paddle
+from ppdiffusers import StableDiffusionPipeline
+pipe = StableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
+# 开启xformers加速 默认选择"cutlass"加速
+pipe.enable_xformers_memory_efficient_attention()
+# flash 需要使用 A100、A10、3060、3070、3080、3090 等以上显卡。
+# pipe.enable_xformers_memory_efficient_attention("flash")
+```
 ### 文图生成 （Text-to-Image Generation）
 
 ```python
@@ -313,11 +342,11 @@ image.save("ldm-super-resolution-image.png")
 </details>
 
 ## 模型推理部署
-除了**Paddle动态图**运行之外，很多模型还支持将模型导出并使用推理引擎运行。我们提供基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，涵盖文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，或者使用[一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py)导出模型，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
+除了**Paddle动态图**运行之外，很多模型还支持将模型导出并使用推理引擎运行。我们提供基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，涵盖文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
-**注意：当前导出的vae encoder带有随机因素！[随机因素代码地址](https://github.com/PaddlePaddle/PaddleNLP/blob/649b18a1834163007358e3a9dffd6462c0f9c7cf/ppdiffusers/ppdiffusers/models/vae.py#L365-L370)**
+**注意：当前导出的vae encoder带有随机因素！**
 
 - CompVis/stable-diffusion-v1-4@fastdeploy
 - runwayml/stable-diffusion-v1-5@fastdeploy
@@ -331,11 +360,12 @@ image.save("ldm-super-resolution-image.png")
 </details>
 
 ```python
+import paddle
 import fastdeploy as fd
 from ppdiffusers import FastDeployStableDiffusionMegaPipeline
 from ppdiffusers.utils import load_image
 
-def create_runtime_option(device_id=-1, backend="paddle"):
+def create_runtime_option(device_id=0, backend="paddle", use_cuda_stream=True):
     option = fd.RuntimeOption()
     if backend == "paddle":
         option.use_paddle_backend()
@@ -345,13 +375,16 @@ def create_runtime_option(device_id=-1, backend="paddle"):
         option.use_cpu()
     else:
         option.use_gpu(device_id)
+        if use_cuda_stream:
+            paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
+            option.set_external_raw_stream(paddle_stream)
     return option
 
 runtime_options = {
-    "text_encoder": create_runtime_option(-1, "onnx"),  # use cpu
-    "vae_encoder": create_runtime_option(-1, "paddle"),  # use cpu
-    "vae_decoder": create_runtime_option(-1, "paddle"),  # use cpu
-    "unet": create_runtime_option(0, "paddle"),  # use gpu
+    "text_encoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "vae_encoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "vae_decoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "unet": create_runtime_option(0, "paddle"),  # use gpu:0
 }
 
 fd_pipe = FastDeployStableDiffusionMegaPipeline.from_pretrained(

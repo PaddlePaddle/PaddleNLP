@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import inspect
-import time
 from typing import Callable, List, Optional, Union
 
 import numpy as np
@@ -365,13 +364,14 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        start_time_encode_prompt = time.perf_counter()
+        # start_time_encode_prompt = time.perf_counter()
         text_embeddings = self._encode_prompt(
             prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
         )
-        print("_encode_prompt latency:", time.perf_counter() - start_time_encode_prompt)
+        # print("_encode_prompt latency:", time.perf_counter() - start_time_encode_prompt)
         # 4. Prepare timesteps
-        timesteps = self.scheduler.timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps.cast(paddle.float32)
 
         # 5. Prepare latent variables
         num_channels_latents = 4
@@ -397,8 +397,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
 
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
+        text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
+
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
                 noise_pred_unet = paddle.zeros(
                     [2 * batch_size * num_images_per_prompt, 4, height // 8, width // 8], dtype="float32"
@@ -444,9 +445,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                         callback(i, t, latents)
 
         # 8. Post-processing
-        time_start_decoder = time.perf_counter()
+        # time_start_decoder = time.perf_counter()
         image = self.decode_latents(latents)
-        print("decoder latency:", time.perf_counter() - time_start_decoder)
+        # print("decoder latency:", time.perf_counter() - time_start_decoder)
         # 9. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 

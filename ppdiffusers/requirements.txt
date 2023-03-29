@@ -1,5 +1,6 @@
-paddlepaddle-gpu>=2.4.0
+paddlepaddle-gpu>=2.4.2
 paddlenlp>=2.5.2
+safetensors
 ftfy
 regex
 Pillow
