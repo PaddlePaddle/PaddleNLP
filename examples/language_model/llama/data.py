@@ -21,7 +21,7 @@ import paddle
 from paddlenlp.data import Pad
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-from .utils import IGNORE_INDEX
+IGNORE_INDEX = 0  # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
 
 
 def convert_example(example, tokenizer, data_args, is_test=True):
@@ -91,6 +91,7 @@ class DataCollatorForSupervisedDataset(object):
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
         input_ids = pad_sequence(input_ids, pad_index=self.tokenizer.pad_token_id)
         labels = pad_sequence(labels, pad_index=IGNORE_INDEX)
+
         return dict(
             input_ids=input_ids,
             labels=labels,

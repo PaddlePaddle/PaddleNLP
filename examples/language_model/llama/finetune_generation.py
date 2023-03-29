@@ -57,7 +57,7 @@ class ModelArgument:
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
-    lora: bool = field(default=True, metadata={"help": "Whether to use LoRA technique"})
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():

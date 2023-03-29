@@ -23,8 +23,6 @@ from rouge import Rouge
 from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import Trainer
 
-IGNORE_INDEX = 0  # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
-
 
 class LlamaTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
@@ -43,18 +41,35 @@ class LlamaTrainer(Trainer):
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
 
         model.eval()
-        with paddle.no_grad():
-            tokens = model.generate(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-            )[0]
-            all_preds = []
-            for pred_tokens in tokens:
-                all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
-            max_pred_length = max([len(x) for x in all_preds])
-            for index, preds in enumerate(all_preds):
-                all_preds[index] = preds + [IGNORE_INDEX] * (max_pred_length - len(preds))
-        return (None, paddle.to_tensor(all_preds), inputs["labels"])
+
+        tokens = model.generate(
+            input_ids=inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+            max_length=50,
+            min_length=3,
+            use_cache=True,
+            temperature=1.0,
+            top_k=1,
+            top_p=1.0,
+            repetition_penalty=1.0,
+            decode_strategy="sampling",
+        )[0]
+        all_preds = []
+        for pred_tokens in tokens:
+            all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
+        max_pred_length = max([len(x) for x in all_preds])
+        for index, preds in enumerate(all_preds):
+            all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
+
+        all_labels = []
+        for label in inputs["labels"].numpy():
+            label = [x for x in label[label != self.tokenizer.pad_token_id]]
+            all_labels.append(label)
+        max_label_length = max([len(x) for x in all_labels])
+        for index, labels in enumerate(all_labels):
+            all_labels[index] = labels + [-100] * (max_label_length - len(labels))
+
+        return (None, paddle.to_tensor(all_preds), paddle.to_tensor(all_labels))
 
     def create_scheduler(self, num_training_steps: int):
         num_warmup_steps = (
