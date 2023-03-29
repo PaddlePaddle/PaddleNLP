@@ -71,6 +71,7 @@ def main():
     config.use_cache = True
     config.top_k = 1
     config.use_recompute = False
+    config.use_pure_fp16 = False
 
     # Merge the model splits to a total model
     merge_model_path = merge_model_parallel(args.model_path, config)

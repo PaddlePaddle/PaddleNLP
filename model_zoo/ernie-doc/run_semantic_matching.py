@@ -13,33 +13,30 @@
 # limitations under the License.
 
 import argparse
-import collections
-from collections import namedtuple, defaultdict
-
 import os
 import random
-from functools import partial
 import time
+from collections import defaultdict
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.io import DataLoader
+from data import SemanticMatchingIterator
+from model import ErnieDocForTextMatching
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
 
-from paddlenlp.transformers import ErnieDocModel
-from paddlenlp.transformers import ErnieDocForSequenceClassification
-from paddlenlp.transformers import ErnieDocTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddlenlp.transformers import (
+    ErnieDocModel,
+    ErnieDocTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
-from data import SemanticMatchingIterator
-from model import ErnieDocForTextMatching
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
@@ -58,9 +55,8 @@ parser.add_argument("--dataset", default="cail2019_scm", choices=["cail2019_scm"
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-
-# yapf: enable
 args = parser.parse_args()
+# fmt: on
 
 DATASET_INFO = {
     "cail2019_scm": (ErnieDocTokenizer, "dev", "test", Accuracy()),
@@ -89,7 +85,6 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
 
     probs_dict = defaultdict(list)
     label_dict = dict()
-    global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
         (
             input_ids,

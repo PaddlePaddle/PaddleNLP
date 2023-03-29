@@ -913,7 +913,8 @@ print_info $? pointer_summarizer_train
 #28 question_matching
 question_matching() {
 cd ${nlp_dir}/examples/text_matching/question_matching/
-cp -r /ssd1/paddlenlp/download/question_matching/* ./
+wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/data_v4.tar.gz
+tar -xvzf data_v4.tar.gz
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 #train
 time (

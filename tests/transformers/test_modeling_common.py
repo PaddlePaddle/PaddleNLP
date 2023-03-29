@@ -609,9 +609,13 @@ class ModelTesterPretrainedMixin:
                 model = self.base_model_class.from_pretrained(model_name, cache_dir=tempdir)
                 self.assertIsNotNone(model)
                 self.assertTrue(
-                    os.path.isfile(os.path.join(tempdir, self.base_model_class.resource_files_names["model_state"]))
+                    os.path.isfile(
+                        os.path.join(tempdir, model_name, self.base_model_class.resource_files_names["model_state"])
+                    )
                 )
-                self.assertTrue(os.path.isfile(os.path.join(tempdir, self.base_model_class.model_config_file)))
+                self.assertTrue(
+                    os.path.isfile(os.path.join(tempdir, model_name, self.base_model_class.model_config_file))
+                )
 
     @slow
     def test_pretrained_save_and_load(self):

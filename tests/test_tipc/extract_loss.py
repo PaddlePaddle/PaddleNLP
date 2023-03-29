@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import argparse
 import re
+import sys
 
 
 def parameter_parser():
@@ -93,7 +93,6 @@ def action(tuple_list, action):
 
 
 def main():
-    current_step = 0
     tuple_list = []
     for line in sys.stdin:
         line = line.strip()

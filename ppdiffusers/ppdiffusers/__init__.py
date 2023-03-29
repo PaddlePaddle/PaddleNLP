@@ -115,6 +115,7 @@ else:
         LDMBertModel,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
+        StableDiffusionAttendAndExcitePipeline,
         StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
