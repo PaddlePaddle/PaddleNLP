@@ -271,7 +271,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3/:$PYTHONPATH
+    export PYTHONPATH=/paddle/PaddleFleetX:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -290,7 +290,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3/:$PYTHONPATH
+    export PYTHONPATH=/paddle/PaddleFleetX:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
