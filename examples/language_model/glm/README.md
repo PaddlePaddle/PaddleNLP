@@ -11,10 +11,12 @@
 
 ## 快速开始
 
-### CNN DailyMail 任务 Fine-tuning：
+### DuReaderQG 问题生成任务
+
+# Large 模型单卡训练脚本
 
 ```
-python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
+python finetune_generation.py \
 --model_name_or_path THUDM/glm-large-chinese \
 --num_train_epochs 4 \
 --learning_rate 3e-5 \
@@ -52,3 +54,35 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `num_beams`: 搜索方向数量，默认为5。
 - `label_smoothing`: 标签平滑因子，默认为0.1.
 - `lr_decay_ratio`: 学习率衰减因子，默认为0.1.
+
+# Large 模型多卡训练脚本（模型并行策略）
+
+```
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" finetune_generation.py \
+--model_name_or_path THUDM/glm-large-chinese \
+--num_train_epochs 4 \
+--learning_rate 3e-5 \
+--warmup_ratio 0.06 \
+--weight_decay 0.1 \
+--label_smoothing 0.1 \
+--save_steps 10000 \
+--logging_steps 1 \
+--eval_steps 4 \
+--output_dir ./checkpoints/glm-large-chinese \
+--src_length 608 \
+--tgt_length 160 \
+--min_tgt_length 55 \
+--length_penalty 0.7 \
+--no_repeat_ngram_size 3 \
+--num_beams 5 \
+--select_topk True \
+--per_device_eval_batch_size 2 \
+--per_device_train_batch_size 2 \
+--max_grad_norm 1.0 \
+--lr_scheduler_type linear \
+--fp16 \
+--recompute \
+--do_train \
+--do_eval \
+--tensor_parallel_degree 8
+```
