@@ -16,6 +16,7 @@ import json
 import math
 import os
 import re
+from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
@@ -25,14 +26,13 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
-from ..utils.env import LORA_CONFIG_NAME
+from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
 
 __all__ = [
     "LoRAConfig",
     "LoRALinear",
-    "get_lora_model",
-    "mark_only_lora_as_trainable",
+    "LoRAModel",
 ]
 
 
@@ -195,80 +195,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-# TODO (this is tmp API. will formalize before release)
-def _find_and_replace_module(model, module_name, lora_config):
-    parent_module = model
-    attribute_chain = module_name.split(".")
-    for name in attribute_chain[:-1]:
-        parent_module = getattr(parent_module, name)
-    module = getattr(parent_module, attribute_chain[-1])
-    if isinstance(module, nn.Linear):
-        lora_module = LoRALinear(
-            in_features=module.weight.shape[0],
-            out_features=module.weight.shape[1],
-            r=lora_config.r,
-            lora_alpha=lora_config.lora_alpha,
-            lora_dropout=lora_config.lora_dropout,
-            merge_weights=lora_config.merge_weights,
-        )
-    elif isinstance(module, ColumnParallelLinear):
-        # recover the original output_features
-        output_features_mp = module.weight.shape[1] * module.world_size
-        lora_module = ColumnParallelLoRALinear(
-            in_features=module.weight.shape[0],
-            out_features=output_features_mp,
-            gather_output=module.gather_output,
-            has_bias=module.bias is not None,
-            r=lora_config.r,
-            lora_alpha=lora_config.lora_alpha,
-            lora_dropout=lora_config.lora_dropout,
-            merge_weights=lora_config.merge_weights,
-        )
-    lora_module.weight = module.weight
-    if module.bias is not None:
-        lora_module.bias = module.bias
-    setattr(parent_module, attribute_chain[-1], lora_module)
-
-
-def mark_only_lora_as_trainable(model: nn.Layer, trainable_bias: Optional[str] = None) -> None:
-    for _, layer in model.named_sublayers():
-        if isinstance(layer, LoRALinear) or isinstance(layer, ColumnParallelLoRALinear):
-            for name, weight in layer.state_dict().items():
-                if trainable_bias in ["lora", "all"] and "bias" in name:
-                    weight.stop_gradient = False
-                elif "lora" in name:
-                    weight.stop_gradient = False
-                else:
-                    weight.stop_gradient = True
-        else:
-            for name, weight in layer.state_dict().items():
-                if trainable_bias == "all" and "bias" in name:
-                    weight.stop_gradient = False
-                else:
-                    weight.stop_gradient = True
-
-
-def print_trainable_parameters(model: nn.Layer) -> None:
-    freeze_numel = 0
-    trainable_numel = 0
-    for _, weight in model.state_dict().items():
-        if weight.stop_gradient:
-            freeze_numel += weight.numel().numpy()[0]
-        else:
-            trainable_numel += weight.numel().numpy()[0]
-    logger.info(
-        f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
-    )
-
-
-def print_trainable_parameter_names(model: nn.Layer):
-    names = []
-    for name, weight in model.state_dict().items():
-        if not weight.stop_gradient:
-            names.append(name)
-    return names
-
-
 @dataclass
 class LoRAConfig:
     """
@@ -338,7 +264,7 @@ class LoRAConfig:
         if os.path.isfile(os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)):
             config_file = os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)
         else:
-            raise ValueError(f"Can't find config.json at '{pretrained_model_name_or_path}'")
+            raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
 
@@ -364,12 +290,114 @@ class LoRAConfig:
         return json_object
 
 
-# TODO (this is tmp API. will formalize before release)
-def get_lora_model(model, lora_config: LoRAConfig):
-    target_modules = lora_config.target_modules
-    for target_module in target_modules:
-        for i in model.named_sublayers():
-            module_name = i[0]
-            if re.fullmatch(target_module, module_name):
-                _find_and_replace_module(model, module_name, lora_config)
-    return model
+class LoRAModel(nn.Layer):
+    def __init__(self, model, lora_config: LoRAConfig) -> None:
+        super().__init__()
+        self.lora_config = lora_config
+        self.model = model
+        for target_module in self.lora_config.target_modules:
+            for i in self.model.named_sublayers():
+                module_name = i[0]
+                if re.fullmatch(target_module, module_name):
+                    self._find_and_replace_module(module_name)
+        self.forward = self.model.forward
+
+    @classmethod
+    def from_pretrained(cls, model, lora_path):
+        lora_config = LoRAConfig.from_pretrained(lora_path)
+        lora_model = cls(model, lora_config)
+        lora_weight_path = os.path.join(lora_path, LORA_WEIGHT_FILE_NAME)
+        if os.path.exists(lora_weight_path):
+            logger.info(f"Loading the LoRA weights from {lora_weight_path}")
+            lora_state_dict = paddle.load(lora_weight_path)
+            lora_model.model.set_state_dict(lora_state_dict)
+        else:
+            logger.info(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+        return lora_model
+
+    def save_pretrained(self, save_directory: str, **kwargs):
+        assert not os.path.isfile(
+            save_directory
+        ), f"Saving directory ({save_directory}) should be a directory, not a file"
+        os.makedirs(save_directory, exist_ok=True)
+
+        self.lora_config.save_pretrained(save_directory)
+        weight_filename = os.path.join(save_directory, LORA_WEIGHT_FILE_NAME)
+        trainable_state_dict = self._get_trainable_state_dict()
+        paddle.save(trainable_state_dict, weight_filename)
+
+    def _find_and_replace_module(self, module_name):
+        parent_module = self.model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        module = getattr(parent_module, attribute_chain[-1])
+        if isinstance(module, nn.Linear):
+            lora_module = LoRALinear(
+                in_features=module.weight.shape[0],
+                out_features=module.weight.shape[1],
+                r=self.lora_config.r,
+                lora_alpha=self.lora_config.lora_alpha,
+                lora_dropout=self.lora_config.lora_dropout,
+                merge_weights=self.lora_config.merge_weights,
+            )
+        elif isinstance(module, ColumnParallelLinear):
+            # recover the original output_features
+            output_features_mp = module.weight.shape[1] * module.world_size
+            lora_module = ColumnParallelLoRALinear(
+                in_features=module.weight.shape[0],
+                out_features=output_features_mp,
+                gather_output=module.gather_output,
+                has_bias=module.bias is not None,
+                r=self.lora_config.r,
+                lora_alpha=self.lora_config.lora_alpha,
+                lora_dropout=self.lora_config.lora_dropout,
+                merge_weights=self.lora_config.merge_weights,
+            )
+        lora_module.weight = module.weight
+        if module.bias is not None:
+            lora_module.bias = module.bias
+        setattr(parent_module, attribute_chain[-1], lora_module)
+
+    def _get_trainable_state_dict(self):
+        trainable_state_dict = OrderedDict()
+        for name, weight in self.model.state_dict().items():
+            if not weight.stop_gradient:
+                trainable_state_dict[name] = weight
+        return trainable_state_dict
+
+    def print_trainable_parameters(self) -> None:
+        freeze_numel = 0
+        trainable_numel = 0
+        for _, weight in self.model.state_dict().items():
+            if weight.stop_gradient:
+                freeze_numel += weight.numel().numpy()[0]
+            else:
+                trainable_numel += weight.numel().numpy()[0]
+        logger.info(
+            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
+        )
+
+    def print_trainable_parameter_names(self):
+        names = []
+        for name, weight in self.model.state_dict().items():
+            if not weight.stop_gradient:
+                names.append(name)
+        return names
+
+    def mark_only_lora_as_trainable(self) -> None:
+        for _, layer in self.model.named_sublayers():
+            if isinstance(layer, LoRALinear) or isinstance(layer, ColumnParallelLoRALinear):
+                for name, weight in layer.state_dict().items():
+                    if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
+                        weight.stop_gradient = False
+                    elif "lora" in name:
+                        weight.stop_gradient = False
+                    else:
+                        weight.stop_gradient = True
+            else:
+                for name, weight in layer.state_dict().items():
+                    if self.lora_config.trainable_bias == "all" and "bias" in name:
+                        weight.stop_gradient = False
+                    else:
+                        weight.stop_gradient = True
