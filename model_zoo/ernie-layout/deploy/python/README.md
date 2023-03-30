@@ -35,7 +35,7 @@ wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip &
 - Run
 
 ```shell
-python infer.py --model_dir ../../ner_export --task_type ner --device gpu --lang "en" --batch_size 8
+python infer.py --model_dir ../../ner_export --task_type ner --device gpu --lang "en" --batch_size 8 --device gpu
 ```
 
 - Output sample
@@ -79,7 +79,7 @@ python infer.py --model_dir ../../ner_export --task_type ner --device gpu --lang
 - Run
 
 ```shell
-python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --lang "ch" --batch_size 8
+python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --lang "ch" --batch_size 8 --device gpu
 ```
 
 - Output sample
@@ -104,7 +104,7 @@ python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --la
 - Run
 
 ```shell
-python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batch_size 8
+python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batch_size 8 --device gpu
 ```
 
 - Output sample

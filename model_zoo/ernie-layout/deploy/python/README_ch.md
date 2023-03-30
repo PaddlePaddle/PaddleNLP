@@ -98,7 +98,7 @@ python infer.py --model_dir ../../mrc_export/ --task_type mrc --device gpu  --la
 - 使用如下命令进行英文文档图像分类部署
 
 ```shell
-python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --batch_size 8
+python infer.py --model_dir ../../cls_export/ --task_type cls --lang "en" --device gpu --batch_size 8
 ```
 
 - 输出样例
