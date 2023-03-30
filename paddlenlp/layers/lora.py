@@ -583,7 +583,7 @@ class LoRAModel(nn.Layer):
                         )
             else:
                 raise TypeError(
-                    f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
+                    f"Invalid `enable_lora_list` value: {lora_config.enable_lora_list}. Since `target_modules` is `List[str]`, `enable_lora_list` must be `None` or `List[Optional[List[bool]]]`"
                 )
 
         for target_module, enable_lora in zip(target_modules, enable_lora_list):
