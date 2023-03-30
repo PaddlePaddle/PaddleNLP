@@ -228,9 +228,13 @@ def torch_load(path: str, **pickle_load_args):
     return state_dict
 
 
-def convert_to_paddle(state_dict, return_numpy=False):
-    state_dict = state_dict.get("state_dict", state_dict)
+def convert_to_paddle(state_dict, return_numpy=False, return_global_step=False):
     pd_state_dict = {}
+    # maybe we will use global_step
+    if return_global_step:
+        pd_state_dict["global_step"] = state_dict.get("global_step", -1)
+    state_dict = state_dict.get("state_dict", state_dict)
+
     for k, v in state_dict.items():
         # maybe position id is bfloat32
         # if "position_id" in k and "int" not in str(v.dtype):
@@ -287,7 +291,7 @@ def safetensors_load(path: str):
     return data
 
 
-def smart_load(path: str, map_location: str = "cpu", return_numpy=False):
+def smart_load(path: str, map_location: str = "cpu", return_numpy=False, return_global_step=False):
     suffix = Path(path).suffix
     name = Path(path).name
     state_dict = None
@@ -297,21 +301,21 @@ def smart_load(path: str, map_location: str = "cpu", return_numpy=False):
             return state_dict
 
         if suffix in torch_suffix:
-            state_dict = convert_to_paddle(torch_load(path), return_numpy)
+            state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
             return state_dict
 
         if suffix in safetensors_suffix:
-            state_dict = convert_to_paddle(safetensors_load(path), return_numpy)
+            state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
             return state_dict
 
         # must use safetensors_load first
         try:
-            state_dict = convert_to_paddle(safetensors_load(path), return_numpy)
+            state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with safetensors!")
         try:
-            state_dict = convert_to_paddle(torch_load(path), return_numpy)
+            state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with torch! We will try to load this with safetensors!")

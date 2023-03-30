@@ -893,21 +893,23 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
     from omegaconf import OmegaConf
 
-    checkpoint = smart_load(checkpoint_path, return_numpy=True)
+    checkpoint = smart_load(checkpoint_path, return_numpy=True, return_global_step=True)
+
+    global_step = int(checkpoint.pop("global_step", -1))
+
+    if global_step == -1:
+        print("global_step key not found in model")
+
     # must cast them to float32
     newcheckpoint = {}
     for k, v in checkpoint.items():
-        if "int" in str(v.dtype):
+        try:
+            if "int" in str(v.dtype):
+                continue
+        except Exception:
             continue
         newcheckpoint[k] = v.astype("float32")
     checkpoint = newcheckpoint
-
-    # Sometimes models don't have the global_step item
-    if "global_step" in checkpoint:
-        global_step = checkpoint["global_step"]
-    else:
-        print("global_step key not found in model")
-        global_step = None
 
     if "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
