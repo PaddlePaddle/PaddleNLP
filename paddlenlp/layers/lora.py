@@ -220,7 +220,7 @@ class LoRAMergedLinear(nn.Linear):
             self.enable_lora = enable_lora
         else:
             raise TypeError("enable_lora must be a list of bools")
-        self.single_out_features = out_features // len(enable_lora)
+
         self.out_features = out_features
         self.in_features = in_features
 
@@ -245,7 +245,7 @@ class LoRAMergedLinear(nn.Linear):
                 ),
             )
             self.lora_B = self.create_parameter(
-                shape=[self.single_out_features * sum(enable_lora), r],
+                shape=[out_features // len(enable_lora) * sum(enable_lora), r],
                 dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
@@ -257,7 +257,7 @@ class LoRAMergedLinear(nn.Linear):
 
             # Compute lora indices
             self.enable_lora_indices = paddle.full(
-                shape=[len(enable_lora), self.single_out_features], fill_value=False, dtype="bool"
+                shape=[len(enable_lora), out_features // len(enable_lora)], fill_value=False, dtype="bool"
             )
             self.enable_lora_indices[enable_lora, :] = True
             self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [-1])
