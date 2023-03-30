@@ -579,7 +579,7 @@ class LoRAModel(nn.Layer):
                         or (isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora))
                     ):
                         raise TypeError(
-                            f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
+                            f"Invalid `enable_lora_list` value: {lora_config.enable_lora_list}. Since `target_modules` is `List[str]`, `enable_lora_list` must be `None` or  `List[Optional[List[bool]]]`"
                         )
             else:
                 raise TypeError(
