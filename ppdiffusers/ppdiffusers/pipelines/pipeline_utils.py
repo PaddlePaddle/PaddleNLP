@@ -610,6 +610,8 @@ class DiffusionPipeline(ConfigMixin):
         return_cached_folder = kwargs.pop("return_cached_folder", False)
         variant = kwargs.pop("variant", None)
         from_hf_hub = kwargs.pop("from_hf_hub", FROM_HF_HUB)
+        max_workers = int(kwargs.pop("max_workers", 1))
+
         cache_dir = (
             kwargs.pop("cache_dir", DIFFUSERS_CACHE) if from_hf_hub else kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         )
@@ -734,6 +736,7 @@ class DiffusionPipeline(ConfigMixin):
                     allow_patterns=allow_patterns,
                     ignore_patterns=ignore_patterns,
                     user_agent=user_agent,
+                    max_workers=max_workers,
                 )
             else:
                 if cls == DiffusionPipeline:
@@ -748,6 +751,7 @@ class DiffusionPipeline(ConfigMixin):
                     resume_download=resume_download,
                     folder_names=folder_names,
                     variant=variant,
+                    max_workers=max_workers,
                     is_fastdeploy_model=is_fastdeploy_model,
                 )
         else:
