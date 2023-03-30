@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=gpt_stage2
-dp_degree=1
+model_item=gpt_1024_flash
+dp_degree=8
 mp_degree=1
 pp_degree=1
-bs_item=128
+bs_item=64
 fp_item=fp16
-run_mode=DP1-MP1-PP1-Sharding16
-device_num=N2C16
-sharding_degree=16
-sharding_stage=2
-sharding_offload=True
-max_iter=30
+run_mode=DP8-MP1-PP1
+device_num=N1C8
+yaml_path=./ppfleetx/configs/nlp/gpt/pretrain_gpt_345M_single_card.yaml
 
 model=gpt
 micro_bs=8
 
 cd ./benchmarks
-bash ./test_tipc/gpt/dygraph/sharding/benchmark_common/prepare.sh
+bash ./test_tipc/gpt/dygraph/data_parallel/benchmark_common/prepare.sh
 # run
-bash ./test_tipc/gpt/dygraph/sharding/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
-${sharding_degree} ${sharding_stage} ${sharding_offload} ${max_iter} 2>&1;
+bash ./test_tipc/gpt/dygraph/data_parallel/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
+${yaml_path} 2>&1;
