@@ -35,6 +35,8 @@ from utils import (
     _rotate_checkpoints,
     all_gather,
     is_dp_group_support_in_group_sharded_parallel,
+    optimizer_name_suffix,
+    weight_name_suffix,
     wrap_sharding_2_3,
 )
 from visualdl import LogWriter
@@ -52,6 +54,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
+from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
@@ -285,11 +288,16 @@ def do_train(args):
         log_writer = LogWriter(log_writer_path)
 
     WEIGHTS_NAME = "model_state.pdparams"
-    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
+    OPTIMIZER_NAME = "optimizer.pdopt"
 
-    if args.mp_degree > 1:
-        WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        GPTForSequenceClassification.resource_files_names = {"model_state": WEIGHTS_NAME}
+    if args.mp_degree > 1 or args.sharding_degree > 1:
+        WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, weight_name_suffix())
+        OPTIMIZER_NAME = _add_variant(OPTIMIZER_NAME, optimizer_name_suffix())
+        # GPTForSequenceClassification using old style save_pretrained
+        # remove if CLASS using save_pretrained_v2
+        logger.info(f"{WEIGHTS_NAME}, {OPTIMIZER_NAME}, {optimizer_name_suffix()}")
+        if not GPTForSequenceClassification.constructed_from_pretrained_config():
+            GPTForSequenceClassification.resource_files_names = {"model_state": WEIGHTS_NAME}
 
     model = GPTForSequenceClassification.from_pretrained(
         args.model_name_or_path,
