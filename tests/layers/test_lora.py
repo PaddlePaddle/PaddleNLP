@@ -22,12 +22,7 @@ import numpy as np
 import paddle
 from parameterized import parameterized
 
-from paddlenlp.layers import (
-    LoRAConfig,
-    LoRALinear,
-    get_lora_model,
-    mark_only_lora_as_trainable,
-)
+from paddlenlp.layers import LoRAConfig, LoRALinear, LoRAModel
 from paddlenlp.transformers import AutoModel
 
 
@@ -83,19 +78,20 @@ class TestLoraLayer(unittest.TestCase):
 
 class TestLoraModel(unittest.TestCase):
     @parameterized.expand([(None,), ("all",), ("lora",)])
-    def test_get_lora_model(self, bias):
+    def test_lora_model_constructor(self, bias):
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
             merge_weights=True,
+            trainable_bias=bias,
         )
         # turn off plm dropout for to test train vs test
         model = AutoModel.from_pretrained(
             "__internal_testing__/tiny-random-bert", hidden_dropout_prob=0, attention_probs_dropout_prob=0
         )
-        lora_model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(lora_model, bias)
+        lora_model = LoRAModel(model, lora_config)
+        lora_model.mark_only_lora_as_trainable()
         for name, weight in lora_model.state_dict().items():
             if any([re.fullmatch(target_module, name) for target_module in lora_config.target_modules]):
                 if "lora" in name:
@@ -110,14 +106,38 @@ class TestLoraModel(unittest.TestCase):
                 else:
                     self.assertTrue(weight.stop_gradient)
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
-        model.train()
-        train_forward_results = model(input_ids)
+        lora_model.train()
+        train_forward_results = lora_model(input_ids)
         self.assertIsNotNone(train_forward_results)
-        model.eval()
-        eval_forward_results = model(input_ids)
+        lora_model.eval()
+        eval_forward_results = lora_model(input_ids)
         self.assertIsNotNone(eval_forward_results)
         for i, j in zip(train_forward_results, eval_forward_results):
             self.assertTrue(paddle.allclose(i, j))
+
+    @parameterized.expand([(None,), ("all",), ("lora",)])
+    def test_lora_model_save_load(self, bias):
+        with TemporaryDirectory() as tempdir:
+            input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
+            lora_config = LoRAConfig(
+                target_modules=[".*q_proj.*", ".*v_proj.*"],
+                r=4,
+                lora_alpha=8,
+                merge_weights=True,
+                trainable_bias=bias,
+            )
+            model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+            lora_model = LoRAModel(model, lora_config)
+            lora_model.eval()
+            original_results = lora_model(input_ids)
+            lora_model.save_pretrained(tempdir)
+
+            new_model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+            loaded_lora_model = LoRAModel.from_pretrained(new_model, tempdir)
+            loaded_lora_model.eval()
+            loaded_results = loaded_lora_model(input_ids)
+            for i, j in zip(original_results, loaded_results):
+                self.assertTrue(paddle.allclose(i, j))
 
 
 class TestLoRAConfig(unittest.TestCase):
