@@ -117,6 +117,7 @@ def main():
             r=4,
             lora_alpha=8,
             merge_weights=True,
+            enable_lora_list=[[True, False, True]],
         )
         model = get_lora_model(model, lora_config)
         mark_only_lora_as_trainable(model)
