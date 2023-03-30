@@ -456,7 +456,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         timestep: Union[paddle.Tensor, float, int],
         encoder_hidden_states: paddle.Tensor,
         controlnet_cond: paddle.Tensor,
-        conditioning_scale: Union[List[float], float],
+        conditioning_scale: Union[List[float], float] = 1.0,
         class_labels: Optional[paddle.Tensor] = None,
         timestep_cond: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
