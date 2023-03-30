@@ -262,8 +262,9 @@ class LoRAMergedLinear(nn.Linear):
         output_shape = x.shape
         output_shape[-1] = self.out_features
         result = paddle.zeros(output_shape, dtype=x.dtype).reshape([output_shape[-1], -1])
-        result[self.enable_lora_indices, :] = x.reshape([-1, x.shape[-1]]).transpose([1, 0])
-        return result.transpose([1, 0]).reshape(output_shape)
+        result[self.enable_lora_indices, :] = x.reshape([-1, x.shape[-1]]).transpose([1, 0])  # cost most of time
+        result = result.transpose([1, 0]).reshape(output_shape)
+        return result
 
     def train(self):
         super().train()
@@ -302,27 +303,21 @@ class LoRAMergedLinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            after_A = self.lora_dropout(input) @ self.lora_A
-            perm = [i for i in range(len(after_A.shape))]
-            perm[-1], perm[-2] = perm[-2], perm[-1]
-            if len(after_A.shape) == 2:
-                after_B = (
-                    F.conv1d(
-                        after_A.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
-                    )
-                    .squeeze(0)
-                    .transpose([1, 0])
+            delta_weight = (
+                F.conv1d(
+                    self.lora_A.transpose([1, 0]).unsqueeze(0),
+                    self.lora_B.unsqueeze(-1),
+                    groups=sum(self.enable_lora),
                 )
-            elif len(after_A.shape) == 3:
-                after_B = (
-                    F.conv1d(after_A.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
-                ).transpose([0, 2, 1])
-            else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                .squeeze(0)
+                .transpose([1, 0])
+            )
+            new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
+            result = F.linear(x=input, weight=new_weight, bias=self.bias, name=self.name)
+        else:
+            result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
 
-            result += self.zero_pad(after_B * self.scaling)
         return result
 
     def extra_repr(self):
