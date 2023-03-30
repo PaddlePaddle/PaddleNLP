@@ -24,6 +24,7 @@ from .dataset_utils import (
     create_tokens_and_tokentypes,
     get_a_and_b_segments,
     get_samples_mapping,
+    truncate_segments,
 )
 
 
@@ -172,7 +173,7 @@ def build_training_sample(
 
     # Truncate to `target_sequence_length`.
     max_num_tokens = target_seq_length
-    # truncated = truncate_segments(tokens_a, tokens_b, len(tokens_a), len(tokens_b), max_num_tokens, np_rng)
+    truncate_segments(tokens_a, tokens_b, len(tokens_a), len(tokens_b), max_num_tokens, np_rng)
 
     # Build tokens and toketypes.
     tokens, tokentypes = create_tokens_and_tokentypes(tokens_a, tokens_b, cls_id, sep_id)
@@ -209,6 +210,7 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions, masked_labels
 
     # Some checks.
     num_tokens = len(tokens)
+    print(num_tokens, max_seq_length)
     padding_length = max_seq_length - num_tokens
     assert padding_length >= 0
     assert len(tokentypes) == num_tokens
