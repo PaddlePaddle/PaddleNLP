@@ -45,6 +45,7 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
+from ..layers.lora import LoRAModel
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -1512,7 +1513,7 @@ class Trainer:
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
-        if not isinstance(self.model, PretrainedModel):
+        if not isinstance(self.model, PretrainedModel) and not isinstance(self.model, LoRAModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
 
                 # unwrap_model(self.model).save_pretrained(

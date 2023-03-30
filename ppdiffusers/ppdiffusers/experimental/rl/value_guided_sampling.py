@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@ import numpy as np
 import paddle
 
 from ...models.unet_1d import UNet1DModel
-from ...pipeline_utils import DiffusionPipeline
+from ...pipelines import DiffusionPipeline
+from ...utils import randn_tensor
 from ...utils.dummy_paddle_objects import DDPMScheduler
 
 
@@ -26,6 +27,7 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
     Pipeline for sampling actions from a diffusion model trained to predict sequences of states.
+
     Original implementation inspired by this repository: https://github.com/jannerm/diffuser.
 
     Parameters:
@@ -88,10 +90,11 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         y = None
         for i in self.progress_bar(self.scheduler.timesteps):
             # create batch of timesteps to pass into model
-            timesteps = paddle.full((batch_size,), i, dtype="int64")
+            timesteps = paddle.full((batch_size,), i, dtype=paddle.int64)
             for _ in range(n_guide_steps):
                 with paddle.set_grad_enabled(True):
                     x.stop_gradient = False
+
                     # permute to match dimension for pre-trained models
                     y = self.value_function(x.transpose([0, 2, 1]), timesteps).sample
                     grad = paddle.autograd.grad([y.sum()], [x])[0]
@@ -104,7 +107,9 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
                 x = x.detach()
                 x = x + scale * grad
                 x = self.reset_x0(x, conditions, self.action_dim)
+
             prev_x = self.unet(x.transpose([0, 2, 1]), timesteps).sample.transpose([0, 2, 1])
+
             # TODO: verify deprecation of this kwarg
             x = self.scheduler.step(prev_x, i, x, predict_epsilon=False)["prev_sample"]
 
@@ -119,10 +124,10 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         obs = obs[None].repeat(batch_size, axis=0)
 
         conditions = {0: self.to_paddle(obs)}
-        shape = [batch_size, planning_horizon, self.state_dim + self.action_dim]
+        shape = (batch_size, planning_horizon, self.state_dim + self.action_dim)
 
         # generate initial noise and apply our conditions (to make the trajectories start at current state)
-        x1 = paddle.randn(shape)
+        x1 = randn_tensor(shape, dtype=self.unet.dtype)
         x = self.reset_x0(x1, conditions, self.action_dim)
         x = self.to_paddle(x)
 
@@ -133,7 +138,7 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         sorted_idx = paddle.argsort(y, 0, descending=True).squeeze()
         sorted_values = x[sorted_idx]
         actions = sorted_values[:, :, : self.action_dim]
-        actions = actions.detach().numpy()
+        actions = actions.detach().cpu().numpy()
         denorm_actions = self.de_normalize(actions, key="actions")
 
         # select the action with the highest value
@@ -142,5 +147,6 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         else:
             # if we didn't run value guiding, select a random action
             selected_index = np.random.randint(0, batch_size)
+
         denorm_actions = denorm_actions[selected_index, 0]
         return denorm_actions
