@@ -303,21 +303,25 @@ class LoRAMergedLinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
+        result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            delta_weight = (
-                F.conv1d(
-                    self.lora_A.transpose([1, 0]).unsqueeze(0),
-                    self.lora_B.unsqueeze(-1),
-                    groups=sum(self.enable_lora),
+            after_A = self.lora_dropout(input) @ self.lora_A
+            if len(after_A.shape) == 2:
+                after_B = (
+                    F.conv1d(
+                        after_A.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
                 )
-                .squeeze(0)
-                .transpose([1, 0])
-            )
-            new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
-            result = F.linear(x=input, weight=new_weight, bias=self.bias, name=self.name)
-        else:
-            result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+            elif len(after_A.shape) == 3:
+                after_B = (
+                    F.conv1d(after_A.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
+                ).transpose([0, 2, 1])
+            else:
+                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
 
+            result += self.zero_pad(after_B * self.scaling)
         return result
 
     def extra_repr(self):
