@@ -1024,31 +1024,61 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     if controlnet is None:
         controlnet = "control_stage_config" in original_config.model.params
 
-    if controlnet and model_type != "FrozenCLIPEmbedder":
-        raise ValueError("`controlnet`=True only supports `model_type`='FrozenCLIPEmbedder'")
-
     if model_type == "FrozenOpenCLIPEmbedder":
         text_model = convert_open_clip_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2", subfolder="tokenizer")
+        tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2/tokenizer")
 
         if paddle_dtype is not None:
             vae.to(dtype=paddle_dtype)
             text_model.to(dtype=paddle_dtype)
             unet.to(dtype=paddle_dtype)
-        pipe = cls(
-            vae=vae,
-            text_encoder=text_model,
-            tokenizer=tokenizer,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=None,
-            feature_extractor=None,
-            requires_safety_checker=False,
-        )
+
+        if controlnet:
+            # Convert the ControlNetModel model.
+            ctrlnet_config = create_unet_diffusers_config(original_config, image_size=image_size, controlnet=True)
+            ctrlnet_config["upcast_attention"] = upcast_attention
+
+            ctrlnet_config.pop("sample_size")
+
+            controlnet_model = ControlNetModel(**ctrlnet_config)
+            controlnet_model.eval()
+
+            converted_ctrl_checkpoint = convert_ldm_unet_checkpoint(
+                checkpoint, ctrlnet_config, path=checkpoint_path, extract_ema=extract_ema, controlnet=True
+            )
+            controlnet_model.load_dict(
+                convert_diffusers_vae_unet_to_ppdiffusers(controlnet_model, converted_ctrl_checkpoint)
+            )
+
+            if paddle_dtype is not None:
+                controlnet_model.to(dtype=paddle_dtype)
+
+            pipe = StableDiffusionControlNetPipeline(
+                vae=vae,
+                text_encoder=text_model,
+                tokenizer=tokenizer,
+                unet=unet,
+                controlnet=controlnet_model,
+                scheduler=scheduler,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
+            )
+        else:
+            pipe = cls(
+                vae=vae,
+                text_encoder=text_model,
+                tokenizer=tokenizer,
+                unet=unet,
+                scheduler=scheduler,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
+            )
 
     elif model_type == "FrozenCLIPEmbedder":
         text_model = convert_ldm_clip_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="tokenizer")
+        tokenizer = CLIPTokenizer.from_pretrained("CompVis/stable-diffusion-v1-4/tokenizer")
         if requires_safety_checker:
             safety_checker = StableDiffusionSafetyChecker.from_pretrained(
                 "CompVis/stable-diffusion-v1-4", subfolder="safety_checker"

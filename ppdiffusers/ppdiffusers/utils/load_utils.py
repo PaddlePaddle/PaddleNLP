@@ -235,6 +235,15 @@ def convert_to_paddle(state_dict, return_numpy=False, return_global_step=False):
         pd_state_dict["global_step"] = state_dict.pop("global_step", -1)
     state_dict = state_dict.get("state_dict", state_dict)
 
+    # ugly
+    # {
+    #    "state_dict" : {"state_dict": {}, "epoch": {}, "xxxxx"}
+    # }
+    if "global_step" in state_dict and "state_dict" in state_dict:
+        if return_global_step:
+            pd_state_dict["global_step"] = state_dict.pop("global_step", -1)
+        state_dict = state_dict.get("state_dict", state_dict)
+
     for k, v in state_dict.items():
         # maybe position id is bfloat32
         # if "position_id" in k and "int" not in str(v.dtype):
