@@ -208,7 +208,7 @@ class CrossAttention(nn.Layer):
         return tensor
 
     def get_attention_scores(self, query, key, attention_mask=None):
-        if self.upcast_softmax:
+        if self.upcast_softmax or self.upcast_attention:
             dtype = query.dtype
 
         if self.upcast_attention:
@@ -224,7 +224,8 @@ class CrossAttention(nn.Layer):
             attention_scores = attention_scores.cast(paddle.float32)
 
         attention_probs = F.softmax(attention_scores, axis=-1)
-        if self.upcast_softmax:
+
+        if self.upcast_softmax or self.upcast_attention:
             attention_probs = attention_probs.cast(dtype)
 
         return attention_probs
