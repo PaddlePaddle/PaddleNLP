@@ -363,7 +363,7 @@ class LoRAConfig:
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
     enable_lora_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
-        default=None, metadata={"help": "Define whether used with `lora.MergedLinear`."}
+        default=None, metadata={"help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."}
     )
 
     @property
