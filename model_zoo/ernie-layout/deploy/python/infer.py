@@ -32,7 +32,8 @@ def parse_args():
         "--backend",
         type=str,
         default="paddle",
-        choices=["onnx_runtime", "paddle", "tensorrt", "paddle_tensorrt"],
+        # choices=["onnx_runtime", "paddle", "tensorrt", "paddle_tensorrt"],
+        choices=["paddle"],
         help="The inference runtime backend.",
     )
     parser.add_argument("--max_length", type=int, default=512, help="The max length of sequence.")
