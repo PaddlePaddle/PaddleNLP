@@ -1175,7 +1175,6 @@ class Blip2Model(Blip2PretrainedModel):
 
     def __init__(self, config: Blip2Config):
         super().__init__(config)
-        from paddlenlp.transformers import AutoModelForCausalLM
 
         self.vision_model = Blip2VisionModel(config.vision_config)
 
@@ -1184,9 +1183,11 @@ class Blip2Model(Blip2PretrainedModel):
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         if config.use_decoder_only_language_model:
-            language_model = AutoModelForCausalLM.from_config(config.text_config)
+            if isinstance(config.text_config, OPTConfig):
+                language_model = OPTForCausalLM(config.text_config)
+            else:
+                raise NotImplementedError
         else:
-            # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
             else:
@@ -1382,7 +1383,7 @@ class Blip2Model(Blip2PretrainedModel):
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> prompt = "Question: how many cats are there? Answer:"
         >>> inputs = processor(images=image, text=prompt, return_tensors="pd")
-        >>> outputs = model(**inputs)
+        >>> outputs = model(pixel_values=inputs["pixel_values"],input_ids=inputs["input_ids"])
         ```"""
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -1433,7 +1434,7 @@ class Blip2Model(Blip2PretrainedModel):
             loss = None
             # we compute the loss here since we need to take into account the sequence length of the query embeds
             if labels is not None:
-                logits = logits[:, -labels.size(1) :, :]
+                logits = logits[:, -labels.shape[1] :, :]
                 # Shift so that tokens < n predict n
                 shift_logits = logits[..., :-1, :]
                 shift_labels = labels[..., 1:]
@@ -1487,6 +1488,8 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
             # language_model = AutoModelForCausalLM.from_config(config.text_config)
             if isinstance(config.text_config, OPTConfig):
                 language_model = OPTForCausalLM(config.text_config)
+            else:
+                raise NotImplementedError
         else:
             # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
