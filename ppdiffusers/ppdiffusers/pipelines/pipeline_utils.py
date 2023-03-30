@@ -974,14 +974,18 @@ class DiffusionPipeline(ConfigMixin):
                 f"Pipeline {pipeline_class} expected {expected_modules}, but only {passed_modules} were passed."
             )
 
-        # 5. (TODO, junnyu) make sure all modules are in eval mode
+        # 5. (TODO, junnyu) make sure all modules are in eval mode and cast dtype
         for name, _module in init_kwargs.items():
             if isinstance(_module, nn.Layer):
                 _module.eval()
+                if paddle_dtype is not None and _module.dtype != paddle_dtype:
+                    _module.to(dtype=paddle_dtype)
             elif isinstance(_module, (tuple, list)):
                 if isinstance(_module[0], nn.Layer):
                     for _submodule in _module:
                         _submodule.eval()
+                        if paddle_dtype is not None and _submodule.dtype != paddle_dtype:
+                            _submodule.to(dtype=paddle_dtype)
 
         # 6. Instantiate the pipeline
         model = pipeline_class(**init_kwargs)
