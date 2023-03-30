@@ -18,7 +18,6 @@ import math
 import re
 import time
 from dataclasses import dataclass, field
-from pprint import pprint as print
 
 import numpy as np
 import paddle
@@ -29,6 +28,9 @@ from SwissArmyTransformer import get_tokenizer
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.utils.log import logger
+
+# from pprint import pprint as print
+
 
 paddle.set_default_dtype("float16")
 
@@ -43,7 +45,6 @@ class DataArgument:
     overlapping_eval: int = field(default=32, metadata={"help": "Sliding window for overlapping eval."})
     batch_size: int = field(default=8, metadata={"help": "Batch size per GPU/CPU for training."})
     seq_length: int = field(default=1024, metadata={"help": "Maximum sequence length to process for evaluation."})
-    logging_steps: int = field(default=100, metadata={"help": "Log every X updates steps."})
 
 
 class LM_Eval_Dataset(paddle.io.Dataset):
@@ -66,39 +67,35 @@ class LM_Eval_Dataset(paddle.io.Dataset):
     def __len__(self):
         return self.total_sequences
 
-    def _construct_sample(self, tokens):
-        tokens = np.array(tokens).astype("int64").tolist()
+    def __getitem__(self, idx):
+        start_idx = idx * self.overlapping_eval
+        end_idx = start_idx + self.seq_len - 2  # gmask, sop
+        tokens = self.tokens[start_idx:end_idx]
+
         prompt_length = self.seq_len - 1 - self.overlapping_eval
         prompt, text = tokens[:prompt_length], tokens[prompt_length:]
 
-        seq_length = len(prompt) + len(text) + 1
-        attention_mask = np.tril(np.ones((seq_length, seq_length), dtype=np.int64))
-        attention_mask[: len(prompt) + 1, : len(prompt) + 1] = 1
+        input_len = len(prompt) + 2
 
-        mask_id = self.mask_idx
-        sop_id = self.sop_idx
+        input_ids = np.array(
+            prompt
+            + [self.mask_idx, self.sop_idx]
+            + text
+            + [self.pad_idx] * (self.seq_len - 2 - len(prompt) - len(text))
+        )
+        attention_mask = np.tri(self.seq_len, self.seq_len, dtype=np.int64)
+        attention_mask[:input_len, :input_len] = 1
+        attention_mask = attention_mask[None, :, :]
 
-        return [
-            np.array(prompt + [mask_id, sop_id] + text[:-1], dtype=np.int64),
-            np.array([0] * (len(prompt) + 1) + [1] * len(text), dtype=np.int64),
-            attention_mask < 0.5,
-            np.arange(0, seq_length, dtype=np.int64),
-            np.array(prompt + [mask_id] + text, dtype=np.int64),
-        ]
+        position_ids = np.arange(0, self.seq_len, dtype=np.int64)
+        position_ids[input_len:] = np.where(input_ids == self.mask_idx)[0]
 
-    def __getitem__(self, idx):
-        start_idx = idx * self.overlapping_eval
-        end_idx = start_idx + self.seq_len - 1
-        tokens = self.tokens[start_idx:end_idx]
-        num_tokens = len(tokens)
-        if num_tokens < self.seq_len:
-            num_pad = self.seq_len - num_tokens
-            tokens += [self.pad_idx] * num_pad
-        [tokens, loss_mask, attention_mask, position_ids, labels] = self._construct_sample(tokens)
-        if self.overlapping_eval != self.seq_len and idx != 0:
-            loss_mask[: -self.overlapping_eval] *= 0
+        loss_mask = np.zeros(self.seq_len, dtype="float32")
+        loss_mask[input_len : input_len + len(text)] = 1.0
 
-        return [tokens, loss_mask, attention_mask, position_ids, labels]
+        targets = np.array(input_ids.tolist())
+
+        return [input_ids, loss_mask, attention_mask < 0.5, position_ids, targets]
 
 
 class Lambada_Eval_Dataset(paddle.io.Dataset):
@@ -113,38 +110,29 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
     def __len__(self):
         return len(self.tokens)
 
-    def _construct_sample(self, tokens):
-        tokens = np.array(tokens).astype("int64").tolist()
-        prompt = tokens[:-1]
-        labels = tokens[-1:]
-
-        seq_length = len(tokens)
-        # attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length, seq_length))
-        attention_mask[: len(prompt) + 1, : len(prompt) + 1] = 1
-
-        mask_id = self.mask_idx
-        sop_id = self.sop_idx
-
-        return [
-            np.array(prompt + [mask_id, sop_id] + labels[:-1], dtype=np.int64),
-            attention_mask < 0.5,
-            np.arange(0, seq_length, dtype=np.int64),
-            labels,
-        ]
-
     def __getitem__(self, idx):
-        tokens = self.tokens[idx][: self.seq_len - 1]
+        inputs = self.tokens[idx][-self.seq_len :]
         labels = self.labels[idx]
-        tokens = tokens + labels
-        num_tokens = len(tokens)
-        if num_tokens < self.seq_len + 1:
-            num_pad = self.seq_len + 1 - num_tokens
-            tokens += [self.pad_idx] * num_pad
+
+        inputs = inputs + [self.mask_idx, self.sop_idx]
+        input_len = len(inputs)
+        input_ids = inputs + labels[:-1]
+        if len(input_ids) > self.seq_len - 1:
+            input_ids = input_ids[-(self.seq_len - 1) :]
+        pred_index = len(input_ids)
+        if len(input_ids) < self.seq_len:
+            input_ids = input_ids + [self.pad_idx] * (self.seq_len - len(input_ids))
+        input_ids = np.array(input_ids)
+        attention_mask = np.tri(self.seq_len, self.seq_len).reshape([1, self.seq_len, self.seq_len])
+        attention_mask[:, :input_len] = 1
+        position_ids = np.arange(0, self.seq_len, dtype=np.int64)
+        position_ids[input_len:] = np.where(input_ids == self.mask_idx)[0]
         loss_mask = np.zeros(self.seq_len, dtype="float32")
-        loss_mask[num_tokens - len(labels) - 1 : num_tokens - 1] = 1.0
-        [tokens, attention_mask, position_ids, labels] = self._construct_sample(tokens)
-        return [tokens, loss_mask, attention_mask, position_ids, labels]
+        loss_mask[input_len : input_len + len(labels)] = 1.0
+        targets = np.array(input_ids.tolist())
+        targets[pred_index] = labels[-1]
+
+        return [input_ids, loss_mask, attention_mask < 0.5, position_ids, targets]
 
 
 def wikitext_detokenizer(string):
@@ -182,7 +170,7 @@ def wikitext_detokenizer(string):
 
 def get_tokens(tokenizer, text, strict=True):
     if not strict:
-        tokens = tokenizer(text)["input_ids"]
+        tokens = tokenizer.tokenize(text)
         return tokens[:-1], [tokens[-1]]
     last_token = text.split()[-1]
     start_idx = text.rfind(last_token)
@@ -208,7 +196,7 @@ def create_eval_dataset(args):
         val_dataset = LM_Eval_Dataset(
             tokenized_data,
             seq_len,
-            tokenizer.get_command("<pad>"),
+            0,  # tokenizer.get_command("[pad]"),
             tokenizer.get_command("[gMASK]"),
             tokenizer.get_command("sop"),
             args.overlapping_eval,
@@ -226,7 +214,7 @@ def create_eval_dataset(args):
             tokenized_data,
             tokenized_label,
             seq_len,
-            tokenizer.get_command("<pad>"),
+            0,  # tokenizer.get_command("[pad]"),
             tokenizer.get_command("[gMASK]"),
             tokenizer.get_command("sop"),
         )
@@ -246,11 +234,22 @@ def create_eval_dataset(args):
     return args, val_dataloader
 
 
-def do_eval(args):
+def do_eval():
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+    strategy = paddle.distributed.fleet.DistributedStrategy()
+    strategy.hybrid_configs = {
+        "dp_degree": 1,
+        "mp_degree": tensor_parallel_degree,
+        "pp_degree": 1,
+        "sharding_degree": 1,
+    }
+    paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
+
     parser = PdArgumentParser((DataArgument, TrainingArguments))
     args, training_args = parser.parse_args_into_dataclasses()
 
-    paddle.set_device(args.device)
+    paddle.set_device(training_args.device)
 
     # 屏蔽init_weights
     GLM130BModel.init_weights = lambda *args, **kwargs: None
@@ -260,10 +259,9 @@ def do_eval(args):
 
     model = GLM130BModel.from_pretrained(
         args.model_path,
-        parallel_output=True,
         load_state_as_np=True,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        tensor_parallel_degree=tensor_parallel_degree,
+        tensor_parallel_rank=tensor_parallel_rank,
         low_cpu_mem_usage=True,
         dtype="float16",
     )
@@ -289,10 +287,10 @@ def do_eval(args):
                 acc = paddle.where(paddle.cast(loss_mask, "bool"), acc, paddle.ones_like(acc))
                 acc = paddle.sum(paddle.prod(acc, -1))
                 total_score += acc.numpy()
-            if step % args.logging_steps == 0:
+            if step % training_args.logging_steps == 0:
                 logger.info(
                     "step %d, batch: %d, %s: %f, speed: %.2f step/s"
-                    % (step, step, score_name, total_score, args.logging_steps / (time.time() - tic_eval))
+                    % (step, step, score_name, total_score, training_args.logging_steps / (time.time() - tic_eval))
                 )
                 tic_eval = time.time()
 

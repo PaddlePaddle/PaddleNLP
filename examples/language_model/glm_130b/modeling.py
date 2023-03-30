@@ -178,6 +178,7 @@ class GLM130BAttention(nn.Layer):
         cache: Tensor = None,
         label_id=0,
     ):
+        hidden_states = hidden_states.transpose([1, 0, 2])
         # [s, b, h]
         query_length, batch_size = hidden_states.shape[:2]
         if cache is None:
@@ -250,11 +251,14 @@ class GLM130BAttention(nn.Layer):
         # [b * n, s, s]
         attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
 
+        # [b * n, s, h/n]
         context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
         context_layer = context_layer.reshape(output_shape)
 
+        # [b, s, n, h/n]
         context_layer = context_layer.transpose([0, 2, 1, 3])
 
+        # [b, n, h]
         new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
         context_layer = context_layer.reshape(new_context_shape)
 
@@ -389,8 +393,9 @@ class GLM130BStack(nn.Layer):
         attention_mask: Tensor,
         memory_states: Optional[Tensor] = None,
     ):
+
         batch_size, query_length = input_ids.shape
-        word_embeddings = self.word_embeddings(input_ids).transpose([1, 0, 2])
+        word_embeddings = self.word_embeddings(input_ids)
         # memory_length = memory_states[0].shape[1] if memory_states is not None else 0
 
         if attention_mask is None:
@@ -591,7 +596,7 @@ class GLM130BModel(GLM130BPretrainedModel):
             else:
                 logits = F.linear(logits, self.transformer.word_embeddings.weight.T)
 
-            logits = logits.transpose([1, 0, 2])
+            # logits = logits.transpose([1, 0, 2])
 
         if not return_dict:
             return (logits, hidden_layers)
