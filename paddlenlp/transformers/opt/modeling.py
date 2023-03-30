@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import collections
+from functools import partial
 from typing import Any, Dict, List
 
 import paddle
@@ -61,10 +62,8 @@ class MultiHeadAttention(nn.Layer):
     ):
         super(MultiHeadAttention, self).__init__()
 
-        embed_dim = config.hidden_size
-        self.embed_dim = config.hidden_size
         self.num_heads = config.num_attention_heads
-        self.head_dim = embed_dim // self.num_heads
+        self.head_dim = config.hidden_size // self.num_heads
 
         # get the `num_heads`
         assert self.num_heads % config.mp_degree == 0
@@ -75,52 +74,49 @@ class MultiHeadAttention(nn.Layer):
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
         assert (
-            self.head_dim * self.num_heads * config.mp_degree == self.embed_dim
-        ), "embed_dim must be divisible by num_heads"
+            self.head_dim * self.num_heads * config.mp_degree == config.hidden_size
+        ), "hidden_size must be divisible by num_heads"
 
-        if self.fuse_attention_qkv:
-            if config.mp_degree > 1:
+        if config.mp_degree > 1:
+            if self.fuse_attention_qkv:
                 self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_heads * self.head_dim,
-                    has_bias=config.enable_bias,
+                    config.hidden_size,
+                    config.hidden_size * 3,
+                    has_bias=True,
                     input_is_parallel=True,
                 )
             else:
-                self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim)
-        else:
-            if config.mp_degree > 1:
                 self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_heads * self.head_dim,
-                    has_bias=config.enable_bias,
+                    config.hidden_size,
+                    config.hidden_size,
+                    has_bias=True,
                     gather_output=False,
                 )
                 self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_heads * self.head_dim,
-                    has_bias=config.enable_bias,
+                    config.hidden_size,
+                    config.hidden_size,
+                    has_bias=True,
                     gather_output=False,
                 )
                 self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_heads * self.head_dim,
-                    has_bias=config.enable_bias,
+                    config.hidden_size,
+                    config.hidden_size,
+                    has_bias=True,
                     gather_output=False,
                 )
-            else:
-                self.q_proj = nn.Linear(embed_dim, embed_dim)
-                self.k_proj = nn.Linear(self.embed_dim, embed_dim)
-                self.v_proj = nn.Linear(self.embed_dim, embed_dim)
 
-        if config.mp_degree > 1:
             self.out_proj = fleet.meta_parallel.RowParallelLinear(
-                self.num_heads * self.head_dim,
-                self.hidden_size,
-                input_is_parallel=True,
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
             )
         else:
-            self.out_proj = nn.Linear(embed_dim, embed_dim)
+            if self.fuse_attention_qkv:
+                self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size)
+            else:
+                self.q_proj = nn.Linear(config.hidden_size, config.hidden_size)
+                self.k_proj = nn.Linear(config.hidden_size, config.hidden_size)
+                self.v_proj = nn.Linear(config.hidden_size, config.hidden_size)
+
+            self.out_proj = nn.Linear(config.hidden_size, config.hidden_size)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
@@ -293,7 +289,7 @@ class TransformerDecoderLayer(nn.Layer):
             self.linear2 = fleet.meta_parallel.RowParallelLinear(
                 dim_feedforward,
                 d_model,
-                gather_output=False,
+                input_is_parallel=True,
                 has_bias=False,
             )
         else:
@@ -570,6 +566,49 @@ class OPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = OPT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
+    def _get_tensor_parallel_mappings(cls, config: OPTConfig, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+        actions = {
+            "word_embeddings.weight": partial(fn, is_column=False),
+        }
+        for layer_index in range(config.num_hidden_layers):
+            actions.update(
+                {
+                    # Column Linear
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.linear1.weight": partial(fn, is_column=True),
+                    # Row Linear
+                    f"decoder.layers.{layer_index}.linear2.weight": partial(fn, is_column=False),
+                    f"decoder.layers.{layer_index}.self_attn.out_proj.weight": partial(fn, is_column=False),
+                }
+            )
+
+        if config.word_embed_proj_dim != config.hidden_size:
+            actions.update(
+                {
+                    "decoder.project_out.weight": partial(fn, is_column=True),
+                    "decoder.project_in.weight": partial(fn, is_column=True),
+                }
+            )
+
+        print(f"opt-model base-name: {cls.__name__}")
+        if cls.__name__ != "OPTModel":
+            for key in list(actions.keys()):
+                actions["opt." + key] = actions.pop(key)
+
+        return actions
+
+    @classmethod
     def _get_name_mappings(cls, config: OPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -645,7 +684,7 @@ class OPTPretrainedModel(PretrainedModel):
             model_mappings.extend(layer_mappings)
 
         # base-model prefix "OPTModel"
-        if "OPTModel" not in config.architectures:
+        if cls.__name__ != "OPTModel":
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "opt." + mapping[1]
