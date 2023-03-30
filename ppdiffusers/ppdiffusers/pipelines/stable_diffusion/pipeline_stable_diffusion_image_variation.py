@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,16 +24,9 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProj
 
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
-from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import (
-    DDIMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    LMSDiscreteScheduler,
-    PNDMScheduler,
-)
-from ...utils import deprecate, logging
+from ...schedulers import KarrasDiffusionSchedulers
+from ...utils import deprecate, logging, randn_tensor
+from ..pipeline_utils import DiffusionPipeline
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
 
@@ -45,7 +38,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
     Pipeline to generate variations from an input image using Stable Diffusion.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Args:
         vae ([`AutoencoderKL`]):
@@ -64,6 +57,8 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
+    # TODO: feature_extractor is required to encode images (if they are in PIL format),
+    # we should give a descriptive message if the pipeline doesn't have one.
     _optional_components = ["safety_checker"]
 
     def __init__(
@@ -71,14 +66,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
         vae: AutoencoderKL,
         image_encoder: CLIPVisionModelWithProjection,
         unet: UNet2DConditionModel,
-        scheduler: Union[
-            DDIMScheduler,
-            PNDMScheduler,
-            LMSDiscreteScheduler,
-            EulerDiscreteScheduler,
-            EulerAncestralDiscreteScheduler,
-            DPMSolverMultistepScheduler,
-        ],
+        scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
         requires_safety_checker: bool = True,
@@ -89,16 +77,18 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
             )
+
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
+                f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
+
         is_unet_version_less_0_9_0 = hasattr(unet.config, "_ppdiffusers_version") and version.parse(
             version.parse(unet.config._ppdiffusers_version).base_version
         ) < version.parse("0.9.0.dev0")
@@ -106,7 +96,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
         if is_unet_version_less_0_9_0 and is_unet_sample_size_less_64:
             deprecation_message = (
                 "The configuration file of the unet has set the default `sample_size` to smaller than"
-                " 64 which seems highly unlikely. If your checkpoint is a fine-tuned version of any of the"
+                " 64 which seems highly unlikely .If your checkpoint is a fine-tuned version of any of the"
                 " following: \n- CompVis/stable-diffusion-v1-4 \n- CompVis/stable-diffusion-v1-3 \n-"
                 " CompVis/stable-diffusion-v1-2 \n- CompVis/stable-diffusion-v1-1 \n- runwayml/stable-diffusion-v1-5"
                 " \n- runwayml/stable-diffusion-inpainting \n you should change 'sample_size' to 64 in the"
@@ -119,6 +109,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
             new_config = dict(unet.config)
             new_config["sample_size"] = 64
             unet._internal_dict = FrozenDict(new_config)
+
         self.register_modules(
             vae=vae,
             image_encoder=image_encoder,
@@ -137,7 +128,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
             image = self.feature_extractor(images=image, return_tensors="pd").pixel_values
 
         image = image.cast(dtype)
-        image_embeddings = self.image_encoder(image, return_dict=True).image_embeds
+        image_embeddings = self.image_encoder(image).image_embeds
         image_embeddings = image_embeddings.unsqueeze(1)
 
         # duplicate image embeddings for each generation per prompt, using mps friendly method
@@ -146,16 +137,16 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
         image_embeddings = image_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         if do_classifier_free_guidance:
-            uncond_embeddings = paddle.zeros_like(image_embeddings)
+            negative_prompt_embeds = paddle.zeros_like(image_embeddings)
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            image_embeddings = paddle.concat([uncond_embeddings, image_embeddings])
+            image_embeddings = paddle.concat([negative_prompt_embeds, image_embeddings])
 
         return image_embeddings
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, dtype):
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
@@ -166,16 +157,16 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
             has_nsfw_concept = None
         return image, has_nsfw_concept
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
+        latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -215,9 +206,9 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
                 f" {type(callback_steps)}."
             )
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
-        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
                 f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
@@ -225,17 +216,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
             )
 
         if latents is None:
-            if isinstance(generator, list):
-                shape = [
-                    1,
-                ] + shape[1:]
-                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
-                latents = paddle.concat(latents, axis=0)
-            else:
-                latents = paddle.randn(shape, generator=generator, dtype=dtype)
-        else:
-            if latents.shape != shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+            latents = randn_tensor(shape, generator=generator, dtype=dtype)
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
@@ -286,8 +267,7 @@ class StableDiffusionImageVariationPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation
-                deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents

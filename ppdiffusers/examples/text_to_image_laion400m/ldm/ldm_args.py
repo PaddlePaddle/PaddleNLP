@@ -46,6 +46,9 @@ class ModelArguments:
         default=None, metadata={"help": "Path to pretrained model or model, when we want to resume training."}
     )
     image_logging_steps: Optional[int] = field(default=1000, metadata={"help": "Log image every X steps."})
+    enable_xformers_memory_efficient_attention: bool = field(
+        default=False, metadata={"help": "enable_xformers_memory_efficient_attention."}
+    )
 
 
 @dataclass

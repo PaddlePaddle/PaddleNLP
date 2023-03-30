@@ -22,4 +22,4 @@ pipe = KarrasVePipeline.from_pretrained("google/ncsnpp-celebahq-256", scheduler=
 image = pipe().images
 
 # 保存图片
-image[0].save("karras_ve_generated_image.png")
+image[0].save("unconditional_image_generation-stochastic_karras_ve-result.png")
