@@ -42,8 +42,8 @@ def convert_example(example, tokenizer, data_args, is_test=True):
         target = example["target"]
     elif "question" in example.keys():
         target = example["question"]
-    example["text_a"] = "答案：" + title + "，" + "上下文：" + source
-    example["text_b"] = "在已知答案的前提下，问题：" + target
+    example["text_a"] = "答案：" + title + "，" + "上下文：" + source + "在已知答案的前提下，问题："
+    example["text_b"] = target + tokenizer.eos_token
 
     source_tokenized = tokenizer(
         example["text_a"],

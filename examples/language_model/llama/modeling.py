@@ -151,32 +151,32 @@ class LlamaMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
-        if config.tensor_parallel_degree > 1:
-            self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-        else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+        # if config.tensor_parallel_degree > 1:
+        #     self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
+        #         self.hidden_size,
+        #         self.intermediate_size,
+        #         gather_output=False,
+        #         has_bias=False,
+        #     )
+        #     self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
+        #         self.hidden_size,
+        #         self.intermediate_size,
+        #         gather_output=False,
+        #         has_bias=False,
+        #     )
+        # else:
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
-        if config.tensor_parallel_degree > 1:
-            self.down_proj = fleet.meta_parallel.RowParallelLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                input_is_parallel=True,
-                has_bias=False,
-            )
-        else:
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        # if config.tensor_parallel_degree > 1:
+        #     self.down_proj = fleet.meta_parallel.RowParallelLinear(
+        #         self.intermediate_size,
+        #         self.hidden_size,
+        #         input_is_parallel=True,
+        #         has_bias=False,
+        #     )
+        # else:
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -417,14 +417,15 @@ class LlamaPretrainedModel(PretrainedModel):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "llama.layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "llama.layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "llama.layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "llama.layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "llama.layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
+                # "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
+                # "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
                 # Row Linear
-                "llama.layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "llama.layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                "embed_tokens.weight": partial(fn, is_column=False),
+                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
+                # "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -475,13 +476,14 @@ class LlamaModel(LlamaPretrainedModel):
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
-                weight_attr=paddle.ParamAttr(
-                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
-                ),
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
             )
         else:
             # self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size, self.padding_idx)
-            self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
+            self.embed_tokens = nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
 
         self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.norm = RMSNorm(config)
