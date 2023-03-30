@@ -232,7 +232,7 @@ def convert_to_paddle(state_dict, return_numpy=False, return_global_step=False):
     pd_state_dict = {}
     # maybe we will use global_step
     if return_global_step:
-        pd_state_dict["global_step"] = state_dict.get("global_step", -1)
+        pd_state_dict["global_step"] = state_dict.pop("global_step", -1)
     state_dict = state_dict.get("state_dict", state_dict)
 
     for k, v in state_dict.items():
