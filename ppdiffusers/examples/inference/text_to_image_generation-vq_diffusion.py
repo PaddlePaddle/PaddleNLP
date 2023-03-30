@@ -19,4 +19,4 @@ pipe = VQDiffusionPipeline.from_pretrained("microsoft/vq-diffusion-ithq")
 output = pipe("teddy bear playing in the pool", truncation_rate=1.0)
 
 image = output.images[0]
-image.save("vq_diffusion_teddy_bear.png")
+image.save("text_to_image_generation-vq_diffusion-result.png")

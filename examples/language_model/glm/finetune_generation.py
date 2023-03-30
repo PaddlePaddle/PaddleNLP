@@ -22,7 +22,7 @@ from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
@@ -119,8 +119,9 @@ def main():
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     # model.generate = partial(

@@ -19,8 +19,8 @@ import shutil
 
 import numpy as np
 import paddle
-from modeling import BloomModel
 
+from paddlenlp.transformers import BloomModel
 from paddlenlp.utils.env import MODEL_HOME
 
 PREFIX_CHECKPOINT_DIR = "model_state"
@@ -161,16 +161,19 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
     return sub_directory_name
 
 
-def merge_model_parallel(model_name_or_path, config, as_float32=False):
+def merge_model_parallel(model_name_or_path: str, config, as_float32=False):
     # Get the 3D rank
     is_path = True if os.path.exists(model_name_or_path) else False
+    # 1. is model-name, eg: bigscience/bloom-560m
     if not is_path:
-        raise "Please input the path for the model"
+        return model_name_or_path
+
     weight_file_name = os.path.join(model_name_or_path, "model_state.pdparams")
+    # 2. dir for: /path/to/model_state.pdparams
     if os.path.exists(os.path.join(model_name_or_path, "model_state.pdparams")):
         return weight_file_name
 
-    # Collect the split files
+    # 3. collect the split files
     file_list = []
     for file_name in os.listdir(model_name_or_path):
         if file_name.count("model_state_mp") and file_name.count("pdparams"):

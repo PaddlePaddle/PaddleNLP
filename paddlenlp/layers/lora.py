@@ -16,6 +16,7 @@ import json
 import math
 import os
 import re
+from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
@@ -25,15 +26,15 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
-from ..utils.env import LORA_CONFIG_NAME
+from ..transformers.model_utils import PretrainedModel
+from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
 
 __all__ = [
     "LoRAConfig",
     "LoRALinear",
     "LoRAMergedLinear",
-    "get_lora_model",
-    "mark_only_lora_as_trainable",
+    "LoRAModel",
 ]
 
 
@@ -197,7 +198,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
 
 
 class LoRAMergedLinear(nn.Linear):
-    # LoRA implemented in a dense layer
+    # LoRA implemented in a dense layer  with merged linear weights for q, k, v
     def __init__(
         self,
         in_features: int,
@@ -215,7 +216,10 @@ class LoRAMergedLinear(nn.Linear):
         ), f"The length of enable_lora must divide out_features: {out_features} % {len(enable_lora)} != 0"
         self.r = r
         self.lora_alpha = lora_alpha
-        self.enable_lora = enable_lora
+        if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
+            self.enable_lora = enable_lora
+        else:
+            raise TypeError("enable_lora must be a list of bools")
         self.single_out_features = out_features // len(enable_lora)
         self.out_features = out_features
         self.in_features = in_features
@@ -256,7 +260,7 @@ class LoRAMergedLinear(nn.Linear):
                 shape=[len(enable_lora), self.single_out_features], fill_value=False, dtype="bool"
             )
             self.enable_lora_indices[enable_lora, :] = True
-            self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [out_features])
+            self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [-1])
 
     def zero_pad(self, x):
         output_shape = x.shape
@@ -327,97 +331,6 @@ class LoRAMergedLinear(nn.Linear):
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
-
-
-# TODO (this is tmp API. will formalize before release)
-def _find_and_replace_module(model, module_name, lora_config, enable_lora):
-    parent_module = model
-    attribute_chain = module_name.split(".")
-    for name in attribute_chain[:-1]:
-        parent_module = getattr(parent_module, name)
-    module = getattr(parent_module, attribute_chain[-1])
-    if enable_lora is None:
-        if isinstance(module, nn.Linear):
-            lora_module = LoRALinear(
-                in_features=module.weight.shape[0],
-                out_features=module.weight.shape[1],
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
-            )
-        elif isinstance(module, ColumnParallelLinear):
-            # recover the original output_features
-            output_features_mp = module.weight.shape[1] * module.world_size
-            lora_module = ColumnParallelLoRALinear(
-                in_features=module.weight.shape[0],
-                out_features=output_features_mp,
-                gather_output=module.gather_output,
-                has_bias=module.bias is not None,
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
-            )
-    else:
-        if isinstance(module, nn.Linear):
-            lora_module = LoRAMergedLinear(
-                in_features=module.weight.shape[0],
-                out_features=module.weight.shape[1],
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
-                enable_lora=enable_lora,
-            )
-
-    lora_module.weight = module.weight
-    if module.bias is not None:
-        lora_module.bias = module.bias
-    setattr(parent_module, attribute_chain[-1], lora_module)
-
-
-def mark_only_lora_as_trainable(model: nn.Layer, trainable_bias: Optional[str] = None) -> None:
-    for _, layer in model.named_sublayers():
-        if (
-            isinstance(layer, LoRALinear)
-            or isinstance(layer, ColumnParallelLoRALinear)
-            or isinstance(layer, LoRAMergedLinear)
-        ):
-            for name, weight in layer.state_dict().items():
-                if trainable_bias in ["lora", "all"] and "bias" in name:
-                    weight.stop_gradient = False
-                elif "lora" in name:
-                    weight.stop_gradient = False
-                else:
-                    weight.stop_gradient = True
-        else:
-            for name, weight in layer.state_dict().items():
-                if trainable_bias == "all" and "bias" in name:
-                    weight.stop_gradient = False
-                else:
-                    weight.stop_gradient = True
-
-
-def print_trainable_parameters(model: nn.Layer) -> None:
-    freeze_numel = 0
-    trainable_numel = 0
-    for _, weight in model.state_dict().items():
-        if weight.stop_gradient:
-            freeze_numel += weight.numel().numpy()[0]
-        else:
-            trainable_numel += weight.numel().numpy()[0]
-    logger.info(
-        f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
-    )
-
-
-def print_trainable_parameter_names(model: nn.Layer):
-    names = []
-    for name, weight in model.state_dict().items():
-        if not weight.stop_gradient:
-            names.append(name)
-    return names
 
 
 @dataclass
@@ -492,7 +405,7 @@ class LoRAConfig:
         if os.path.isfile(os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)):
             config_file = os.path.join(pretrained_model_name_or_path, LORA_CONFIG_NAME)
         else:
-            raise ValueError(f"Can't find config.json at '{pretrained_model_name_or_path}'")
+            raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
 
@@ -518,48 +431,164 @@ class LoRAConfig:
         return json_object
 
 
-# TODO (this is tmp API. will formalize before release)
-def get_lora_model(model, lora_config: LoRAConfig):
+class LoRAModel(nn.Layer):
+    def __init__(self, model, lora_config: LoRAConfig) -> None:
+        super().__init__()
+        self.lora_config = lora_config
+        self.model = self.get_lora_model(model, lora_config)
+        self.forward = self.model.forward
 
-    if lora_config.target_modules is None:
-        return model
-    elif isinstance(lora_config.target_modules, str):
-        target_modules = [lora_config.target_modules]
-        if lora_config.enable_lora_list is None or (
-            isinstance(lora_config.enable_lora_list, List)
-            and all(isinstance(item, bool) for item in lora_config.enable_lora_list)
-        ):
-            enable_lora_list = [lora_config.enable_lora_list]
+    @classmethod
+    def from_pretrained(cls, model, lora_path):
+        lora_config = LoRAConfig.from_pretrained(lora_path)
+        lora_model = cls(model, lora_config)
+        lora_weight_path = os.path.join(lora_path, LORA_WEIGHT_FILE_NAME)
+        if os.path.exists(lora_weight_path):
+            logger.info(f"Loading the LoRA weights from {lora_weight_path}")
+            lora_state_dict = paddle.load(lora_weight_path)
+            lora_model.model.set_state_dict(lora_state_dict)
         else:
-            raise ValueError(
-                f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {str}, lora_config.enable_lora_list must be None or a list of {bool}"
-            )
-    else:
-        target_modules = lora_config.target_modules
-        if lora_config.enable_lora_list is None:
-            enable_lora_list = [None for _ in range(len(target_modules))]
-        elif isinstance(lora_config.enable_lora_list, List):
-            enable_lora_list = lora_config.enable_lora_list
-            if len(enable_lora_list) != len(target_modules):
-                raise ValueError(
-                    f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, len(enable_lora_list) should equal to len(target_modules): {len(enable_lora_list)} != {len(target_modules)}"
+            logger.info(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+        return lora_model
+
+    def save_pretrained(self, save_directory: str, **kwargs):
+        assert not os.path.isfile(
+            save_directory
+        ), f"Saving directory ({save_directory}) should be a directory, not a file"
+        os.makedirs(save_directory, exist_ok=True)
+
+        self.lora_config.save_pretrained(save_directory)
+        weight_filename = os.path.join(save_directory, LORA_WEIGHT_FILE_NAME)
+        trainable_state_dict = self.get_trainable_state_dict()
+        paddle.save(trainable_state_dict, weight_filename)
+
+    def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
+        parent_module = model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        module = getattr(parent_module, attribute_chain[-1])
+        if enable_lora is None:
+            if isinstance(module, nn.Linear):
+                lora_module = LoRALinear(
+                    in_features=module.weight.shape[0],
+                    out_features=module.weight.shape[1],
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
                 )
-            for enable_lora in enable_lora_list:
-                if not (
-                    enable_lora is None
-                    or (isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora))
-                ):
-                    raise ValueError(
-                        f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
-                    )
+            elif isinstance(module, ColumnParallelLinear):
+                # recover the original output_features
+                output_features_mp = module.weight.shape[1] * module.world_size
+                lora_module = ColumnParallelLoRALinear(
+                    in_features=module.weight.shape[0],
+                    out_features=output_features_mp,
+                    gather_output=module.gather_output,
+                    has_bias=module.bias is not None,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                )
         else:
-            raise ValueError(
-                f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
-            )
+            if isinstance(module, nn.Linear):
+                lora_module = LoRAMergedLinear(
+                    in_features=module.weight.shape[0],
+                    out_features=module.weight.shape[1],
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                    enable_lora=enable_lora,
+                )
 
-    for target_module, enable_lora in zip(target_modules, enable_lora_list):
-        for i in model.named_sublayers():
-            module_name = i[0]
-            if re.fullmatch(target_module, module_name):
-                _find_and_replace_module(model, module_name, lora_config, enable_lora)
-    return model
+        lora_module.weight = module.weight
+        if module.bias is not None:
+            lora_module.bias = module.bias
+        setattr(parent_module, attribute_chain[-1], lora_module)
+
+    def get_trainable_state_dict(self):
+        trainable_state_dict = OrderedDict()
+        for name, weight in self.model.state_dict().items():
+            if not weight.stop_gradient:
+                trainable_state_dict[name] = weight
+        return trainable_state_dict
+
+    def print_trainable_parameters(self) -> None:
+        freeze_numel = 0
+        trainable_numel = 0
+        for _, weight in self.model.state_dict().items():
+            if weight.stop_gradient:
+                freeze_numel += weight.numel().numpy()[0]
+            else:
+                trainable_numel += weight.numel().numpy()[0]
+        logger.info(
+            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
+        )
+
+    def mark_only_lora_as_trainable(self) -> None:
+        for _, layer in self.model.named_sublayers():
+            if (
+                isinstance(layer, LoRALinear)
+                or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAMergedLinear)
+            ):
+                for name, weight in layer.state_dict().items():
+                    if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
+                        weight.stop_gradient = False
+                    elif "lora" in name:
+                        weight.stop_gradient = False
+                    else:
+                        weight.stop_gradient = True
+            else:
+                for name, weight in layer.state_dict().items():
+                    if self.lora_config.trainable_bias == "all" and "bias" in name:
+                        weight.stop_gradient = False
+                    else:
+                        weight.stop_gradient = True
+
+    def get_lora_model(self, model: Union[PretrainedModel, nn.Layer], lora_config: LoRAConfig):
+
+        if lora_config.target_modules is None:
+            return model
+        elif isinstance(lora_config.target_modules, str):
+            target_modules = [lora_config.target_modules]
+            if lora_config.enable_lora_list is None or (
+                isinstance(lora_config.enable_lora_list, List)
+                and all(isinstance(item, bool) for item in lora_config.enable_lora_list)
+            ):
+                enable_lora_list = [lora_config.enable_lora_list]
+            else:
+                raise TypeError(
+                    f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {str}, lora_config.enable_lora_list must be None or a list of {bool}"
+                )
+        else:
+            target_modules = lora_config.target_modules
+            if lora_config.enable_lora_list is None:
+                enable_lora_list = [None for _ in range(len(target_modules))]
+            elif isinstance(lora_config.enable_lora_list, List):
+                enable_lora_list = lora_config.enable_lora_list
+                if len(enable_lora_list) != len(target_modules):
+                    raise TypeError(
+                        f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, len(enable_lora_list) should equal to len(target_modules): {len(enable_lora_list)} != {len(target_modules)}"
+                    )
+                for enable_lora in enable_lora_list:
+                    if not (
+                        enable_lora is None
+                        or (isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora))
+                    ):
+                        raise TypeError(
+                            f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
+                        )
+            else:
+                raise TypeError(
+                    f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, lora_config.enable_lora_list must be None or {List[Optional[List[bool]]]}"
+                )
+
+        for target_module, enable_lora in zip(target_modules, enable_lora_list):
+            for i in model.named_sublayers():
+                module_name = i[0]
+                if re.fullmatch(target_module, module_name):
+                    self._find_and_replace_module(model, module_name, lora_config, enable_lora)
+        return model

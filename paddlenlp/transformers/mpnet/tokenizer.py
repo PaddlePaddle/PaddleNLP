@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..bert.tokenizer import BertTokenizer
 from .. import AddedToken
+from ..bert.tokenizer import BertTokenizer
 
 __all__ = ["MPNetTokenizer"]
 
@@ -59,6 +59,7 @@ class MPNetTokenizer(BertTokenizer):
             pad_token=pad_token,
             cls_token=cls_token,
             mask_token=mask_token,
+            **kwargs,
         )
 
         bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
@@ -84,32 +85,40 @@ class MPNetTokenizer(BertTokenizer):
         self,
         text,
         text_pair=None,
-        max_seq_len=None,
+        max_length=None,
         stride=0,
+        padding=False,
         is_split_into_words=False,
         pad_to_max_seq_len=False,
-        truncation_strategy="longest_first",
+        truncation=False,
         return_position_ids=False,
         return_token_type_ids=False,
         return_attention_mask=False,
         return_length=False,
         return_overflowing_tokens=False,
         return_special_tokens_mask=False,
+        add_special_tokens=True,
+        pad_to_multiple_of=None,
+        return_offsets_mapping=False,
     ):
         return super().__call__(
             text,
             text_pair=text_pair,
-            max_seq_len=max_seq_len,
+            max_length=max_length,
             stride=stride,
+            padding=padding,
             is_split_into_words=is_split_into_words,
             pad_to_max_seq_len=pad_to_max_seq_len,
-            truncation_strategy=truncation_strategy,
+            truncation=truncation,
             return_position_ids=return_position_ids,
             return_token_type_ids=return_token_type_ids,
             return_attention_mask=return_attention_mask,
             return_length=return_length,
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
+            add_special_tokens=add_special_tokens,
+            pad_to_multiple_of=pad_to_multiple_of,
+            return_offsets_mapping=return_offsets_mapping,
         )
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -184,3 +193,9 @@ class MPNetTokenizer(BertTokenizer):
         if token_ids_1 is None:
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + [(0, 0)] + offset_mapping_1 + [(0, 0)]

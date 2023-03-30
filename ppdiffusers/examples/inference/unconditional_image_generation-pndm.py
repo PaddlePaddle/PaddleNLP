@@ -21,4 +21,4 @@ pipe = PNDMPipeline.from_pretrained("google/ddpm-celebahq-256")
 image = pipe(num_inference_steps=1000).images[0]
 
 # 保存图片
-image.save("pndm_generated_image.png")
+image.save("unconditional_image_generation-pndm-result.png")
