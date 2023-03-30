@@ -263,6 +263,15 @@ class LoRAMergedLinear(nn.Linear):
             self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [-1])
 
     def zero_pad(self, x):
+        # implementation 1: faster, close to LoRALinear
+        # split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
+        # assert len(split_output) == sum(self.enable_lora)
+        # for index in range(len(self.enable_lora)):
+        #     if self.enable_lora[index] is False:
+        #         split_output.insert(index, paddle.zeros_like(split_output[0]))
+        # concat_output = paddle.concat(split_output, axis=-1)
+        # return concat_output
+        # implementation 2: slower
         output_shape = x.shape
         output_shape[-1] = self.out_features
         result = paddle.zeros(output_shape, dtype=x.dtype).reshape([output_shape[-1], -1])
@@ -363,7 +372,10 @@ class LoRAConfig:
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
     enable_lora_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
-        default=None, metadata={"help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."}
+        default=None,
+        metadata={
+            "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
+        },
     )
 
     @property
