@@ -18,4 +18,4 @@ pipe = VersatileDiffusionTextToImagePipeline.from_pretrained("shi-labs/versatile
 pipe.remove_unused_weights()
 
 image = pipe("an astronaut riding on a horse on mars").images[0]
-image.save("versatile-diffusion-astronaut.png")
+image.save("text_to_image_generation-versatile_diffusion-result.png")

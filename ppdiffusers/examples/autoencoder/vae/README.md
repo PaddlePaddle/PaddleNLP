@@ -1,6 +1,6 @@
 ## AutoEncoderKL(VAE) 从零训练代码
 
-本教程带领大家如何开启[f8encoder_f16decoder](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/examples/autoencoder/vae/config/f8encoder_f16decoder.yaml)架构的AutoEncoderKL (VAE）模型。
+本教程带领大家如何开启[f8encoder_f16decoder](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/examples/autoencoder/vae/config/f8encoder_f16decoder.yaml)架构的AutoEncoderKL (VAE) 模型。
 
 
 ## 1 本地运行
@@ -157,6 +157,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_vae.py \
 
 ## 2 模型推理
 ```python
+import paddle
+from IPython.display import display
 from ppdiffusers import AutoencoderKL, StableDiffusionImg2ImgPipeline
 from ppdiffusers.utils import load_image
 from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import preprocess

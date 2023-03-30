@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +23,6 @@ import PIL.Image
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -37,6 +37,7 @@ from ...schedulers.preconfig import (
     PreconfigLMSDiscreteScheduler,
 )
 from ...utils import PIL_INTERPOLATION, logging
+from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -372,10 +373,15 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 image = [image]
 
             if isinstance(image[0], PIL.Image.Image):
-                image = [
-                    np.array(i.resize((width, height), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image
-                ]
-                image = np.concatenate(image, axis=0)
+                images = []
+                for image_ in image:
+                    image_ = image_.convert("RGB")
+                    image_ = image_.resize((width, height), resample=PIL_INTERPOLATION["lanczos"])
+                    image_ = np.array(image_)
+                    image_ = image_[None, :]
+                    images.append(image_)
+
+                image = np.concatenate(images, axis=0)
                 image = np.array(image).astype(np.float32) / 255.0
                 image = image.transpose(0, 3, 1, 2)
                 image = paddle.to_tensor(image)
@@ -621,8 +627,8 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         else:
             noise_pred_unet_batch_size = batch_size * num_images_per_prompt
 
+        prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=paddle.float32)
             for i, t in enumerate(timesteps):
                 noise_pred_unet = paddle.zeros(
                     [noise_pred_unet_batch_size, 4, height // 8, width // 8], dtype=paddle.float32
