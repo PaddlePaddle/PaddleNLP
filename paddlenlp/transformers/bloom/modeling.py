@@ -746,13 +746,19 @@ class BloomPreTrainedModel(PretrainedModel):
                 ]
             )
 
-        model_class_name = config.architectures[0]
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
+        model_class_name = config.architectures[0]
 
         if model_class_name != "BloomModel":
             for mapping in mappings:
                 mapping.source_name = "transformer." + mapping.source_name
                 mapping.target_name = "bloom." + mapping.target_name
+
+        if model_class_name == "BloomForSequenceClassification":
+            mappings.append(StateDictNameMapping("score.weight", "score.weight", "transpose"))
+        if model_class_name == "BloomForTokenClassification":
+            mappings.append(StateDictNameMapping("classifier.weight", "classifier.weight", "transpose"))
+            mappings.append(StateDictNameMapping("classifier.bias", "classifier.bias"))
 
         return mappings
 
@@ -898,8 +904,7 @@ class BloomModel(BloomPreTrainedModel):
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
-            if input_ids is not None:
-                attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
+            attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
 
         alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         causal_mask = self._prepare_attn_mask(
@@ -907,7 +912,7 @@ class BloomModel(BloomPreTrainedModel):
             input_shape=(batch_size, seq_length),
             past_key_values_length=past_key_values_length,
         )
-        if self.config.mp_rank >= 0:
+        if self.config.mp_degree > 1:
             block_size = self.config.n_head // self.config.mp_degree
             alibi = alibi[:, self.mp_rank * block_size : (self.mp_rank + 1) * block_size]
             alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
@@ -1215,27 +1220,31 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
 
         if input_ids is not None:
             batch_size = input_ids.shape[0]
+            sequence_length = input_ids.shape[1]
         else:
             batch_size = inputs_embeds.shape[0]
+            sequence_length = inputs_embeds.shape[1]
 
         if self.config.pad_token_id is None and batch_size != 1:
             raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
 
         if self.config.pad_token_id is None:
-            sequence_lengths = -1
-
+            pooled_logits = logits[:, -1]
         else:
             if input_ids is not None:
+                # select the last word of batch sentence
                 sequence_lengths = paddle.where(input_ids != self.config.pad_token_id, 1, 0).sum(axis=-1) - 1
-                # sequence_lengths = paddle.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
+                sequence_lengths += paddle.to_tensor([i * input_ids.shape[1] for i in range(batch_size)])
+                pooled_logits = paddle.index_select(
+                    logits.reshape([batch_size * sequence_length, -1]), sequence_lengths, axis=0
+                )
+
             else:
-                sequence_lengths = -1
+                pooled_logits = logits[:, -1]
                 logger.warning(
                     f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
                     "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
                 )
-
-        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
 
         loss = None
         if labels is not None:
