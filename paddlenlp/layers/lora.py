@@ -571,7 +571,7 @@ class LoRAModel(nn.Layer):
                 enable_lora_list = lora_config.enable_lora_list
                 if len(enable_lora_list) != len(target_modules):
                     raise TypeError(
-                        f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is {List[str]}, len(enable_lora_list) should equal to len(target_modules): {len(enable_lora_list)} != {len(target_modules)}"
+                        f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is `List[str]`, `enable_lora_list` should have the same length as `target_modules`"
                     )
                 for enable_lora in enable_lora_list:
                     if not (
