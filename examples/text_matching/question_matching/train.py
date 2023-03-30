@@ -12,31 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-
-from data import create_dataloader, read_text_pair, convert_example
+from data import convert_example, create_dataloader, read_text_pair
 from model import QuestionMatching
 
-# yapf: disable
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
+
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--train_set", type=str, required=True, help="The full path of train_set_file")
 parser.add_argument("--dev_set", type=str, required=True, help="The full path of dev_set_file")
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=256, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=256, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument('--max_steps', default=-1, type=int, help="If > 0, set total number of training steps to perform.")
 parser.add_argument("--train_batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--eval_batch_size", default=128, type=int, help="Batch size per GPU/CPU for training.")
@@ -49,11 +45,9 @@ parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of"
-    "KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
-
+parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def set_seed(seed):

@@ -121,6 +121,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlipText", "blip"),
         ("BlipVision", "blip"),
         ("Blip", "blip"),
+        ("Bloom", "bloom"),
     ]
 )
 
@@ -141,6 +142,13 @@ MAPPING_TASKS = OrderedDict(
         ("Discriminator", "AutoDiscriminator"),
         ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
         ("ForImageGeneration", "AutoModelForImageGeneration"),
+    ]
+)
+
+MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
+    [
+        # Model for Causal LM mapping
+        ("opt", "OPTForCausalLM"),
     ]
 )
 

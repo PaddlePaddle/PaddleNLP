@@ -21,18 +21,10 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from configuration import BloomConfig
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
-from processor import (
-    ForcedBOSTokenLogitsProcessor,
-    ForcedEOSTokenLogitsProcessor,
-    HammingDiversityLogitsProcessor,
-    LogitsProcessorList,
-    RepetitionPenaltyLogitsProcessor,
-)
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -44,28 +36,51 @@ from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.converter import StateDictNameMapping
 from paddlenlp.utils.log import logger
 
-BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "bigscience/bloom-560m",
+from .configuration import BloomConfig
+from .processor import (
+    ForcedBOSTokenLogitsProcessor,
+    ForcedEOSTokenLogitsProcessor,
+    HammingDiversityLogitsProcessor,
+    LogitsProcessorList,
+    RepetitionPenaltyLogitsProcessor,
+)
+
+__all__ = [
+    "BloomModel",
+    "BloomForPretraining",
+    "BloomForCausalLM",
+    "BloomForSequenceClassification",
+    "BloomForTokenClassification",
+    "BloomForGeneration",
 ]
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output=True):
-    hcg = fleet.get_hybrid_communicate_group()
-    model_parallel_group = hcg.get_model_parallel_group()
-    mp_degree = hcg.get_model_parallel_world_size()
-    # rank = hcg.get_model_parallel_rank()
-    if mp_degree > 1:
-        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+    world_size = paddle.distributed.get_world_size()
+    if world_size > 1:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=True)
         if parallel_output:
             return logits
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        logits = paddle.matmul(x, y, transpose_y=True)
         return logits
 
 
-def finfo(dtype):
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
     if dtype == paddle.float32:
         return np.finfo(np.float32)
     if dtype == paddle.float16:
@@ -147,9 +162,9 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     slopes = paddle.pow(base, powers)
 
     if closest_power_of_2 != num_heads:
-        extra_base = paddle.tensor(2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3))), dtype=paddle.float32)
+        extra_base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3))), dtype=paddle.float32)
         num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
-        extra_powers = paddle.arange(1, 1 + 2 * num_remaining_heads, 2, dtype=paddle.int32)
+        extra_powers = paddle.arange(1, 1 + 2 * num_remaining_heads, 2, dtype=paddle.float32)
         slopes = paddle.concat([slopes, paddle.pow(extra_base, extra_powers)], axis=0)
 
     # Note: alibi will added to the attention bias that will be applied to the query, key product of attention
@@ -435,7 +450,7 @@ class BloomAttention(nn.Layer):
         # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
-        input_dtype = attention_scores.dtype
+        input_dtype = query_layer.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
         if self.config.use_pure_fp16:
             with paddle.amp.auto_cast(False):
@@ -482,6 +497,8 @@ class BloomAttention(nn.Layer):
 
         outputs = (output_tensor, present)
         if output_attentions:
+            # output attentions should be: [batch_size, self.num_heads, q_length, kv_length]
+            attention_probs = attention_probs.reshape([batch_size, self.num_heads, q_length, kv_length])
             outputs += (attention_probs,)
 
         return outputs
@@ -565,6 +582,7 @@ class BloomBlock(nn.Layer):
             residual = hidden_states
 
         # Self attention.
+
         attn_outputs = self.self_attention(
             layernorm_output,
             residual,
@@ -595,7 +613,6 @@ class BloomBlock(nn.Layer):
             outputs = (output,) + outputs
         else:
             outputs = (output,) + outputs[1:]
-
         return outputs  # hidden_states, present, attentions
 
 
@@ -613,13 +630,12 @@ class BloomPreTrainedModel(PretrainedModel):
 
     def init_weights(self, module):
         """Initialize the weights."""
-        # TODO(wj-Mcat): init for embedding
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.set_value(
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
             if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.tensor.zeros(shape=module.weight.shape))
+                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, BloomModel):
@@ -729,7 +745,15 @@ class BloomPreTrainedModel(PretrainedModel):
                     [f"h.{i}.mlp.dense_4h_to_h.bias", f"h.{i}.mlp.dense_4h_to_h.bias"],
                 ]
             )
+
+        model_class_name = config.architectures[0]
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
+
+        if model_class_name != "BloomModel":
+            for mapping in mappings:
+                mapping.source_name = "transformer." + mapping.source_name
+                mapping.target_name = "bloom." + mapping.target_name
+
         return mappings
 
 
@@ -947,17 +971,19 @@ class BloomModel(BloomPreTrainedModel):
 
 
 class BloomLMHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+    def __init__(self, config, embedding_weights=None):
         super(BloomLMHead, self).__init__()
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
+            )
             if embedding_weights is None
             else embedding_weights
         )
+        self.config = config
 
     def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight)
-        # logits = paddle.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
         return logits
 
 
@@ -1009,24 +1035,28 @@ class BloomForPretraining(BloomPreTrainedModel):
     def forward(
         self,
         input_ids,
-        position_ids,
-        labels,
-        loss_mask,
+        labels=None,
+        loss_mask=None,
         attention_mask=None,
-        masked_positions=None,
         use_cache=False,
         cache=None,
     ):
-        outputs = self.bloom(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
-        )
+        outputs = self.bloom(input_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = parallel_matmul(encoder_outputs[0], self.bloom.word_embeddings.weight)
+
+        logits = parallel_matmul(
+            encoder_outputs[0],
+            self.bloom.word_embeddings.weight,
+            parallel_output=False,
+        )
+        if labels is None:
+            return logits
+
         loss = self.criterion(logits, labels, loss_mask)
-        return loss
+        return loss, logits
 
 
 class BloomForCausalLM(BloomPreTrainedModel):
@@ -1035,7 +1065,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomModel(config)
-        self.lm_head = BloomLMHead(config.hidden_size, config.vocab_size, self.bloom.word_embeddings.weight)
+        self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
 
         # Initialize weights and apply final processing
@@ -1053,21 +1083,11 @@ class BloomForCausalLM(BloomPreTrainedModel):
             input_ids = input_ids[:, -1].unsqueeze(-1)
 
         attention_mask = kwargs.get("attention_mask", None)
-        position_ids = kwargs.get("position_ids", None)
 
-        if attention_mask is not None and position_ids is None:
-            # create position_ids on the fly for batch generation
-            position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids = masked_fill(position_ids, attention_mask == 0, 1)
-            if past:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-        else:
-            position_ids = None
         return {
             "input_ids": input_ids,
             "past_key_values": past,
             "use_cache": kwargs.get("use_cache"),
-            "position_ids": position_ids,
             "attention_mask": attention_mask,
         }
 
@@ -1107,7 +1127,10 @@ class BloomForCausalLM(BloomPreTrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
-        lm_logits = self.lm_head(hidden_states)
+        # TODO(wj-Mcat): to enable lm_head
+        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
+
+        # lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
@@ -1197,8 +1220,10 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
 
         if self.config.pad_token_id is None and batch_size != 1:
             raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
+
         if self.config.pad_token_id is None:
             sequence_lengths = -1
+
         else:
             if input_ids is not None:
                 sequence_lengths = paddle.where(input_ids != self.config.pad_token_id, 1, 0).sum(axis=-1) - 1
@@ -1324,14 +1349,6 @@ class BloomForTokenClassification(BloomPreTrainedModel):
         )
 
 
-def TopKProcess(probs, top_k, min_tokens_to_keep):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-    # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
-    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
-    return probs
-
-
 class BloomForGeneration(BloomPreTrainedModel):
     """
     Bloom Model with pretraining tasks on top.
@@ -1342,7 +1359,10 @@ class BloomForGeneration(BloomPreTrainedModel):
 
     """
 
-    def __init__(self, config):
+    def __init__(self, config: BloomConfig):
+        # when running generation, it must be True
+        config.use_cache = True
+
         super(BloomForGeneration, self).__init__(config)
         self.bloom = BloomModel(config)
         self.config = config
@@ -1583,8 +1603,7 @@ class BloomForGeneration(BloomPreTrainedModel):
             # matmul = auto.shard_op(paddle.matmul, self.bloom.mesh[-1],
             #                        [x_dims_mapping, w_dims_mapping, None])
 
-            with paddle.fluid.name_scope("skip_quant"):
-                logits = paddle.matmul(logits, self.bloom.word_embeddings.weight, transpose_y=True)
+            logits = paddle.matmul(logits, self.bloom.word_embeddings.weight, transpose_y=True)
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
@@ -1617,7 +1636,10 @@ class BloomForGeneration(BloomPreTrainedModel):
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             if not self.use_topp_sampling:
-                next_tokens = paddle.multinomial(probs)
+                # TODO(wj-Mcat): multinomial do not support fp16, so convert it to fp32
+                # refer to: https://github.com/PaddlePaddle/Paddle/issues/51852
+                next_tokens = paddle.multinomial(paddle.cast(probs, paddle.float32))
+                # next_tokens = paddle.multinomial(probs)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
