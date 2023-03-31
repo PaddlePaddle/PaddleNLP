@@ -46,7 +46,44 @@ __all__ = [
 ]
 
 PREFIX_CHECKPOINT_DIR = "model_state"
-_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\_mp_(\d+)" + ".pdparams$")
+_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\.tp(\d+)" + ".pdparams$")
+
+
+def use_hybrid_parallel():
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        return hcg
+    except:
+        return None
+
+
+def optimizer_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        if hcg.get_sharding_parallel_world_size() > 1:
+            name.append(f"shard{hcg.get_sharding_parallel_rank():0>2d}")
+
+        return "_".join(name)
+    else:
+        return None
+
+
+def weight_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        return "_".join(name)
+    else:
+        return None
 
 
 def left_padding(inputs, pad_id, padding="longest"):

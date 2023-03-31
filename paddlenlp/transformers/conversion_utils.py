@@ -37,6 +37,7 @@ from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
 
+from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     PADDLE_WEIGHT_FILE_NAME,
@@ -339,6 +340,52 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
     ), f"weight_list length is not equal 3, it should be Q K V list. but got length {len(weight_list)}"
     weight = np.concatenate(weight_list, axis=-1)
     return naive_merged_qkv_to_tensor_parallel_qkv(weight)
+
+
+def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
+    def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+        if x is None:
+            return None
+        x = merge_tensor_parallel_weight(
+            x,
+            is_column=is_column,
+        )
+        if is_old_qkv:
+            assert is_column, "QKV tensor should be column parallel linear."
+            assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
+            x = tensor_parallel_qkv_to_naive_merged_qkv(x, num_attention_heads)
+        if transpose:
+            x = np.transpose(x, [1, 0])
+
+        return x
+
+    return fn
+
+
+def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
+    def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+        if x is None:
+            return None
+        if transpose:
+            x = np.transpose(x, [1, 0])
+        if is_old_qkv:
+            assert is_column, "QKV tensor should be column parallel linear."
+            assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
+            x = naive_merged_qkv_to_tensor_parallel_qkv(x, num_attention_heads)
+        return split_tensor_parallel_weight(
+            x,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+            is_column=is_column,
+        )
+
+    return fn
+
+
+def split_or_merge_func(is_split, tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
+    if is_split:
+        return get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads)
+    return get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads)
 
 
 @dataclass
@@ -857,30 +904,69 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
-    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig) -> None:
         """the entry of converting config and converting model file
 
         Args:
             input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
-        # FIXME(wj-Mcat): add compatibility with downstream models
-        name_mappings = cls._get_tensor_parallel_mappings(config)
-
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
         state_dict = paddle.load(weight_file, return_numpy=True)
 
-        # 3. convert state_dict
-        for name_mapping in name_mappings:
-            if name_mapping.source_name not in state_dict:
-                logger.warning(f"key<{name_mapping.source_name}> not in the model state weight file.")
-                continue
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
 
-            state_dict[name_mapping.target_name] = name_mapping.run(state_dict, name_mapping.source_name)
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+
+        for name, action in name_action_mappings.items():
+            if name not in state_dict:
+                logger.warning(f"key<{name}> not in the model state weight file.")
+                continue
+            tensor = state_dict.pop(name)
+            state_dict[name] = action(tensor)
 
         return state_dict
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: PretrainedConfig) -> List[StateDictNameMapping]:
+    def merge_tensor_parallel(cls, state_dict, config) -> None:
+        """the entry of converting config and converting model file
+
+        Args:
+            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            config (PretrainedConfig): the PretrainedConfig instance of model
+        """
+        name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
+
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+
+        state_dict_to_save = {}
+
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        is_dst = paddle.distributed.get_rank(mp_group) == 0
+
+        for key in state_dict.keys():
+            tensor = state_dict[key]
+            if key in name_action_mappings:
+                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                action = name_action_mappings.pop(key)
+                tensor = action(ret) if is_dst else None
+            else:
+                tensor = tensor.numpy() if is_dst else None
+
+            state_dict_to_save[key] = tensor
+
+        if len(name_action_mappings) > 0:
+            for x in name_action_mappings.keys():
+                logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+
+        return state_dict_to_save
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config: PretrainedConfig, is_split=True) -> List[StateDictNameMapping]:
         """get name mapping of PretrainedModel
 
         Args:
@@ -893,6 +979,26 @@ class ConversionMixin:
             List[StateDictNameMapping]: the name-mappings for tensor_parallel
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _resolve_prefix_keys(state_keys_base, state_keys_real):
+        # state_keys_map base to real
+        state_keys_map = {}
+
+        state_keys_base = set(state_keys_base)
+        state_keys_real = set(state_keys_real)
+
+        for key in state_keys_base:
+            for x in state_keys_real:
+                if x.endswith(key):
+                    state_keys_map[key] = x
+                    break
+            if key not in state_keys_map:
+                logger.error(f"could not find name {key} in loaded state dict!")
+            else:
+                state_keys_real.remove(state_keys_map[key])
+
+        return state_keys_map
 
 
 class Converter(ConversionMixin, LogitComparer):

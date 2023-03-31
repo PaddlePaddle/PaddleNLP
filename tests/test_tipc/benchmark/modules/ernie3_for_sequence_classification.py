@@ -17,7 +17,6 @@ from functools import partial
 import paddle
 from paddle.io import DataLoader, DistributedBatchSampler
 
-from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.utils.log import logger
@@ -69,7 +68,9 @@ def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512,
     if tokenizer is None:
         return example
     if "sentence" in example:
-        example = tokenizer(example["sentence"], max_length=max_seq_length, truncation=True, padding="max_length")
+        example = tokenizer(
+            example["sentence"], max_length=max_seq_length, truncation=True, padding="max_length", return_tensors="np"
+        )
     elif "sentence1" in example:
         example = tokenizer(
             example["sentence1"],
@@ -77,15 +78,20 @@ def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512,
             max_length=max_seq_length,
             padding="max_length",
             truncation=True,
+            return_tensors="np",
         )
 
     if not is_test:
         if "token_type_ids" in example:
-            return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"], "labels": label}
+            return {
+                "input_ids": example["input_ids"][0],
+                "token_type_ids": example["token_type_ids"][0],
+                "labels": label,
+            }
         else:
-            return {"input_ids": example["input_ids"], "labels": label}
+            return {"input_ids": example["input_ids"][0], "labels": label}
     else:
-        return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"]}
+        return {"input_ids": example["input_ids"][0], "token_type_ids": example["token_type_ids"][0]}
 
 
 class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
@@ -133,13 +139,12 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         train_batch_sampler = DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True
         )
-
-        batchify_fn = DataCollatorWithPadding(tokenizer)
+        # fix develop bug, we donot use DataCollatorWithPadding.
+        # batchify_fn = DataCollatorWithPadding(tokenizer)
 
         train_loader = DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
-            collate_fn=batchify_fn,
             num_workers=4,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
         )
 
@@ -156,7 +161,7 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
 
     def forward(self, model, args, input_data=None, **kwargs):
         loss = model(**input_data)[0]
-        return loss, paddle.sum((input_data["input_ids"] != self.pad_token_id)).numpy().astype("int64").item()
+        return loss, args.batch_size * args.max_seq_length
 
     def logger(
         self,

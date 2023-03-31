@@ -67,7 +67,6 @@ class FastLayerNorm(OriginLayerNorm):
 class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, weight, bias=None, name=None):
-        ctx.need_bias = bias is not None and not bias.stop_gradient
         y = origin_linear(x, weight, bias)
         ctx.save_for_backward(x, weight, bias)
         return y
@@ -76,6 +75,15 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
     def backward(ctx, y_grad):
         x, weight, bias = ctx.saved_tensor()
         x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
+
+        if bias is None:
+            if hasattr(weight, "main_grad"):
+                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.main_grad, None, True)
+                return x_grad, None
+            else:
+                weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                return x_grad, weight_grad
+
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
             weight.main_grad, bias.main_grad = _C_ops.fused_linear_param_grad_add(
                 x, y_grad, weight.main_grad, bias.main_grad, True

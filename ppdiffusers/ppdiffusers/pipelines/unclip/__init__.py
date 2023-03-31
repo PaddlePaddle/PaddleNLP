@@ -23,7 +23,11 @@ try:
     if not (is_paddlenlp_available() and is_paddle_available()):
         raise OptionalDependencyNotAvailable()
 except OptionalDependencyNotAvailable:
-    from ...utils.dummy_paddle_and_paddlenlp_objects import UnCLIPPipeline
+    from ...utils.dummy_paddle_and_paddlenlp_objects import (
+        UnCLIPImageVariationPipeline,
+        UnCLIPPipeline,
+    )
 else:
     from .pipeline_unclip import UnCLIPPipeline
+    from .pipeline_unclip_image_variation import UnCLIPImageVariationPipeline
     from .text_proj import UnCLIPTextProjModel
