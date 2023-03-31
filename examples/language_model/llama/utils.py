@@ -42,7 +42,7 @@ class LlamaTrainer(Trainer):
 
         model.eval()
 
-        tokens = model.generate(
+        preds = model.generate(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             max_length=50,
@@ -54,13 +54,6 @@ class LlamaTrainer(Trainer):
             repetition_penalty=1.0,
             decode_strategy="sampling",
         )[0]
-        all_preds = []
-        for pred_tokens in tokens:
-            all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
-        max_pred_length = max([len(x) for x in all_preds])
-        for index, preds in enumerate(all_preds):
-            all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
-
         all_labels = []
         for label in inputs["labels"].numpy():
             label = [x for x in label[label != self.tokenizer.pad_token_id]]
@@ -69,7 +62,7 @@ class LlamaTrainer(Trainer):
         for index, labels in enumerate(all_labels):
             all_labels[index] = labels + [-100] * (max_label_length - len(labels))
 
-        return (None, paddle.to_tensor(all_preds), paddle.to_tensor(all_labels))
+        return (None, paddle.to_tensor(preds), paddle.to_tensor(all_labels))
 
     def create_scheduler(self, num_training_steps: int):
         num_warmup_steps = (

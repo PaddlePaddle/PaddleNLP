@@ -21,32 +21,34 @@ import paddle
 from paddlenlp.data import Pad
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-IGNORE_INDEX = 0  # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
+IGNORE_INDEX = -100
 
 
-def convert_example(example, tokenizer, data_args, is_test=True):
-    source = None
-    title = None
-    target = None
-    if "source" in example and "title" in example:
-        source = example["source"]
-        if "title" in example.keys():
-            title = example["title"]
-    elif "context" in example and "answer" in example:
-        source = example["context"]
-        if "answer" in example.keys():
-            title = example["answer"]
-    else:
-        assert False, "Source and title are not in the input dictionary, nor are context and answer."
-    if "target" in example.keys():
-        target = example["target"]
-    elif "question" in example.keys():
-        target = example["question"]
-    example["text_a"] = "答案：" + title + "，" + "上下文：" + source + "在已知答案的前提下，问题："
-    example["text_b"] = target + tokenizer.eos_token
+def convert_example(example, tokenizer, data_args):
+    """
+    Convert an example into necessary features.
+    """
+    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    context = example["context"]
+    question = example["question"]
+    try:
+        answer = example["answers"][0]
+    except:
+        print(example["context"])
+        print(example["question"])
+        print(example["answers"])
+        print(example["answer_starts"])
+        print(example["is_impossible"])
+
+    input_seq = f"answer: {answer} context: {context} </s>"
+    output_seq = f"question: {question} </s>"
 
     source_tokenized = tokenizer(
-        example["text_a"],
+        input_seq,
         return_tensors="pd",
         max_length=data_args.src_length,
         truncation=True,
@@ -57,7 +59,7 @@ def convert_example(example, tokenizer, data_args, is_test=True):
     )
 
     example_tokenized = tokenizer(
-        example["text_a"] + example["text_b"],
+        input_seq + output_seq,
         return_tensors="pd",
         max_length=data_args.src_length + data_args.tgt_length,
         truncation=True,

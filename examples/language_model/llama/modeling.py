@@ -151,32 +151,32 @@ class LlamaMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
-        # if config.tensor_parallel_degree > 1:
-        #     self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
-        #         self.hidden_size,
-        #         self.intermediate_size,
-        #         gather_output=False,
-        #         has_bias=False,
-        #     )
-        #     self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
-        #         self.hidden_size,
-        #         self.intermediate_size,
-        #         gather_output=False,
-        #         has_bias=False,
-        #     )
-        # else:
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+            self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+        else:
+            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
-        # if config.tensor_parallel_degree > 1:
-        #     self.down_proj = fleet.meta_parallel.RowParallelLinear(
-        #         self.intermediate_size,
-        #         self.hidden_size,
-        #         input_is_parallel=True,
-        #         has_bias=False,
-        #     )
-        # else:
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
+        else:
+            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -420,12 +420,12 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
                 "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
                 "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                # "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                # "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                # "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -639,9 +639,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, tensor_parallel_degree=1):
+    def __init__(self, tensor_parallel_degree=1, tensor_parallel_output=False):
         super(LlamaPretrainingCriterion, self).__init__()
-        if tensor_parallel_degree > 1:
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
@@ -650,8 +650,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
-            # TODO: Temporarily set to 0, fix after ParallelCrossEntropy support -100
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != 0]
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != -100]
             loss = paddle.mean(masked_lm_loss)
         return loss
 
@@ -664,7 +663,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = LlamaModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-        self.criterion = LlamaPretrainingCriterion(tensor_parallel_degree=config.tensor_parallel_degree)
+        self.criterion = LlamaPretrainingCriterion(
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_output=config.tensor_parallel_output,
+        )
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)

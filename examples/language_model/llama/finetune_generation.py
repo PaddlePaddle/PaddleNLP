@@ -31,9 +31,9 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
-    src_length: int = field(default=608, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
+    task_name: str = field(default="squad", metadata={"help": "The name of task."})
+    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=142, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
     length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
     no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
@@ -95,7 +95,7 @@ def main():
     model = LlamaForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
-        # low_cpu_mem_usage=True, # todo enable low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
         # dtype="float16",  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -117,17 +117,17 @@ def main():
     tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
-    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    dev_ds = dev_ds.map(partial(trans_func, is_test=False))
+    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
 
+    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = train_ds.map(partial(trans_func))
+    dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []
         all_labels = []
-        preds = [x[x != -100] for x in eval_preds.predictions]
+        preds = eval_preds.predictions
         all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
         labels = [x[x != -100] for x in eval_preds.label_ids]
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
