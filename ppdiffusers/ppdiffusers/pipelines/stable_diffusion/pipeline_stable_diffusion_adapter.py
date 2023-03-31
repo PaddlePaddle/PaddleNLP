@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,19 +18,19 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
-from PIL import Image as PIL_Image
-from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+import PIL
+
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ...models import Adapter, AutoencoderKL, MultiAdapter, UNet2DConditionModel
-from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import KarrasDiffusionSchedulers
-from ...utils import PIL_INTERPOLATION, logging
+from ...utils import PIL_INTERPOLATION, logging, randn_tensor, replace_example_docstring
+from ..pipeline_utils import DiffusionPipeline
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
 
 logger = logging.get_logger(__name__)
-
-"""
+EXAMPLE_DOC_STRING = """
     Examples:
         ```py
         >>> from PIL import Image
@@ -53,41 +54,29 @@ logger = logging.get_logger(__name__)
         >>> out_image = pipe(
         ...     "At night, glowing cubes in front of the beach",
         ...     image=color_palette,
+        ...     generator=generator,
         ... ).images[0]
         ```
 """
 
 
-def preprocess(image, target_height, target_width):
+def preprocess(image):
     if isinstance(image, paddle.Tensor):
         return image
-    elif isinstance(image, PIL_Image.Image):
+    elif isinstance(image, PIL.Image.Image):
         image = [image]
-    multi_control = isinstance(image[0], list) or isinstance(image[0], tuple)
-    multi_control |= isinstance(image[0], paddle.Tensor) and image[0].ndim == 4
-    if multi_control:
-        images = [preprocess(subset, target_height, target_width) for subset in image]
-        b, c, h, w = images[0].shape
-        image = [img.reshape([b * c, h, w]) for img in images]
-    if isinstance(image[0], PIL_Image.Image):
-        image = [
-            np.array(i.resize((target_width, target_height), resample=PIL_INTERPOLATION["lanczos"]))[(None), :]
-            for i in image
-        ]
+    if isinstance(image[0], PIL.Image.Image):
+        w, h = image[0].size
+        w, h = map(lambda x: x - x % 8, (w, h))
+        image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])) for i in image]
+        image = [(i[None, ..., None] if i.ndim == 2 else i[None, ...]) for i in image]
         image = np.concatenate(image, axis=0)
         image = np.array(image).astype(np.float32) / 255.0
         image = image.transpose(0, 3, 1, 2)
         image = paddle.to_tensor(data=image)
     elif isinstance(image[0], paddle.Tensor):
         if image[0].ndim == 3:
-            size_align_4d = []
-            for img_ten in image:
-                h, w = img_ten.shape[-2:]
-                img_ten = paddle.unsqueeze(input=img_ten, axis=0)
-                if (h, w) != (target_height, target_width):
-                    img_ten = paddle.nn.functional.interpolate(img_ten, (target_height, target_width))
-                size_align_4d.append(img_ten)
-            image = paddle.concat(x=size_align_4d, axis=0)
+            image = paddle.stack(x=image, axis=0)
         elif image[0].ndim == 4:
             image = paddle.concat(x=image, axis=0)
         else:
@@ -115,16 +104,17 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             Variational Auto-Encoder (VAE) Model to encode and decode images to and from latent representations.
         text_encoder ([`CLIPTextModel`]):
             Frozen text-encoder. Stable Diffusion uses the text portion of
-            [CLIP] specifically the [clip-vit-large-patch14] variant.
+            CLIP, specifically
+            the [clip-vit-large-patch14](https://huggingface.co/openai/clip-vit-large-patch14) variant.
         tokenizer (`CLIPTokenizer`):
-            Tokenizer of class
-            [CLIPTokenizer].
+            Tokenizer of class CLIPTokenizer.
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
+            Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
@@ -147,7 +137,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         super().__init__()
         if safety_checker is None and requires_safety_checker:
             logger.warning(
-                f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered results in services or applications open to the public."
+                f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered results in services or applications open to the public. Both the diffusers team and Hugging Face strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling it only for use-cases that involve analyzing network behavior or auditing its results. For more information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
             )
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
@@ -244,7 +234,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                 attention_mask = text_inputs.attention_mask
             else:
                 attention_mask = None
-                prompt_embeds = self.text_encoder(text_input_ids, attention_mask=attention_mask)
+            prompt_embeds = self.text_encoder(text_input_ids, attention_mask=attention_mask)
             prompt_embeds = prompt_embeds[0]
         prompt_embeds = prompt_embeds.astype(self.text_encoder.dtype)
         bs_embed, seq_len, _ = prompt_embeds.shape
@@ -278,9 +268,9 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             negative_prompt_embeds = negative_prompt_embeds[0]
         if do_classifier_free_guidance:
             seq_len = negative_prompt_embeds.shape[1]
-            negative_prompt_embeds = negative_prompt_embeds.astype(dtype=self.text_encoder.dtype)
+            negative_prompt_embeds = negative_prompt_embeds.astype(self.text_encoder.dtype)
             negative_prompt_embeds = negative_prompt_embeds.tile(repeat_times=[1, num_images_per_prompt, 1])
-            negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+            negative_prompt_embeds = negative_prompt_embeds.reshape((batch_size * num_images_per_prompt, seq_len, -1))
             prompt_embeds = paddle.concat(x=[negative_prompt_embeds, prompt_embeds])
         return prompt_embeds
 
@@ -288,20 +278,17 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
             image, has_nsfw_concept = self.safety_checker(
-                images=image, clip_input=safety_checker_input.pixel_values.cast(dtype)
+                images=image, clip_input=safety_checker_input.pixel_values.astype(dtype)
             )
         else:
             has_nsfw_concept = None
         return image, has_nsfw_concept
 
     def decode_latents(self, latents):
-        if hasattr(self.vae.config, "scaling_factor"):
-            latents = 1 / self.vae.config.scaling_factor * latents
-        else:
-            latents = 1 / 0.18215 * latents
+        latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(min=0, max=1)
-        image = image.transpose(perm=[0, 2, 3, 1]).astype(dtype="float32").numpy()
+        image = image.cpu().transpose(perm=[0, 2, 3, 1]).astype(dtype="float32").numpy()
         return image
 
     def prepare_extra_step_kwargs(self, generator, eta):
@@ -360,27 +347,36 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             raise ValueError(
                 f"You have passed a list of generators of length {len(generator)}, but requested an effective batch size of {batch_size}. Make sure the batch size matches the length of the generators."
             )
-
         if latents is None:
-            if isinstance(generator, list):
-                shape = [
-                    1,
-                ] + shape[1:]
-                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
-                latents = paddle.concat(latents, axis=0)
-            else:
-                latents = paddle.randn(shape, generator=generator, dtype=dtype)
+            latents = randn_tensor(shape, generator=generator, dtype=dtype)
         else:
-            if latents.shape != shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+            latents = latents
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
+    def _default_height_width(self, height, width, image):
+        while isinstance(image, list):
+            image = image[0]
+        if height is None:
+            if isinstance(image, PIL.Image.Image):
+                height = image.height
+            elif isinstance(image, paddle.Tensor):
+                height = image.shape[-2]
+            height = height // 8 * 8
+        if width is None:
+            if isinstance(image, PIL.Image.Image):
+                width = image.width
+            elif isinstance(image, paddle.Tensor):
+                width = image.shape[-1]
+            width = width // 8 * 8
+        return height, width
+
     @paddle.no_grad()
+    @replace_example_docstring(EXAMPLE_DOC_STRING)
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
-        image: Union[paddle.Tensor, PIL_Image.Image, List[PIL_Image.Image]] = None,
+        image: Union[paddle.Tensor, PIL.Image.Image, List[PIL.Image.Image]] = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 50,
@@ -397,7 +393,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: int = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        adapter_conditioning_scale: float = 1.0,
+        adapter_conditioning_scale: Union[float, List[float]] = 1.0,
     ):
         """
         Function invoked when calling the pipeline for generation.
@@ -406,10 +402,10 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
                 instead.
-            image (`paddle.Tensor`, `PIL.Image.Image`, `List[paddle.Tensor]` or `List[PIL.Image.Image]`):
-                The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
-                the type is is specified as `paddle.Tensor`, it is passed to ControlNet as is. PIL.Image.Image` can
-                also be accepted as an image. The control image is automatically resized to fit the output image.
+            image (`paddle.Tensor`, `PIL.Image.Image`, `List[paddle.Tensor]` or `List[PIL.Image.Image]` or `List[List[PIL.Image.Image]]`):
+                The Adapter input condition. Adapter uses this input condition to generate guidance to Unet. If the
+                type is specified as `Torch.FloatTensor`, it is passed to Adapter as is. PIL.Image.Image` can also be
+                accepted as an image. The control image is automatically resized to fit the output image.
             height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
                 The height in pixels of the generated image.
             width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
@@ -433,7 +429,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator` or `List[paddle.Generator]`, *optional*):
-                One or a list of [paddle generator(s)]
+                One or a list of paddle generator(s)
                 to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
@@ -460,7 +456,12 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                 called at every step.
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
-                `self.processor` in [ppdiffusers.cross_attention].
+                `self.processor` in
+                [ppdiffusers.cross_attention].
+            adapter_conditioning_scale (`float` or `List[float]`, *optional*, defaults to 1.0):
+                The outputs of the adapter are multiplied by `adapter_conditioning_scale` before they are added to the
+                residual in the original unet. If multiple adapters are specified in init, you can set the
+                corresponding scale as a list.
 
         Examples:
 
@@ -471,12 +472,17 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        height = height or self.unet.config.sample_size * self.vae_scale_factor
-        width = width or self.unet.config.sample_size * self.vae_scale_factor
+        height, width = self._default_height_width(height, width, image)
         self.check_inputs(
             prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
         )
-        adapter_input = preprocess(image, height, width)
+        is_multi_adapter = isinstance(self.adapter, MultiAdapter)
+        if is_multi_adapter:
+            adapter_input = [preprocess(img) for img in image]
+            n, c, h, w = adapter_input[0].shape
+            adapter_input = paddle.stack(x=[x.reshape([n * c, h, w]) for x in adapter_input])
+        else:
+            adapter_input = preprocess(image)
         adapter_input = adapter_input.astype(self.adapter.dtype)
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
@@ -525,7 +531,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                     t,
                     encoder_hidden_states=prompt_embeds,
                     cross_attention_kwargs=cross_attention_kwargs,
-                    down_block_additional_residuals=adapter_state,
+                    down_block_additional_residuals=[state.clone() for state in adapter_state],
                 ).sample
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
