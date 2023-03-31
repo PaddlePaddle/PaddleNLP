@@ -228,11 +228,11 @@ class AlbertLayer(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=False,
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=False,
     ):
         attention_output = self.attention(
             hidden_states,
@@ -257,15 +257,12 @@ class AlbertLayerGroup(Layer):
         self.albert_layers = nn.LayerList([AlbertLayer(config) for _ in range(config.inner_group_num)])
 
     def forward(
-            self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False,
-            output_hidden_states=False
+        self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False, output_hidden_states=False
     ):
-
         layer_attentions = () if output_attentions else None
         all_hidden_states = (hidden_states,) if output_hidden_states else None
 
         for layer_index, albert_layer in enumerate(self.albert_layers):
-
             layer_output = albert_layer(
                 hidden_states,
                 attention_mask,
@@ -302,13 +299,13 @@ class AlbertTransformer(Layer):
         self.albert_layer_groups = nn.LayerList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_hidden_states=False,
-            output_attentions=False,
-            return_dict=False,
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_hidden_states=False,
+        output_attentions=False,
+        return_dict=False,
     ):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
@@ -324,7 +321,7 @@ class AlbertTransformer(Layer):
             layer_group_output = self.albert_layer_groups[group_idx](
                 hidden_states,
                 attention_mask,
-                head_mask[group_idx * layers_per_group: (group_idx + 1) * layers_per_group],
+                head_mask[group_idx * layers_per_group : (group_idx + 1) * layers_per_group],
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
@@ -456,16 +453,16 @@ class AlbertModel(AlbertPretrainedModel):
         return head_mask
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            output_hidden_states=False,
-            output_attentions=False,
-            return_dict=False,
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        output_hidden_states=False,
+        output_attentions=False,
+        return_dict=False,
     ):
         r"""
         The AlbertModel forward method, overrides the `__call__()` special method.
@@ -641,18 +638,18 @@ class AlbertForPretraining(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            sentence_order_label=None,
-            labels=None,
-            output_attentions=False,
-            output_hidden_states=False,
-            return_dict=False,
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        sentence_order_label=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
     ):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
