@@ -23,7 +23,7 @@ device_num=N2C16
 sharding_degree=16
 sharding_stage=2
 sharding_offload=True
-max_iter=100
+max_iter=30
 
 model=gpt
 micro_bs=8

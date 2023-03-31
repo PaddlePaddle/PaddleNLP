@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import numpy as np
-import PIL
+import PIL.Image
 
 from ...utils import BaseOutput, is_paddle_available, is_paddlenlp_available
 
 
 @dataclass
-# Copied from diffusers.pipelines.stable_diffusion.__init__.StableDiffusionPipelineOutput with Stable->Alt
+# Copied from ppdiffusers.pipelines.stable_diffusion.__init__.StableDiffusionPipelineOutput with Stable->Alt
 class AltDiffusionPipelineOutput(BaseOutput):
     """
     Output class for Alt Diffusion pipelines.

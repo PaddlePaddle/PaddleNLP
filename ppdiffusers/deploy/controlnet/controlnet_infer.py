@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ def parse_arguments():
         type=str,
         default="paddle",
         # Note(zhoushunjie): Will support 'tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
+        choices=["onnx_runtime", "paddle", "paddle_tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -310,8 +310,8 @@ if __name__ == "__main__":
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
-        use_trt = True if args.backend == "paddle-tensorrt" else False
+    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
+        use_trt = True if args.backend == "paddle_tensorrt" else False
         # unet
         start = time.time()
         unet_runtime = create_paddle_inference_runtime(
