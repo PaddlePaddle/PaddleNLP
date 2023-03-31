@@ -46,7 +46,8 @@ def parse_line(line, filename):
         vec = line.strip().split("\t")
         data_source = parse_src(filename)
         if data_source == "laion400m":
-            _, caption, _, img_b64 = vec[:4]
+            # _, caption, _, img_b64 = vec[:4]
+            caption, _, img_b64 = vec[:3]
         else:
             _, captions, _, _, _, img_b64 = vec[:6]
             caption = random.sample(captions.split("|"), 1)[0].replace("\1", "")

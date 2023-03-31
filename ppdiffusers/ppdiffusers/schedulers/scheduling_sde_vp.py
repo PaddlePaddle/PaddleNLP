@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Google Brain and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@ import math
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
+from ..utils import randn_tensor
 from .scheduling_utils import SchedulerMixin
 
 
@@ -80,7 +81,7 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
         x_mean = x + drift * dt
 
         # add noise
-        noise = paddle.randn(x.shape, generator=generator)
+        noise = randn_tensor(x.shape, generator=generator, dtype=x.dtype)
         x = x_mean + diffusion * math.sqrt(-dt) * noise
 
         return x, x_mean
