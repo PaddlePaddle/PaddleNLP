@@ -604,3 +604,10 @@ class LoRAModel(nn.Layer):
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
         return model
+
+    def __getattr__(self, name: str):
+        """Forward missing attributes to the wrapped module."""
+        try:
+            return super().__getattr__(name)  # defer to nn.Layer's logic
+        except AttributeError:
+            return getattr(self.model, name)
