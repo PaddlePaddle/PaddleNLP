@@ -11,20 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import distutils.util
+from __future__ import annotations
+
 import os
 
-import fastdeploy as fd
+import paddle
 
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import GPTTokenizer
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", required=True, help="The directory of model.")
-    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
+    parser.add_argument("--model_dir", required=True, help="The directory of model.")
+    parser.add_argument("--model_prefix", type=str, default="llama", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -32,19 +33,7 @@ def parse_arguments():
         choices=["gpu", "cpu"],
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        default="paddle",
-        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
-        help="The inference runtime backend.",
-    )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
-    parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
     return parser.parse_args()
 
 
@@ -59,51 +48,54 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-        self.runtime = self.create_fd_runtime(args)
+        self.tokenizer = GPTTokenizer.from_pretrained(
+            args.model_dir,
+            add_bos_token=False,
+        )
+        self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
-        self.args = args
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_path, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_path, args.model_prefix + ".pdiparams")
-        option.set_model_path(model_path, params_path)
-        if args.device == "cpu":
-            option.use_cpu()
-            option.set_cpu_thread_num(args.cpu_threads)
-        else:
-            option.use_gpu(args.device_id)
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        runtime = fd.Runtime(option)
-        return runtime
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        config = paddle.inference.Config(model_path, params_path)
+
+        if args.device == "gpu":
+            # set GPU configs accordingly
+            config.enable_use_gpu(100, 0)
+        elif args.device == "cpu":
+            # set CPU configs accordingly,
+            # such as enable_mkldnn, set_cpu_math_library_num_threads
+            config.disable_gpu()
+        config.disable_glog_info()
+        self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
         inputs = self.tokenizer(
             input_text,
+            padding=True,
             return_tensors="np",
-            padding="max_length",
-            max_length=self.args.src_length,
-            truncation=True,
-            truncation_side="left",
+            return_attention_mask=True,
+            return_position_ids=True,
         )
         return inputs
 
-    def infer(self, input_map):
-        results = self.runtime.infer(dict(input_map))
+    def infer(self, inputs):
+        input_handles = {}
+        for name in self.predictor.get_input_names():
+            input_handles[name] = self.predictor.get_input_handle(name)
+            input_handles[name].copy_from_cpu(inputs[name])
+
+        self.predictor.run()
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
         return results
 
     def postprocess(self, infer_data):
         result = []
-        for x in infer_data[0].tolist():
-            print(self.tokenizer.all_special_ids)
-            res = self.tokenizer.decode(x, skip_special_tokens=True)
-            result.append(res)
+        for x in infer_data.tolist():
+            sentence = self.tokenizer.decode(x, skip_special_tokens=True)
+            result.append(sentence)
         out_dict = {"result": result}
         return out_dict
 
@@ -116,8 +108,11 @@ class Predictor(object):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    paddle.seed(100)
     predictor = Predictor(args)
-    all_texts = ["Hello, I am conscious and", "The woman worked as a"]
+    all_texts = [
+        "context: I went to the supermarket today and spent five dollars.  question: How much do I speed today?. answer: "
+    ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)

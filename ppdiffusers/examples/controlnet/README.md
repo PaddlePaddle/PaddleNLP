@@ -78,7 +78,6 @@ python -u train_txt2img_control_trainer.py \
     --dataloader_num_workers 4 \
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
-    --use_paddle_conv_init True \
     --file_path ./fill50k \
     --recompute True \
     --overwrite_output_dir
@@ -147,7 +146,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_co
     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --max_grad_norm -1 \
     --file_path ./fill50k \
-    --use_paddle_conv_init True \
     --recompute True \
     --overwrite_output_dir
 ```

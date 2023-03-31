@@ -127,6 +127,7 @@ from .prophetnet.tokenizer import *
 from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
+from .mpnet.configuration import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
@@ -221,6 +222,9 @@ from .glm.tokenizer import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
+from .bloom.configuration import *
+from .bloom.modeling import *
+from .bloom.tokenizer import *
 from .clipseg.configuration import *
 from .clipseg.modeling import *
 from .clipseg.processing import *

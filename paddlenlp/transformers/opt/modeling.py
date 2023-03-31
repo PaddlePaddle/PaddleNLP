@@ -479,7 +479,7 @@ class OPTLearnedPositionEmbedding(nn.Embedding):
         """
         # cut positions if `past_key_values_length` is > 0
         position_ids = position_ids[:, past_key_values_length:]
-        return super().forward(position_ids + self.offset)
+        return nn.Embedding.forward(self, position_ids + self.offset)
 
 
 class OPTEmbeddings(Layer):
@@ -601,7 +601,6 @@ class OPTPretrainedModel(PretrainedModel):
                 }
             )
 
-        print(f"opt-model base-name: {cls.__name__}")
         if cls.__name__ != "OPTModel":
             for key in list(actions.keys()):
                 actions["opt." + key] = actions.pop(key)
@@ -819,7 +818,6 @@ class OPTModel(OPTPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
-
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1004,7 +1002,6 @@ class OPTForCausalLM(OPTPretrainedModel):
                 output_ids, score = model.generate(input_ids=inputs['input_ids'])
                 print(tokenizer.batch_decode(output_ids[0]))
         """
-
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states

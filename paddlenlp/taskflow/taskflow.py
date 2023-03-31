@@ -39,11 +39,6 @@ from .text_correction import CSCTask
 from .text_feature_extraction import TextFeatureExtractionTask
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
-from .text_to_image import (
-    TextToImageDiscoDiffusionTask,
-    TextToImageGenerationTask,
-    TextToImageStableDiffusionTask,
-)
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
@@ -436,68 +431,6 @@ TASKS = {
             },
         },
         "default": {"mode": "finetune"},
-    },
-    "text_to_image": {
-        "models": {
-            "dalle-mini": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mini",
-                "task_priority_path": "dalle-mini",
-            },
-            "dalle-mega-v16": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mega-v16",
-                "task_priority_path": "dalle-mega-v16",
-            },
-            "dalle-mega": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mega",
-                "task_priority_path": "dalle-mega",
-            },
-            "pai-painter-painting-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-painting-base-zh",
-                "task_priority_path": "pai-painter-painting-base-zh",
-            },
-            "pai-painter-scenery-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
-                "task_priority_path": "pai-painter-scenery-base-zh",
-            },
-            "pai-painter-commercial-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
-                "task_priority_path": "pai-painter-commercial-base-zh",
-            },
-            "openai/disco-diffusion-clip-vit-base-patch32": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-vit-base-patch32",
-                "task_priority_path": "openai/disco-diffusion-clip-vit-base-patch32",
-            },
-            "openai/disco-diffusion-clip-rn50": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn50",
-                "task_priority_path": "openai/disco-diffusion-clip-rn50",
-            },
-            "openai/disco-diffusion-clip-rn101": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
-                "task_priority_path": "openai/disco-diffusion-clip-rn101",
-            },
-            "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
-                "task_priority_path": "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
-            },
-            "CompVis/stable-diffusion-v1-4": {
-                "task_class": TextToImageStableDiffusionTask,
-                "task_flag": "text_to_image-CompVis/stable-diffusion-v1-4",
-                "task_priority_path": "CompVis/stable-diffusion-v1-4",
-            },
-        },
-        "default": {
-            "model": "CompVis/stable-diffusion-v1-4",
-        },
     },
     "document_intelligence": {
         "models": {

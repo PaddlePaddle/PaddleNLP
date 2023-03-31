@@ -41,7 +41,7 @@ def convert_example(
     question = example["question"]
     answer = (example.get("answers", []) or ["there is no answer"])[0]
 
-    input_seq = f"context: {context} </s> question: {question} </s> answer: "
+    input_seq = f"context: {context}. question: {question}. answer: "
     output_seq = answer
 
     # 1. tokenize input-tokens

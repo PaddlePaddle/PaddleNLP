@@ -1148,12 +1148,12 @@ class GenerationMixin(object):
 
         def _post_process_(outputs, input_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
-
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
+
             logits = logits_processors(input_ids, logits)
 
             # sample
@@ -1173,6 +1173,7 @@ class GenerationMixin(object):
             if paddle.get_default_dtype() not in ["float32", "float64"]:
                 probs = probs.astype("float32")
             next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
