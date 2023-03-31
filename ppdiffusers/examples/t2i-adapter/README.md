@@ -83,7 +83,7 @@ python -u train_txt2img_control_trainer.py \
     --overwrite_output_dir
 ```
 
-`train_txt2img_control_trainer.py`代码可传入的参数解释如下：
+`train_t2i_adapter_trainer.py`代码可传入的参数解释如下：
 > * `--vae_name_or_path`: 预训练`vae`模型名称或地址，`runwayml/stable-diffusion-v1-5/vae`，程序将自动从BOS上下载预训练好的权重。
 > * `--text_encoder_name_or_path`: 预训练`text_encoder`模型名称或地址，`runwayml/stable-diffusion-v1-5/text_encoder`，程序将自动从BOS上下载预训练好的权重。
 > * `--unet_name_or_path`: 预训练`unet`模型名称或地址，`runwayml/stable-diffusion-v1-5/unet`，程序将自动从BOS上下载预训练好的权重。
