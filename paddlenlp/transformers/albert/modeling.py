@@ -760,7 +760,7 @@ class AlbertMLMHead(Layer):
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
 
-        self.tie_status = getattr(self, "tie_word_embeddings", False) or self.config.get("tie_word_embeddings", False)
+        self.tie_status = getattr(self, "tie_word_embeddings", False) or config.get("tie_word_embeddings", False)
         # tie_weights() will tie decoder weight with input embeddings
         if self.tie_status:
             self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
