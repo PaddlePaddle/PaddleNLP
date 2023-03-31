@@ -81,6 +81,15 @@ else:
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
     from .unclip import UnCLIPPipeline
+    from .unidiffuser import (
+        UniDiffuserImageGenerationPipeline,
+        UniDiffuserImageToTextPipeline,
+        UniDiffuserImageVariationPipeline,
+        UniDiffuserJointGenerationPipeline,
+        UniDiffuserTextGenerationPipeline,
+        UniDiffuserTextToImagePipeline,
+        UniDiffuserTextVariationPipeline,
+    )
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,

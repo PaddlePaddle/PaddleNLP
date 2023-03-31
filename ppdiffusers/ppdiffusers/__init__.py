@@ -42,12 +42,16 @@ else:
     from .modeling_utils import ModelMixin
     from .models import (
         AutoencoderKL,
+        CaptionDecoder,
         ControlNetModel,
+        FrozenAutoencoderKL,
+        FrozenCLIPEmbedder,
         PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,
         UNet2DModel,
+        UViT,
         VQModel,
     )
     from .optimization import (
@@ -128,6 +132,13 @@ else:
         StableDiffusionPipelineSafe,
         StableDiffusionUpscalePipeline,
         UnCLIPPipeline,
+        UniDiffuserImageGenerationPipeline,
+        UniDiffuserImageToTextPipeline,
+        UniDiffuserImageVariationPipeline,
+        UniDiffuserJointGenerationPipeline,
+        UniDiffuserTextGenerationPipeline,
+        UniDiffuserTextToImagePipeline,
+        UniDiffuserTextVariationPipeline,
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
         VersatileDiffusionPipeline,

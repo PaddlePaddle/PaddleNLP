@@ -18,9 +18,13 @@ from ..utils import is_paddle_available
 
 if is_paddle_available():
     from .attention import Transformer2DModel
+    from .autoencoder import FrozenAutoencoderKL
+    from .caption_decoder import CaptionDecoder
+    from .clip_text_encoder import FrozenCLIPEmbedder
     from .controlnet import ControlNetModel
     from .prior_transformer import PriorTransformer
     from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel
     from .unet_2d_condition import UNet2DConditionModel
+    from .uvit_multi_post_ln import UViT
     from .vae import AutoencoderKL, VQModel
