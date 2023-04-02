@@ -91,6 +91,7 @@ else:
         PNDMPipeline,
         RePaintPipeline,
         ScoreSdeVePipeline,
+        TextPipelineOutput,
     )
     from .schedulers import (
         DDIMInverseScheduler,

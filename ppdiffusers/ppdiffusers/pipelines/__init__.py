@@ -38,6 +38,7 @@ else:
         AudioPipelineOutput,
         DiffusionPipeline,
         ImagePipelineOutput,
+        TextPipelineOutput,
     )
     from .pndm import PNDMPipeline
     from .repaint import RePaintPipeline

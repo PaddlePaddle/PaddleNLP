@@ -18,8 +18,8 @@
 from ..utils.import_utils import is_paddle_available
 
 if is_paddle_available():
-    from .attention import Transformer2DModel
     from .autoencoder import FrozenAutoencoderKL
+    from .autoencoder_kl import AutoencoderKL
     from .caption_decoder import CaptionDecoder
     from .clip_text_encoder import FrozenCLIPEmbedder
     from .controlnet import ControlNetModel

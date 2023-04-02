@@ -28,7 +28,6 @@ zeros_ = Constant(value=0.0)
 trunc_normal_ = TruncatedNormal(std=0.02)
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -256,9 +255,9 @@ class UViT(nn.Layer):
         norm_layer=nn.LayerNorm,
         mlp_time_embed=False,
         use_checkpoint=False,
-        text_dim=None,
-        num_text_tokens=None,
-        clip_img_dim=None,
+        text_dim=64,
+        num_text_tokens=77,
+        clip_img_dim=512,
         pretrained_path=None,
     ):
         super().__init__()
