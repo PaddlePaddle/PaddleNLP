@@ -33,7 +33,7 @@ for k, v in hf_model.named_parameters():
         k = k.replace("attention.self", "attention.self_attn")
     if v.ndim == 2 and "embeddings" not in k:
         v = v.transpose(0, 1)
-    paddle_state_dict[k] = v.data.numpy()
+    paddle_state_dict[k] = paddle.to_tensor(v.data.numpy())
 
 paddle.save(paddle_state_dict, "./model_state.pdparams")
 

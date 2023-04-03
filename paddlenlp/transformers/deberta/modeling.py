@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 from collections.abc import Sequence
 
 import paddle
@@ -42,6 +43,25 @@ __all__ = [
 ]
 
 
+class GELUActivation(nn.Layer):
+    """
+    Original Implementation of the GELU activation function in Google BERT repo when initially created. For
+    information: OpenAI GPT's GELU is slightly different (and gives slightly different results): 0.5 * x * (1 +
+    torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3)))) This is now written in C in nn.functional
+    Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    """
+
+    def __init__(self, use_gelu_python: bool = False):
+        super().__init__()
+        self.act = nn.functional.gelu
+
+    def _gelu_python(self, input):
+        return input * 0.5 * (1.0 + paddle.erf(input / math.sqrt(2.0)))
+
+    def forward(self, input):
+        return self.act(input)
+
+
 def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length):
     """
     Replace non-padding symbols with their position numbers. Position numbers begin at padding_idx+1. Padding symbols
@@ -60,7 +80,7 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
 
 def softmax_with_mask(x, mask, axis):
     rmask = paddle.logical_not(mask.astype("bool"))
-    y = paddle.full(x.shape, -3.4028234663852886e38, x.dtype)
+    y = paddle.full(x.shape, -float("inf"), x.dtype)
     return F.softmax(paddle.where(rmask, y, x), axis=axis)
 
 
@@ -140,12 +160,9 @@ class DebertaLayerNorm(nn.Layer):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
-        input_type = hidden_states.dtype
-        hidden_states = hidden_states.astype("float32")
         mean = hidden_states.mean(-1, keepdim=True)
         variance = (hidden_states - mean).pow(2).mean(-1, keepdim=True)
         hidden_states = (hidden_states - mean) / paddle.sqrt(variance + self.variance_epsilon)
-        hidden_states = hidden_states.astype(input_type)
         y = self.weight * hidden_states + self.bias
         return y
 
@@ -355,7 +372,7 @@ class DisentangledSelfAttention(nn.Layer):
 class DebertaAttention(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.self_attn = DisentangledSelfAttention(config)
+        self.self = DisentangledSelfAttention(config)
         self.output = DebertaSelfOutput(config)
         self.config = config
 
@@ -368,7 +385,7 @@ class DebertaAttention(nn.Layer):
         relative_pos=None,
         rel_embeddings=None,
     ):
-        self_output = self.self_attn(
+        self_output = self.self(
             hidden_states,
             attention_mask,
             output_attentions,
@@ -395,8 +412,7 @@ class DebertaIntermediate(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
-        if config.hidden_act == "gelu":
-            self.intermediate_act_fn = F.gelu
+        self.intermediate_act_fn = GELUActivation()
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
