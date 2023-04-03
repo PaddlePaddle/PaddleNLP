@@ -129,6 +129,7 @@ def main():
         all_preds = []
         all_labels = []
         preds = eval_preds.predictions
+        preds = [x[x != -100] for x in preds]
         all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
         labels = [x[x != -100] for x in eval_preds.label_ids]
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
