@@ -132,6 +132,12 @@ def main():
         all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
         labels = [x[x != -100] for x in eval_preds.label_ids]
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+
+        all_preds = [pred.strip() for pred in all_preds]
+        all_labels = [label.strip() for label in all_labels]
+        all_preds = [pred.strip("question:") for pred in all_preds]
+        all_labels = [label.strip("question:") for label in all_labels]
+
         eval_result = compute_metrics(all_preds, all_labels)
         return eval_result
 
