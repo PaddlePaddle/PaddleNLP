@@ -19,3 +19,4 @@ rm -rf ckpt
 mkdir -p ckpt
 wget -O ckpt/GPT_345M.tar.gz https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz
 tar -xzf ckpt/GPT_345M.tar.gz -C ckpt/
+test
