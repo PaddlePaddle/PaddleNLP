@@ -84,7 +84,7 @@ python setup.py install
 ## 快速开始
 我们将以扩散模型的典型代表**Stable Diffusion**为例，带你快速了解PPDiffusers。
 
-**Stable Diffusion**基于**潜在扩散模型（Latent Diffusion Models）**，专门用于**文图生成（Text-to-Image Generation）任务**。该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/)以及[RunwayML](https://runwayml.com/)的工程师共同开发完成。Stable Diffusion发布了v1和v2两个版本，即v1版本采用了 LAION-5B 数据集子集（分辨率为 512x512）进行训练，并具有以下架构设置：自动编码器下采样因子为8，UNet大小为860M，文本编码器为CLIP ViT-L/14。V2版本相较于V1版本在生成图像的质量和分辨率等进行了改善。
+**Stable Diffusion**基于**潜在扩散模型（Latent Diffusion Models）**，专门用于**文图生成（Text-to-Image Generation）任务**。该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/)以及[RunwayML](https://runwayml.com/)的工程师共同开发完成，目前发布了v1和v2两个版本。v1版本采用了LAION-5B数据集子集（分辨率为 512x512）进行训练，并具有以下架构设置：自动编码器下采样因子为8，UNet大小为860M，文本编码器为CLIP ViT-L/14。v2版本相较于v1版本在生成图像的质量和分辨率等进行了改善。
 
 ### Stable Diffusion重点模型权重
 
@@ -290,7 +290,7 @@ image.save("a_yellow_cat.png")
 </div>
 </details>
 
-### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super Superresolution）
+### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super-Resolution）
 
 <details><summary>&emsp;Text-Guided Image Upscaling Demo</summary>
 
@@ -316,7 +316,7 @@ image.save("upscaled_white_cat.png")
 </div>
 </details>
 
-<details><summary>&emsp;Super Superresolution Demo</summary>
+<details><summary>&emsp;Super-Resolution Demo</summary>
 
 ```python
 import paddle
