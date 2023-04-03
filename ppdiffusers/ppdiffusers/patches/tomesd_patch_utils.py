@@ -36,7 +36,7 @@ def scatter_reduce(
 ) -> paddle.Tensor:
     # reduce "sum", "prod", "mean",
     # TODO support "amax", "amin" and include_self = False
-    if reduce in ["sum", "assign"]:
+    if reduce in ["sum", "assign", "add"]:
         if reduce == "sum":
             reduce = "add"
         input.put_along_axis_(indices=index, values=src, axis=dim, reduce=reduce)
