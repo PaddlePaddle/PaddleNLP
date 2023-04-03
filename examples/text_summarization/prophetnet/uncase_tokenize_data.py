@@ -1,3 +1,17 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import os
 
@@ -19,7 +33,7 @@ def uncased_preocess(fin, fout, keep_sep=False, max_len=512):
             output_string = " [X_SEP] ".join(s_list)
         else:
             output_string = " ".join(s_list)
-        encoded_string = tokenizer(output_string, return_attention_mask=True, max_seq_len=max_len)
+        encoded_string = tokenizer(output_string, return_attention_mask=True, max_length=max_len)
         ids, attention_mask_ids = encoded_string["input_ids"][:max_len], encoded_string["attention_mask"][:max_len]
         output_string = "$1$".join([" ".join([str(i) for i in ids]), " ".join([str(i) for i in attention_mask_ids])])
         fout.write("{}\n".format(output_string))
@@ -30,7 +44,7 @@ def tokenize_with_bert_uncase(fin, fout, max_len=512):
     fout = open(fout, "w", encoding="utf-8")
     tokenizer = ProphetNetTokenizer(vocab_file="prophetnet.tokenizer")
     for line in tqdm.tqdm(fin.readlines()):
-        encoded_string = tokenizer(line, return_attention_mask=True, max_seq_len=max_len)
+        encoded_string = tokenizer(line, return_attention_mask=True, max_length=max_len)
         ids, attention_mask_ids = encoded_string["input_ids"][:max_len], encoded_string["attention_mask"][:max_len]
         output_string = "$1$".join([" ".join([str(i) for i in ids]), " ".join([str(i) for i in attention_mask_ids])])
         fout.write("{}\n".format(output_string))
