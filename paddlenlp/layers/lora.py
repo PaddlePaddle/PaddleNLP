@@ -255,29 +255,17 @@ class LoRAMergedLinear(nn.Linear):
             # Freezing the pre-trained weight matrix
             self.weight.stop_gradient = True
 
-            # Compute lora indices
-            self.enable_lora_indices = paddle.full(
-                shape=[len(enable_lora), out_features // len(enable_lora)], fill_value=False, dtype="bool"
-            )
-            self.enable_lora_indices[enable_lora, :] = True
-            self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [-1])
-
     def zero_pad(self, x):
-        # implementation 1: faster, close to LoRALinear
-        # split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
-        # assert len(split_output) == sum(self.enable_lora)
-        # for index in range(len(self.enable_lora)):
-        #     if self.enable_lora[index] is False:
-        #         split_output.insert(index, paddle.zeros_like(split_output[0]))
-        # concat_output = paddle.concat(split_output, axis=-1)
-        # return concat_output
-        # implementation 2: slower
-        output_shape = x.shape
-        output_shape[-1] = self.out_features
-        result = paddle.zeros(output_shape, dtype=x.dtype).reshape([output_shape[-1], -1])
-        result[self.enable_lora_indices, :] = x.reshape([-1, x.shape[-1]]).transpose([1, 0])  # cost most of time
-        result = result.transpose([1, 0]).reshape(output_shape)
-        return result
+        # if enable_lora is all true, then there is no need to zero pad
+        if all(self.enable_lora):
+            return x
+        else:
+            split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
+            for index in range(len(self.enable_lora)):
+                if self.enable_lora[index] is False:
+                    split_output.insert(index, paddle.zeros_like(split_output[0]))
+            concat_output = paddle.concat(split_output, axis=-1)
+            return concat_output
 
     def train(self):
         super().train()
