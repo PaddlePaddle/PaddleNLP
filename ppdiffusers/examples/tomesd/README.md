@@ -4,9 +4,9 @@
 [Token Merging for Fast Stable Diffusion](https://arxiv.org/pdf/2303.17604.pdf) 是一种 token 合并技术，它通过合并冗余的 token 从而可以减少 transformer 的计算量。该项技术可以应用到所有含有 transformer 结构的扩散模型中，比如：StableDiffusion、ControlNet 等模型。
 
 ToMe for SD 生成的图像有着如下优势：
-- 生成的接近原始图像；
+- 生成的结果能够接近原始图像；
 - 生成速度提高了 2 倍；
-- 显存减少了 ~5.7 倍，即使合并了一半以上的token （60%）。
+- 即使合并了一半以上的token （60%），显存减少了约 5.7 倍。
 
 **Note:** 下面是原作者repo中贴出的fid、时间和显存占用对比表。
 | Method                      | r% | FID ↓  | Time (s/im) ↓            | Memory (GB/im) ↓        |
@@ -94,7 +94,7 @@ image.save("bird.png")
 配置信息：
 - GPU：A100
 - 分辨率：512x512
-- Scheduler：DPMSolver
+- Scheduler：DPMSolverMultistepScheduler
 - 精度：FP16
 - 推理步数：50
 
