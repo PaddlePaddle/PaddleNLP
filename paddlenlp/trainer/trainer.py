@@ -1393,7 +1393,7 @@ class Trainer:
             output_dir = self.args.output_dir
 
         if self.args.should_save:
-            self._save(output_dir, merge_tensor_parallel=merge_tensor_parallel)
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
