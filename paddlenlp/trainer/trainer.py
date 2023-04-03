@@ -1382,7 +1382,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel=False):
+    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
