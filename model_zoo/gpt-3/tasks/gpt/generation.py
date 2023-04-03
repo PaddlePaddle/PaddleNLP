@@ -12,25 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
-import random
 import sys
-import time
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
-import yaml
-from paddle.distributed import fleet
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../../")))
 
-from ppfleetx.distributed.apis import env
-from ppfleetx.models import build_module
-from ppfleetx.utils import config
+from ppfleetx.distributed.apis import env  # noqa: E402
+from ppfleetx.models import build_module  # noqa: E402
+from ppfleetx.utils import config  # noqa: E402
 
 if __name__ == "__main__":
     args = config.parse_args()
