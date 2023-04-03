@@ -124,6 +124,7 @@ from .megatronbert.tokenizer import *
 from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .prophetnet.configuration import *
 from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *

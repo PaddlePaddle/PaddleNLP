@@ -12,7 +12,7 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-pip install -U ppdiffusers visualdl
+pip install -U ppdiffusers visualdl -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ### 1.2 Sks Dog 训练教程
