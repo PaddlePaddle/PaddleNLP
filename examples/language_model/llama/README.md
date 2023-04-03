@@ -55,7 +55,7 @@ python -u  -m paddle.distributed.fleet.launch \
 
 ```shell
 python export_generation_model.py \
-    --model_path checkpoints \
+    --model_path checkpoints/ \
     --output_path inference/llama
 ```
 

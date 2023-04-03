@@ -16,7 +16,6 @@ import argparse
 import os
 
 import paddle
-from configuration import LlamaConfig
 from modeling import LlamaForCausalLM
 from tokenizer import LlamaTokenizer
 
@@ -44,38 +43,15 @@ def main():
     args = parse_args()
 
     paddle.seed(100)
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
-    strategy = paddle.distributed.fleet.DistributedStrategy()
-    strategy.hybrid_configs = {
-        "dp_degree": 1,
-        "mp_degree": tensor_parallel_degree,
-        "pp_degree": 1,
-        "sharding_degree": 1,
-    }
-    paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
 
-    tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
-    config = LlamaConfig.from_pretrained(args.model_path)
-
-    # Set the generaiton the hyperparameter
-    config.max_length = 100
-    config.min_length = 0
-    config.decode_strategy = "sampling"
-    config.temperature = 1.0
-    config.top_k = 1
-    config.top_p = 1.0
-    config.repetition_penalty = 1.0
-    config.use_cache = True
-    config.use_recompute = False
+    tokenizer = LlamaTokenizer.from_pretrained(args.model_path, add_bos_token=True)
 
     model = LlamaForCausalLM.from_pretrained(
         args.model_path,
-        tensor_parallel_degree=tensor_parallel_degree,
-        tensor_parallel_rank=tensor_parallel_rank,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        config=config,
+        use_recompute=False,
+        use_cache=True,
     )
 
     model.eval()
@@ -85,13 +61,13 @@ def main():
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            config.max_length,
-            config.min_length,
-            config.decode_strategy,
-            config.temperature,
-            config.top_k,
-            config.top_p,
-            config.repetition_penalty,
+            100,  # max length
+            0,  # min length
+            "sampling",  # decode_strategy
+            1.0,  # temperature
+            1,  # top_k
+            1.0,  # top_p
+            1.0,  # repetition_penalty,
         ],
     )
 
