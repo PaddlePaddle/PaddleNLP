@@ -24,7 +24,7 @@ from collections import OrderedDict
 from types import FunctionType, MethodType
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .utils import (
+from ..utils import (
     DIFFUSERS_CACHE,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
@@ -847,10 +847,10 @@ if is_paddle_available() and is_paddlenlp_available():
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
-        from .models.modeling_pytorch_paddle_utils import (
+        from ..models.modeling_pytorch_paddle_utils import (
             convert_paddle_state_dict_to_pytorch,
         )
-        from .models.modeling_utils import convert_state_dict
+        from ..models.modeling_utils import convert_state_dict
 
         if to_diffusers is None:
             to_diffusers = TO_DIFFUSERS
@@ -942,16 +942,16 @@ if is_paddle_available() and is_paddlenlp_available():
     )
 
     # logger.set_level("WARNING")
-    from .models.modeling_pytorch_paddle_utils import (
+    from ..models.modeling_pytorch_paddle_utils import (
         convert_pytorch_state_dict_to_paddle,
     )
-    from .pipelines.alt_diffusion.modeling_roberta_series import (
+    from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
     )
-    from .pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
-    from .pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
-    from .pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-    from .pipelines.stable_diffusion_safe.safety_checker import (
+    from ..pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
+    from ..pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
+    from ..pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+    from ..pipelines.stable_diffusion_safe.safety_checker import (
         SafeStableDiffusionSafetyChecker,
     )
 
