@@ -18,21 +18,21 @@ import unittest
 import paddle
 
 from paddlenlp.transformers import (
-    RembertConfig,
+    RemBertConfig,
     RemBertForMaskedLM,
     RemBertForMultipleChoice,
     RemBertForQuestionAnswering,
     RemBertForSequenceClassification,
     RemBertForTokenClassification,
     RemBertModel,
-    RembertPretrainedModel,
+    RemBertPretrainedModel,
 )
 
 from ...testing_utils import slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
-class RembertModelTester:
+class RemBertModelTester:
     def __init__(
         self,
         parent,
@@ -97,7 +97,7 @@ class RembertModelTester:
         return config, input_ids, token_type_ids, input_mask
 
     def get_config(self):
-        return RembertConfig(
+        return RemBertConfig(
             vocab_size=self.vocab_size,
             input_embedding_size=self.input_embedding_size,
             hidden_size=self.hidden_size,
@@ -201,7 +201,7 @@ class RembertModelTester:
         self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_classes])
 
 
-class RembertModelTest(ModelTesterMixin, unittest.TestCase):
+class RemBertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RemBertModel
     return_dict: bool = False
     use_labels: bool = False
@@ -217,7 +217,7 @@ class RembertModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        self.model_tester = RembertModelTester(self)
+        self.model_tester = RemBertModelTester(self)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -245,6 +245,6 @@ class RembertModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(RembertPretrainedModel.pretrained_init_configuration)[:1]:
+        for model_name in list(RemBertPretrainedModel.pretrained_init_configuration)[:1]:
             model = RemBertModel.from_pretrained(model_name)
             self.assertIsNotNone(model)

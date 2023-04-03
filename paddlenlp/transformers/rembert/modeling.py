@@ -25,7 +25,7 @@ from ..activations import get_activation
 from .configuration import (
     REMBERT_PRETRAINED_INIT_CONFIGURATION,
     REMBERT_PRETRAINED_RESOURCE_FILES_MAP,
-    RembertConfig,
+    RemBertConfig,
 )
 
 __all__ = [
@@ -34,16 +34,16 @@ __all__ = [
     "RemBertForQuestionAnswering",
     "RemBertForSequenceClassification",
     "RemBertForMultipleChoice",
-    "RembertPretrainedModel",
+    "RemBertPretrainedModel",
     "RemBertForTokenClassification",
 ]
 
 
-class RembertPretrainedModel(PretrainedModel):
+class RemBertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = REMBERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = REMBERT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "rembert"
-    config_class = RembertConfig
+    config_class = RemBertConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -64,7 +64,7 @@ class RembertPretrainedModel(PretrainedModel):
 class RemBertEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.input_embedding_size)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.input_embedding_size)
@@ -104,7 +104,7 @@ class RemBertEmbeddings(nn.Layer):
 
 
 class RemBertPooler(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertPooler, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
@@ -119,7 +119,7 @@ class RemBertPooler(nn.Layer):
 
 
 class RemBertSelfAttention(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertSelfAttention, self).__init__()
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
@@ -170,7 +170,7 @@ class RemBertSelfAttention(nn.Layer):
 
 
 class RemBertSelfOutput(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertSelfOutput, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
@@ -184,7 +184,7 @@ class RemBertSelfOutput(nn.Layer):
 
 
 class RemBertAttention(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertAttention, self).__init__()
         self.self = RemBertSelfAttention(config)
         self.output = RemBertSelfOutput(config)
@@ -200,7 +200,7 @@ class RemBertAttention(nn.Layer):
 
 
 class RemBertIntermediate(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertIntermediate, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.intermediate_act_fn = get_activation(config.hidden_act)
@@ -212,7 +212,7 @@ class RemBertIntermediate(nn.Layer):
 
 
 class RemBertOutput(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertOutput, self).__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
@@ -226,7 +226,7 @@ class RemBertOutput(nn.Layer):
 
 
 class RemBertLayer(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertLayer, self).__init__()
         self.attention = RemBertAttention(config)
 
@@ -250,7 +250,7 @@ class RemBertLayer(nn.Layer):
 
 
 class RemBertEncoder(nn.Layer):
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertEncoder, self).__init__()
         self.embedding_hidden_mapping_in = nn.Linear(config.input_embedding_size, config.hidden_size)
         self.layer = nn.LayerList([RemBertLayer(config) for _ in range(config.num_hidden_layers)])
@@ -267,7 +267,7 @@ class RemBertEncoder(nn.Layer):
 
 
 @register_base_model
-class RemBertModel(RembertPretrainedModel):
+class RemBertModel(RemBertPretrainedModel):
     """
     The bare RemBERT Model transformer outputting raw hidden-states.
 
@@ -281,7 +281,7 @@ class RemBertModel(RembertPretrainedModel):
 
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertModel, self).__init__(config)
         self.pad_token_id = config.pad_token_id
         self.num_hidden_layers = config.num_hidden_layers
@@ -386,7 +386,7 @@ class RemBertModel(RembertPretrainedModel):
         return sequence_output, pooled_output
 
 
-class RemBertForSequenceClassification(RembertPretrainedModel):
+class RemBertForSequenceClassification(RemBertPretrainedModel):
     """
     RemBert Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
@@ -398,7 +398,7 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
             The number of classes.
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertForSequenceClassification, self).__init__(config)
         self.rembert = RemBertModel(config)
         self.dense = nn.Linear(config.hidden_size, config.num_classes)
@@ -450,7 +450,7 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
         return logits
 
 
-class RemBertForQuestionAnswering(RembertPretrainedModel):
+class RemBertForQuestionAnswering(RemBertPretrainedModel):
     """
     RemBert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
@@ -460,7 +460,7 @@ class RemBertForQuestionAnswering(RembertPretrainedModel):
             An instance of RemBertModel.
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertForQuestionAnswering, self).__init__(config)
         self.rembert = RemBertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
@@ -534,7 +534,7 @@ class RemBertLMPredictionHead(nn.Layer):
     RemBert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self, config: RembertConfig, embedding_weights=None):
+    def __init__(self, config: RemBertConfig, embedding_weights=None):
         super(RemBertLMPredictionHead, self).__init__()
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = get_activation(config.hidden_act)
@@ -554,7 +554,7 @@ class RemBertLMPredictionHead(nn.Layer):
 
 
 class RemBertOnlyMLMHead(nn.Layer):
-    def __init__(self, config: RembertConfig, embedding_weights):
+    def __init__(self, config: RemBertConfig, embedding_weights):
         super(RemBertOnlyMLMHead, self).__init__()
         self.predictions = RemBertLMPredictionHead(config, embedding_weights=embedding_weights)
 
@@ -563,7 +563,7 @@ class RemBertOnlyMLMHead(nn.Layer):
         return prediction_scores
 
 
-class RemBertForMaskedLM(RembertPretrainedModel):
+class RemBertForMaskedLM(RemBertPretrainedModel):
     """
     RemBert Model with a `masked language modeling` head on top.
 
@@ -573,7 +573,7 @@ class RemBertForMaskedLM(RembertPretrainedModel):
 
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertForMaskedLM, self).__init__(config)
         self.rembert = RemBertModel(config)
         self.cls = RemBertOnlyMLMHead(
@@ -623,7 +623,7 @@ class RemBertForMaskedLM(RembertPretrainedModel):
         return prediction_scores
 
 
-class RemBertForTokenClassification(RembertPretrainedModel):
+class RemBertForTokenClassification(RemBertPretrainedModel):
     """
     RemBert Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
@@ -635,7 +635,7 @@ class RemBertForTokenClassification(RembertPretrainedModel):
             The number of classes.
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertForTokenClassification, self).__init__(config)
         self.num_classes = config.num_classes
         self.rembert = RemBertModel(config)  # allow rembert to be config
@@ -686,7 +686,7 @@ class RemBertForTokenClassification(RembertPretrainedModel):
         return logits
 
 
-class RemBertForMultipleChoice(RembertPretrainedModel):
+class RemBertForMultipleChoice(RemBertPretrainedModel):
     """
     RemBert Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
@@ -698,7 +698,7 @@ class RemBertForMultipleChoice(RembertPretrainedModel):
             The number of choices.
     """
 
-    def __init__(self, config: RembertConfig):
+    def __init__(self, config: RemBertConfig):
         super(RemBertForMultipleChoice, self).__init__(config)
         self.num_choices = config.num_choices
         self.rembert = RemBertModel(config)

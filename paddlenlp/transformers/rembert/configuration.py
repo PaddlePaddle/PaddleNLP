@@ -19,7 +19,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = [
     "REMBERT_PRETRAINED_INIT_CONFIGURATION",
     "REMBERT_PRETRAINED_RESOURCE_FILES_MAP",
-    "RembertConfig",
+    "RemBertConfig",
 ]
 
 REMBERT_PRETRAINED_INIT_CONFIGURATION = {
@@ -48,7 +48,7 @@ REMBERT_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class RembertConfig(PretrainedConfig):
+class RemBertConfig(PretrainedConfig):
     r"""
     Args:
     vocab_size (int):
