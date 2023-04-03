@@ -56,7 +56,9 @@ __all__ = [
 
 
 def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
-    world_size = paddle.distributed.get_world_size()
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    world_size = hcg.get_model_parallel_world_size()
     if world_size > 1:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         hcg = fleet.get_hybrid_communicate_group()
@@ -837,6 +839,7 @@ class BloomModel(BloomPreTrainedModel):
             use_cache,
             output_attentions,
             alibi,
+            use_reentrant=False,
         )
         return hidden_states
 
@@ -921,10 +924,11 @@ class BloomModel(BloomPreTrainedModel):
             )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
+            has_gradient = not hidden_states.stop_gradient
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.config.use_recompute:
+            if self.config.use_recompute and has_gradient:
                 outputs = self.recompute_training(
                     block,
                     hidden_states,
