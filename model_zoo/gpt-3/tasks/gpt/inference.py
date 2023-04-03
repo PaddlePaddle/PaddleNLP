@@ -22,11 +22,11 @@ import paddle.distributed as dist
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../../")))
 
-from ppfleetx.core import EagerEngine  # noqa: E402
-from ppfleetx.data import tokenizers  # noqa: E402
-from ppfleetx.distributed.apis import env  # noqa: E402
-from ppfleetx.models import build_module  # noqa: E402
-from ppfleetx.utils import config  # noqa: E402
+from ppfleetx.core import EagerEngine
+from ppfleetx.data import tokenizers
+from ppfleetx.distributed.apis import env
+from ppfleetx.models import build_module
+from ppfleetx.utils import config
 
 if __name__ == "__main__":
     args = config.parse_args()
