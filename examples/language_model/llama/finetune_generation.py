@@ -124,7 +124,6 @@ def main():
     train_ds = train_ds.map(partial(trans_func))
     dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
-    # collate_fn = DataCollatorForSeq2Seq(tokenizer)
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []
@@ -159,9 +158,9 @@ def main():
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
 
-    # if training_args.do_eval:
-    #     eval_result = trainer.evaluate(dev_ds)
-    #     trainer.log_metrics("test", eval_result)
+    if training_args.do_eval:
+        eval_result = trainer.evaluate(dev_ds)
+        trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":
