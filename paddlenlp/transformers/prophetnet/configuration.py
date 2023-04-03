@@ -19,7 +19,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = [
     "PROPHETNET_PRETRAINED_INIT_CONFIGURATION",
     "PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP",
-    "PROPHETNETConfig",
+    "ProphetNetConfig",
 ]
 
 PROPHETNET_PRETRAINED_INIT_CONFIGURATION = {
@@ -65,7 +65,7 @@ PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class PROPHETNETConfig(PretrainedConfig):
+class ProphetNetConfig(PretrainedConfig):
 
     model_type = "prophetnet"
 

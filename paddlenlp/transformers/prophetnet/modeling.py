@@ -26,7 +26,7 @@ from ..activations import ACT2FN
 from .configuration import (
     PROPHETNET_PRETRAINED_INIT_CONFIGURATION,
     PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP,
-    PROPHETNETConfig,
+    ProphetNetConfig,
 )
 
 __all__ = [
@@ -137,7 +137,7 @@ class ProphetNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = PROPHETNET_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "prophetnet"
-    config_class = PROPHETNETConfig
+    config_class = ProphetNetConfig
 
     def init_weights(self, layer):
         if isinstance(layer, nn.Linear):
@@ -182,7 +182,7 @@ class ProphetNetPositionalEmbeddings(nn.Embedding):
     ProphetNetPositional Embeddings.
     """
 
-    def __init__(self, config: PROPHETNETConfig):
+    def __init__(self, config: ProphetNetConfig):
         self.max_length = config.max_position_embeddings
         super(ProphetNetPositionalEmbeddings, self).__init__(
             config.max_position_embeddings, config.hidden_size, config.pad_token_id
@@ -705,7 +705,7 @@ class ProphetNetEncoderLayer(Layer):
     Encoder block for Prophetnet
     """
 
-    def __init__(self, config: PROPHETNETConfig):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetEncoderLayer, self).__init__()
         # 1st residual block
         self.self_attn = ProphetNetAttention(
@@ -739,7 +739,7 @@ class ProphetNetDecoderLayer(Layer):
     Decoder block for Prophetnet
     """
 
-    def __init__(self, config: PROPHETNETConfig):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetDecoderLayer, self).__init__()
         # 1st residual block
         self.self_attn = ProphetNetNgramSelfAttention(
@@ -831,7 +831,7 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
         pre-defined word embeddings instead of randomly initialized word embeddings.
     """
 
-    def __init__(self, word_embeddings, config: PROPHETNETConfig):
+    def __init__(self, word_embeddings, config: ProphetNetConfig):
         super(ProphetNetEncoder, self).__init__(config)
         self.init_std = config.init_std
         if word_embeddings is not None:
@@ -875,7 +875,7 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
 
 
 class ProphetNetDecoder(ProphetNetPretrainedModel):
-    def __init__(self, word_embeddings, config: PROPHETNETConfig):
+    def __init__(self, word_embeddings, config: ProphetNetConfig):
         super(ProphetNetDecoder, self).__init__(config)
         self.init_std = config.init_std
         self.ngram = config.ngram
@@ -1091,7 +1091,7 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
 
 @register_base_model
 class ProphetNetModel(ProphetNetPretrainedModel):
-    def __init__(self, config: PROPHETNETConfig):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetModel, self).__init__(config)
         self.init_std = config.init_std
         self.eps = config.eps
@@ -1174,7 +1174,7 @@ class Linear_wo_bias(Layer):
 
 
 class ProphetNetForConditionalGeneration(ProphetNetPretrainedModel):
-    def __init__(self, config: PROPHETNETConfig):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetForConditionalGeneration, self).__init__(config)
         self.prophetnet = ProphetNetModel(config)
         self.padding_idx = self.prophetnet.word_embeddings._padding_idx

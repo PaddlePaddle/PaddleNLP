@@ -18,7 +18,7 @@ import unittest
 import paddle
 
 from paddlenlp.transformers import (
-    PROPHETNETConfig,
+    ProphetNetConfig,
     ProphetNetForConditionalGeneration,
     ProphetNetModel,
     ProphetNetPretrainedModel,
@@ -110,7 +110,7 @@ class ProphetNetModelTester:
         return config, input_ids, input_mask, decoder_input_ids, decoder_input_mask
 
     def get_config(self):
-        return PROPHETNETConfig(
+        return ProphetNetConfig(
             vocab_size=self.vocab_size,
             bos_token_id=self.bos_token_id,
             pad_token_id=self.pad_token_id,
@@ -174,7 +174,7 @@ class ProphetNetModelTester:
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
 
-class BlenderbotModelTest(ModelTesterMixin, unittest.TestCase):
+class ProphetNetModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ProphetNetModel
     return_dict: bool = False
     use_labels: bool = False
