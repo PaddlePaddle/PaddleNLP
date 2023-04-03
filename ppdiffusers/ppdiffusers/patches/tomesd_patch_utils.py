@@ -37,6 +37,8 @@ def scatter_reduce(
     # reduce "sum", "prod", "mean",
     # TODO support "amax", "amin" and include_self = False
     if reduce in ["sum", "assign"]:
+        if reduce == "sum":
+            reduce = "add"
         input.put_along_axis_(indices=index, values=src, axis=dim, reduce=reduce)
     elif reduce == "mean":
         # compute sum first
