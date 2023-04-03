@@ -14,13 +14,13 @@
 import os
 
 import paddle
-from paddle.common_ops_import import core
 import paddle.nn as nn
-import paddle.nn.functional as F
+from paddle.common_ops_import import core
 
+from paddlenlp.experimental import FasterPretrainedModel, FasterTokenizer
 from paddlenlp.utils.log import logger
-from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
-from .. import PretrainedModel, register_base_model
+
+from .. import register_base_model
 
 __all__ = [
     "PPMiniLMModel",
