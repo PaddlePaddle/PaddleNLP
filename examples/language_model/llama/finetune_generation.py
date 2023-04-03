@@ -99,7 +99,7 @@ def main():
         # dtype="float16",  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        use_recompute=False,
+        use_recompute=True,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
@@ -115,6 +115,7 @@ def main():
 
     tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.padding_side = "left"
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
@@ -123,6 +124,7 @@ def main():
     train_ds = train_ds.map(partial(trans_func))
     dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
+    # collate_fn = DataCollatorForSeq2Seq(tokenizer)
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []
@@ -158,7 +160,7 @@ def main():
         trainer.save_state()
 
     # if training_args.do_eval:
-    #     eval_result = trainer.evaluate(test_ds)
+    #     eval_result = trainer.evaluate(dev_ds)
     #     trainer.log_metrics("test", eval_result)
 
 

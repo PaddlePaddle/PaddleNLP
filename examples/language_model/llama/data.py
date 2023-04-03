@@ -18,7 +18,6 @@ from typing import Dict, List
 
 import paddle
 
-from paddlenlp.data import Pad
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
 IGNORE_INDEX = -100
@@ -75,11 +74,22 @@ def convert_example(example, tokenizer, data_args):
     )
 
 
-def pad_sequence(inputs, pad_index=0):
-    sequences = [inp.numpy() for inp in inputs]
-    outputs = Pad(pad_val=pad_index)(sequences)
-    output_tensor = paddle.to_tensor(outputs)
-    return output_tensor
+def left_padding(inputs, pad_id):
+    max_length = 0
+    for ids in inputs:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(values, max_length, to_pad_id):
+        res = []
+        for value in values:
+            res.append(extend_max_lenth(value.tolist(), max_length, to_pad_id))
+        return res
+
+    res = extend_filed(inputs, max_length, pad_id)
+    return paddle.to_tensor(res)
 
 
 @dataclass
@@ -91,8 +101,8 @@ class DataCollatorForSupervisedDataset(object):
     def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
 
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
-        input_ids = pad_sequence(input_ids, pad_index=self.tokenizer.pad_token_id)
-        labels = pad_sequence(labels, pad_index=IGNORE_INDEX)
+        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
+        labels = left_padding(labels, pad_id=IGNORE_INDEX)
 
         return dict(
             input_ids=input_ids,

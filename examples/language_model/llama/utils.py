@@ -46,7 +46,7 @@ class LlamaTrainer(Trainer):
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             max_length=50,
-            min_length=3,
+            min_length=0,
             use_cache=True,
             temperature=1.0,
             top_k=1,

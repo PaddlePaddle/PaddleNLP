@@ -498,7 +498,7 @@ class LlamaModel(LlamaPretrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, inputs_embeds, past_key_values_length):
+    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
@@ -572,10 +572,7 @@ class LlamaModel(LlamaPretrainedModel):
         # embed positions
         if attention_mask is None:
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), inputs_embeds, cache_length
-        )
-
+        attention_mask = self._prepare_decoder_attention_mask(attention_mask, (batch_size, seq_length), cache_length)
         hidden_states = inputs_embeds
 
         # decoder layers
