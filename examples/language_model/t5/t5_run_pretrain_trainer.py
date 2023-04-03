@@ -25,7 +25,7 @@ from typing import Optional
 
 import numpy as np
 import paddle
-from link_to_dataset_utils import build_train_valid_test_datasets
+from dataset_utils import build_train_valid_test_datasets
 
 from paddlenlp.data import Stack
 from paddlenlp.trainer import (
