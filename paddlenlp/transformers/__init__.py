@@ -143,6 +143,7 @@ from .reformer.tokenizer import *
 from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
+from .rembert.configuration import *
 from .roformer.modeling import *
 from .roformer.configuration import *
 from .roformer.tokenizer import *
