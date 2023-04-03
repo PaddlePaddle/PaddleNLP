@@ -56,6 +56,7 @@ def scatter_reduce(
 
 
 # patch scatter_reduce
+paddle.scatter_reduce = scatter_reduce
 paddle.Tensor.scatter_reduce = scatter_reduce
 
 
