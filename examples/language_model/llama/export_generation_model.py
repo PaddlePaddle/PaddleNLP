@@ -17,7 +17,6 @@ import os
 
 import paddle
 from configuration import LlamaConfig
-from model_split_merge import merge_model_parallel
 from modeling import LlamaForCausalLM
 from tokenizer import LlamaTokenizer
 
@@ -26,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_path",
-        default="output/200/splits_mp_02_sharding_01/",
+        default="checkpoints",
         type=str,
         required=False,
         help="Path of the trained model to be exported.",
@@ -45,7 +44,16 @@ def main():
     args = parse_args()
 
     paddle.seed(100)
-    paddle.set_default_dtype("float16")
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+    strategy = paddle.distributed.fleet.DistributedStrategy()
+    strategy.hybrid_configs = {
+        "dp_degree": 1,
+        "mp_degree": tensor_parallel_degree,
+        "pp_degree": 1,
+        "sharding_degree": 1,
+    }
+    paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
 
     tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
     config = LlamaConfig.from_pretrained(args.model_path)
@@ -61,13 +69,14 @@ def main():
     config.use_cache = True
     config.use_recompute = False
 
-    # Merge the model splits to a total model
-    merge_model_path = merge_model_parallel(args.model_path, config)
-    # merge_model_path = args.model_path
-
-    # Load the model and parameter
-    config.mp_degree = 1
-    model = LlamaForCausalLM.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
+    model = LlamaForCausalLM.from_pretrained(
+        args.model_path,
+        tensor_parallel_degree=tensor_parallel_degree,
+        tensor_parallel_rank=tensor_parallel_rank,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,
+        config=config,
+    )
 
     model.eval()
     model = paddle.jit.to_static(
