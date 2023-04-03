@@ -11,7 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# reference https://github.com/dbolya/tomesd
+#
+# Copyright (c) 2023 Daniel Bolya
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+# Adapted from https://github.com/dbolya/tomesd
 
 import math
 from typing import Any, Callable, Dict, Tuple, Type, Union
@@ -36,7 +41,7 @@ def scatter_reduce(
 ) -> paddle.Tensor:
     # reduce "sum", "prod", "mean",
     # TODO support "amax", "amin" and include_self = False
-    if reduce in ["sum", "assign", "add"]:
+    if reduce in ["sum", "assign"]:
         if reduce == "sum":
             reduce = "add"
         input.put_along_axis_(indices=index, values=src, axis=dim, reduce=reduce)
