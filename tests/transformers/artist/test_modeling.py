@@ -22,7 +22,6 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import (
     ArtistConfig,
     ArtistForConditionalGeneration,
-    ArtistForImageGeneration,
     ArtistModel,
 )
 from tests.transformers.test_modeling_common import (
@@ -200,7 +199,7 @@ class ArtistModelTest(ModelTesterMixin, unittest.TestCase):
     use_labels = False
     return_dict = False
 
-    all_model_classes = (ArtistModel, ArtistForConditionalGeneration, ArtistForImageGeneration)
+    all_model_classes = (ArtistModel, ArtistForConditionalGeneration)
 
     def setUp(self):
         self.model_tester = ArtistModelTester(self)

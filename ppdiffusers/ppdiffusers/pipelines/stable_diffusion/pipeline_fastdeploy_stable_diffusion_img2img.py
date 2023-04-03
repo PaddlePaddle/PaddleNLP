@@ -21,7 +21,6 @@ import PIL
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
     DDIMScheduler,
@@ -32,6 +31,7 @@ from ...schedulers import (
     PNDMScheduler,
 )
 from ...utils import PIL_INTERPOLATION, logging
+from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -122,7 +122,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             )
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
+                f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
 
@@ -415,9 +415,9 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
 
         # 8. Denoising loop
+        text_embeddings = paddle.to_tensor(text_embeddings, dtype=paddle.float32)
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
-            text_embeddings = paddle.to_tensor(text_embeddings)
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents

@@ -1278,4 +1278,8 @@ ernie_doc(){
 ernie_health(){
     ernie-health
 }
+
+gpt-3() {
+    bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
+}
 $1
