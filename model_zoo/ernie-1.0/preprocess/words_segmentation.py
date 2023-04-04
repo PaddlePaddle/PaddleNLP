@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import re
 import argparse
+import json
 import multiprocessing
 import os
-import time
-import jieba
+import re
 import sys
+import time
 from functools import partial
 
 
@@ -93,7 +92,7 @@ def read_wudao(path):
     with open(path, "r") as f:
         try:
             contents = json.load(f)
-        except Exception as e:
+        except Exception:
             print("Failed to load %s" % path)
             raise StopIteration
     for js in contents:
@@ -130,9 +129,6 @@ def text_to_text(path, output_path, read_func, seg_func):
     seg_func = CHINESE_SEG_FUNC[seg_func]
     read_func = READFILE_FUNC[read_func]
 
-    import time
-
-    s = time.time()
     data_len = 0
     count = 0
     with open(out_name, "w") as f:
@@ -193,7 +189,6 @@ def main():
     for i, (bytes_processed, out_path) in enumerate(encoded_files, start=1):
         total_bytes_processed += bytes_processed
         out_paths.append(out_path)
-        master_start = time.time()
 
         if i % args.log_interval == 0:
             current = time.time()

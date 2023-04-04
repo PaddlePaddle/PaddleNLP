@@ -182,7 +182,7 @@ def main():
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()

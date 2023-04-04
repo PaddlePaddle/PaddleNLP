@@ -51,7 +51,7 @@ class TestWordAug(unittest.TestCase):
         for t in self.types:
             if t == "mlm":
                 aug = WordSubstitute(
-                    "mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab"
+                    "mlm", create_n=create_n, model_name="__internal_testing__/tiny-random-ernie", vocab="test_vocab"
                 )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
@@ -72,7 +72,9 @@ class TestWordAug(unittest.TestCase):
     def test_word_insert(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = WordInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab")
+                aug = WordInsert(
+                    "mlm", create_n=create_n, model_name="__internal_testing__/tiny-random-ernie", vocab="test_vocab"
+                )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue
