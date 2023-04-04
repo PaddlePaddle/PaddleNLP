@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-from __future__ import division
+from __future__ import division, print_function
 
-import numpy as np
 import math
+
 import paddle
 
 __all__ = ["DistributedBatchSampler"]
@@ -120,7 +119,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
             self.consumed_samples % self.nranks == 0
         ), "The consumed_samples should be divided by nranks. consumed_samples=%d, nranks=%s" % (
             self.consumed_samples,
-            nranks,
+            self.nranks,
         )
         self.remain_num_samples = int(math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 / self.nranks))
         self.remain_total_size = self.remain_num_samples * self.nranks

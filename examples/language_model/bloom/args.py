@@ -42,7 +42,7 @@ def process_batch_size(args):
     assert args.local_batch_size % args.micro_batch_size == 0
 
 
-def parse_args():
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list")
     parser.add_argument(
@@ -173,6 +173,8 @@ def parse_args():
         "--use_recompute", type=strtobool, nargs="?", const=False, help="Using the recompute to save the memory."
     )
 
+    parser.add_argument("--lora", type=strtobool, nargs="?", const=False, help="Using LoRA or not.")
+
     # add sharding stage2/3
     parser.add_argument(
         "--sharding_stage",
@@ -252,7 +254,11 @@ def parse_args():
     parser.add_argument("--max_seq_length", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--max_source_length", type=int, default=512, help="Max sequence length for finetune.")
     parser.add_argument("--max_target_length", type=int, default=512, help="Max sequence length for finetune.")
+    return parser
 
+
+def parse_args():
+    parser = get_parser()
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
     if args.tokenizer_name_or_path is None:

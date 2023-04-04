@@ -1,5 +1,5 @@
-paddlenlp>=2.5.0
-ppdiffusers>=0.9.0
+paddlenlp>=2.5.2
+ppdiffusers>=0.14.0
 scipy
 pyyaml
 opencv-python

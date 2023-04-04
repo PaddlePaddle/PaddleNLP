@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -340,11 +341,12 @@ checkpoint_file = (
 
 class SegmenterDetector:
     def __init__(self):
-        modelpath = os.path.join(annotator_ckpts_path, "segmenter_model.pdparams")
+        segmenter_annotator_ckpts_path = os.path.join(annotator_ckpts_path, "segmenter_model")
+        modelpath = os.path.join(segmenter_annotator_ckpts_path, "model.pdparams")
         if not os.path.exists(modelpath):
-            from basicsr.utils.download_util import load_file_from_url
+            from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
-            load_file_from_url(checkpoint_file, model_dir=annotator_ckpts_path, file_name="segmenter_model.pdparams")
+            get_path_from_url_with_filelock(checkpoint_file, root_dir=segmenter_annotator_ckpts_path)
         self.model_path = modelpath
 
         cfg = "annotator/segmenter_paddle/segmenter_vit_base_linear_ade20k_512x512_160k.yml"

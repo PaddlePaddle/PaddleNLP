@@ -654,7 +654,7 @@ python finetune.py  \
     --per_device_train_batch_size  16 \
     --num_train_epochs 20 \
     --learning_rate 1e-5 \
-    --label_names 'start_positions' 'end_positions' \
+    --label_names "start_positions" "end_positions" \
     --do_train \
     --do_eval \
     --do_export \
@@ -691,7 +691,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --do_eval \
     --do_export \
     --export_model_dir $finetuned_model \
-    --label_names 'start_positions' 'end_positions' \
+    --label_names "start_positions" "end_positions" \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
@@ -875,84 +875,69 @@ paddlenlp server server:app --host 0.0.0.0 --port 8989
 
 以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
-- 环境准备
-
-  UIE的部署分为 CPU 和 GPU 两种情况，请根据你的部署环境安装对应的依赖。
-
-  - CPU端
-
-    CPU端的部署请使用如下命令安装所需依赖：
-
-    ```shell
-    pip install -r deploy/python/requirements_cpu.txt
-    ```
-
-  - GPU端
-
-    为了在 GPU 上获得最佳的推理性能和稳定性，请先确保机器已正确安装 NVIDIA 相关驱动和基础软件，确保 **CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
-
-    ```shell
-    pip install -r deploy/python/requirements_gpu.txt
-    ```
-
-    如果有模型推理加速、内存显存占用优化的需求，并且 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，例如 V100、T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
-
-    如果 GPU 设备的 CUDA 计算能力较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
-
-    更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
 - 模型导出
 
-模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdimodel`、`*.pdiparams` 模型文件可用于推理。
+模型训练、压缩时已经自动进行了静态图的导出以及 tokenizer 配置文件保存，保存路径`${finetuned_model}` 下应该有 `*.pdimodel`、`*.pdiparams` 模型文件可用于推理。
 
-- 推理
+- 模型部署
 
-  - CPU端推理样例
+以下示例展示如何基于 FastDeploy 库完成 UIE 模型完成通用信息抽取任务的 Python 预测部署。先参考 [UIE 模型部署](./deploy/python/README.md)安装FastDeploy Python 依赖包。 可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型。模型目录为 `model_zoo/uie/checkpoint/model_best`（用户可按实际情况设置）。
 
-    在CPU端，请使用如下命令进行部署
+```bash
+# UIE 模型 CPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device cpu
+# UIE 模型 GPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device gpu
 
-    ```shell
-    python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model
-    ```
+# UIE-M 模型 CPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device cpu --multilingual
+# UIE-M 模型 GPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device gpu --multilingual
+```
 
-    部署UIE-M模型
+运行完成后返回的结果如下：
 
-    ```shell
-    python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model --multilingual
-    ```
+```bash
+[2023-03-06 03:31:21,456] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'export'.
+[INFO] fastdeploy/runtime/runtime.cc(91)::AutoSelectBackend    FastDeploy will choose Backend::PDINFER to inference this model.
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
+-----------------------------
+1. Input text:
+"北京市海淀区人民法院
+民事判决书
+(199x)建初字第xxx号
+原告：张三。
+委托代理人李四，北京市 A律师事务所律师。
+被告：B公司，法定代表人王五，开发公司总经理。
+委托代理人赵六，北京市 C律师事务所律师。"
+2. Input schema:
+['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
+3. Result:
+{'原告': [{'end': 38,
+         'probability': 0.9991321038858274,
+         'relations': {'委托代理人': [{'end': 47,
+                                  'probability': 0.8729063160951966,
+                                  'start': 45,
+                                  'text': '李四'}]},
+         'start': 36,
+         'text': '张三'}],
+ '法院': [{'end': 11,
+         'probability': 0.9766876070751707,
+         'start': 1,
+         'text': '北京市海淀区人民法院'}],
+ '被告': [{'end': 68,
+         'probability': 0.9532207287016696,
+         'relations': {'委托代理人': [{'end': 93,
+                                  'probability': 0.7685119772607152,
+                                  'start': 91,
+                                  'text': '赵六'}]},
+         'start': 65,
+         'text': 'B公司'}]}
+......
+```
 
-
-    可配置参数说明：
-
-    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
-    - `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型是多语言模型，需要设置为 True；默认为 False。
-
-  - GPU端推理样例
-
-    在GPU端，请使用如下命令进行部署
-
-    ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix ${finetuned_model}/model --use_fp16 --device_id 0
-    ```
-
-    部署UIE-M模型
-
-    ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix ${finetuned_model}/model --use_fp16 --device_id 0 --multilingual
-    ```
-
-    可配置参数说明：
-
-    - `model_path_prefix`: 用于推理的 Paddle 模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
-    - `use_fp16`: FP32 模型是否使用 FP16 进行加速，使用 FP32、INT8 推理时不需要设置，默认关闭。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
-    - `device_id`: GPU 设备 ID，默认为 0。
-    - `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型是多语言模型，需要设置为 True；默认为 False。
+更多细节请参考[UIE Python 部署方法](./deploy/python/README.md)
 
 <a name="CCKS比赛"></a>
 

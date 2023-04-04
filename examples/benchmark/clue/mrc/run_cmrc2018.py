@@ -13,28 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import contextlib
+import distutils.util
+import json
 import os
 import random
 import time
-import json
-import math
-import distutils.util
-import argparse
-import contextlib
 
-from functools import partial
 import numpy as np
 import paddle
-
+from datasets import load_dataset
 from paddle.io import DataLoader
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+from paddlenlp.transformers import (
+    AutoModelForQuestionAnswering,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
-
-from datasets import load_dataset
 
 
 def parse_args():
@@ -164,7 +163,6 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         raw_dataset, dataset, (all_start_logits, all_end_logits), False, args.n_best_size, args.max_answer_length
     )
 
-    mode = "validation" if do_eval else "test"
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     if do_eval:
@@ -466,8 +464,6 @@ def run(args):
             prepare_validation_features, batched=True, remove_columns=column_names, num_proc=args.num_proc
         )
         test_ds_for_model = test_ds.remove_columns(["example_id", "offset_mapping", "attention_mask"])
-        dev_batchify_fn = DataCollatorWithPadding(tokenizer)
-
         test_batch_sampler = paddle.io.BatchSampler(test_ds_for_model, batch_size=args.eval_batch_size, shuffle=False)
 
         batchify_fn = DataCollatorWithPadding(tokenizer)

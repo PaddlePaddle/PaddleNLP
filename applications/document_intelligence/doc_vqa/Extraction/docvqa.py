@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import cv2
-import sys
-import json
-import copy
 import collections
-import numpy as np
-from tqdm import tqdm
+import json
+import sys
 
+import numpy as np
 import paddle
 from paddle.io import Dataset
+from tqdm import tqdm
 
 sys.path.insert(0, "../")
 
@@ -113,7 +110,6 @@ class DocVQA(Dataset):
             end_token = "</s>"
 
         features = []
-        total = len(examples)
         for (example_index, example) in enumerate(examples):
             query_tokens = tokenizer.tokenize(example.question)
             if len(query_tokens) > max_query_length:

@@ -508,6 +508,13 @@ class PretrainedConfig:
             "tie_word_embeddings", True
         )  # Whether input and output word embeddings should be tied for all MLM, LM and Seq2Seq models.
 
+        # Parameters for tensor parallel
+        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
+        # to calculate cross-entropy loss for parallel model.
+        self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
+
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
         self.is_decoder = kwargs.pop("is_decoder", False)

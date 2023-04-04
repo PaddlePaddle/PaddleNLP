@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 import functools
-import numpy as np
+import os
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
-from paddle.io import DataLoader, BatchSampler
+from paddle.io import BatchSampler, DataLoader
+from utils import preprocess_function, read_local_dataset
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-from utils import preprocess_function, read_local_dataset
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()

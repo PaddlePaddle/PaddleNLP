@@ -13,15 +13,15 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from typing import List, Dict, Union, Callable, Optional
+from typing import Dict, List, Union
+
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import PretrainedTokenizer
-
 from data import InputExample
+
+from paddlenlp.transformers import PretrainedTokenizer
 
 
 class Verbalizer(nn.Layer):

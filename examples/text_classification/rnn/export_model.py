@@ -15,20 +15,27 @@
 import argparse
 
 import paddle
+from model import (
+    BiLSTMAttentionModel,
+    BoWModel,
+    CNNModel,
+    GRUModel,
+    LSTMModel,
+    RNNModel,
+    SelfInteractiveAttention,
+)
+
 from paddlenlp.data import Vocab
 
-from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to vocabulary.")
-parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
-    default="bilstm", help="Select which network to train, defaults to bilstm.")
+parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'], default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
 parser.add_argument("--output_path", type=str, default='./static_graph_params', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def main():

@@ -14,7 +14,6 @@
 
 import paddle
 import paddle.nn as nn
-import numpy as np
 
 
 class StackModel(nn.Layer):

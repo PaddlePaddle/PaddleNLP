@@ -51,14 +51,17 @@ class GLMTrainer(Trainer):
                 position_ids=inputs["position_ids"],
                 attention_mask=inputs["attention_mask"],
             )[0]
-            all_preds = tokens.tolist()
+            all_preds = []
+            for pred_tokens in tokens:
+                all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
             max_pred_length = max([len(x) for x in all_preds])
             for index, preds in enumerate(all_preds):
                 all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
 
             all_labels = []
-            for label, mask in zip(inputs["labels"].numpy(), inputs["attention_mask"].numpy()):
-                label = [x for x in label[mask.astype("bool")][0]]
+            for label, mask in zip(inputs["labels"].numpy(), inputs["loss_mask"].numpy()):
+                label = label[mask.astype("bool")]
+                label = [x for x in label[label != self.tokenizer.pad_token_id]]
                 all_labels.append(label)
             max_label_length = max([len(x) for x in all_labels])
             for index, labels in enumerate(all_labels):
@@ -89,6 +92,7 @@ def generate(
     input_ids=None,
     position_ids=None,
     attention_mask=None,
+    out_seq_length=768,
     tgt_length=256,
     min_tgt_length=5,
     num_beams=1,
@@ -114,7 +118,7 @@ def generate(
     batch_size = input_ids.shape[0]
     beam_scorer = BeamSearchScorer(
         batch_size=batch_size,
-        max_length=tgt_length,
+        max_length=out_seq_length,
         num_beams=num_beams,
         length_penalty=length_penalty,
         do_early_stopping=False,
@@ -131,7 +135,7 @@ def generate(
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 cache=None,
-                use_cache=True,
+                # use_cache=True,
             )
             seq_length = next_token_logits.shape[1]
             next_token_logits = next_token_logits[:, -1]
@@ -157,7 +161,7 @@ def generate(
                 position_ids=position_ids,
                 attention_mask=cur_attention_mask,
                 cache=mems,
-                use_cache=True,
+                # use_cache=True,
             )
             next_token_logits = next_token_logits[:, -1]
         next_token_logits = top_k_logits(next_token_logits, top_k=top_k, top_p=top_p)
@@ -170,6 +174,7 @@ def generate(
         probs = nn.functional.softmax(next_token_scores, axis=-1)
         if select_topk:
             _, next_tokens = paddle.topk(probs, k=2 * num_beams, axis=-1, largest=True)
+            # _, next_tokens = paddle.topk(probs, k=num_beams, axis=-1, largest=True)
         else:
             next_tokens = paddle.multinomial(probs, num_samples=2 * num_beams)
         next_token_scores = paddle.take_along_axis(next_token_scores, next_tokens, axis=-1)

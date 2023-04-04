@@ -15,9 +15,12 @@
 import os
 import time
 
+# isort: split
+import paddle
+
+# isort: split
 import fastdeploy as fd
 import numpy as np
-import paddle
 from fastdeploy import ModelFormat
 
 from paddlenlp.trainer.argparser import strtobool
@@ -74,7 +77,7 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="euler_ancestral",
+        default="pndm",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )

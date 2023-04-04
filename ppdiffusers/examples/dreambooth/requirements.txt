@@ -1,0 +1,3 @@
+paddlenlp>=2.5.2
+Pillow
+ppdiffusers>=0.14.0

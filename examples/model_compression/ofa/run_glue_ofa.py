@@ -24,9 +24,6 @@ import paddle
 import paddle.nn.functional as F
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
-from paddleslim.nas.ofa import OFA, DistillConfig, utils
-from paddleslim.nas.ofa.convert_super import Convert, supernet
-from paddleslim.nas.ofa.utils import nlp_utils
 
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
@@ -38,6 +35,12 @@ from paddlenlp.transformers import (
     LinearDecayWithWarmup,
 )
 from paddlenlp.utils.log import logger
+
+# paddleslim needs to be imported last for some overrides to kick in
+from paddleslim.nas.ofa import OFA, DistillConfig, utils  # isort: skip
+from paddleslim.nas.ofa.convert_super import Convert, supernet  # isort: skip
+from paddleslim.nas.ofa.utils import nlp_utils  # isort: skip
+
 
 METRIC_CLASSES = {
     "cola": Mcc,

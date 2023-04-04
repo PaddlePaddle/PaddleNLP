@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-
 from functools import partial
-import numpy as np
 
+import numpy as np
 import paddle
-from paddlenlp.data import Vocab, Pad
-from paddlenlp.data import SamplerHelper
+
+from paddlenlp.data import Pad, SamplerHelper, Vocab
 from paddlenlp.datasets import load_dataset
 
 
@@ -56,7 +53,7 @@ def create_data_loader(args):
 
     dev_batch_sampler = SamplerHelper(dev_ds).sort(key=key, buffer_size=batch_size * 20).batch(batch_size=batch_size)
 
-    test_batch_sampler = SamplerHelper(dev_ds).sort(key=key, buffer_size=batch_size * 20).batch(batch_size=batch_size)
+    # test_batch_sampler = SamplerHelper(dev_ds).sort(key=key, buffer_size=batch_size * 20).batch(batch_size=batch_size)
 
     train_loader = paddle.io.DataLoader(
         train_ds,

@@ -14,15 +14,11 @@
 
 import argparse
 import os
-from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
-
 from model import PointwiseMatching
+
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
