@@ -13,14 +13,16 @@
 # limitations under the License.
 
 import argparse
-import time
-import numpy as np
-import os
-import io
-import shutil
 import fileinput
+import io
+import os
+import shutil
+import time
+
+import numpy as np
 
 from paddlenlp.transformers import ElectraTokenizer
+from paddlenlp.utils.log import logger
 
 
 def parse_args():

@@ -13,13 +13,10 @@
 # limitations under the License.
 
 import argparse
-import os
 import time
 
 import numpy as np
-import paddle
 import paddle.distributed.fleet as fleet
-import ppfleetx_ops
 from ppfleetx.core.engine.inference_engine import InferenceEngine
 
 
