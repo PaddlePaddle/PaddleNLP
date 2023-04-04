@@ -118,8 +118,6 @@ def main():
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
-    dev_ds.data = dev_ds.data[:100]
-    dev_ds.new_data = dev_ds.new_data[:100]
 
     trans_func = partial(
         convert_example,

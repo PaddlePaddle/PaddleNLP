@@ -25,7 +25,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument("--model_prefix", type=str, default="llama", help="The model and params file prefix.")
+    parser.add_argument("--model_prefix", type=str, default="opt", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -100,7 +100,7 @@ class Predictor(object):
         return output
 
 
-if __name__ == "__main__":
+def main():
     args = parse_arguments()
     paddle.seed(100)
     predictor = Predictor(args)
@@ -113,3 +113,7 @@ if __name__ == "__main__":
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
             print("{} \n\n {}".format(text, result))
+
+
+if __name__ == "__main__":
+    main()
