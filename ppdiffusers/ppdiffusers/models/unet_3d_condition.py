@@ -323,13 +323,19 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         elif len(timesteps.shape) == 0:
             timesteps = timesteps[None]
         num_frames = sample.shape[2]
-        timesteps = timesteps.expand(shape=sample.shape[0])
+        timesteps = timesteps.expand(
+            [
+                sample.shape[0],
+            ]
+        )
         t_emb = self.time_proj(timesteps)
         t_emb = t_emb.astype(dtype=self.dtype)
         emb = self.time_embedding(t_emb, timestep_cond)
         emb = emb.repeat_interleave(repeats=num_frames, axis=0)
         encoder_hidden_states = encoder_hidden_states.repeat_interleave(repeats=num_frames, axis=0)
-        sample = sample.transpose(perm=[0, 2, 1, 3, 4]).reshape((sample.shape[0] * num_frames, -1) + sample.shape[3:])
+        sample = sample.transpose(perm=[0, 2, 1, 3, 4]).reshape(
+            (sample.shape[0] * num_frames, -1) + tuple(sample.shape[3:])
+        )
         sample = self.conv_in(sample)
         sample = self.transformer_in(sample, num_frames=num_frames).sample
         down_block_res_samples = (sample,)
@@ -394,7 +400,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             sample = self.conv_norm_out(sample)
             sample = self.conv_act(sample)
         sample = self.conv_out(sample)
-        sample = sample[(None), :].reshape((-1, num_frames) + sample.shape[1:]).transpose(perm=[0, 2, 1, 3, 4])
+        sample = sample[(None), :].reshape((-1, num_frames) + tuple(sample.shape[1:])).transpose(perm=[0, 2, 1, 3, 4])
         if not return_dict:
             return (sample,)
         return UNet3DConditionOutput(sample=sample)

@@ -48,7 +48,8 @@ EXAMPLE_DOC_STRING = """
 def tensor2vid(video: paddle.Tensor, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) -> List[np.ndarray]:
     mean = paddle.to_tensor(mean).reshape((1, -1, 1, 1, 1))
     std = paddle.to_tensor(std).reshape((1, -1, 1, 1, 1))
-    video = paddle.scale(video, scale=std) + mean
+    video = video.multiply(std)
+    video = video.add(mean)
 
     video.clip_(min=0, max=1)
     i, c, f, h, w = video.shape
@@ -187,7 +188,7 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.astype(self.text_encoder.dtype)
         bs_embed, seq_len, _ = prompt_embeds.shape
         prompt_embeds = prompt_embeds.tile(repeat_times=[1, num_images_per_prompt, 1])
-        prompt_embeds = prompt_embeds.np.reshape((bs_embed * num_images_per_prompt, seq_len, -1))
+        prompt_embeds = prompt_embeds.reshape((bs_embed * num_images_per_prompt, seq_len, -1))
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
@@ -218,10 +219,7 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             seq_len = negative_prompt_embeds.shape[1]
             negative_prompt_embeds = negative_prompt_embeds.astype(self.text_encoder.dtype)
             negative_prompt_embeds = negative_prompt_embeds.tile(repeat_times=[1, num_images_per_prompt, 1])
-            """Class Method: *.view, not convert, please check whether it is paddle.Tensor.*/Optimizer.*/nn.Module.*, and convert manually"""
-            negative_prompt_embeds = negative_prompt_embeds.np.reshape(
-                (batch_size * num_images_per_prompt, seq_len, -1)
-            )
+            negative_prompt_embeds = negative_prompt_embeds.reshape((batch_size * num_images_per_prompt, seq_len, -1))
             prompt_embeds = paddle.concat(x=[negative_prompt_embeds, prompt_embeds])
         return prompt_embeds
 
@@ -231,7 +229,9 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         latents = latents.transpose(perm=[0, 2, 1, 3, 4]).reshape((batch_size * num_frames, channels, height, width))
         image = self.vae.decode(latents).sample
         video = (
-            image[(None), :].reshape((batch_size, num_frames, -1) + image.shape[2:]).transpose(perm=[0, 2, 1, 3, 4])
+            image[(None), :]
+            .reshape((batch_size, num_frames, -1) + tuple(image.shape[2:]))
+            .transpose(perm=[0, 2, 1, 3, 4])
         )
         video = video.astype(dtype="float32")
         return video
