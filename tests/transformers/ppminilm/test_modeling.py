@@ -104,17 +104,8 @@ class PPMiniLMModelTester:
         token_type_ids = None
         if self.use_token_type_ids:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
-
-        sequence_labels = None
-        token_labels = None
-        choice_labels = None
-        if self.use_labels:
-            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
-            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
-            choice_labels = ids_tensor([self.batch_size], self.num_choices)
-
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        return config, input_ids, token_type_ids, input_mask
 
     def get_config(self) -> PPMiniLMConfig:
         return PPMiniLMConfig(
@@ -141,9 +132,6 @@ class PPMiniLMModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = PPMiniLMModel(config)
         model.eval()
@@ -159,9 +147,6 @@ class PPMiniLMModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = PPMiniLMForMultipleChoice(config)
         model.eval()
@@ -172,7 +157,6 @@ class PPMiniLMModelTester:
             multiple_choice_inputs_ids,
             attention_mask=multiple_choice_input_mask,
             token_type_ids=multiple_choice_token_type_ids,
-            # labels=choice_labels,
         )
         self.parent.assertEqual(result.shape, [self.batch_size, self.num_choices])
 
@@ -182,22 +166,14 @@ class PPMiniLMModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = PPMiniLMForQuestionAnswering(config)
         model.eval()
         result = model(
             input_ids,
-            # attention_mask=input_mask,
             token_type_ids=token_type_ids,
-            # start_positions=sequence_labels,
-            # end_positions=sequence_labels,
-            # return_dict=self.return_dict,
+            attention_mask=input_mask,
         )
-        # if sequence_labels is not None:
-        #     result = result[1:]
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
@@ -208,9 +184,6 @@ class PPMiniLMModelTester:
         input_ids,
         token_type_ids,
         input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
     ):
         model = PPMiniLMForSequenceClassification(config)
         model.eval()
@@ -234,9 +207,6 @@ class PPMiniLMModelTester:
             input_ids,
             token_type_ids,
             input_mask,
-            sequence_labels,
-            token_labels,
-            choice_labels,
         ) = config_and_inputs
         inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
         return config, inputs_dict

@@ -40,7 +40,7 @@ class PPMiniLMEmbeddings(nn.Layer):
     def __init__(self, config: PPMiniLMConfig):
         super(PPMiniLMEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
@@ -134,13 +134,6 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
 
     def __init__(self, config: PPMiniLMConfig):
         super(PPMiniLMModel, self).__init__(config)
-        # self.vocab = self.load_vocabulary(config.vocab_file)
-        # if not os.path.isfile(config.vocab_file):
-        #     raise ValueError(
-        #         "Can't find a vocabulary file at path '{}'. To load the "
-        #         "vocabulary from a pretrained model please use "
-        #         "`model = PPMiniLMModel.from_pretrained(PRETRAINED_MODEL_NAME)`".format(config.vocab_file)
-        #     )
         self.embeddings = PPMiniLMEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(

@@ -41,18 +41,14 @@ PPMINILM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "ppminilm-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/ppminilm-6l-768h.pdparams",
     },
-    "vocab_file": {
-        "ppminilm-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
-    },
 }
 
 
 class PPMiniLMConfig(PretrainedConfig):
     r"""
-    This is the configuration class to store the configuration of a [`PPMiniLMModel`] or a [`PPMiniLMModel`]. It is used to
+    This is the configuration class to store the configuration of a [`PPMiniLMModel`]. It is used to
     instantiate a PPMiniLM model according to the specified arguments, defining the model architecture. Instantiating a
-    configuration with the defaults will yield a similar configuration to that of the PPMiniLM
-    ppminilm-6l-768h architecture.
+    configuration with the defaults will yield a similar configuration to that of the PPMiniLM ppminilm-6l-768h architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
