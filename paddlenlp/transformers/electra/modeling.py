@@ -628,7 +628,7 @@ class ElectraClassificationHead(nn.Layer):
             Dimensionality of the embedding layer.
         hidden_dropout_prob (float):
             The dropout probability for all fully connected layers.
-        num_classes (int):
+        num_labels (int):
             The number of classes.
         activation (str):
             The activation function name between layers.
@@ -639,7 +639,7 @@ class ElectraClassificationHead(nn.Layer):
         super(ElectraClassificationHead, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.out_proj = nn.Linear(config.hidden_size, config.num_classes)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
         self.act = get_activation(config.hidden_act)
 
     def forward(self, features, **kwargs):
@@ -653,7 +653,7 @@ class ElectraClassificationHead(nn.Layer):
 
         Returns:
             Tensor: Returns a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
         """
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
@@ -746,7 +746,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
     Args:
         electra (:class:`ElectraModel`):
             An instance of ElectraModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of Electra.
@@ -802,7 +802,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -837,12 +837,12 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -867,7 +867,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
     Args:
         electra (:class:`ElectraModel`):
             An instance of ElectraModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of Electra.
@@ -925,7 +925,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -961,7 +961,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape([-1, self.num_classes]), labels.reshape([-1]))
+            loss = loss_fct(logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
 
         if not return_dict:
             output = (logits,) + sequence_output[1:]
