@@ -17,7 +17,6 @@ from __future__ import annotations
 import unittest
 
 import paddle
-from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     PPMiniLMForMultipleChoice,
@@ -46,7 +45,6 @@ class PPMiniLMModelTester:
         is_training=True,
         use_input_mask=True,
         use_token_type_ids=True,
-        use_labels=True,
         vocab_size=99,
         hidden_size=32,
         num_hidden_layers=5,
@@ -60,12 +58,10 @@ class PPMiniLMModelTester:
         initializer_range=0.02,
         pad_token_id=0,
         pool_act="tanh",
-        type_sequence_label_size=2,
         num_labels=3,
         num_choices=4,
         scope=None,
         dropout=0.56,
-        return_dict=False,
     ):
         self.parent: PPMiniLMModelTest = parent
         self.batch_size = batch_size
@@ -73,7 +69,6 @@ class PPMiniLMModelTester:
         self.is_training = is_training
         self.use_input_mask = use_input_mask
         self.use_token_type_ids = use_token_type_ids
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -87,12 +82,10 @@ class PPMiniLMModelTester:
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
         self.pool_act = pool_act
-        self.type_sequence_label_size = type_sequence_label_size
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
         self.dropout = dropout
-        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -212,19 +205,8 @@ class PPMiniLMModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(
-    ("return_dict", "use_labels"),
-    [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
-    ],
-)
 class PPMiniLMModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = PPMiniLMModel
-    return_dict = False
-    use_labels = False
 
     all_model_classes = (
         PPMiniLMModel,
