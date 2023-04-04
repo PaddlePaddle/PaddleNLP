@@ -26,15 +26,17 @@ from ppdiffusers import (
     DDPMScheduler,
     LDMBertModel,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
-from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.models.attention import AttentionBlock
 from ppdiffusers.models.ema import LitEma
+from ppdiffusers.pipelines.latent_diffusion import LDMBertConfig
+from ppdiffusers.training_utils import freeze_params
 
 try:
     from ppdiffusers.models.attention import SpatialTransformer
 except ImportError:
-    from ppdiffusers.models.attention import Transformer2DModel as SpatialTransformer
+    from ppdiffusers.models.transformer_2d import Transformer2DModel as SpatialTransformer
 
 import json
 
@@ -91,7 +93,8 @@ class LatentDiffusionModel(nn.Layer):
                     f"The tokenizer's model_max_length {self.tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {self.tokenizer.model_max_length} as max_position_embeddings!"
                 )
                 text_encoder_config["max_position_embeddings"] = self.tokenizer.model_max_length
-            self.text_encoder = LDMBertModel(**text_encoder_config)
+            config = LDMBertConfig(**text_encoder_config)
+            self.text_encoder = LDMBertModel(config)
             self.text_encoder_is_pretrained = False
             # init unet2d
             self.unet = UNet2DConditionModel(**read_json(model_args.unet_config_file))
@@ -99,12 +102,13 @@ class LatentDiffusionModel(nn.Layer):
         else:
             # init text_encoder
             self.text_encoder = LDMBertModel.from_pretrained(
-                os.path.join(model_args.pretrained_model_name_or_path, "bert")
+                model_args.pretrained_model_name_or_path, subfolder="bert"
             )
+
             self.text_encoder_is_pretrained = True
             # init unet2d
             self.unet = UNet2DConditionModel.from_pretrained(
-                os.path.join(model_args.pretrained_model_name_or_path, "unet")
+                model_args.pretrained_model_name_or_path, subfolder="unet"
             )
             self.unet_is_pretrained = True
 
@@ -124,6 +128,15 @@ class LatentDiffusionModel(nn.Layer):
         self.use_ema = model_args.use_ema
         if self.use_ema:
             self.model_ema = LitEma(self.unet)
+
+        if model_args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+            try:
+                self.unet.enable_xformers_memory_efficient_attention()
+            except Exception as e:
+                logger.warn(
+                    "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                    f" correctly and a GPU is available: {e}"
+                )
 
     def init_weights(self):
         # init text_encoder

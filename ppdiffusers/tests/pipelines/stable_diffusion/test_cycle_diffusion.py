@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,11 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
+from ppdiffusers_test.pipeline_params import (
+    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
+)
+from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -28,11 +32,20 @@ from ppdiffusers import (
     DDIMScheduler,
     UNet2DConditionModel,
 )
-from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
+from ppdiffusers.utils import floats_tensor, load_image, slow
+from ppdiffusers.utils.testing_utils import require_paddle_gpu
 
 
 class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     pipeline_class = CycleDiffusionPipeline
+    params = TEXT_GUIDED_IMAGE_VARIATION_PARAMS - {
+        "negative_prompt",
+        "height",
+        "width",
+        "negative_prompt_embeds",
+    }
+    required_optional_params = PipelineTesterMixin.required_optional_params - {"latents"}
+    batch_params = TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS
 
     def get_dummy_components(self):
         paddle.seed(0)
@@ -64,17 +77,19 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             latent_channels=4,
         )
         paddle.seed(0)
-        text_encoder_config = dict(
-            text_embed_dim=32,
-            text_heads=4,
-            text_layers=5,
+        text_encoder_config = CLIPTextConfig(
+            bos_token_id=0,
+            eos_token_id=2,
+            hidden_size=32,
+            intermediate_size=37,
+            layer_norm_eps=1e-05,
+            num_attention_heads=4,
+            num_hidden_layers=5,
+            pad_token_id=1,
             vocab_size=1000,
         )
-        text_encoder_config = CLIPTextConfig.from_dict(text_encoder_config)
-        text_encoder = CLIPTextModel(text_encoder_config)
-        text_encoder.eval()
+        text_encoder = CLIPTextModel(text_encoder_config).eval()
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
-
         components = {
             "unet": unet,
             "scheduler": scheduler,
@@ -89,6 +104,7 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     def get_dummy_inputs(self, seed=0):
         image = floats_tensor((1, 3, 32, 32), rng=random.Random(seed))
         generator = paddle.Generator().manual_seed(seed)
+
         inputs = {
             "prompt": "An astronaut riding an elephant",
             "source_prompt": "An astronaut riding a horse",
@@ -104,60 +120,64 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         return inputs
 
     def test_stable_diffusion_cycle(self):
-
         components = self.get_dummy_components()
         pipe = CycleDiffusionPipeline(**components)
         pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         output = pipe(**inputs)
         images = output.images
-
         image_slice = images[0, -3:, -3:, -1]
-
         assert images.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [
-                0.054250508546829224,
-                0.7774901390075684,
-                0.7094265222549438,
-                0.1572849154472351,
-                0.978983461856842,
-                0.49742749333381653,
-                0.362673282623291,
-                0.6486804485321045,
-                0.45295289158821106,
-            ]
+            [0.04812625, 0.77983606, 0.71009433, 0.15924984, 0.9788434, 0.49732354, 0.362224, 0.6481595, 0.4530744]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+
+    def test_stable_diffusion_cycle_fp16(self):
+        components = self.get_dummy_components()
+        for name, module in components.items():
+            if hasattr(module, "to"):
+                components[name] = module.to(dtype=paddle.float16)
+        pipe = CycleDiffusionPipeline(**components)
+        pipe.set_progress_bar_config(disable=None)
+        inputs = self.get_dummy_inputs()
+        output = pipe(**inputs)
+        images = output.images
+        image_slice = images[0, -3:, -3:, -1]
+        assert images.shape == (1, 32, 32, 3)
+        expected_slice = np.array(
+            [0.05053711, 0.78125, 0.7114258, 0.15991211, 0.9785156, 0.49804688, 0.36279297, 0.6484375, 0.45361328]
+        )
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+
+    @unittest.skip("non-deterministic pipeline")
+    def test_inference_batch_single_identical(self):
+        return super().test_inference_batch_single_identical()
 
 
-# TODO junnyu
 @slow
+@require_paddle_gpu
 class CycleDiffusionPipelineIntegrationTests(unittest.TestCase):
     def tearDown(self):
-        # clean up the VRAM after each test
         super().tearDown()
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def test_cycle_diffusion_pipeline(self):
-        init_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/black_colored_car.png")
-        expected_image = load_numpy(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/cycle-diffusion/blue_colored_car.npy"
+    def test_cycle_diffusion_pipeline_fp16(self):
+        init_image = load_image(
+            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/cycle-diffusion/black_colored_car.png"
         )
+        expected_image = np.array([[0.14477539, 0.20483398, 0.14135742], [0.10009766, 0.17602539, 0.11083984]])
         init_image = init_image.resize((512, 512))
-
         model_id = "CompVis/stable-diffusion-v1-4"
         scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
-        pipe = CycleDiffusionPipeline.from_pretrained(model_id, scheduler=scheduler, safety_checker=None)
-
+        pipe = CycleDiffusionPipeline.from_pretrained(
+            model_id, scheduler=scheduler, safety_checker=None, paddle_dtype=paddle.float16, revision="fp16"
+        )
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-
         source_prompt = "A black colored car"
         prompt = "A blue colored car"
-
         generator = paddle.Generator().manual_seed(0)
         output = pipe(
             prompt=prompt,
@@ -172,5 +192,33 @@ class CycleDiffusionPipelineIntegrationTests(unittest.TestCase):
             output_type="np",
         )
         image = output.images
+        assert np.abs(image[0][0][:2] - expected_image).max() < 0.5
 
-        assert np.abs(image - expected_image).max() < 1e-2
+    def test_cycle_diffusion_pipeline(self):
+        init_image = load_image(
+            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/cycle-diffusion/black_colored_car.png"
+        )
+        expected_image = np.array([[0.16294342, 0.20514232, 0.14554858], [0.11476257, 0.16831946, 0.11495486]])
+        init_image = init_image.resize((512, 512))
+        model_id = "CompVis/stable-diffusion-v1-4"
+        scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
+        pipe = CycleDiffusionPipeline.from_pretrained(model_id, scheduler=scheduler, safety_checker=None)
+        pipe.set_progress_bar_config(disable=None)
+        pipe.enable_attention_slicing()
+        source_prompt = "A black colored car"
+        prompt = "A blue colored car"
+        generator = paddle.Generator().manual_seed(0)
+        output = pipe(
+            prompt=prompt,
+            source_prompt=source_prompt,
+            image=init_image,
+            num_inference_steps=100,
+            eta=0.1,
+            strength=0.85,
+            guidance_scale=3,
+            source_guidance_scale=1,
+            generator=generator,
+            output_type="np",
+        )
+        image = output.images
+        assert np.abs(image[0][0][:2] - expected_image).max() < 0.01

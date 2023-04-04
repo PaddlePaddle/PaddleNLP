@@ -14,16 +14,12 @@
 # limitations under the License.
 """ Modeling classes for LayoutLM model."""
 
-import copy
-import math
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
-import paddle.nn.functional as F
 from paddle.nn import Layer
-from paddle.nn import CrossEntropyLoss
 
 from paddlenlp.utils.log import logger
+
 from .. import PretrainedModel, register_base_model
 
 __all__ = [

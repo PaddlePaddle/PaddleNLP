@@ -1,4 +1,5 @@
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,13 +22,14 @@ import paddle
 from PIL import Image
 
 from ...models import AutoencoderKL, UNet2DConditionModel
-from ...pipeline_utils import (
+from ...schedulers import DDIMScheduler, DDPMScheduler
+from ...utils import randn_tensor
+from ..pipeline_utils import (
     AudioPipelineOutput,
     BaseOutput,
     DiffusionPipeline,
     ImagePipelineOutput,
 )
-from ...schedulers import DDIMScheduler, DDPMScheduler
 from .mel import Mel
 
 
@@ -93,9 +95,11 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         step_generator: paddle.Generator = None,
         eta: float = 0,
         noise: paddle.Tensor = None,
+        encoding: paddle.Tensor = None,
         return_dict=True,
     ) -> Union[
-        Union[AudioPipelineOutput, ImagePipelineOutput], Tuple[List[Image.Image], Tuple[int, List[np.ndarray]]]
+        Union[AudioPipelineOutput, ImagePipelineOutput],
+        Tuple[List[Image.Image], Tuple[int, List[np.ndarray]]],
     ]:
         """Generate random mel spectrogram from audio input and convert to audio.
 
@@ -112,6 +116,7 @@ class AudioDiffusionPipeline(DiffusionPipeline):
             step_generator (`paddle.Generator`): random number generator used to de-noise or None
             eta (`float`): parameter between 0 and 1 used with DDIM scheduler
             noise (`paddle.Tensor`): noise tensor of shape (batch_size, 1, height, width) or None
+            encoding (`paddle.Tensor`): for UNet2DConditionModel shape (batch_size, seq_length, cross_attention_dim)
             return_dict (`bool`): if True return AudioPipelineOutput, ImagePipelineOutput else Tuple
 
         Returns:
@@ -127,8 +132,13 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         input_dims = self.get_input_dims()
         self.mel.set_resolution(x_res=input_dims[1], y_res=input_dims[0])
         if noise is None:
-            noise = paddle.randn(
-                (batch_size, self.unet.in_channels, self.unet.sample_size[0], self.unet.sample_size[1]),
+            noise = randn_tensor(
+                (
+                    batch_size,
+                    self.unet.in_channels,
+                    self.unet.sample_size[0],
+                    self.unet.sample_size[1],
+                ),
                 generator=generator,
             )
         images = noise
@@ -147,7 +157,7 @@ class AudioDiffusionPipeline(DiffusionPipeline):
                 input_images = self.vqvae.encode(paddle.unsqueeze(input_images, 0)).latent_dist.sample(
                     generator=generator
                 )[0]
-                input_images = 0.18215 * input_images
+                input_images = self.vqvae.config.scaling_factor * input_images
 
             if start_step > 0:
                 images[0, 0] = self.scheduler.add_noise(input_images, noise, self.scheduler.timesteps[start_step - 1])
@@ -162,15 +172,25 @@ class AudioDiffusionPipeline(DiffusionPipeline):
             )
 
         for step, t in enumerate(self.progress_bar(self.scheduler.timesteps[start_step:])):
-            model_output = self.unet(images, t)["sample"]
+            if isinstance(self.unet, UNet2DConditionModel):
+                model_output = self.unet(images, t, encoding)["sample"]
+            else:
+                model_output = self.unet(images, t)["sample"]
 
             if isinstance(self.scheduler, DDIMScheduler):
                 images = self.scheduler.step(
-                    model_output=model_output, timestep=t, sample=images, eta=eta, generator=step_generator
+                    model_output=model_output,
+                    timestep=t,
+                    sample=images,
+                    eta=eta,
+                    generator=step_generator,
                 )["prev_sample"]
             else:
                 images = self.scheduler.step(
-                    model_output=model_output, timestep=t, sample=images, generator=step_generator
+                    model_output=model_output,
+                    timestep=t,
+                    sample=images,
+                    generator=step_generator,
                 )["prev_sample"]
 
             if mask is not None:
@@ -181,7 +201,7 @@ class AudioDiffusionPipeline(DiffusionPipeline):
 
         if self.vqvae is not None:
             # 0.18215 was scaling factor used in training to ensure unit variance
-            images = 1 / 0.18215 * images
+            images = 1 / self.vqvae.config.scaling_factor * images
             images = self.vqvae.decode(images)["sample"]
 
         images = (images / 2 + 0.5).clip(0, 1)

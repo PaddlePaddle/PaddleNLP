@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,16 +21,17 @@ import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..initializer import zeros_
-from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 from .cross_attention import AttnProcessor
 from .embeddings import TimestepEmbedding, Timesteps
+from .modeling_utils import ModelMixin
 from .unet_2d_blocks import (
     CrossAttnDownBlock2D,
     DownBlock2D,
     UNetMidBlock2DCrossAttn,
     get_down_block,
 )
+from .unet_2d_condition import UNet2DConditionModel
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -274,6 +276,60 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             resnet_pre_temb_non_linearity=self.resnet_pre_temb_non_linearity,
         )
 
+    @classmethod
+    def from_unet(
+        cls,
+        unet: UNet2DConditionModel,
+        controlnet_conditioning_channel_order: str = "rgb",
+        conditioning_embedding_out_channels: Optional[Tuple[int]] = (16, 32, 96, 256),
+        load_weights_from_unet: bool = True,
+    ):
+        r"""
+        Instantiate Controlnet class from UNet2DConditionModel.
+        Parameters:
+            unet (`UNet2DConditionModel`):
+                UNet model which weights are copied to the ControlNet. Note that all configuration options are also
+                copied where applicable.
+        """
+        controlnet = cls(
+            in_channels=unet.config.in_channels,
+            flip_sin_to_cos=unet.config.flip_sin_to_cos,
+            freq_shift=unet.config.freq_shift,
+            down_block_types=unet.config.down_block_types,
+            only_cross_attention=unet.config.only_cross_attention,
+            block_out_channels=unet.config.block_out_channels,
+            layers_per_block=unet.config.layers_per_block,
+            downsample_padding=unet.config.downsample_padding,
+            mid_block_scale_factor=unet.config.mid_block_scale_factor,
+            act_fn=unet.config.act_fn,
+            norm_num_groups=unet.config.norm_num_groups,
+            norm_eps=unet.config.norm_eps,
+            cross_attention_dim=unet.config.cross_attention_dim,
+            attention_head_dim=unet.config.attention_head_dim,
+            use_linear_projection=unet.config.use_linear_projection,
+            class_embed_type=unet.config.class_embed_type,
+            num_class_embeds=unet.config.num_class_embeds,
+            upcast_attention=unet.config.upcast_attention,
+            resnet_time_scale_shift=unet.config.resnet_time_scale_shift,
+            projection_class_embeddings_input_dim=unet.config.projection_class_embeddings_input_dim,
+            controlnet_conditioning_channel_order=controlnet_conditioning_channel_order,
+            conditioning_embedding_out_channels=conditioning_embedding_out_channels,
+            resnet_pre_temb_non_linearity=unet.config.resnet_pre_temb_non_linearity,
+        )
+
+        if load_weights_from_unet:
+            controlnet.conv_in.load_dict(unet.conv_in.state_dict())
+            controlnet.time_proj.load_dict(unet.time_proj.state_dict())
+            controlnet.time_embedding.load_dict(unet.time_embedding.state_dict())
+
+            if controlnet.class_embedding:
+                controlnet.class_embedding.load_dict(unet.class_embedding.state_dict())
+
+            controlnet.down_blocks.load_dict(unet.down_blocks.state_dict())
+            controlnet.mid_block.load_dict(unet.mid_block.state_dict())
+
+        return controlnet
+
     @property
     def attn_processors(self) -> Dict[str, AttnProcessor]:
         r"""
@@ -400,12 +456,16 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         timestep: Union[paddle.Tensor, float, int],
         encoder_hidden_states: paddle.Tensor,
         controlnet_cond: paddle.Tensor,
+        conditioning_scale: Union[List[float], float] = 1.0,
         class_labels: Optional[paddle.Tensor] = None,
         timestep_cond: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         return_dict: bool = True,
     ) -> Union[ControlNetOutput, Tuple]:
+        # TODO junnyu, add this to support pure fp16
+        sample = sample.cast(self.dtype)
+
         # check channel order
         channel_order = self.config.controlnet_conditioning_channel_order
 
@@ -449,9 +509,14 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             if class_labels is None:
                 raise ValueError("class_labels should be provided when num_class_embeds > 0")
 
+            # maybe cast it to float16
+            class_labels = class_labels.cast(self.dtype)
             if self.config.class_embed_type == "timestep":
                 class_labels = self.time_proj(class_labels)
 
+            # maybe cast it to int64
+            if isinstance(self.class_embedding, nn.Embedding):
+                class_labels = class_labels.cast(paddle.int64)
             class_emb = self.class_embedding(class_labels).cast(self.dtype)
             emb = emb + class_emb
 
@@ -503,6 +568,16 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         down_block_res_samples = controlnet_down_block_res_samples
 
         mid_block_res_sample = self.controlnet_mid_block(sample)
+
+        # add conditioning_scale https://github.com/huggingface/diffusers/pull/2627
+        if isinstance(conditioning_scale, float):
+            down_block_res_samples = [sample * conditioning_scale for sample in down_block_res_samples]
+            mid_block_res_sample *= conditioning_scale
+        else:
+            down_block_res_samples = [
+                sample * ccs for sample, ccs in zip(down_block_res_samples, conditioning_scale[:-1])
+            ]
+            mid_block_res_sample *= conditioning_scale[-1]
 
         if not return_dict:
             return (down_block_res_samples, mid_block_res_sample)
