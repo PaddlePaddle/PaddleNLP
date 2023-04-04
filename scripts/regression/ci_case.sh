@@ -1281,5 +1281,6 @@ ernie_health(){
 
 gpt-3() {
     bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
+    print_info $? `ls -l ${log_path} | tail -n 1 | awk '{print $9}'`
 }
 $1

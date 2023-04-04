@@ -942,6 +942,7 @@ function gpt_auto_export() {
 
 function before_hook() {
     # requirements
+    sed -i -e "s/paddlenlp/#paddlenlp/g" requirements.txt
     python -m pip install -r requirements.txt --force-reinstall
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 
