@@ -16,6 +16,7 @@
 import unittest
 
 from paddlenlp.transformers.llama.tokenizer import LlamaTokenizer
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 
 from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
@@ -27,10 +28,10 @@ VOCAB_FILES_NAMES = {
 class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = LlamaTokenizer
-    from_pretrained_kwargs = {"add_prefix_space": True}
-    test_seq2seq = False
+    # from_pretrained_kwargs = {"add_prefix_space": True}
+    # test_seq2seq = False
 
-    def get_tokenizer(self, **kwargs):
+    def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         tokenizer = LlamaTokenizer.from_pretrained("facebookresearch/tiny-random-llama", **kwargs)
         tokenizer.pad_token = tokenizer.unk_token
         return tokenizer
