@@ -27,3 +27,4 @@ Profiler:
 
 Model:
   use_flash_attn: False
+  use_memory_attn: False
