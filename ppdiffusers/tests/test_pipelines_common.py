@@ -31,6 +31,13 @@ from ppdiffusers.utils.testing_utils import require_paddle
 ALLOWED_REQUIRED_ARGS = ["source_prompt", "prompt", "image", "mask_image", "example_image"]
 
 
+def to_np(tensor):
+    if isinstance(tensor, paddle.Tensor):
+        tensor = tensor.detach().cpu().numpy()
+
+    return tensor
+
+
 @require_paddle
 class PipelineTesterMixin:
     """
@@ -87,7 +94,8 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
 
-        max_diff = np.abs(output - output_loaded).max()
+        max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
+
         self.assertLess(max_diff, 1e-4)
 
     def test_pipeline_call_implements_required_args(self):
@@ -225,7 +233,7 @@ class PipelineTesterMixin:
         output = pipe(**self.get_dummy_inputs())[0]
         output_tuple = pipe(**self.get_dummy_inputs(), return_dict=False)[0]
 
-        max_diff = np.abs(output - output_tuple).max()
+        max_diff = np.abs(to_np(output) - to_np(output_tuple)).max()
         self.assertLess(max_diff, 1e-4)
 
     def test_num_inference_steps_consistent(self):
@@ -287,7 +295,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
 
-        max_diff = np.abs(output - output_loaded).max()
+        max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
         self.assertLess(max_diff, 1e-4)
 
     def test_attention_slicing_forward_pass(self):
@@ -306,7 +314,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_with_slicing = pipe(**inputs)[0]
 
-        max_diff = np.abs(output_with_slicing - output_without_slicing).max()
+        max_diff = np.abs(to_np(output_with_slicing) - to_np(output_without_slicing)).max()
         self.assertLess(max_diff, 1e-3, "Attention slicing should not affect the inference results")
 
     def test_progress_bar(self):

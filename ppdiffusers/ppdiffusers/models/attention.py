@@ -336,6 +336,10 @@ class BasicTransformerBlock(nn.Layer):
         attention_head_dim (`int`): The number of channels in each head.
         dropout (`float`, *optional*, defaults to 0.0): The dropout probability to use.
         cross_attention_dim (`int`, *optional*): The size of the encoder_hidden_states vector for cross attention.
+        only_cross_attention (`bool`, *optional*):
+            Whether to use only cross-attention layers. In this case two cross attention layers are used.
+        double_self_attention (`bool`, *optional*):
+            Whether to use two self-attention layers. In this case no cross attention layers are used.
         activation_fn (`str`, *optional*, defaults to `"geglu"`): Activation function to be used in feed-forward.
         num_embeds_ada_norm (:
             obj: `int`, *optional*): The number of diffusion steps used during training. See `Transformer2DModel`.
@@ -354,6 +358,7 @@ class BasicTransformerBlock(nn.Layer):
         num_embeds_ada_norm: Optional[int] = None,
         attention_bias: bool = False,
         only_cross_attention: bool = False,
+        double_self_attention: bool = False,
         upcast_attention: bool = False,
     ):
         super().__init__()
@@ -374,10 +379,10 @@ class BasicTransformerBlock(nn.Layer):
         self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn)
 
         # 2. Cross-Attn
-        if cross_attention_dim is not None:
+        if cross_attention_dim is not None or double_self_attention:
             self.attn2 = CrossAttention(
                 query_dim=dim,
-                cross_attention_dim=cross_attention_dim,
+                cross_attention_dim=cross_attention_dim if not double_self_attention else None,
                 heads=num_attention_heads,
                 dim_head=attention_head_dim,
                 dropout=dropout,
@@ -389,7 +394,7 @@ class BasicTransformerBlock(nn.Layer):
 
         self.norm1 = AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim)
 
-        if cross_attention_dim is not None:
+        if cross_attention_dim is not None or double_self_attention:
             self.norm2 = AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim)
         else:
             self.norm2 = None

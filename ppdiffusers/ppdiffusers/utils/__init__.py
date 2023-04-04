@@ -90,6 +90,9 @@ _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
 ]
 
 
+from .testing_utils import export_to_video
+
+
 def check_min_version(min_version):
     if version.parse(__version__) < version.parse(min_version):
         if "dev" in min_version:
