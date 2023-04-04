@@ -15,7 +15,8 @@
 import os
 
 import paddle
-from tokenizer import LlamaTokenizer
+
+from paddlenlp.transformers import AutoTokenizer
 
 
 def parse_arguments():
@@ -46,7 +47,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = LlamaTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             args.model_dir,
             add_bos_token=False,
         )

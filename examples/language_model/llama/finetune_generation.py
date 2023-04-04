@@ -18,14 +18,13 @@ from functools import partial
 
 import paddle
 from data import DataCollatorForSupervisedDataset, convert_example
-from modeling import LlamaForCausalLM
-from tokenizer import LlamaTokenizer
 from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
 from paddlenlp.layers.lora import print_trainable_parameters
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -92,7 +91,7 @@ def main():
             )
 
     # Load the pretrained language model.
-    model = LlamaForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -113,7 +112,7 @@ def main():
         mark_only_lora_as_trainable(model)
         print_trainable_parameters(model)
 
-    tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer.pad_token = tokenizer.unk_token
     tokenizer.padding_side = "left"
 
@@ -166,7 +165,7 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate(dev_ds)
+        eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
 
 

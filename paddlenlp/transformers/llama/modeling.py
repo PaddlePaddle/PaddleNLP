@@ -21,7 +21,6 @@ from typing import Optional, Tuple
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from configuration import LlamaConfig
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
@@ -31,6 +30,8 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
+from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "facebookresearch/tiny-random-llama",

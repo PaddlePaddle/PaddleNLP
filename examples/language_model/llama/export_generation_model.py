@@ -16,8 +16,8 @@ import argparse
 import os
 
 import paddle
-from modeling import LlamaForCausalLM
-from tokenizer import LlamaTokenizer
+
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def parse_args():
@@ -44,9 +44,9 @@ def main():
 
     paddle.seed(100)
 
-    tokenizer = LlamaTokenizer.from_pretrained(args.model_path, add_bos_token=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, add_bos_token=True)
 
-    model = LlamaForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,

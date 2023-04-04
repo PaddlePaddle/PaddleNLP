@@ -54,6 +54,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieTokenizer", "ernie"),
         ("FNetTokenizer", "fnet"),
         ("FunnelTokenizer", "funnel"),
+        ("LlamaTokenizer", "llama"),
         ("LayoutXLMTokenizer", "layoutxlm"),
         ("LayoutLMv2Tokenizer", "layoutlmv2"),
         ("LayoutLMTokenizer", "layoutlm"),
