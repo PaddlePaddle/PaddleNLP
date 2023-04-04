@@ -691,7 +691,8 @@ print_info $? ernie-ctm_eval
 # 20 distilbert
 distilbert (){
 cd ${nlp_dir}/examples/model_compression/distill_lstm/
-mv ${nlp_dir}/examples/benchmark/glue/SST-2/* ./
+wget -q https://paddle-qa.bj.bcebos.com/SST-2_GLUE.tar
+tar -xzvf SST-2_GLUE.tar 
 time (
     python small.py \
     --task_name sst-2 \
@@ -715,7 +716,7 @@ time (
     --batch_size 128 \
     --model_name bert-base-uncased \
     --output_dir distilled_models/SST-2 \
-    --teacher_dir ./sst-2_ft_model_1.pdparams/ \
+    --teacher_dir ./SST-2/sst-2_ft_model_1.pdparams/ \
     --save_steps 1000 \
     --n_iter 1 \
     --embedding_name w2v.google_news.target.word-word.dim300.en >${log_path}/distilbert_teacher_train) >>${log_path}/distilbert_teacher_train 2>&1
@@ -912,7 +913,8 @@ print_info $? pointer_summarizer_train
 #28 question_matching
 question_matching() {
 cd ${nlp_dir}/examples/text_matching/question_matching/
-cp -r /ssd1/paddlenlp/download/question_matching/* ./
+wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/data_v4.tar.gz
+tar -xvzf data_v4.tar.gz
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 #train
 time (
@@ -1275,5 +1277,9 @@ ernie_doc(){
 
 ernie_health(){
     ernie-health
+}
+
+gpt-3() {
+    bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
 }
 $1

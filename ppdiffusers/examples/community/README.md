@@ -75,6 +75,93 @@ for i, img in enumerate(images):
 [clip_guided_sd_2]: https://user-images.githubusercontent.com/40912707/220514765-89e48c13-156f-4e61-b433-06f1283d2265.png
 [clip_guided_sd_3]: https://user-images.githubusercontent.com/40912707/220514751-82d63fd4-e35e-482b-a8e1-c5c956119b2e.png
 
+### Wildcard Stable Diffusion
+
+例如我们有下面的prompt:
+
+```
+prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
+```
+然后，我们可以定义动物、物体和衣服的可能采样值。这些文件可以来自与类别同名的.txt文件。
+这些可能值也可以定义为字典，例如：`{"animal":["dog", "cat", mouse"]}`
+
+下面是一个完整的示例：
+创建一个`animal.txt`，包含的内容为：
+
+```
+dog
+cat
+mouse
+```
+创建一个`object.txt`，包含的内容为：
+```
+chair
+sofa
+bench
+```
+代码示例为：
+```
+
+from wildcard_stable_diffusion import WildcardStableDiffusionPipeline
+
+pipe = WildcardStableDiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4"
+)
+prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
+image = pipe(
+    prompt,
+    wildcard_option_dict={
+        "clothing":["hat", "shirt", "scarf", "beret"]
+    },
+    wildcard_files=["object.txt", "animal.txt"],
+    num_prompt_samples=1
+).images[0]
+image.save("wildcard_img.png")
+```
+
+### Composable Stable diffusion
+
+以下代码需要9GB的显存。
+```
+import os
+
+import paddle
+from composable_stable_diffusion import ComposableStableDiffusionPipeline
+
+prompt = "mystical trees | A magical pond | dark"
+scale = 7.5
+steps = 50
+weights = "7.5 | 7.5 | -7.5"
+pipe = ComposableStableDiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+)
+pipe.safety_checker = None
+
+images = []
+generator = paddle.Generator().manual_seed(2)
+for i in range(4):
+    image = pipe(prompt, guidance_scale=scale, num_inference_steps=steps,
+                 weights=weights, generator=generator).images[0]
+    images.append(image)
+
+# save images locally
+if not os.path.exists("composable_sd"):
+    os.mkdir("composable_sd")
+for i, img in enumerate(images):
+    img.save(f"./composable_sd/image_{i}.png")
+```
+
+### One Step Unet
+
+one-step-unet可以按照下面的方式运行：
+
+```
+from one_step_unet import UnetSchedulerOneForwardPipeline
+
+pipe = UnetSchedulerOneForwardPipeline.from_pretrained("google/ddpm-cifar10-32")
+pipe()
+```
+这个pipeline不是作为feature使用的，它只是一个如何添加社区pipeline的示例
 
 ### Stable Diffusion Interpolation
 

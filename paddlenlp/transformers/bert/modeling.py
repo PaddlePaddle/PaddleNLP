@@ -428,7 +428,6 @@ class BertModel(BertPretrainedModel):
                 batch_size = past_key_values[0][0].shape[0]
                 past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
-
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]

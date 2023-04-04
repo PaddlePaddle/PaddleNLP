@@ -5,7 +5,7 @@
 <p align="center">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/pyversions/paddlenlp"></a>
     <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg"></a>
-    <a href="../../LICENSE"><img src="https://img.shields.io/github/license/paddlepaddle/paddlenlp"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/blob/develop/LICENSE"><img src="https://img.shields.io/github/license/paddlepaddle/paddlenlp"></a>
 </p>
 
 <h4 align="center">
@@ -17,26 +17,24 @@
 
 # PPDiffusers: Diffusers toolbox implemented based on PaddlePaddle
 
-**PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库，具体来说，PPDiffusers具有以下特性：
+**PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库。
 
 ## News 📢
-* 🔥 **2023.03.08 发布 0.11.1 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理**
 
-* 🔥 **2023.01.18 发布 0.11.0 版本，新增Heun和Single step DPM-Solver噪声调度器，支持Karlo UnCLIP、Paint-by-example、Depth-Guided Stable Diffusion等图像生成扩散模型， 支持Audio Diffusion音频生成扩散模型；**
+* 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
+模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）或 [SD等原库的Lightning权重进行推理](#加载原库的Lightning权重)，[支持加载Civitai社区的LoRA权重](#加载Civitai社区的LoRA权重)；
+[支持xformers](#XFormers加速) 训练与推理；
+新增用于超高分辨率生成的VAE tiling；
+新增Instruct Pix2Pix、Semantic guidance、Depth2image等模型。**
 
-* 🔥 **2022.12.06 发布 0.9.0 版本，支持 [StableDiffusion2.0](https://github.com/Stability-AI/stablediffusion) 的文生图、图生图、图像编辑及图像超分等功能；**
 
-* 🔥 **2022.11.11 发布 0.6.2 版本，支持使用FastDeploy对 [StableDiffusion进行高性能部署](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/README.md)、支持 [Diffusers或原版模型->PPDiffusers权重转换](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/scripts/convert_diffusers_model/README.md)；**
-
-* 🔥 **2022.11.04 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重；**
-
-* 🔥 **2022.10.27 发布 PPDiffusers仓库**。
+* 🔥 **2023.01.18 发布 0.11.0 版本，新增Heun和Single step DPM-Solver噪声调度器，支持Karlo UnCLIP、Paint-by-example、Depth-Guided Stable Diffusion等图像生成扩散模型， 支持Audio Diffusion音频生成扩散模型。**
 
 
 ## 特性
 #### 📦 SOTA扩散模型Pipelines集合
 我们提供**SOTA（State-of-the-Art）** 的扩散模型Pipelines集合。
-目前**PPDiffusers**已经集成了**33+Pipelines**，支持文图生成（Text-to-Image Generation）、文本引导的图像编辑（Text-Guided Image Inpainting）、文本指导的图像变换（Image-to-Image Text-Guided Generation）、超分（Super Superresolution）在内的10+任务，覆盖文本图像跨模态、图像、音频等多种模态。
+目前**PPDiffusers**已经集成了**50+Pipelines**，支持文图生成（Text-to-Image Generation）、文本引导的图像编辑（Text-Guided Image Inpainting）、文本引导的图像变换（Image-to-Image Text-Guided Generation）、超分（Super Superresolution）在内的10+任务，覆盖文本图像跨模态、图像、音频等多种模态。
 如果想要了解当前支持的所有**Pipelines**以及对应的来源信息，可以阅读[🔥 PPDiffusers Pipelines](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/README.md)文档。
 
 
@@ -63,19 +61,16 @@ fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-dif
 ## 安装
 
 ### 环境依赖
-- paddlepaddle-gpu>=2.4.0
-- paddlenlp>=2.5.0
-- ftfy
-- regex
-- Pillow
+```
+pip install -r requirements.txt
+```
+关于PaddlePaddle安装的详细教程请查看[Installation](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html)。
 
 ### pip安装
 
 ```shell
-pip install --upgrade ppdiffusers
+pip install --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
-
-更多关于PaddlePaddle安装的详细教程请查看[Installation](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html)。
 
 ### 手动安装
 ```shell
@@ -87,21 +82,11 @@ python setup.py install
 ```
 
 ## 快速开始
+我们将以扩散模型的典型代表**Stable Diffusion**为例，带你快速了解PPDiffusers。
 
-为了快速上手使用该项目, 我们可以先阅读🤗 Huggingface团队提供的两个Notebook教程 [Getting started with Diffusers](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/diffusers_intro.ipynb) 和 [Training a diffusers model](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/training_example.ipynb)。（Tips：国内用户可能无法正常打开）
+**Stable Diffusion**基于**潜在扩散模型（Latent Diffusion Models）**，专门用于**文图生成（Text-to-Image Generation）任务**。该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/)以及[RunwayML](https://runwayml.com/)的工程师共同开发完成，目前发布了v1和v2两个版本。v1版本采用了LAION-5B数据集子集（分辨率为 512x512）进行训练，并具有以下架构设置：自动编码器下采样因子为8，UNet大小为860M，文本编码器为CLIP ViT-L/14。v2版本相较于v1版本在生成图像的质量和分辨率等进行了改善。
 
-**Stable Diffusion 1.x** 是一个**文本到图像（text-to-image）**的**潜在扩散模型(Latent Diffusion Model, LDM)**, 该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为 **512x512** 分辨率的 [LAION-5B](https://laion.ai/blog/laion-5b/) 数据集子集进行训练。该模型使用了 **Openai** 开源的 **CLIP ViT-L/14** 文本编码器（约**123M**参数）来编码提示（prompt）文本（注意该部分权重不进行训练）。该模型还使用了**UNet2DCondition**模型（约**860M**参数）来建模扩散过程。
-
-**Stable Diffusion 2.0** 由 [LAION](https://laion.ai/) 在 [Stability AI](https://stability.ai/) 的支持下开发完成的，它与早期的 **V1** 版本相比，大大改善了生成图像的质量。该版本中的文生图模型不仅可以生成默认分辨率为 **512x512** 像素还可以生成 **768x768** 分辨率的图像。该模型作为 **Stable Diffusion 1.x** 的升级版, 使用了全新的 [OpenCLIP-ViT/H](https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K) 中的文本编码器（注意：该文本编码器一共**24层**，实际只使用**23层**）。LAION 团队首先使用 **V1 版的策略**在 **512x512** 像素的图片上进行训练得到了一个基础版模型 [stabilityai/stable-diffusion-2-base](https://huggingface.co/stabilityai/stable-diffusion-2-base)，然后他们还使用了 [v-objective](https://arxiv.org/abs/2202.00512) 策略，在基础模型之上进一步使用 **768x768** 分辨率的图片进行训练，得到了一个最终版的模型 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2)。
-
-___Tips___:
-___为了方便国内用户下载使用及快速体验Stable Diffusion模型，我们在百度云(BOS)上提供了paddle版本的镜像权重。注意：为了使用该模型与权重，你必须接受该模型所要求的**License**，请访问huggingface的[runwayml/stable-diffusion-v1-5](https://huggingface.co/runwayml/stable-diffusion-v1-5) 和 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2), 仔细阅读里面的**License**，然后签署该协议。___
-___Stable Diffusion是基于以下的License:
-The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
-
-下面将以最近较为火热的 **🔥Stable Diffusion** 模型为例，来说明如何快速使用 **PPDiffusers**，在开始之前我们可以点开下面的折叠按钮，查看当前 Stable Diffusion 模型所支持的权重！
-
-### PPDiffusers模型支持的权重
+### Stable Diffusion重点模型权重
 
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（英文） </summary>
 
@@ -152,19 +137,49 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 </details>
 
 
+### 加载HF Diffusers权重
+```python
+from ppdiffusers import StableDiffusionPipeline
+# 设置from_hf_hub为True，表示从huggingface hub下载，from_diffusers为True表示加载的是diffusers版Pytorch权重
+pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2", from_hf_hub=True, from_diffusers=True)
+```
+
+### 加载原库的Lightning权重
+```python
+from ppdiffusers import StableDiffusionPipeline
+# 可输入网址 或 本地ckpt、safetensors文件
+pipe = StableDiffusionPipeline.from_pretrained_original_ckpt("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/chilloutmix_NiPrunedFp32Fix.safetensors")
+```
+
+### 加载Civitai社区的LoRA权重
+```python
+from ppdiffusers import StableDiffusionPipeline
+pipe = StableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix")
+# 加载lora权重
+pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
+```
+
+### XFormers加速
+为了使用**XFormers加速**，我们需要安装`develop`版本的`paddle`，Linux系统的安装命令如下：
+```sh
+python -m pip install paddlepaddle-gpu==0.0.0.post117 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
+```
+
+```python
+import paddle
+from ppdiffusers import StableDiffusionPipeline
+pipe = StableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
+# 开启xformers加速 默认选择"cutlass"加速
+pipe.enable_xformers_memory_efficient_attention()
+# flash 需要使用 A100、A10、3060、3070、3080、3090 等以上显卡。
+# pipe.enable_xformers_memory_efficient_attention("flash")
+```
 ### 文图生成 （Text-to-Image Generation）
 
 ```python
 import paddle
 from ppdiffusers import StableDiffusionPipeline
 
-# 可选模型权重
-# CompVis/stable-diffusion-v1-4
-# runwayml/stable-diffusion-v1-5
-# stabilityai/stable-diffusion-2-base （原始策略 512x512）
-# stabilityai/stable-diffusion-2 （v-objective 768x768）
-# Linaqruf/anything-v3.0
-# ......
 pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2")
 
 # 设置随机种子，我们可以复现下面的结果！
@@ -187,13 +202,6 @@ import paddle
 from ppdiffusers import StableDiffusionImg2ImgPipeline
 from ppdiffusers.utils import load_image
 
-# 可选模型权重
-# CompVis/stable-diffusion-v1-4
-# runwayml/stable-diffusion-v1-5
-# stabilityai/stable-diffusion-2-base （原始策略 512x512）
-# stabilityai/stable-diffusion-2 （v-objective 768x768）
-# Linaqruf/anything-v3.0
-# ......
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained("Linaqruf/anything-v3.0", safety_checker=None)
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/image_Kurisu.png"
@@ -282,7 +290,7 @@ image.save("a_yellow_cat.png")
 </div>
 </details>
 
-### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super Superresolution）
+### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super-Resolution）
 
 <details><summary>&emsp;Text-Guided Image Upscaling Demo</summary>
 
@@ -308,7 +316,7 @@ image.save("upscaled_white_cat.png")
 </div>
 </details>
 
-<details><summary>&emsp;Super Superresolution Demo</summary>
+<details><summary>&emsp;Super-Resolution Demo</summary>
 
 ```python
 import paddle
@@ -333,12 +341,12 @@ image.save("ldm-super-resolution-image.png")
 
 </details>
 
-## 模型部署
-StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，包括文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，或者使用[一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py)导出模型，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
+## 模型推理部署
+除了**Paddle动态图**运行之外，很多模型还支持将模型导出并使用推理引擎运行。我们提供基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，涵盖文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
-**注意：当前导出的vae encoder带有随机因素！[随机因素代码地址](https://github.com/PaddlePaddle/PaddleNLP/blob/649b18a1834163007358e3a9dffd6462c0f9c7cf/ppdiffusers/ppdiffusers/models/vae.py#L365-L370)**
+**注意：当前导出的vae encoder带有随机因素！**
 
 - CompVis/stable-diffusion-v1-4@fastdeploy
 - runwayml/stable-diffusion-v1-5@fastdeploy
@@ -351,12 +359,15 @@ StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型�
 
 </details>
 
+<details><summary>&emsp; FastDeploy Demo </summary>
+
 ```python
+import paddle
 import fastdeploy as fd
 from ppdiffusers import FastDeployStableDiffusionMegaPipeline
 from ppdiffusers.utils import load_image
 
-def create_runtime_option(device_id=-1, backend="paddle"):
+def create_runtime_option(device_id=0, backend="paddle", use_cuda_stream=True):
     option = fd.RuntimeOption()
     if backend == "paddle":
         option.use_paddle_backend()
@@ -366,13 +377,16 @@ def create_runtime_option(device_id=-1, backend="paddle"):
         option.use_cpu()
     else:
         option.use_gpu(device_id)
+        if use_cuda_stream:
+            paddle_stream = paddle.device.cuda.current_stream(device_id).cuda_stream
+            option.set_external_raw_stream(paddle_stream)
     return option
 
 runtime_options = {
-    "text_encoder": create_runtime_option(-1, "onnx"),  # use cpu
-    "vae_encoder": create_runtime_option(-1, "paddle"),  # use cpu
-    "vae_decoder": create_runtime_option(-1, "paddle"),  # use cpu
-    "unet": create_runtime_option(0, "paddle"),  # use gpu
+    "text_encoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "vae_encoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "vae_decoder": create_runtime_option(0, "paddle"),  # use gpu:0
+    "unet": create_runtime_option(0, "paddle"),  # use gpu:0
 }
 
 fd_pipe = FastDeployStableDiffusionMegaPipeline.from_pretrained(
@@ -407,6 +421,7 @@ image_inpaint_legacy = fd_pipe.inpaint_legacy(
 ).images[0]
 image_inpaint_legacy.save("image_inpaint_legacy.png")
 ```
+</details>
 <div align="center">
 <img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/205297240-46b80992-34af-40cd-91a6-ae76589d0e21.png">
 </div>

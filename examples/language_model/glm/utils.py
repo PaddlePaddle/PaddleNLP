@@ -174,6 +174,7 @@ def generate(
         probs = nn.functional.softmax(next_token_scores, axis=-1)
         if select_topk:
             _, next_tokens = paddle.topk(probs, k=2 * num_beams, axis=-1, largest=True)
+            # _, next_tokens = paddle.topk(probs, k=num_beams, axis=-1, largest=True)
         else:
             next_tokens = paddle.multinomial(probs, num_samples=2 * num_beams)
         next_token_scores = paddle.take_along_axis(next_token_scores, next_tokens, axis=-1)
