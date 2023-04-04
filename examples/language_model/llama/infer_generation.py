@@ -119,4 +119,4 @@ if __name__ == "__main__":
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
-            print("{} \n {}".format(text, result))
+            print("{} \n\n {}".format(text, result))

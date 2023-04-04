@@ -73,9 +73,11 @@ python infer_generation.py \
 
 ```text
 answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>
-  question: What was von Miller's job title?
+
+question: What was von Miller's job title?
 --------------------
 answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>
-  question: How many total tackles did von Miller get in the Super Bowl?
+
+question: How many total tackles did von Miller get in the Super Bowl?
 --------------------
 ```

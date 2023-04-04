@@ -31,12 +31,12 @@ class LlamaTokenizer(PretrainedTokenizer):
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "facebookresearch/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
+            "facebookresearch/tiny-random-Llama": "https://bj.bcebos.com/paddlenlp/models/transformers/Llama/sentencepiece.bpe.model",
         },
     }
 
     pretrained_init_configuration = {
-        "facebookresearch/tiny-random-llama": {},
+        "facebookresearch/tiny-random-Llama": {},
     }
 
     def __init__(
@@ -60,14 +60,6 @@ class LlamaTokenizer(PretrainedTokenizer):
         self.decode_with_prefix_space = decode_with_prefix_space
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(vocab_file)
-        self._no_prefix_space_tokens = None
-
-    @property
-    def no_prefix_space_tokens(self):
-        if self._no_prefix_space_tokens is None:
-            vocab = self.convert_ids_to_tokens(list(range(self.vocab_size)))
-            self._no_prefix_space_tokens = {i for i, tok in enumerate(vocab) if not tok.startswith("▁")}
-        return self._no_prefix_space_tokens
 
     @property
     def vocab_size(self):
@@ -101,21 +93,15 @@ class LlamaTokenizer(PretrainedTokenizer):
         token = self.sp_model.IdToPiece(index)
         return token
 
-    def _maybe_add_prefix_space(self, tokens, decoded):
-        if tokens and tokens[0] not in self.no_prefix_space_tokens:
-            return " " + decoded
-        else:
-            return decoded
-
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (string) in a single string."""
         current_sub_tokens = []
         out_string = ""
         prev_is_special = False
-        for token in tokens:
+        for i, token in enumerate(tokens):
             # make sure that special tokens are not decoded using sentencepiece model
             if token in self.all_special_tokens:
-                if not prev_is_special:
+                if not prev_is_special and i != 0:
                     out_string += " "
                 out_string += self.sp_model.decode(current_sub_tokens) + token
                 prev_is_special = True
@@ -124,7 +110,6 @@ class LlamaTokenizer(PretrainedTokenizer):
                 current_sub_tokens.append(token)
                 prev_is_special = False
         out_string += self.sp_model.decode(current_sub_tokens)
-        out_string = self._maybe_add_prefix_space(tokens=tokens, decoded=out_string)
         return out_string
 
     def save_vocabulary(self, save_directory, filename_prefix: Optional[str] = None) -> Tuple[str]:
