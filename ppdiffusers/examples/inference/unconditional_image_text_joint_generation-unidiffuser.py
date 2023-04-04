@@ -13,20 +13,23 @@
 # limitations under the License.
 
 import paddle
+
 from ppdiffusers import UniDiffuserJointGenerationPipeline
-from ppdiffusers.models import UViT, FrozenAutoencoderKL, CaptionDecoder
+from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserJointGenerationPipeline(
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
-    vae=FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
+    vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
     scheduler=None,
 )
-pipe.caption_decoder = CaptionDecoder(pretrained_path="models/caption_decoder.pdparams")
+
 result = pipe(generator=generator)
 image = result.images[0]
-text = result.texts[0]
 image.save("./unidiffuser-joint_i.png")
+text = result.texts[0]
+print(text)
 with open("./unidiffuser-joint_t.txt", "w") as f:
     print("{}\n".format(text), file=f)

@@ -13,14 +13,17 @@
 # limitations under the License.
 
 import paddle
-from ppdiffusers import UniDiffuserImageGenerationPipeline
-from ppdiffusers.models import FrozenAutoencoderKL, UViT
+
+from ppdiffusers.models import AutoencoderKL, UViTModel
+from ppdiffusers.pipelines import UniDiffuserImageGenerationPipeline
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserImageGenerationPipeline(
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
-    vae=FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
+    vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     scheduler=None,
 )
+
 image = pipe(generator=generator).images[0]
 image.save("./unidiffuser-i.png")

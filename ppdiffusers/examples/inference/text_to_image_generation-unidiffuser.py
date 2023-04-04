@@ -14,25 +14,20 @@
 
 import paddle
 
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from ppdiffusers import UniDiffuserTextToImagePipeline
-from ppdiffusers.models import (
-    FrozenCLIPEmbedder,
-    UViT,
-    CaptionDecoder,
-    FrozenAutoencoderKL,
-)
+from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserTextToImagePipeline(
-    clip_text_model=FrozenCLIPEmbedder(version="openai/clip-vit-large-patch14"),
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
+    text_encoder=CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14"),
+    tokenizer=CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
     caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
-    vae=FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams"),
+    vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     scheduler=None,
 )
-pipe.clip_text_model = FrozenCLIPEmbedder(version="openai/clip-vit-large-patch14")
-pipe.vae = FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams")
-pipe.caption_decoder = CaptionDecoder(pretrained_path="models/caption_decoder.pdparams")
 
 prompt = "an elephant under the sea"
 image = pipe(prompt=prompt, generator=generator).images[0]

@@ -56,8 +56,6 @@ else:
         AutoencoderKL,
         CaptionDecoder,
         ControlNetModel,
-        FrozenAutoencoderKL,
-        FrozenCLIPEmbedder,
         LitEma,
         ModelMixin,
         PriorTransformer,
@@ -65,7 +63,7 @@ else:
         UNet1DModel,
         UNet2DConditionModel,
         UNet2DModel,
-        UViT,
+        UViTModel,
         VQModel,
     )
     from .optimization import (

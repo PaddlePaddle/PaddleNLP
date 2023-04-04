@@ -13,29 +13,26 @@
 # limitations under the License.
 
 import paddle
-from ppdiffusers.utils import load_image
-from paddlenlp.transformers import CLIPModel, CLIPProcessor
+
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
 from ppdiffusers import UniDiffuserImageToTextPipeline
-from ppdiffusers.models import (
-    UViT,
-    FrozenAutoencoderKL,
-    CaptionDecoder,
-)
+from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
+from ppdiffusers.utils import load_image
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserImageToTextPipeline(
-    image_encoder=CLIPModel.from_pretrained("openai/clip-vit-base-patch32"),
-    image_feature_extractor=CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32"),
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
-    vae=FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams"),
+    image_encoder=CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32"),
+    image_feature_extractor=CLIPFeatureExtractor.from_pretrained("openai/clip-vit-base-patch32"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
+    vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
     scheduler=None,
 )
-pipe.vae = FrozenAutoencoderKL(pretrained_path="models/autoencoder_kl.pdparams")
-pipe.caption_decoder = CaptionDecoder(pretrained_path="models/caption_decoder.pdparams")
 
 url = "https://bj.bcebos.com/v1/paddlenlp/models/community/thu-ml/data/space.jpg"
 image = load_image(url)
 text = pipe(image=image, generator=generator).texts[0]
+print(text)
 with open("./unidiffuser-i2t.txt", "w") as f:
     print("{}\n".format(text), file=f)

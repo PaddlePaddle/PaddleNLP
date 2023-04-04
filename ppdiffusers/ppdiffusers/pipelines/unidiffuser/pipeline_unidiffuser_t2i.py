@@ -16,17 +16,22 @@ import inspect
 import time
 from typing import Callable, List, Optional, Union
 
-import einops
-import numpy as np
 import paddle
-import PIL
 
-from ...models import AutoencoderKL, CaptionDecoder, FrozenCLIPEmbedder, UViT
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+
+from ...models import AutoencoderKL, CaptionDecoder, UViTModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
-from .unidiffuser_common import stable_diffusion_beta_schedule
+from .unidiffuser_common import (
+    combine,
+    combine_joint,
+    split,
+    split_joint,
+    stable_diffusion_beta_schedule,
+)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -35,79 +40,37 @@ _betas = stable_diffusion_beta_schedule()
 N = len(_betas)
 
 
-def split(x, z_shape=(4, 64, 64), clip_img_dim=512):
-    C, H, W = z_shape
-    z_dim = C * H * W
-    z, clip_img = x.split([z_dim, clip_img_dim], axis=1)
-    z = einops.rearrange(z, "B (C H W) -> B C H W", C=C, H=H, W=W)
-    clip_img = einops.rearrange(clip_img, "B (L D) -> B L D", L=1, D=clip_img_dim)
-    return z, clip_img
-
-
-def combine(z, clip_img):
-    z = einops.rearrange(z, "B C H W -> B (C H W)")
-    clip_img = einops.rearrange(clip_img, "B L D -> B (L D)")
-    return paddle.concat([z, clip_img], axis=-1)
-
-
-def unpreprocess(v):  # to B C H W and [0, 1]
-    v = 0.5 * (v + 1.0)
-    v.clip_(0.0, 1.0)
-    return v
-
-
-def split_joint(x):
-    z_shape = (4, 64, 64)
-    clip_img_dim = 512
-    text_dim = 64
-
-    C, H, W = z_shape
-    z_dim = C * H * W
-    z, clip_img, text = x.split([z_dim, clip_img_dim, 77 * text_dim], axis=1)
-    z = einops.rearrange(z, "B (C H W) -> B C H W", C=C, H=H, W=W)
-    clip_img = einops.rearrange(clip_img, "B (L D) -> B L D", L=1, D=clip_img_dim)
-    text = einops.rearrange(text, "B (L D) -> B L D", L=77, D=text_dim)
-    return z, clip_img, text
-
-
-def combine_joint(z, clip_img, text):
-    z = einops.rearrange(z, "B C H W -> B (C H W)")
-    clip_img = einops.rearrange(clip_img, "B L D -> B (L D)")
-    text = einops.rearrange(text, "B L D -> B (L D)")
-    return paddle.concat([z, clip_img, text], axis=-1)
-
-
 class UniDiffuserTextToImagePipeline(DiffusionPipeline):
 
-    clip_text_model: FrozenCLIPEmbedder
-    unet: UViT
+    text_encoder: CLIPTextModel
+    tokenizer: CLIPTokenizer
+    unet: UViTModel
     caption_decoder: CaptionDecoder
     vae: AutoencoderKL
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
 
     def __init__(
         self,
-        clip_text_model: FrozenCLIPEmbedder,
-        unet: UViT,
+        text_encoder: CLIPTextModel,
+        tokenizer: CLIPTokenizer,
+        unet: UViTModel,
         caption_decoder: CaptionDecoder,
         vae: AutoencoderKL,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
         super().__init__()
         self.register_modules(
-            clip_text_model=clip_text_model,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
             unet=unet,
-            caption_decoder=CaptionDecoder,
+            caption_decoder=caption_decoder,
             vae=vae,
             scheduler=scheduler,
         )
-        self.use_caption_decoder = False
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     def t2i_nnet(self, x, timesteps, text):  # text is the low dimension version of the text clip embedding
         data_type = 1
-        text_dim = 64
-        z_shape = (4, 64, 64)
-        clip_img_dim = 512
         sample_scale = 7
 
         z, clip_img = split(x)
@@ -125,19 +88,17 @@ class UniDiffuserTextToImagePipeline(DiffusionPipeline):
         if sample_scale == 0.0:
             return x_out
 
-        if 1:  # config.sample.t2i_cfg_mode == 'true_uncond':
-            text_N = paddle.randn(text.shape)  # 3 other possible choices
-            z_out_uncond, clip_img_out_uncond, text_out_uncond = self.unet(
-                z,
-                clip_img,
-                text=text_N,
-                t_img=timesteps,
-                t_text=paddle.ones_like(timesteps) * N,
-                data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
-            )
-            x_out_uncond = combine(z_out_uncond, clip_img_out_uncond)
-        else:
-            raise NotImplementedError
+        text_N = paddle.randn(text.shape)
+        z_out_uncond, clip_img_out_uncond, text_out_uncond = self.unet(
+            z,
+            clip_img,
+            text=text_N,
+            t_img=timesteps,
+            t_text=paddle.ones_like(timesteps) * N,
+            data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
+        )
+        x_out_uncond = combine(z_out_uncond, clip_img_out_uncond)
+
         return x_out + sample_scale * (x_out - x_out_uncond)
 
     def sample_fn(self, mode, z=None, clip_img=None, text=None):
@@ -183,34 +144,13 @@ class UniDiffuserTextToImagePipeline(DiffusionPipeline):
         elif mode in ["i2t", "t"]:
             return x
 
-    def _encode_text_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
-        text_inputs = self.tokenizer(
-            prompt,
-            truncation=True,
-            max_length=77,
-            return_length=True,
-            return_overflowing_tokens=False,
-            padding="max_length",
-            return_tensors="pd",
-        )
-        text_input_ids = text_inputs.input_ids
-        # tokens = batch_encoding["input_ids"]
-
-        text_embeddings = self.text_encoder(input_ids=text_input_ids)
-        z = text_embeddings.last_hidden_state
-        return z
-
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
+        latents = 1 / self.vae.config.scaling_factor * latents
         with paddle.amp.auto_cast():
-            image = self.vae.decode(latents)
-        # samples = unpreprocess(image)
-        # image = samples[0]
-        # image_ndarr = (image * 255 + 0.5).clip_(0, 255).transpose([1, 2, 0]).astype('uint8').numpy()
-        # return image_ndarr
-
+            image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
@@ -281,7 +221,7 @@ class UniDiffuserTextToImagePipeline(DiffusionPipeline):
         height: int = 512,
         width: int = 512,
         num_inference_steps: int = 50,
-        guidance_scale: float = 7.0,  # 7.5
+        guidance_scale: float = 7.0,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
@@ -313,20 +253,27 @@ class UniDiffuserTextToImagePipeline(DiffusionPipeline):
         # )
 
         n_samples = 1
-        clip_img_dim = 512
         clip_text_dim = 64
-        z_shape = (4, 64, 64)
 
         contexts = paddle.randn([n_samples, 77, clip_text_dim])
-        img_contexts = paddle.randn([n_samples, 2 * z_shape[0], z_shape[1], z_shape[2]])
-        clip_imgs = paddle.randn([n_samples, 1, clip_img_dim])
         prompts = [prompt] * n_samples
-        contexts = self.clip_text_model.encode(prompts)  # contexts = prompts
-        contexts_low_dim = self.caption_decoder.encode_prefix(
-            contexts
-        )  # the low dimensional version of the contexts, which is the input to the nnet
 
+        batch_encoding = self.tokenizer(
+            prompts,
+            truncation=True,
+            max_length=77,
+            return_length=True,
+            return_overflowing_tokens=False,
+            padding="max_length",
+            return_tensors="pd",
+        )
+        outputs = self.text_encoder(input_ids=batch_encoding["input_ids"])
+        contexts = outputs.last_hidden_state
+
+        contexts_low_dim = self.caption_decoder.encode_prefix(contexts)
         _z, _clip_img = self.sample_fn("t2i", text=contexts_low_dim)
+
+        # 9. Post-processing
         image = self.decode_latents(_z)
 
         # 10. Convert to PIL

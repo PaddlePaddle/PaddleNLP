@@ -18,10 +18,8 @@
 from ..utils.import_utils import is_paddle_available
 
 if is_paddle_available():
-    from .autoencoder import FrozenAutoencoderKL
     from .autoencoder_kl import AutoencoderKL
     from .caption_decoder import CaptionDecoder
-    from .clip_text_encoder import FrozenCLIPEmbedder
     from .controlnet import ControlNetModel
     from .dual_transformer_2d import DualTransformer2DModel
     from .ema import LitEma
@@ -31,5 +29,5 @@ if is_paddle_available():
     from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel
     from .unet_2d_condition import UNet2DConditionModel
-    from .uvit_multi_post_ln import UViT
+    from .uvit import UViTModel
     from .vq_model import VQModel

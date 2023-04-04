@@ -104,51 +104,6 @@ def center_crop(width, height, img):
     return np.array(img).astype(np.uint8)
 
 
-def prepare_contexts(config, clip_text_model, clip_img_model, clip_img_model_preprocess, autoencoder):
-    resolution = config.z_shape[-1] * 8
-
-    contexts = paddle.randn([config.n_samples, 77, config.clip_text_dim])
-    img_contexts = paddle.randn([config.n_samples, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2]])
-    clip_imgs = paddle.randn([config.n_samples, 1, config.clip_img_dim])
-
-    if config.mode in ["t2i", "t2i2t"]:
-        prompts = [config.prompt] * config.n_samples
-
-        contexts = clip_text_model.encode(prompts)  # contexts = prompts
-
-    elif config.mode in ["i2t", "i2t2i"]:
-        from PIL import Image
-
-        img_contexts = []
-        clip_imgs = []
-
-        def get_img_feature(image):
-            image = np.array(image).astype(np.uint8)
-            image = center_crop(resolution, resolution, image)
-            inputs = clip_img_model_preprocess(images=Image.fromarray(image), return_tensors="pd")
-            clip_img_feature = clip_img_model.get_image_features(**inputs)
-
-            image = (image / 127.5 - 1.0).astype(np.float32)
-            image = einops.rearrange(image, "h w c -> 1 c h w")
-            image = paddle.to_tensor(image)
-            moments = autoencoder.encode_moments(image)
-
-            return clip_img_feature, moments
-
-        image = Image.open(config.img).convert("RGB")
-        clip_img, img_context = get_img_feature(image)
-
-        img_contexts.append(img_context)
-        clip_imgs.append(clip_img)
-        img_contexts = img_contexts * config.n_samples
-        clip_imgs = clip_imgs * config.n_samples
-
-        img_contexts = paddle.concat(img_contexts, axis=0)
-        clip_imgs = paddle.stack(clip_imgs, axis=0)
-
-    return contexts, img_contexts, clip_imgs
-
-
 def unpreprocess(v):  # to B C H W and [0, 1]
     v = 0.5 * (v + 1.0)
     v.clip_(0.0, 1.0)

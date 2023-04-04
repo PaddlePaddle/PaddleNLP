@@ -16,19 +16,19 @@ import inspect
 import time
 from typing import Callable, List, Optional, Union
 
-import einops
-import numpy as np
 import paddle
-import PIL
-from IPython import embed
 
-from ...models import CaptionDecoder, FrozenAutoencoderKL, UViT
+from ...models import AutoencoderKL, CaptionDecoder, UViTModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
 from . import JointPipelineOutput
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
-from .unidiffuser_common import stable_diffusion_beta_schedule
+from .unidiffuser_common import (
+    combine_joint,
+    split_joint,
+    stable_diffusion_beta_schedule,
+)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -37,59 +37,17 @@ _betas = stable_diffusion_beta_schedule()
 N = len(_betas)
 
 
-def split(x, z_shape=(4, 64, 64), clip_img_dim=512):
-    C, H, W = z_shape
-    z_dim = C * H * W
-    z, clip_img = x.split([z_dim, clip_img_dim], axis=1)
-    z = einops.rearrange(z, "B (C H W) -> B C H W", C=C, H=H, W=W)
-    clip_img = einops.rearrange(clip_img, "B (L D) -> B L D", L=1, D=clip_img_dim)
-    return z, clip_img
-
-
-def combine(z, clip_img):
-    z = einops.rearrange(z, "B C H W -> B (C H W)")
-    clip_img = einops.rearrange(clip_img, "B L D -> B (L D)")
-    return paddle.concat([z, clip_img], axis=-1)
-
-
-def unpreprocess(v):  # to B C H W and [0, 1]
-    v = 0.5 * (v + 1.0)
-    v.clip_(0.0, 1.0)
-    return v
-
-
-def split_joint(x):
-    z_shape = (4, 64, 64)
-    clip_img_dim = 512
-    text_dim = 64
-
-    C, H, W = z_shape
-    z_dim = C * H * W
-    z, clip_img, text = x.split([z_dim, clip_img_dim, 77 * text_dim], axis=1)
-    z = einops.rearrange(z, "B (C H W) -> B C H W", C=C, H=H, W=W)
-    clip_img = einops.rearrange(clip_img, "B (L D) -> B L D", L=1, D=clip_img_dim)
-    text = einops.rearrange(text, "B (L D) -> B L D", L=77, D=text_dim)
-    return z, clip_img, text
-
-
-def combine_joint(z, clip_img, text):
-    z = einops.rearrange(z, "B C H W -> B (C H W)")
-    clip_img = einops.rearrange(clip_img, "B L D -> B (L D)")
-    text = einops.rearrange(text, "B L D -> B (L D)")
-    return paddle.concat([z, clip_img, text], axis=-1)
-
-
 class UniDiffuserJointGenerationPipeline(DiffusionPipeline):
 
-    unet: UViT
-    vae: FrozenAutoencoderKL
+    unet: UViTModel
+    vae: AutoencoderKL
     caption_decoder: CaptionDecoder
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
 
     def __init__(
         self,
-        unet: UViT,
-        vae: FrozenAutoencoderKL,
+        unet: UViTModel,
+        vae: AutoencoderKL,
         caption_decoder: CaptionDecoder,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
@@ -97,9 +55,10 @@ class UniDiffuserJointGenerationPipeline(DiffusionPipeline):
         self.register_modules(
             unet=unet,
             vae=vae,
-            caption_decoder=CaptionDecoder,
+            caption_decoder=caption_decoder,
             scheduler=scheduler,
         )
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     def joint_nnet(self, x, timesteps):
         data_type = 1
@@ -177,17 +136,12 @@ class UniDiffuserJointGenerationPipeline(DiffusionPipeline):
         _z, _clip_img, _text = split_joint(x)
         return _z, _clip_img, _text
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
+        latents = 1 / self.vae.config.scaling_factor * latents
         with paddle.amp.auto_cast():
-            image = self.vae.decode(latents)
-        # samples = unpreprocess(image)
-        # image = samples[0]
-        # image_ndarr = (image * 255 + 0.5).clip_(0, 255).transpose([1, 2, 0]).astype('uint8').numpy()
-        # return image_ndarr
-
+            image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
@@ -267,32 +221,11 @@ class UniDiffuserJointGenerationPipeline(DiffusionPipeline):
         # # corresponds to doing no classifier free guidance.
         # do_classifier_free_guidance = guidance_scale > 1.0
 
-        # # 3. Encode input prompt
-        # text_embeddings = self._encode_text_prompt(
-        #     prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
-        # )
-        # contexts_low_dim = text_embeddings
-        # _n_samples = contexts_low_dim.shape[0]
-
-        # config = dict(
-        #     n_samples=1,
-        #     clip_img_dim=512,
-        #     clip_text_dim=64,
-        #     z_shape=(4, 64, 64),
-        # )
-        # contexts = paddle.randn([config.n_samples, 77, config.clip_text_dim])
-        # img_contexts = paddle.randn([config.n_samples, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2]])
-        # clip_imgs = paddle.randn([config.n_samples, 1, config.clip_img_dim])
-
         _z, _clip_img, _text = self.sample_fn()
-
-        # samples = unpreprocess(decode(_z))
-        # os.makedirs(os.path.join(config.output_path, config.mode), exist_ok=True)
 
         # 9. Post-processing
         image = self.decode_latents(_z)
         text = self.caption_decoder.generate_captions(_text)
-        print(text)
 
         # 10. Convert to PIL
         if output_type == "pil":

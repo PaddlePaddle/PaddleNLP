@@ -13,20 +13,23 @@
 # limitations under the License.
 
 import paddle
+
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from ppdiffusers import UniDiffuserTextVariationPipeline
-from ppdiffusers.models import FrozenCLIPEmbedder, UViT, CaptionDecoder
+from ppdiffusers.models import CaptionDecoder, UViTModel
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserTextVariationPipeline(
-    clip_text_model=FrozenCLIPEmbedder(version="openai/clip-vit-large-patch14"),
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
+    text_encoder=CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14"),
+    tokenizer=CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
     caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
     scheduler=None,
 )
-pipe.clip_text_model = FrozenCLIPEmbedder(version="openai/clip-vit-large-patch14")
-pipe.caption_decoder = CaptionDecoder(pretrained_path="models/caption_decoder.pdparams")
 
 prompt = "an elephant under the sea"
 text = pipe(prompt=prompt, generator=generator).texts[0]
+print(text)
 with open("./unidiffuser-t2i2t.txt", "w") as f:
     print("{}\n".format(text), file=f)

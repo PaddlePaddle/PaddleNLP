@@ -16,12 +16,9 @@ import inspect
 import time
 from typing import Callable, List, Optional, Union
 
-import einops
-import numpy as np
 import paddle
-import PIL
 
-from ...models import CaptionDecoder, UViT
+from ...models import CaptionDecoder, UViTModel
 from ...pipeline_utils import DiffusionPipeline, TextPipelineOutput
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
@@ -37,26 +34,25 @@ N = len(_betas)
 
 class UniDiffuserTextGenerationPipeline(DiffusionPipeline):
 
-    unet: UViT
+    unet: UViTModel
     caption_decoder: CaptionDecoder
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
 
     def __init__(
         self,
-        unet: UViT,
+        unet: UViTModel,
         caption_decoder: CaptionDecoder,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
         super().__init__()
         self.register_modules(
             unet=unet,
-            caption_decoder=CaptionDecoder,
+            caption_decoder=caption_decoder,
             scheduler=scheduler,
         )
 
     def t_nnet(self, x, timesteps):
         data_type = 1
-        text_dim = 64
         z_shape = (4, 64, 64)
         clip_img_dim = 512
 
@@ -74,8 +70,6 @@ class UniDiffuserTextGenerationPipeline(DiffusionPipeline):
 
     def sample_fn(self, z=None, clip_img=None, text=None):
         _n_samples = 1
-        clip_img_dim = 512
-        z_shape = (4, 64, 64)
         sample_steps = 50
         text_dim = 64
 
@@ -160,41 +154,9 @@ class UniDiffuserTextGenerationPipeline(DiffusionPipeline):
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
-        # 0. Default height and width to unet
-        # height = height #or self.image_unet.config.sample_size * self.vae_scale_factor
-        # width = width #or self.image_unet.config.sample_size * self.vae_scale_factor
-
-        # # 1. Check inputs. Raise error if not correct
-        # self.check_inputs(prompt, height, width, callback_steps)
-
-        # # 2. Define call parameters
-        # batch_size = 1 if isinstance(prompt, str) else len(prompt)
-        # # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-        # # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
-        # # corresponds to doing no classifier free guidance.
-        # do_classifier_free_guidance = guidance_scale > 1.0
-
-        # # 3. Encode input prompt
-        # text_embeddings = self._encode_text_prompt(
-        #     prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
-        # )
-        # contexts_low_dim = text_embeddings
-        # _n_samples = contexts_low_dim.shape[0]
-
-        # config = dict(
-        #     n_samples=1,
-        #     clip_img_dim=512,
-        #     clip_text_dim=64,
-        #     z_shape=(4, 64, 64),
-        # )
-        # contexts = paddle.randn([config.n_samples, 77, config.clip_text_dim])
-        # img_contexts = paddle.randn([config.n_samples, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2]])
-        # clip_imgs = paddle.randn([config.n_samples, 1, config.clip_img_dim])
-
         _text = self.sample_fn()
 
         text = self.caption_decoder.generate_captions(_text)
-        print(text)
 
         if not return_dict:
             return (text,)

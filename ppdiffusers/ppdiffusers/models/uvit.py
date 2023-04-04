@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -22,27 +21,16 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn.initializer import Constant, TruncatedNormal
 
+from ..configuration_utils import ConfigMixin, register_to_config
+from ..utils import BaseOutput
+from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
+from .modeling_utils import ModelMixin
+from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
+
 # Common initializations
 ones_ = Constant(value=1.0)
 zeros_ = Constant(value=0.0)
 trunc_normal_ = TruncatedNormal(std=0.02)
-
-from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, logging
-
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
-
-if hasattr(F, "scaled_dot_product_attention"):
-    ATTENTION_MODE = "flash"
-else:
-    try:
-        import xformers
-        import xformers.ops
-
-        ATTENTION_MODE = "xformers"
-    except:
-        ATTENTION_MODE = "math"
-print(f"attention mode is {ATTENTION_MODE}")
 
 
 def drop_path(input, drop_prob: float = 0.0, training: bool = False):
@@ -147,26 +135,14 @@ class Attention(nn.Layer):
     def forward(self, x):
         B, L, C = x.shape
         qkv = self.qkv(x)
-        if ATTENTION_MODE == "flash":
-            qkv = einops.rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads).float()
+        # TODO: xformers support
+        with paddle.amp.auto_cast(enable=False):
+            qkv = einops.rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads).astype("float32")
             q, k, v = qkv[0], qkv[1], qkv[2]  # B H L D
-            x = F.scaled_dot_product_attention(q, k, v)
-            x = einops.rearrange(x, "B H L D -> B L (H D)")
-        elif ATTENTION_MODE == "xformers":
-            qkv = einops.rearrange(qkv, "B L (K H D) -> K B L H D", K=3, H=self.num_heads)
-            q, k, v = qkv[0], qkv[1], qkv[2]  # B L H D
-            x = xformers.ops.memory_efficient_attention(q, k, v)
-            x = einops.rearrange(x, "B L H D -> B L (H D)", H=self.num_heads)
-        elif ATTENTION_MODE == "math":
-            with paddle.amp.auto_cast(enable=False):
-                qkv = einops.rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads).astype("float32")
-                q, k, v = qkv[0], qkv[1], qkv[2]  # B H L D
-                # attn = q @ k.transpose([0, 1, 3, 2]) * self.scale # B H L L
-                attn = paddle.mm(q, k.transpose([0, 1, 3, 2])) * self.scale  # B H L L
-                attn = F.softmax(attn, axis=-1)
-                attn = self.attn_drop(attn)
-                # x = (attn @ v).transpose([0, 2, 1, 3]).reshape([B, L, C])
-                x = paddle.mm(attn, v).transpose([0, 2, 1, 3]).reshape([B, L, C])
+            attn = paddle.mm(q, k.transpose([0, 1, 3, 2])) * self.scale  # B H L L
+            attn = F.softmax(attn, axis=-1)
+            attn = self.attn_drop(attn)
+            x = paddle.mm(attn, v).transpose([0, 2, 1, 3]).reshape([B, L, C])
 
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -237,7 +213,28 @@ class PatchEmbed(nn.Layer):
         return x
 
 
-class UViT(nn.Layer):
+@dataclass
+class UViTModelOutput(BaseOutput):
+    """
+    Args:
+        sample (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+            Hidden states output. Output of last layer of model.
+    """
+
+    sample_img: paddle.Tensor
+    sample_clip_img: paddle.Tensor
+    sample_text: paddle.Tensor
+
+
+# class UViTModel(ModelMixin, ConfigMixin):
+class UViTModel(nn.Layer):
+    r"""
+    UViTModel is a unet-stype ViT model that takes in a noisy sample and a timestep and returns sample shaped output.
+    Note that the different is the
+
+    """
+
+    # @register_to_config
     def __init__(
         self,
         img_size=64,
@@ -261,6 +258,7 @@ class UViT(nn.Layer):
         pretrained_path=None,
     ):
         super().__init__()
+
         self.in_chans = in_chans
         self.patch_size = patch_size
         self.embed_dim = embed_dim
@@ -377,7 +375,16 @@ class UViT(nn.Layer):
     def no_weight_decay(self):
         return {"pos_embed"}
 
-    def forward(self, img, clip_img, text, t_img, t_text, data_type):
+    def forward(
+        self,
+        img,
+        clip_img,
+        text,
+        t_img,
+        t_text,
+        data_type,
+        return_dict=True,
+    ):
         _, _, H, W = img.shape
         img = self.patch_embed(img)
         clip_img = self.clip_img_embed(clip_img)
@@ -428,8 +435,13 @@ class UViT(nn.Layer):
         )
 
         img_out = self.decoder_pred(img_out)
-        img_out = unpatchify(img_out, self.in_chans)
-        clip_img_out = self.clip_img_out(clip_img_out)
-        text_out = self.text_out(text_out)
+        sample_img = unpatchify(img_out, self.in_chans)
+        sample_clip_img = self.clip_img_out(clip_img_out)
+        sample_text = self.text_out(text_out)
 
-        return img_out, clip_img_out, text_out
+        return sample_img, sample_clip_img, sample_text
+
+        # if not return_dict:
+        #     return (sample_img, sample_clip_img, sample_text)
+
+        # return UViTModelOutput(sample_img=sample_img, sample_clip_img=sample_clip_img, sample_text=sample_text)

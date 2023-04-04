@@ -13,16 +13,19 @@
 # limitations under the License.
 
 import paddle
+
 from ppdiffusers import UniDiffuserTextGenerationPipeline
-from ppdiffusers.models import CaptionDecoder, UViT
+from ppdiffusers.models import CaptionDecoder, UViTModel
 
 generator = paddle.Generator().manual_seed(0)
+
 pipe = UniDiffuserTextGenerationPipeline(
-    unet=UViT(pretrained_path="models/uvit_v1.pdparams"),
+    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
     caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
     scheduler=None,
 )
-pipe.caption_decoder = CaptionDecoder(pretrained_path="models/caption_decoder.pdparams")
+
 text = pipe(generator=generator).texts[0]
+print(text)
 with open("./unidiffuser-t.txt", "w") as f:
     print("{}\n".format(text), file=f)

@@ -21,16 +21,17 @@ import numpy as np
 import paddle
 import PIL
 
-from paddlenlp.transformers import CLIPModel, CLIPProcessor
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
 
-from ...models import FrozenAutoencoderKL, UViT
+from ...models import AutoencoderKL, UViTModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
 from .unidiffuser_common import (
-    center_crop,
+    combine,
     combine_joint,
+    split,
     split_joint,
     stable_diffusion_beta_schedule,
 )
@@ -42,41 +43,20 @@ _betas = stable_diffusion_beta_schedule()
 N = len(_betas)
 
 
-def split(x, z_shape=(4, 64, 64), clip_img_dim=512):
-    C, H, W = z_shape
-    z_dim = C * H * W
-    z, clip_img = x.split([z_dim, clip_img_dim], axis=1)
-    z = einops.rearrange(z, "B (C H W) -> B C H W", C=C, H=H, W=W)
-    clip_img = einops.rearrange(clip_img, "B (L D) -> B L D", L=1, D=clip_img_dim)
-    return z, clip_img
-
-
-def combine(z, clip_img):
-    z = einops.rearrange(z, "B C H W -> B (C H W)")
-    clip_img = einops.rearrange(clip_img, "B L D -> B (L D)")
-    return paddle.concat([z, clip_img], axis=-1)
-
-
-def unpreprocess(v):  # to B C H W and [0, 1]
-    v = 0.5 * (v + 1.0)
-    v.clip_(0.0, 1.0)
-    return v
-
-
 class UniDiffuserImageVariationPipeline(DiffusionPipeline):
 
-    image_encoder: CLIPModel  # clip_img_model clip_img_model_preprocess = CLIPProcessor.from_pretrained(model_name)
-    image_feature_extractor: CLIPProcessor
-    unet: UViT
-    vae: FrozenAutoencoderKL
+    image_encoder: CLIPVisionModelWithProjection
+    image_feature_extractor: CLIPFeatureExtractor
+    unet: UViTModel
+    vae: AutoencoderKL
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
 
     def __init__(
         self,
-        image_encoder: CLIPModel,
-        image_feature_extractor: CLIPProcessor,
-        unet: UViT,
-        vae: FrozenAutoencoderKL,
+        image_encoder: CLIPVisionModelWithProjection,
+        image_feature_extractor: CLIPFeatureExtractor,
+        unet: UViTModel,
+        vae: AutoencoderKL,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
         super().__init__()
@@ -87,6 +67,7 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
             vae=vae,
             scheduler=scheduler,
         )
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     def i2t_nnet(self, x, timesteps, z, clip_img):
         sample_scale = 7
@@ -120,9 +101,6 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
 
     def t2i_nnet(self, x, timesteps, text):  # text is the low dimension version of the text clip embedding
         data_type = 1
-        text_dim = 64
-        z_shape = (4, 64, 64)
-        clip_img_dim = 512
         sample_scale = 7
 
         z, clip_img = split(x)
@@ -140,19 +118,17 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
         if sample_scale == 0.0:
             return x_out
 
-        if 1:  # config.sample.t2i_cfg_mode == 'true_uncond':
-            text_N = paddle.randn(text.shape)  # 3 other possible choices
-            z_out_uncond, clip_img_out_uncond, text_out_uncond = self.unet(
-                z,
-                clip_img,
-                text=text_N,
-                t_img=timesteps,
-                t_text=paddle.ones_like(timesteps) * N,
-                data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
-            )
-            x_out_uncond = combine(z_out_uncond, clip_img_out_uncond)
-        else:
-            raise NotImplementedError
+        text_N = paddle.randn(text.shape)
+        z_out_uncond, clip_img_out_uncond, text_out_uncond = self.unet(
+            z,
+            clip_img,
+            text=text_N,
+            t_img=timesteps,
+            t_text=paddle.ones_like(timesteps) * N,
+            data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
+        )
+        x_out_uncond = combine(z_out_uncond, clip_img_out_uncond)
+
         return x_out + sample_scale * (x_out - x_out_uncond)
 
     def sample_fn(self, mode, z=None, clip_img=None, text=None):
@@ -198,53 +174,41 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
         elif mode in ["i2t", "t"]:
             return x
 
-    def prepare_contexts(self, raw_image, clip_img_model, clip_img_model_preprocess, autoencoder):
-        n_samples = 1
-        z_shape = (4, 64, 64)
-        resolution = z_shape[-1] * 8
+    def _encode_image(self, image, num_images_per_prompt):
+        dtype = self.image_encoder.dtype
 
-        from PIL import Image
+        if not isinstance(image, paddle.Tensor):
+            image = self.image_feature_extractor(images=image, return_tensors="pd").pixel_values
 
+        image = image.cast(dtype)
+        image_embeddings = self.image_encoder(image).image_embeds
+        image_embeddings = image_embeddings.unsqueeze(1)
+
+        # duplicate image embeddings for each generation per prompt, using mps friendly method
+        bs_embed, seq_len, _ = image_embeddings.shape
+        image_embeddings = image_embeddings.tile([1, num_images_per_prompt, 1])
+        image_embeddings = image_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+        return image_embeddings
+
+    def _encode_image_contexts(self, image, num_images_per_prompt):
         img_contexts = []
-        clip_imgs = []
-
-        def get_img_feature(image):
-            image = np.array(image).astype(np.uint8)
-            image = center_crop(resolution, resolution, image)
-            inputs = clip_img_model_preprocess(images=Image.fromarray(image), return_tensors="pd")
-            clip_img_feature = clip_img_model.get_image_features(**inputs)
-
-            image = (image / 127.5 - 1.0).astype(np.float32)
-            image = einops.rearrange(image, "h w c -> 1 c h w")
-            image = paddle.to_tensor(image)
-            moments = autoencoder.encode_moments(image)
-
-            return clip_img_feature, moments
-
-        image = Image.open(raw_image).convert("RGB")
-        clip_img, img_context = get_img_feature(image)
-
-        img_contexts.append(img_context)
-        clip_imgs.append(clip_img)
-        img_contexts = img_contexts * n_samples
-        clip_imgs = clip_imgs * n_samples
-
+        # image = load_image(raw_image)
+        image = np.array(image)  # .astype(np.uint8)
+        image = (image / 127.5 - 1.0).astype(np.float32)
+        image = einops.rearrange(image, "h w c -> 1 c h w")  # (1, 3, 512, 512)
+        moments = self.vae.encode(paddle.to_tensor(image)).latent_dist.sample()  # encode_moments
+        moments = moments * self.vae.scaling_factor
+        img_contexts.append(moments)
+        img_contexts = img_contexts * num_images_per_prompt
         img_contexts = paddle.concat(img_contexts, axis=0)
-        clip_imgs = paddle.stack(clip_imgs, axis=0)
+        return img_contexts
 
-        return img_contexts, clip_imgs
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
+        latents = 1 / self.vae.config.scaling_factor * latents
         with paddle.amp.auto_cast():
-            image = self.vae.decode(latents)
-        # samples = unpreprocess(image)
-        # image = samples[0]
-        # image_ndarr = (image * 255 + 0.5).clip_(0, 255).transpose([1, 2, 0]).astype('uint8').numpy()
-        # return image_ndarr
-
+            image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
@@ -265,6 +229,28 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
+
+    def check_inputs(self, image, height, width, callback_steps):
+        if (
+            not isinstance(image, paddle.Tensor)
+            and not isinstance(image, PIL.Image.Image)
+            and not isinstance(image, list)
+        ):
+            raise ValueError(
+                "`image` has to be of type `paddle.Tensor` or `PIL.Image.Image` or `List[PIL.Image.Image]` but is"
+                f" {type(image)}"
+            )
+
+        if height % 8 != 0 or width % 8 != 0:
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
@@ -299,7 +285,7 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
         height: int = 512,
         width: int = 512,
         num_inference_steps: int = 50,
-        guidance_scale: float = 7.0,  # 7.5
+        guidance_scale: float = 7.0,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
@@ -312,48 +298,26 @@ class UniDiffuserImageVariationPipeline(DiffusionPipeline):
         **kwargs,
     ):
         # 0. Default height and width to unet
-        # height = height #or self.image_unet.config.sample_size * self.vae_scale_factor
-        # width = width #or self.image_unet.config.sample_size * self.vae_scale_factor
+        height = height or self.unet.config.sample_size * self.vae_scale_factor
+        width = width or self.unet.config.sample_size * self.vae_scale_factor
 
-        # # 1. Check inputs. Raise error if not correct
-        # self.check_inputs(prompt, height, width, callback_steps)
+        # 1. Check inputs. Raise error if not correct
+        self.check_inputs(image, height, width, callback_steps)
 
-        # # 2. Define call parameters
-        # batch_size = 1 if isinstance(prompt, str) else len(prompt)
-        # # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-        # # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
-        # # corresponds to doing no classifier free guidance.
-        # do_classifier_free_guidance = guidance_scale > 1.0
+        # 2. Define call parameters
+        if isinstance(image, PIL.Image.Image):
+            batch_size = 1
+        elif isinstance(image, list):
+            batch_size = len(image)
+        else:
+            batch_size = image.shape[0]
 
-        # # 3. Encode input prompt
-        # text_embeddings = self._encode_text_prompt(
-        #     prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
-        # )
-        # contexts_low_dim = text_embeddings
-        # _n_samples = contexts_low_dim.shape[0]
-
-        # config = dict(
-        #     n_samples=1,
-        #     clip_img_dim=512,
-        #     clip_text_dim=64,
-        #     z_shape=(4, 64, 64),
-        # )
-        # contexts = paddle.randn([config.n_samples, 77, config.clip_text_dim])
-        # img_contexts = paddle.randn([config.n_samples, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2]])
-        # clip_imgs = paddle.randn([config.n_samples, 1, config.clip_img_dim])
-
-        img_contexts, clip_imgs = self.prepare_contexts(
-            raw_image=image,
-            clip_img_model=self.image_encoder,
-            clip_img_model_preprocess=self.image_feature_extractor,
-            autoencoder=self.vae,
-        )
-
-        z_img = self.vae.sample(img_contexts)
+        # 3. Encode input image
+        clip_imgs = self._encode_image(image, num_images_per_prompt)
+        z_img = self._encode_image_contexts(image, num_images_per_prompt)
 
         _text = self.sample_fn("i2t", z=z_img, clip_img=clip_imgs)
-        # text = self.caption_decoder.generate_captions(_text)
-        # print(text)
+
         _z, _clip_img = self.sample_fn("t2i", text=_text)
         image = self.decode_latents(_z)
 

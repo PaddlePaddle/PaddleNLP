@@ -13,14 +13,14 @@
 # limitations under the License.
 
 from collections import OrderedDict
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import paddle
 from paddle import nn
 from paddle.nn import functional as F
 
-from paddlenlp.transformers import GPTLMHeadModel, GPTTokenizer
+from paddlenlp.transformers import GPTConfig, GPTLMHeadModel, GPTTokenizer
 
 
 class ClipCaptionModel(nn.Layer):
@@ -31,8 +31,10 @@ class ClipCaptionModel(nn.Layer):
         special_tokens_dict = {"eos_token": eos}
         base_tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
         base_tokenizer.add_special_tokens(special_tokens_dict)
-        self.gpt = GPTLMHeadModel.from_pretrained("gpt2-en", eos_token_id=base_tokenizer.eos_token_id)
-        self.gpt.resize_token_embeddings(len(base_tokenizer))
+        config = GPTConfig.from_pretrained(
+            "gpt2-en", vocab_size=len(base_tokenizer), eos_token_id=base_tokenizer.eos_token_id
+        )
+        self.gpt = GPTLMHeadModel(config)
 
         self.hidden_dim = hidden_dim
         self.encode_prefix = nn.Linear(768, hidden_dim) if hidden_dim is not None else nn.Identity()
@@ -40,9 +42,6 @@ class ClipCaptionModel(nn.Layer):
 
     def get_dummy_token(self, batch_size: int) -> paddle.Tensor:
         return paddle.zeros([batch_size, self.prefix_length], dtype=paddle.int64)
-
-    def encode_decode_prefix(self, prefix):
-        return self.decode_prefix(self.encode_prefix(prefix))
 
     def forward(
         self,
@@ -94,7 +93,6 @@ def generate_beam(
                 generated = model.gpt.gpt.embeddings.word_embeddings(tokens)
 
         for i in range(entry_length):
-            model.gpt.lm_head.decoder_weight = model.gpt.embeddings.word_embeddings.weight
             logits = model.gpt(inputs_embeds=generated)
             logits = logits[:, -1, :] / (temperature if temperature > 0 else 1.0)
             logits = F.softmax(logits, axis=-1).log()
@@ -108,10 +106,18 @@ def generate_beam(
                     tokens = tokens.expand([beam_size, *tokens.shape[1:]])
                     tokens = paddle.concat((tokens, next_tokens), axis=1)
             else:
-                logits[is_stopped] = -float(np.inf)
-                logits[is_stopped, 0] = 0
+                mask = paddle.cast(is_stopped, "int32")
+                logits[mask] = -float(np.inf)
+                logits[mask, 0] = 0
                 scores_sum = scores[:, None] + logits
-                seq_lengths[~is_stopped] += 1
+                incerse_mask = ~is_stopped
+                incerse_mask = paddle.cast(incerse_mask, "int32")
+                seq_lengths[incerse_mask] += 1
+
+                # logits[is_stopped] = -float(np.inf)
+                # logits[is_stopped, 0] = 0
+                # scores_sum = scores[:, None] + logits
+                # seq_lengths[~is_stopped] += 1
                 scores_sum_average = scores_sum / seq_lengths[:, None]
                 scores_sum_average, next_tokens = scores_sum_average.reshape([-1]).topk(beam_size, -1)
                 next_tokens_source = next_tokens // scores_sum.shape[1]
@@ -146,64 +152,6 @@ def generate_beam(
     return output_texts
 
 
-def generate2(
-    model,
-    tokenizer,
-    tokens=None,
-    prompt=None,
-    embedding=None,
-    entry_count=1,
-    entry_length=67,  # maximum number of words
-    top_p=0.8,
-    temperature=1.0,
-    stop_token: str = "<|EOS|>",
-):
-    model.eval()
-    generated_list = []
-    stop_token_index = tokenizer.encode(stop_token)["input_ids"][0]
-    filter_value = -float("Inf")
-
-    with paddle.no_grad():
-        for entry_idx in range(entry_count):
-            if embedding is not None:
-                generated = embedding
-            else:
-                if tokens is None:
-                    tokens = paddle.to_tensor(tokenizer.encode(prompt))
-                    tokens = tokens.unsqueeze(0)
-
-                generated = model.gpt.gpt.embeddings.word_embeddings(tokens)
-
-            for i in range(entry_length):
-                model.gpt.lm_head.decoder_weight = model.gpt.embeddings.word_embeddings.weight
-                logits = model.gpt(inputs_embeds=generated)
-                logits = logits[:, -1, :] / (temperature if temperature > 0 else 1.0)
-                sorted_logits = paddle.sort(logits, descending=True)
-                sorted_indices = paddle.argsort(logits, descending=True)
-                cumulative_probs = paddle.cumsum(F.softmax(sorted_logits, axis=-1), axis=-1)
-                sorted_indices_to_remove = cumulative_probs > top_p
-                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-                sorted_indices_to_remove[..., 0] = 0
-
-                indices_to_remove = sorted_indices[sorted_indices_to_remove]
-                logits[:, indices_to_remove] = filter_value
-                next_token = paddle.argmax(logits, -1).unsqueeze(0)
-                next_token_embed = model.gpt.gpt.embeddings.word_embeddings(next_token)
-                if tokens is None:
-                    tokens = next_token
-                else:
-                    tokens = paddle.concat((tokens, next_token), axis=1)
-                generated = paddle.concat((generated, next_token_embed), axis=1)
-                if stop_token_index == next_token.item():
-                    break
-
-            output_list = list(tokens.squeeze().cpu().numpy())
-            output_text = tokenizer.decode(output_list)
-            generated_list.append(output_text)
-
-    return generated_list[0]
-
-
 class CaptionDecoder(object):
     def __init__(self, pretrained_path, hidden_dim=64):
         super(CaptionDecoder, self).__init__()
@@ -224,26 +172,17 @@ class CaptionDecoder(object):
             new_k = k[7:]  # remove 'module.'
             state_dict[new_k] = v
         self.caption_model.set_state_dict(state_dict)
+        self.caption_model.eval()
+        self.caption_model.stop_gradient = True
 
     def encode_prefix(self, features):
         return self.caption_model.encode_prefix(features)
 
     def generate_captions(self, features):  # the low dimension representation of clip feature
-        """
-        generate captions given features
-        Args:
-            features : (tensor([B x L x D]))
-        Return:
-            generated_captions: (list([L]))
-        """
         features = paddle.split(features, 1, axis=0)
         generated_captions = []
-        use_beam_search = True
         with paddle.no_grad():
             for feature in features:
                 feature = self.caption_model.decode_prefix(feature)  # back to the clip feature
-                if use_beam_search:
-                    generated_captions.append(generate_beam(self.caption_model, self.tokenizer, embedding=feature)[0])
-                else:
-                    generated_captions.append(generate2(self.caption_model, self.tokenizer, embedding=feature))
+                generated_captions.append(generate_beam(self.caption_model, self.tokenizer, embedding=feature)[0])
         return generated_captions
