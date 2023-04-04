@@ -31,12 +31,12 @@ class LlamaTokenizer(PretrainedTokenizer):
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "facebookresearch/tiny-random-Llama": "https://bj.bcebos.com/paddlenlp/models/transformers/Llama/sentencepiece.bpe.model",
+            "facebookresearch/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
         },
     }
 
     pretrained_init_configuration = {
-        "facebookresearch/tiny-random-Llama": {},
+        "facebookresearch/tiny-random-llama": {},
     }
 
     def __init__(
