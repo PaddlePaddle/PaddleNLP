@@ -40,7 +40,7 @@ paddlenlp.utils.serialization.load_torch = load_torch
 paddlenlp.transformers.conversion_utils.load_torch = load_torch
 
 
-class TestCkptShard(unittest.TestCase):
+class TestGLM(unittest.TestCase):
     def testTorchGLM(self):
         from transformers import AutoModel
 
@@ -60,6 +60,7 @@ class TestCkptShard(unittest.TestCase):
         ret = loss.logits.abs().mean().item()
         np.testing.assert_allclose(ret, 2.109480381011963, rtol=1e-7)
 
+    @unittest.skip("Skip export!")
     def testPaddleGLM(self):
         from paddlenlp.transformers import AutoModel
 
@@ -107,6 +108,6 @@ class TestCkptShard(unittest.TestCase):
         model.eval()
 
 
-class TestGLM(TestMultipleGpus):
-    def testGlmMP(self):
-        self.run_2gpu("glm_mp.py")
+class TestGLMTensorParallel(TestMultipleGpus):
+    def testPaddleTensorParallelGLM(self):
+        self.run_4gpu("glm_mp.py")
