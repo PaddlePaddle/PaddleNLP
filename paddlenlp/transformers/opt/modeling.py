@@ -29,7 +29,9 @@ from paddle.nn import Layer
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from paddlenlp.transformers.conversion_utils import StateDictNameMapping
+from paddlenlp.transformers.generation_utils import ModelOutput, convert_dtype
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.log import logger
 
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -467,16 +469,22 @@ class OPTLearnedPositionEmbedding(nn.Embedding):
         self.offset = 2
         super().__init__(num_embeddings + self.offset, embedding_dim)
 
-    def forward(self, position_ids, past_key_values_length: int = 0):
+    def forward(self, attention_mask, past_key_values_length: int = 0):
         """get the position embedding with attention mask
 
         Args:
-            position_ids: (paddle.Tensor): the tensor of position ids
+            attention_mask: (paddle.Tensor): # create positions depending on attention_mask
             past_key_values_length (int, optional): the past key value which will . Defaults to 0.
 
         Returns:
             paddle.Tensor: the position embedding
         """
+        # create positions depending on attention_mask
+        if attention_mask.dtype != paddle.bool:
+            attention_mask = attention_mask == 0.0
+
+        position_ids = paddle.cumsum(paddle.cast(attention_mask, "int64"), axis=-1) - 1
+
         # cut positions if `past_key_values_length` is > 0
         position_ids = position_ids[:, past_key_values_length:]
         return nn.Embedding.forward(self, position_ids + self.offset)
@@ -528,22 +536,14 @@ class OPTEmbeddings(Layer):
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids=None, position_ids=None, input_embeddings=None):
+    def forward(self, input_ids=None, attention_mask=None, input_embeddings=None, past_key_values_length=None):
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
             input_embeddings = self.word_embeddings(input_ids)
-        else:
-            input_shape = paddle.shape(input_embeddings)[:-1]
-
-        if position_ids is None:
-            ones = paddle.ones(input_shape, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            position_ids = seq_length - ones
 
         if self.project_in:
             input_embeddings = self.project_in(input_embeddings)
 
-        position_embeddings = self.position_embeddings(position_ids)
+        position_embeddings = self.position_embeddings(attention_mask, past_key_values_length)
 
         embeddings = input_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
@@ -818,6 +818,9 @@ class OPTModel(OPTPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
+        if position_ids is not None:
+            logger.warning("position_ids has not required for OPTModel.")
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -837,18 +840,18 @@ class OPTModel(OPTPretrainedModel):
         self.checkpoints = []
         past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
 
-        if position_ids is None:
-            position_ids = paddle.arange(
-                past_key_values_length, input_shape[-1] + past_key_values_length, dtype="int64"
-            )
-            position_ids = position_ids.unsqueeze(0)
-            position_ids = paddle.expand(position_ids, input_shape)
+        if attention_mask is None:
+            attention_mask = paddle.zeros(shape=input_shape)
+
         embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, input_embeddings=inputs_embeds
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            input_embeddings=inputs_embeds,
+            past_key_values_length=past_key_values_length,
         )
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
+        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e9, diagonal=1)
         if past_key_values_length > 0:
             causal_mask = paddle.concat(
                 [
@@ -945,7 +948,6 @@ class OPTForCausalLM(OPTPretrainedModel):
     def forward(
         self,
         input_ids=None,
-        position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
         labels=None,
@@ -954,13 +956,12 @@ class OPTForCausalLM(OPTPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        **kwargs,
     ):
         r"""
 
         Args:
             input_ids (Tensor):
-                See :class:`OPTModel`.
-            position_ids (Tensor, optional):
                 See :class:`OPTModel`.
             attention_mask (Tensor, optional):
                 See :class:`OPTModel`.
@@ -1010,7 +1011,6 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         outputs = self.opt(
             input_ids,
-            position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
@@ -1078,38 +1078,42 @@ class OPTForCausalLM(OPTPretrainedModel):
         self._fast_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
         return self._fast_entry
 
-    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, inputs_embeds=None, **kwargs):
-        # only last token for inputs_ids if cache is defined in kwargs
+    def prepare_inputs_for_generation(
+        self, input_ids, use_cache=False, cache=None, attention_mask=None, inputs_embeds=None, **kwargs
+    ):
         if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
+            input_ids = input_ids[:, -1:]
 
-        position_ids = kwargs.get("position_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None:
-            if len(attention_mask.shape) == 4:
-                attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.common_ops_import.convert_dtype(attention_mask.dtype):
-                attention_mask = (1.0 - attention_mask) * -1e4
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and cache is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
             model_inputs = {"input_ids": input_ids}
 
-        if cache is not None:
-            if position_ids is not None:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-                position_ids += 2
-
         model_inputs.update(
             {
                 "cache": cache,
-                "use_cache": use_cache,
+                "use_cache": True,
+                # "return_dict": False,
                 "attention_mask": attention_mask,
-                "position_ids": position_ids,
             }
         )
         return model_inputs
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+            input_ids == pad_token_id
+        ).numpy().item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * -1e9
+        else:
+            attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
+
+        return attention_mask
 
     def __getattr__(self, name):
         try:
@@ -1122,6 +1126,60 @@ class OPTForCausalLM(OPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+    @staticmethod
+    def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
+        # update cache
+        if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
+            model_kwargs["cache"] = outputs[1]
+
+        if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
+            model_kwargs["cache"] = outputs.past_key_values
+
+        # update token_type_ids with last value
+        if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
+            token_type_ids = model_kwargs["token_type_ids"]
+            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
+
+        # update position_ids
+        if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
+            position_ids = model_kwargs["position_ids"]
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
+
+        # update attention_mask
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            # nn.Pad2D don't support the data type `bool`
+            if convert_dtype(attention_mask.dtype) == "bool":
+                attention_mask = paddle.cast(attention_mask, "int64")
+            if len(attention_mask.shape) == 4:
+                cur_device = paddle.get_device()
+                if cur_device.split(":")[0] == "npu":
+                    attention_mask = nn.Pad2D([0, 0, 0, 1], mode="constant")(attention_mask)
+                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=0)(attention_mask)
+                else:
+                    attention_mask = nn.Pad2D([0, 0, 0, 1], mode="replicate")(attention_mask)
+                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e4)(attention_mask)
+
+                dtype = convert_dtype(attention_mask.dtype)
+                if "int" in dtype:
+                    attention_mask[:, :, -1, -1] = 1
+                elif "float" in dtype:
+                    attention_mask[:, :, -1, -1] = 0.0
+                else:
+                    raise ValueError("The data type of input `attention_mask` must " "be bool, int or float")
+            else:
+                attention_mask = paddle.concat(
+                    [attention_mask, paddle.zeros([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+                )
+            model_kwargs["attention_mask"] = attention_mask
+
+        # update role_ids
+        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
+            role_ids = model_kwargs["role_ids"]
+            model_kwargs["role_ids"] = paddle.concat([role_ids, role_ids[:, -1:]], axis=-1)
+
+        return model_kwargs
 
 
 OPTForConditionalGeneration = OPTForCausalLM

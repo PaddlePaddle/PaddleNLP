@@ -13,14 +13,14 @@
 # limitations under the License.
 from __future__ import annotations
 
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.transformers import GPTTokenizer, OPTForCausalLM
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", required=True, help="The directory of model.")
+    parser.add_argument("--model_name_or_path", type=str, default="facebook/opt-125m", help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
@@ -38,20 +38,22 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = GPTTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
         self.args = args
-        self.model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path)
+        self.model = OPTForCausalLM.from_pretrained(args.model_name_or_path)
         self.model.eval()
 
     def preprocess(self, input_text):
         inputs = self.tokenizer(
             input_text,
-            return_tensors="np",
-            padding="max_length",
-            max_length=self.args.src_length,
+            return_tensors="pd",
+            padding=True,
             truncation=True,
             truncation_side="left",
+            return_position_ids=False,
+            return_token_type_ids=False,
         )
         return inputs
 

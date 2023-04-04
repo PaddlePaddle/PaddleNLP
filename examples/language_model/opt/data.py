@@ -41,8 +41,8 @@ def convert_example(
     question = example["question"]
     answer = (example.get("answers", []) or ["there is no answer"])[0]
 
-    input_seq = f"context: {context}. question: {question}. answer: "
-    output_seq = answer
+    input_seq = f"answer: {answer} context: {context} {tokenizer.eos_token}"
+    output_seq = f"question: {question} {tokenizer.eos_token}"
 
     # 1. tokenize input-tokens
     input_tokens = tokenizer.tokenize(input_seq)[:max_source_length]

@@ -21,10 +21,10 @@ from utils import OPTTrainer
 
 from data import DataCollatorForSupervisedDataset, convert_example
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoTokenizer, OPTForConditionalGeneration
+from paddlenlp.transformers import GPTTokenizer, OPTForCausalLM
 from paddlenlp.utils.log import logger
 
 
@@ -92,7 +92,7 @@ def main():
             )
 
     # Load the pretrained language model.
-    model = OPTForConditionalGeneration.from_pretrained(
+    model = OPTForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         # output_predict=True,
         # parallel_output=True,
@@ -110,13 +110,14 @@ def main():
             lora_alpha=8,
             merge_weights=True,
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = GPTTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v2", "dev_v2"])
+    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
     dev_ds.data = dev_ds.data[:100]
     dev_ds.new_data = dev_ds.new_data[:100]
 

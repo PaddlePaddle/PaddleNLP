@@ -50,7 +50,7 @@ class Predictor(object):
     def __init__(self, args):
         self.tokenizer = GPTTokenizer.from_pretrained(
             args.model_dir,
-            add_bos_token=False,
+            add_bos_token=True,
         )
         self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
@@ -70,13 +70,7 @@ class Predictor(object):
         self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
-        inputs = self.tokenizer(
-            input_text,
-            padding=True,
-            return_tensors="np",
-            return_attention_mask=True,
-            return_position_ids=True,
-        )
+        inputs = self.tokenizer(input_text, return_tensors="np", padding=True)
         return inputs
 
     def infer(self, inputs):
@@ -111,10 +105,11 @@ if __name__ == "__main__":
     paddle.seed(100)
     predictor = Predictor(args)
     all_texts = [
-        "context: I went to the supermarket today and spent five dollars.  question: How much do I speed today?. answer: "
+        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
-            print("{} \n {}".format(text, result))
+            print("{} \n\n {}".format(text, result))
