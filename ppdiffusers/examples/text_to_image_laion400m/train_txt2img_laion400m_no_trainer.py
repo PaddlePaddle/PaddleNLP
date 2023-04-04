@@ -34,8 +34,8 @@ from paddle.optimizer import AdamW
 
 from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.utils.log import logger
-from ppdiffusers.modeling_utils import unwrap_model
 from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.training_utils import unwrap_model
 
 
 def get_writer(training_args):
@@ -81,9 +81,6 @@ def main():
     model.set_recompute(training_args.recompute)
     params_to_train = itertools.chain(model.text_encoder.parameters(), model.unet.parameters())
 
-    if num_processes > 1:
-        model = paddle.DataParallel(model)
-
     lr_scheduler = get_scheduler(
         training_args.lr_scheduler_type,
         learning_rate=training_args.learning_rate,
@@ -111,6 +108,9 @@ def main():
         interpolation="lanczos",
         tokenizer=model.tokenizer,
     )
+
+    if num_processes > 1:
+        model = paddle.DataParallel(model)
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -143,7 +143,9 @@ def main():
             break
 
         for step, batch in enumerate(train_dataloader):
-            if num_processes > 1 and ((step + 1) % training_args.gradient_accumulation_steps != 0):
+            if (
+                num_processes > 1 and ((step + 1) % training_args.gradient_accumulation_steps != 0)
+            ) or training_args.recompute:
                 # grad acc, no_sync when (step + 1) % training_args.gradient_accumulation_steps != 0:
                 ctx_manager = model.no_sync()
             else:
@@ -172,7 +174,7 @@ def main():
                     if rank == 0:
                         # add scalar
                         for name, val in logs.items():
-                            writer.add_scalar(name, val, step=global_steps)
+                            writer.add_scalar(name, val, global_steps)
                     log_str = "Train: global_steps {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, train_loss: {4:.10f}, lr_abs: {5:.10f}, speed: {6:.2f} s/it.".format(
                         global_steps,
                         training_args.max_steps,

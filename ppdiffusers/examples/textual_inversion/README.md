@@ -12,12 +12,12 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-pip install -U ppdiffusers visualdl
+pip install -U ppdiffusers visualdl -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ### 1.2 Cat toy 训练 object 的例子
 
-在训练开始之前，我们需要准备需要训练的 3-5 张图片，在这里我们可以从[这里](https://huggingface.co/sd-dreambooth-library/cat-toy) 下载到所需要的图片，然后将里面的内容保存到一个文件夹`cat_toy_images`中。
+在训练开始之前，我们需要准备需要训练的 3-5 张图片，在这里我们可以从[这里](https://huggingface.co/sd-dreambooth-library/cat-toy/tree/main/concept_images) 下载到所需要的图片，然后将里面的内容保存到一个文件夹`cat_toy_images`中。
 <p align="center">
     <img src="https://user-images.githubusercontent.com/50394665/196325636-3ad872b2-4e84-4169-9831-8c8aa6d72a94.png" height=40% width=40%>
 </p>
@@ -60,6 +60,7 @@ python -u train_textual_inversion.py \
 > * `--max_train_steps`: 最大的训练步数，当我们设置这个值后，它会重新计算所需的`num_train_epochs`轮数。
 > * `--save_steps`: 每间隔多少步`（global step步数）`，保存学习到的文件`learned_embeds.pdparams`。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
 > 可以修改的参数
 > * `--language`: 模型的语言，`zh`、`en`或`zh_en`，当我们使用中文模型时候，请设置成`zh`。
@@ -147,6 +148,7 @@ image.save("cat-backpack.png")
 （2）加载已有的`learned_embeds.pdparams`权重
 
 ```python
+import paddle
 from ppdiffusers import StableDiffusionPipeline
 # 我们所需加载的模型地址，这里我们加载了我们微调模型所使用的权重
 model_path = "CompVis/stable-diffusion-v1-4"
@@ -250,6 +252,7 @@ image.save("huang-guang-jian-girl.png")
 （2）加载已有的`learned_embeds.pdparams`权重
 
 ```python
+import paddle
 from ppdiffusers import StableDiffusionPipeline
 # 我们所需加载的模型地址，这里我们加载了我们微调模型所使用的权重
 model_path = "CompVis/stable-diffusion-v1-4"

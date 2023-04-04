@@ -1,4 +1,5 @@
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +23,9 @@ import PIL
 from paddlenlp.transformers import CLIPFeatureExtractor
 
 from ...models import AutoencoderKL, UNet2DConditionModel
-from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
-from ...utils import logging
+from ...utils import logging, randn_tensor
+from ..pipeline_utils import DiffusionPipeline
 from ..stable_diffusion import StableDiffusionPipelineOutput
 from ..stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from .image_encoder import PaintByExampleImageEncoder
@@ -38,8 +39,8 @@ def prepare_mask_and_masked_image(image, mask):
     converted to ``paddle.Tensor`` with shapes ``batch x channels x height x width`` where ``channels`` is ``3`` for the
     ``image`` and ``1`` for the ``mask``.
 
-    The ``image`` will be converted to ``torch.float32`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
-    binarized (``mask > 0.5``) and cast to ``torch.float32`` too.
+    The ``image`` will be converted to ``paddle.float32`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
+    binarized (``mask > 0.5``) and cast to ``paddle.float32`` too.
 
     Args:
         image (Union[np.array, PIL.Image, paddle.Tensor]): The image to inpaint.
@@ -98,8 +99,7 @@ def prepare_mask_and_masked_image(image, mask):
         mask = 1 - mask
 
         # Binarize mask
-        mask[mask < 0.5] = 0
-        mask[mask >= 0.5] = 1
+        mask = paddle.where(mask < 0.5, 0.0, 1.0)
 
         # Image as float32
         image = image.cast(paddle.float32)
@@ -159,6 +159,8 @@ class PaintByExamplePipeline(DiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
+    # TODO: feature_extractor is required to encode initial images (if they are in PIL format),
+    # we should give a descriptive message if the pipeline doesn't have one.
     _optional_components = ["safety_checker"]
 
     def __init__(
@@ -184,7 +186,7 @@ class PaintByExamplePipeline(DiffusionPipeline):
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, dtype):
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
@@ -195,7 +197,7 @@ class PaintByExamplePipeline(DiffusionPipeline):
             has_nsfw_concept = None
         return image, has_nsfw_concept
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -213,16 +215,16 @@ class PaintByExamplePipeline(DiffusionPipeline):
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
+        latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_image_variation.StableDiffusionImageVariationPipeline.check_inputs
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_image_variation.StableDiffusionImageVariationPipeline.check_inputs
     def check_inputs(self, image, height, width, callback_steps):
         if (
             not isinstance(image, paddle.Tensor)
@@ -245,9 +247,9 @@ class PaintByExamplePipeline(DiffusionPipeline):
                 f" {type(callback_steps)}."
             )
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
-        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
                 f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
@@ -255,23 +257,13 @@ class PaintByExamplePipeline(DiffusionPipeline):
             )
 
         if latents is None:
-            if isinstance(generator, list):
-                shape = [
-                    1,
-                ] + shape[1:]
-                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
-                latents = paddle.concat(latents, axis=0)
-            else:
-                latents = paddle.randn(shape, generator=generator, dtype=dtype)
-        else:
-            if latents.shape != shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+            latents = randn_tensor(shape, generator=generator, dtype=dtype)
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint.StableDiffusionInpaintPipeline.prepare_mask_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint.StableDiffusionInpaintPipeline.prepare_mask_latents
     def prepare_mask_latents(
         self, mask, masked_image, batch_size, height, width, dtype, generator, do_classifier_free_guidance
     ):
@@ -294,7 +286,7 @@ class PaintByExamplePipeline(DiffusionPipeline):
             masked_image_latents = paddle.concat(masked_image_latents, axis=0)
         else:
             masked_image_latents = self.vae.encode(masked_image).latent_dist.sample(generator=generator)
-        masked_image_latents = 0.18215 * masked_image_latents
+        masked_image_latents = self.vae.config.scaling_factor * masked_image_latents
 
         # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
         if mask.shape[0] < batch_size:
@@ -324,13 +316,13 @@ class PaintByExamplePipeline(DiffusionPipeline):
         return mask, masked_image_latents
 
     def _encode_image(self, image, num_images_per_prompt, do_classifier_free_guidance):
-        # dtype = self.image_encoder.dtype
+        dtype = self.image_encoder.dtype
 
         if not isinstance(image, paddle.Tensor):
             image = self.feature_extractor(images=image, return_tensors="pd").pixel_values
 
-        # image = image.cast(dtype)
-        image_embeddings = self.image_encoder(image)
+        image = image.cast(dtype)
+        image_embeddings, negative_prompt_embeds = self.image_encoder(image, return_uncond_vector=True)
 
         # duplicate image embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = image_embeddings.shape
@@ -338,14 +330,13 @@ class PaintByExamplePipeline(DiffusionPipeline):
         image_embeddings = image_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         if do_classifier_free_guidance:
-            uncond_embeddings = self.image_encoder.uncond_vector
-            uncond_embeddings = uncond_embeddings.tile([1, image_embeddings.shape[0], 1])
-            uncond_embeddings = uncond_embeddings.reshape([bs_embed * num_images_per_prompt, 1, -1])
+            negative_prompt_embeds = negative_prompt_embeds.tile([1, image_embeddings.shape[0], 1])
+            negative_prompt_embeds = negative_prompt_embeds.reshape([bs_embed * num_images_per_prompt, 1, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            image_embeddings = paddle.concat([uncond_embeddings, image_embeddings])
+            image_embeddings = paddle.concat([negative_prompt_embeds, image_embeddings])
 
         return image_embeddings
 
@@ -359,6 +350,7 @@ class PaintByExamplePipeline(DiffusionPipeline):
         width: Optional[int] = None,
         num_inference_steps: int = 50,
         guidance_scale: float = 5.0,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
@@ -395,14 +387,16 @@ class PaintByExamplePipeline(DiffusionPipeline):
                 Paper](https://arxiv.org/pdf/2205.11487.pdf). Guidance scale is enabled by setting `guidance_scale >
                 1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
                 usually at the expense of lower image quality.
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
+                if `guidance_scale` is less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`torch.Generator`, *optional*):
-                One or a list of [torch generator(s)](https://pytorch.org/docs/stable/generated/torch.Generator.html)
-                to make generation deterministic.
+            generator (`paddle.Generator`, *optional*):
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents

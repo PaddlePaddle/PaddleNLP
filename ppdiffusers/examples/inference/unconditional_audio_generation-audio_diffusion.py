@@ -31,4 +31,4 @@ for i, audio in enumerate(audio):
     write(f"audio_diffusion_test{i}.wav", pipe.mel.sample_rate, audio.transpose())
 
 # 保存图片
-image.save("audio_diffusion_test.png")
+image.save("unconditional_audio_generation-audio_diffusion-result.png")

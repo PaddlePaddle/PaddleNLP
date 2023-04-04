@@ -627,9 +627,6 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if self.tensor_parallel_degree <= 1:
-            self.tensor_parallel_degree = 1
-
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
@@ -639,14 +636,20 @@ class TrainingArguments:
                 world_size % self.tensor_parallel_degree == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree:{self.tensor_parallel_degree}."
 
-            if self.sharding_parallel_degree == -1:
-                self.sharding_parallel_degree = world_size // self.tensor_parallel_degree
+            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
 
-            assert world_size % (self.sharding_parallel_degree * self.tensor_parallel_degree) == 0, (
+            if self.sharding_parallel_degree == -1:
+                if len(self.sharding) > 0:
+                    self.sharding_parallel_degree = world_size // self.tensor_parallel_degree
+
+            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+
+            assert world_size % (sharding_parallel_degree * tensor_parallel_degree) == 0, (
                 "The world size for workers should be divided by sharding_parallel_degree and tensor_parallel_degree, "
-                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, world_size:{self.world_size}"
+                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree},"
+                " world_size:{world_size}"
             )
-            self.data_parallel_degree = world_size // (self.sharding_parallel_degree * self.tensor_parallel_degree)
+            self.data_parallel_degree = world_size // (sharding_parallel_degree * tensor_parallel_degree)
 
             if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
                 warnings.warn("`offload` and `stage3` is not supported NOW!")
@@ -656,9 +659,9 @@ class TrainingArguments:
                 strategy = fleet.DistributedStrategy()
                 strategy.hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
-                    "mp_degree": self.tensor_parallel_degree,
+                    "mp_degree": tensor_parallel_degree,
                     "pp_degree": 1,
-                    "sharding_degree": self.sharding_parallel_degree,
+                    "sharding_degree": sharding_parallel_degree,
                 }
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
@@ -751,14 +754,14 @@ class TrainingArguments:
     @property
     def dataset_rank(self):
         if self.use_hybrid_parallel:
-            return self.sharding_parallel_degree * self.data_parallel_rank + self.sharding_parallel_rank
+            return max(self.sharding_parallel_degree, 1) * self.data_parallel_rank + self.sharding_parallel_rank
         else:
             return paddle.distributed.get_rank()
 
     @property
     def dataset_world_size(self):
         if self.use_hybrid_parallel:
-            return self.sharding_parallel_degree * self.data_parallel_degree
+            return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 
@@ -767,9 +770,7 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             hcg = fleet.get_hybrid_communicate_group()
             sharding_group = hcg.get_sharding_parallel_group()
-            if sharding_group.rank < 0:
-                return 0
-            return sharding_group.rank
+            return max(sharding_group.rank, 0)
         else:
             return 0
 
@@ -777,10 +778,8 @@ class TrainingArguments:
     def tensor_parallel_rank(self):
         if self.use_hybrid_parallel:
             hcg = fleet.get_hybrid_communicate_group()
-            mp_group = hcg.get_model_parallel_group()
-            if mp_group.rank < 0:
-                return 0
-            return mp_group.rank
+            tp_group = hcg.get_model_parallel_group()
+            return max(tp_group.rank, 0)
         else:
             return 0
 

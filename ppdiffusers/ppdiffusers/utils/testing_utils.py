@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,26 +20,48 @@ import random
 import re
 import unittest
 import urllib.parse
+from distutils.util import strtobool
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 import PIL.Image
 import PIL.ImageOps
 import requests
 
-from paddlenlp.trainer.argparser import strtobool
+from .import_utils import (
+    is_fastdeploy_available,
+    is_paddle_available,
+    is_torch_available,
+)
+from .logging import get_logger
 
-from .import_utils import is_fastdeploy_available, is_paddle_available
+global_rng = random.Random()
+
+logger = get_logger(__name__)
 
 if is_paddle_available():
     import paddle
 
-global_rng = random.Random()
+    if "PPDIFFUSERS_TEST_DEVICE" in os.environ:
+        paddle_device = os.environ["PPDIFFUSERS_TEST_DEVICE"]
+
+        available_backends = ["gpu", "cpu"]
+        if paddle_device not in available_backends:
+            raise ValueError(
+                f"unknown paddle backend for ppdiffusers tests: {paddle_device}. Available backends are:"
+                f" {available_backends}"
+            )
+        logger.info(f"paddle_device overrode to {paddle_device}")
+    else:
+        paddle_device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
 
-def image_grid(imgs, rows, cols):
+def image_grid(imgs, rows=None, cols=None):
+    if rows is None and cols is None:
+        rows = 1
+        cols = len(imgs)
     assert len(imgs) == rows * cols
     w, h = imgs[0].size
     grid = PIL.Image.new("RGB", size=(cols * w, rows * h))
@@ -52,10 +74,24 @@ def image_grid(imgs, rows, cols):
 def paddle_all_close(a, b, *args, **kwargs):
     if not is_paddle_available():
         raise ValueError("Paddle needs to be installed to use this function.")
-
     if not paddle.allclose(a, b, *args, **kwargs):
         assert False, f"Max diff is absolute {(a - b).abs().max()}. Diff tensor is {(a - b).abs()}."
     return True
+
+
+def print_tensor_test(tensor, filename="test_corrections.txt", expected_tensor_name="expected_slice"):
+    test_name = os.environ.get("PYTEST_CURRENT_TEST")
+    if not paddle.is_tensor(tensor):
+        tensor = paddle.to_tensor(tensor)
+
+    tensor_str = str(tensor.detach().cpu().flatten().cast("float32")).replace("\n", "")
+    # format is usually:
+    # expected_slice = np.array([-0.5713, -0.3018, -0.9814, 0.04663, -0.879, 0.76, -1.734, 0.1044, 1.161])
+    output_str = tensor_str.replace("tensor", f"{expected_tensor_name} = np.array")
+    test_file, test_class, test_fn = test_name.split("::")
+    test_fn = test_fn.split()[0]
+    with open(filename, "a") as f:
+        print(";".join([test_file, test_class, test_fn, output_str]), file=f)
 
 
 def get_tests_dir(append_path=None):
@@ -112,7 +148,7 @@ def floats_tensor(shape, scale=1.0, rng=None, name=None):
     for _ in range(total_dims):
         values.append(rng.random() * scale)
 
-    return paddle.to_tensor(data=values, dtype=paddle.float32).reshape(shape)
+    return paddle.to_tensor(values, dtype=paddle.float32).reshape(shape)
 
 
 def slow(test_case):
@@ -125,6 +161,16 @@ def slow(test_case):
     return unittest.skipUnless(_run_slow_tests, "test is slow")(test_case)
 
 
+def nightly(test_case):
+    """
+    Decorator marking a test that runs nightly in the ppdiffusers CI.
+
+    Slow tests are skipped by default. Set the RUN_NIGHTLY environment variable to a truthy value to run them.
+
+    """
+    return unittest.skipUnless(_run_nightly_tests, "test is nightly")(test_case)
+
+
 def require_paddle(test_case):
     """
     Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
@@ -132,12 +178,11 @@ def require_paddle(test_case):
     return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
 
 
-def nightly(test_case):
-    """
-    Decorator marking a test that runs nightly in the diffusers CI.
-    Slow tests are skipped by default. Set the RUN_NIGHTLY environment variable to a truthy value to run them.
-    """
-    return unittest.skipUnless(_run_nightly_tests, "test is nightly")(test_case)
+def require_paddle_gpu(test_case):
+    """Decorator marking a test that requires CUDA and Paddle."""
+    return unittest.skipUnless(is_paddle_available() and paddle_device == "gpu", "test requires Paddle+CUDA")(
+        test_case
+    )
 
 
 def require_fastdeploy(test_case):
@@ -147,9 +192,13 @@ def require_fastdeploy(test_case):
     return unittest.skipUnless(is_fastdeploy_available(), "test requires fastdeploy")(test_case)
 
 
-def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:
+def load_numpy(arry: Union[str, np.ndarray], local_path: Optional[str] = None) -> np.ndarray:
     if isinstance(arry, str):
-        if arry.startswith("http://") or arry.startswith("https://"):
+        # local_path = "/home/patrick_huggingface_co/"
+        if local_path is not None:
+            # local_path can be passed to correct images of tests
+            return os.path.join(local_path, "/".join([arry.split("/")[-5], arry.split("/")[-2], arry.split("/")[-1]]))
+        elif arry.startswith("http://") or arry.startswith("https://"):
             response = requests.get(arry)
             response.raise_for_status()
             arry = np.load(BytesIO(response.content))
@@ -167,6 +216,25 @@ def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:
             " ndarray."
         )
 
+    return arry
+
+
+def load_pt(url: str):
+    if is_torch_available():
+        import torch
+
+        response = requests.get(url)
+        response.raise_for_status()
+        arry = torch.load(BytesIO(response.content), map_location="cpu")
+        return arry
+    else:
+        raise ValueError("Please install torch firstly!")
+
+
+def load_pd(url: str):
+    response = requests.get(url)
+    response.raise_for_status()
+    arry = paddle.load(BytesIO(response.content))
     return arry
 
 

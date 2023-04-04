@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2020 Optuna, Hugging Face
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 Optuna, Hugging Face
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,14 +121,14 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
 
 def get_verbosity() -> int:
     """
-    Return the current level for the PaddleNLP PPDiffusers' root logger as an int.
+    Return the current level for the 🤗 PPDiffusers' root logger as an int.
 
     Returns:
         `int`: The logging level.
 
     <Tip>
 
-    PaddleNLP PPDiffusers has following logging levels:
+    🤗 Diffusers has following logging levels:
 
     - 50: `ppdiffusers.logging.CRITICAL` or `ppdiffusers.logging.FATAL`
     - 40: `ppdiffusers.logging.ERROR`
@@ -144,7 +144,7 @@ def get_verbosity() -> int:
 
 def set_verbosity(verbosity: int) -> None:
     """
-    Set the verbosity level for the PaddleNLP PPDiffusers' root logger.
+    Set the verbosity level for the 🤗 Diffusers' root logger.
 
     Args:
         verbosity (`int`):

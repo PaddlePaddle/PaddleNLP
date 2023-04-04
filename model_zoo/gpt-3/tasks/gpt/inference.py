@@ -18,17 +18,15 @@ import os
 import sys
 
 import paddle.distributed as dist
-from paddle.distributed import fleet
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../../")))
 
 from ppfleetx.core import EagerEngine
-from ppfleetx.data import build_dataloader, tokenizers
+from ppfleetx.data import tokenizers
 from ppfleetx.distributed.apis import env
 from ppfleetx.models import build_module
 from ppfleetx.utils import config
-from ppfleetx.utils.log import logger
 
 if __name__ == "__main__":
     args = config.parse_args()

@@ -24,14 +24,20 @@ import paddle
 import paddle.optimizer
 import paddle.static
 from datasets import load_dataset
+from modeling import (
+    BertModel,
+    DeviceScope,
+    IpuBertConfig,
+    IpuBertForQuestionAnswering,
+    IpuBertQAAccAndLoss,
+)
 from paddle.io import BatchSampler, DataLoader
+from run_pretrain import create_ipu_strategy, reset_program_state_dict, set_seed
+from utils import load_custom_ops, parse_args
+
 from paddlenlp.data import Dict, Stack
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import BertTokenizer, LinearDecayWithWarmup
-
-from modeling import BertModel, DeviceScope, IpuBertConfig, IpuBertForQuestionAnswering, IpuBertQAAccAndLoss
-from run_pretrain import create_ipu_strategy, reset_program_state_dict, set_seed
-from utils import load_custom_ops, parse_args
 
 
 def create_data_holder(args):
@@ -345,7 +351,7 @@ def main(args):
         fetch_list = [start_logits.name, end_logits.name]
 
     ipu_compiler = paddle.static.IpuCompiledProgram(main_program, ipu_strategy=ipu_strategy)
-    logging.info(f"start compiling, please wait some minutes")
+    logging.info("start compiling, please wait some minutes")
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
