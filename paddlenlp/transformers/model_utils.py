@@ -605,6 +605,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
         )
 
+    @classmethod
+    def constructed_from_pretrained_config(cls, init_func=None) -> bool:
+        """check if the model is constructed from `PretrainedConfig`
+        Returns:
+            bool: if the model is constructed from `PretrainedConfig`
+        """
+        return cls.config_class is not None and issubclass(cls.config_class, PretrainedConfig)
+
     def save_model_config(self, save_dir: str):
         """
         Saves model configuration to a file named "config.json" under `save_dir`.
