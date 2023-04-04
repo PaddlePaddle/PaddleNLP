@@ -392,10 +392,8 @@ class RemBertForSequenceClassification(RemBertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        rembert (:class:`RemBertModel`):
-            An instance of RemBertModel.
-        num_classes (int, optional):
-            The number of classes.
+        config (:class:`RemBertConfig`):
+            An instance of RemBertConfig used to construct RemBertForSequenceClassification.
     """
 
     def __init__(self, config: RemBertConfig):
@@ -456,8 +454,8 @@ class RemBertForQuestionAnswering(RemBertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        rembert (:class:`RemBertModel`):
-            An instance of RemBertModel.
+        config (:class:`RemBertConfig`):
+            An instance of RemBertConfig used to construct RemBertForQuestionAnswering.
     """
 
     def __init__(self, config: RemBertConfig):
@@ -568,8 +566,8 @@ class RemBertForMaskedLM(RemBertPretrainedModel):
     RemBert Model with a `masked language modeling` head on top.
 
     Args:
-        rembert (:class:`RemBertModel`):
-            An instance of :class:`RemBertModel`.
+        config (:class:`RemBertConfig`):
+            An instance of RemBertConfig used to construct RemBertForMaskedLM.
 
     """
 
@@ -629,16 +627,14 @@ class RemBertForTokenClassification(RemBertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        rembert (:class:`RemBertModel`):
-            An instance of RemBertModel.
-        num_classes (int):
-            The number of classes.
+        config (:class:`RemBertConfig`):
+            An instance of RemBertConfig used to construct RemBertForTokenClassification.
     """
 
     def __init__(self, config: RemBertConfig):
         super(RemBertForTokenClassification, self).__init__(config)
         self.num_classes = config.num_classes
-        self.rembert = RemBertModel(config)  # allow rembert to be config
+        self.rembert = RemBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
         self.apply(self.init_weights)
@@ -692,10 +688,8 @@ class RemBertForMultipleChoice(RemBertPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        rembert (:class:`RemBertModel`):
-            An instance of RemBertModel.
-        num_choices (int):
-            The number of choices.
+        config (:class:`RemBertConfig`):
+            An instance of RemBertConfig used to construct RemBertForMultipleChoice.
     """
 
     def __init__(self, config: RemBertConfig):

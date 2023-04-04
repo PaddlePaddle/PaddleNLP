@@ -188,7 +188,7 @@ class RemBertModelTester:
         result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
         self.parent.assertEqual(result.shape, [self.batch_size, self.num_choices])
 
-    def create_and_check_tokenclassification_model(
+    def create_and_check_token_classification_model(
         self,
         config,
         input_ids,
@@ -239,9 +239,9 @@ class RemBertModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_multiple_choice_model(*config_and_inputs)
 
-    def test_tokenclassification_model(self):
+    def test_token_classification_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_tokenclassification_model(*config_and_inputs)
+        self.model_tester.create_and_check_token_classification_model(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):
