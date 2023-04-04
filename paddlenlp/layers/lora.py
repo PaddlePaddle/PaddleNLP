@@ -308,7 +308,7 @@ class LoRAMergedLinear(nn.Linear):
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
             if len(input_a.shape) == 2:
-                delta_mp = (
+                delta = (
                     F.conv1d(
                         input_a.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
                     )
@@ -316,13 +316,13 @@ class LoRAMergedLinear(nn.Linear):
                     .transpose([1, 0])
                 )
             elif len(input_a.shape) == 3:
-                delta_mp = (
+                delta = (
                     F.conv1d(input_a.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
 
-            result += self.zero_pad(delta_mp * self.scaling)
+            result += self.zero_pad(delta * self.scaling)
         return result
 
     def extra_repr(self):
