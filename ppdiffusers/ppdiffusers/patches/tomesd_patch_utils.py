@@ -41,7 +41,7 @@ def scatter_reduce(
 ) -> paddle.Tensor:
     # reduce "sum", "prod", "mean",
     # TODO support "amax", "amin" and include_self = False
-    if reduce in ["sum", "assign"]:
+    if reduce in ["sum", "assign", "add"]:
         if reduce == "sum":
             reduce = "add"
         input.put_along_axis_(indices=index, values=src, axis=dim, reduce=reduce)
@@ -58,7 +58,7 @@ def scatter_reduce(
             device=paddle.get_device()
         )
     else:
-        raise NotImplementedError("only support mode in ['sum', 'prod', 'mul', 'multiply', 'mean', 'assign']!")
+        raise NotImplementedError("only support mode in ['add', 'sum', 'prod', 'mul', 'multiply', 'mean', 'assign']!")
     return input
 
 
@@ -83,6 +83,7 @@ def bipartite_soft_matching_random2d(
     """
     Partitions the tokens into src and dst and merges r tokens from src to dst.
     Dst tokens are partitioned by choosing one randomy in each (sx, sy) region.
+
     Args:
      - metric [B, N, C]: metric to use for similarity
      - w: image width in tokens
@@ -101,22 +102,35 @@ def bipartite_soft_matching_random2d(
 
         hsy, wsx = h // sy, w // sx
 
-        # For each sy by sx kernel, randomly assign one token to be dst and the rest src
-        idx_buffer: paddle.Tensor = paddle.zeros((1, hsy, wsx, sy * sx, 1))
-
         if no_rand:
-            rand_idx = paddle.zeros((1, hsy, wsx, 1, 1), dtype=paddle.int64)
+            rand_idx = paddle.zeros((hsy, wsx, 1), dtype=paddle.int64)
         else:
-            rand_idx = paddle.randint(sy * sx, shape=(1, hsy, wsx, 1, 1), dtype=paddle.int64)
+            rand_idx = paddle.randint(sy * sx, shape=(hsy, wsx, 1), dtype=paddle.int64)
 
-        idx_buffer.put_along_axis_(
-            axis=3, indices=rand_idx, values=-paddle.ones_like(rand_idx, dtype=idx_buffer.dtype)
+        # The image might not divide sx and sy, so we need to work on a view of the top left if the idx buffer instead
+        idx_buffer_view = paddle.zeros([hsy, wsx, sy * sx], dtype=paddle.int64)
+        idx_buffer_view.put_along_axis_(
+            axis=2, indices=rand_idx, values=-paddle.ones_like(rand_idx, dtype=rand_idx.dtype)
+        )
+        idx_buffer_view = (
+            idx_buffer_view.reshape([hsy, wsx, sy, sx]).transpose([0, 2, 1, 3]).reshape([hsy * sy, wsx * sx])
         )
 
-        idx_buffer = idx_buffer.reshape([1, hsy, wsx, sy, sx, 1]).transpose([0, 1, 3, 2, 4, 5]).reshape([1, N, 1])
-        rand_idx = idx_buffer.argsort(axis=1)
+        # Image is not divisible by sx or sy so we need to move it into a new buffer
+        if (hsy * sy) < h or (wsx * sx) < w:
+            idx_buffer = paddle.zeros([h, w], dtype=paddle.int64)
+            idx_buffer[: (hsy * sy), : (wsx * sx)] = idx_buffer_view
+        else:
+            idx_buffer = idx_buffer_view
 
-        num_dst = int((1 / (sx * sy)) * N)
+        # We set dst tokens to be -1 and src to be 0, so an argsort gives us dst|src indices
+        rand_idx = idx_buffer.reshape([1, -1, 1]).argsort(axis=1)
+
+        # We're finished with these
+        del idx_buffer, idx_buffer_view
+
+        # rand_idx is currently dst|src, so split them
+        num_dst = hsy * wsx
         a_idx = rand_idx[:, num_dst:, :]  # src
         b_idx = rand_idx[:, :num_dst, :]  # dst
 
@@ -127,6 +141,7 @@ def bipartite_soft_matching_random2d(
             dst = x.take_along_axis(indices=b_idx.expand([B, num_dst, C]), axis=1)
             return src, dst
 
+        # Cosine similarity between A and B
         metric = metric / metric.norm(axis=-1, keepdim=True)
         a, b = split(metric)
         scores = paddle.matmul(a, b, transpose_y=True)
@@ -136,6 +151,7 @@ def bipartite_soft_matching_random2d(
 
         # node_max, node_idx = scores.max(axis=-1)
         # top_k vs max argmax
+        # Find the most similar greedily
         node_max, node_idx = paddle.topk(scores, k=1, axis=-1)
         # node_max = scores.max(axis=-1)
         # node_idx = scores.argmax(axis=-1)
@@ -375,7 +391,7 @@ def apply_tome(
 
     """
     if ratio >= 1 - (1 / (sx * sy)):
-        raise ValueError(f"The radio must be less than {1-(1/(sx*sy))} !")
+        raise ValueError(f"The tome ratio must be less than {1-(1/(sx*sy))} !")
 
     # Make sure the model_or_pipe is not currently patched
     model_list = model_or_pipe.remove_tome(only_return_self=False)[1]
