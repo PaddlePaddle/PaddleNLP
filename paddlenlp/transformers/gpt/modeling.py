@@ -1189,10 +1189,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(self, self.base_model_prefix).config[name]
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class GPTForTokenClassification(GPTPretrainedModel):
