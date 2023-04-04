@@ -1329,8 +1329,8 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
     def __init__(self, config: GPTConfig):
         super(GPTForSequenceClassification, self).__init__(config)
-
-        self.gpt = GPTModel(config)  # allow gpt to be config
+        self.num_labels = config.num_labels
+        self.gpt = GPTModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
