@@ -812,7 +812,7 @@ class DebertaLMPredictionHead(nn.Layer):
         return hidden_states
 
 
-class DebertaOnlyMLMHead(nn.Module):
+class DebertaOnlyMLMHead(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.predictions = DebertaLMPredictionHead(config)
