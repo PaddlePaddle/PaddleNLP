@@ -586,12 +586,12 @@ class DebertaPreTrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config):
         mappings = []
-        model_mappings = {
+        model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.LayerNorm.weight", "embeddings.LayerNorm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.LayerNorm.bias"],
             ["encoder.rel_embeddings.weight", "encoder.rel_embeddings.weight"],
-        }
+        ]
         for layer_index in range(config.num_hidden_layers):
 
             layer_mappings = [
