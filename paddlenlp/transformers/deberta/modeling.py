@@ -584,8 +584,8 @@ class DebertaPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = DEBERTA_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
-    def _get_name_mappings(cls, config: DebertaConfig) -> list[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
+    def _get_name_mappings(cls, config):
+        mappings = []
         model_mappings = {
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.LayerNorm.weight", "embeddings.LayerNorm.weight"],
