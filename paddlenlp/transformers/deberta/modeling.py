@@ -33,7 +33,7 @@ from ..model_outputs import (
 from .configuration import (
     DEBERTA_PRETRAINED_INIT_CONFIGURATION,
     DEBERTA_PRETRAINED_RESOURCE_FILES_MAP,
-    DeBERTaConfig,
+    DebertaConfig,
 )
 
 __all__ = [
@@ -576,7 +576,7 @@ class DebertaPreTrainedModel(PretrainedModel):
     """
 
     model_config_file = CONFIG_NAME
-    config_class = DeBERTaConfig
+    config_class = DebertaConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "deberta"
 
@@ -584,7 +584,7 @@ class DebertaPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = DEBERTA_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
-    def _get_name_mappings(cls, config: DeBERTaConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: DebertaConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = {
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
@@ -688,7 +688,7 @@ class DebertaPreTrainedModel(PretrainedModel):
 
 @register_base_model
 class DebertaModel(DebertaPreTrainedModel):
-    def __init__(self, config: DeBERTaConfig):
+    def __init__(self, config: DebertaConfig):
         super().__init__()
         self.config = config
         self.embeddings = DebertaEmbeddings(config)
