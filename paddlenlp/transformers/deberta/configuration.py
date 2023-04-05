@@ -19,7 +19,7 @@ from typing import Dict, List
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["DEBERTA_PRETRAINED_INIT_CONFIGURATION", "DeBERTaConfig", "DEBERTA_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["DEBERTA_PRETRAINED_INIT_CONFIGURATION", "DebertaConfig", "DEBERTA_PRETRAINED_RESOURCE_FILES_MAP"]
 
 DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
     "deberta-base": {
@@ -42,13 +42,14 @@ DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
         "output_hidden_states": True,
         "embedding_size": 768,
         "relative_attention": True,
+        "num_labels": 2,
     },
 }
 
 DEBERTA_PRETRAINED_RESOURCE_FILES_MAP = {"model_state": {"_": "_"}}
 
 
-class DeBERTaConfig(PretrainedConfig):
+class DebertaConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`DeBERTaModel`] . It is used to
     instantiate a DeBERTa model according to the specified arguments, defining the model architecture. Instantiating a
@@ -141,6 +142,7 @@ class DeBERTaConfig(PretrainedConfig):
         output_attentions: bool = False,
         output_hidden_states: bool = True,
         relative_attention: bool = True,
+        num_labels: int = 2,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -163,3 +165,4 @@ class DeBERTaConfig(PretrainedConfig):
         self.output_hidden_states = output_hidden_states
         self.relative_attention = relative_attention
         self.pad_token_id = pad_token_id
+        self.num_labels = num_labels
