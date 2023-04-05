@@ -12,17 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 from collections.abc import Sequence
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
+from ..activations import ACT2FN
+from ..model_outputs import (
+    BaseModelOutput,
+    MaskedLMOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+)
 from .configuration import (
     DEBERTA_PRETRAINED_INIT_CONFIGURATION,
     DEBERTA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -41,25 +48,6 @@ __all__ = [
     "DebertaEncoder",
     "DebertaModel",
 ]
-
-
-class GELUActivation(nn.Layer):
-    """
-    Original Implementation of the GELU activation function in Google BERT repo when initially created. For
-    information: OpenAI GPT's GELU is slightly different (and gives slightly different results): 0.5 * x * (1 +
-    torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3)))) This is now written in C in nn.functional
-    Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-
-    def __init__(self, use_gelu_python: bool = False):
-        super().__init__()
-        self.act = nn.functional.gelu
-
-    def _gelu_python(self, input):
-        return input * 0.5 * (1.0 + paddle.erf(input / math.sqrt(2.0)))
-
-    def forward(self, input):
-        return self.act(input)
 
 
 def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length):
@@ -412,7 +400,7 @@ class DebertaIntermediate(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.intermediate_act_fn = GELUActivation()
+        self.intermediate_act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -598,6 +586,86 @@ class DebertaPreTrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: DeBERTaConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
+        model_mappings = {
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.LayerNorm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.LayerNorm.bias"],
+            ["encoder.rel_embeddings.weight", "encoder.rel_embeddings.weight"],
+        }
+        for layer_index in range(config.num_hidden_layers):
+
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.q_bias",
+                    f"encoder.layer.{layer_index}.attention.self.q_bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.v_bias",
+                    f"encoder.layer.{layer_index}.attention.self.v_bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.in_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.in_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.pos_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.pos_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.bias",
+                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.bias",
+                    f"encoder.layer.{layer_index}.intermediate.dense.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layer.{layer_index}.output.dense.bias"],
+                [
+                    f"encoder.layer.{layer_index}.output.LayerNorm.weight",
+                    f"encoder.layer.{layer_index}.output.LayerNorm.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.output.LayerNorm.bias",
+                    f"encoder.layer.{layer_index}.output.LayerNorm.bias",
+                ],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
     def init_weights(self, layer):
@@ -618,6 +686,7 @@ class DebertaPreTrainedModel(PretrainedModel):
             layer._epsilon = self.config.layer_norm_eps
 
 
+@register_base_model
 class DebertaModel(DebertaPreTrainedModel):
     def __init__(self, config: DeBERTaConfig):
         super().__init__()
@@ -703,8 +772,325 @@ class DebertaModel(DebertaPreTrainedModel):
         if not return_dict:
             return (sequence_output,) + encoder_outputs[(1 if output_hidden_states else 2) :]
 
-        return {
-            "last_hidden_state": sequence_output,
-            "hidden_states": encoder_outputs["hidden_states"] if output_hidden_states else None,
-            "attentions": encoder_outputs["attentions"],
-        }
+        return BaseModelOutput(
+            last_hidden_state=sequence_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions,
+        )
+
+
+class DebertaPredictionHeadTransform(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        if isinstance(config.hidden_act, str):
+            self.transform_act_fn = ACT2FN[config.hidden_act]
+        else:
+            self.transform_act_fn = config.hidden_act
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.transform_act_fn(hidden_states)
+        hidden_states = self.LayerNorm(hidden_states)
+        return hidden_states
+
+
+class DebertaLMPredictionHead(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.transform = DebertaPredictionHeadTransform(config)
+        self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.bias = paddle.create_parameter(
+            shape=[config.vocab_size], default_initializer=nn.initializer.Constant(0.0), dtype="float32"
+        )
+        self.decoder.bias = self.bias
+
+    def forward(self, hidden_states):
+        hidden_states = self.transform(hidden_states)
+        hidden_states = self.decoder(hidden_states)
+        return hidden_states
+
+
+class DebertaOnlyMLMHead(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.predictions = DebertaLMPredictionHead(config)
+
+    def forward(self, sequence_output):
+        prediction_scores = self.predictions(sequence_output)
+        return prediction_scores
+
+
+class DebertaForMaskedLM(DebertaPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.deberta = DebertaModel(config)
+        self.cls = DebertaOnlyMLMHead(config)
+
+        # TODO: need to be modified
+        self.post_init()
+
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
+
+    def set_output_embeddings(self, new_embeddings):
+        self.cls.predictions.decoder = new_embeddings
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.deberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
+        prediction_scores = self.cls(sequence_output)
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(prediction_scores.reshape(-1, self.config.vocab_size), labels.reshape(-1))
+        if not return_dict:
+            output = (prediction_scores,) + outputs[2:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
+        return MaskedLMOutput(
+            loss=masked_lm_loss,
+            logits=prediction_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
+class ContextPooler(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.pooler_hidden_size, config.pooler_hidden_size)
+        self.dropout = nn.Dropout(config.pooler_dropout)
+        self.config = config
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        context_token = hidden_states[:, 0, :]
+        context_token = self.dropout(context_token)
+        pooled_output = self.dense(context_token)
+        pooled_output = F.gelu(pooled_output)
+        return pooled_output
+
+    @property
+    def output_dim(self):
+        return self.config.hidden_size
+
+
+class DebertaForSequenceClassification(DebertaPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.num_labels = config.num_labels
+        self.deberta = DebertaModel(config)
+
+        # TODO: need to be modified
+        self.pooler = ContextPooler(config)
+        output_dim = self.pooler.output_dim
+        self.classifier = nn.Linear(output_dim, config.num_labels)
+
+        drop_out = getattr(config, "cls_dropout", None)
+        drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
+
+        self.dropout = nn.Dropout(drop_out)
+
+    def get_input_embeddings(self):
+        return self.deberta.get_input_embeddings()
+
+    def set_input_embeddings(self, new_embeddings):
+        return self.deberta.set_input_embeddings(new_embeddings)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.deberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        # TODO: need to use pooler
+        pooled_output = self.pooler(outputs[0])
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        loss = None
+        if labels is not None:
+            if self.num_labels == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
+class DebertaForTokenClassification(DebertaPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.num_labels = config.num_labels
+        self.deberta = DebertaModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.deberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        sequence_output = outputs[0]
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
+class DebertaForQuestionAnswering(DebertaPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+
+        self.deberta = DebertaModel(config)
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        start_positions=None,
+        end_positions=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.deberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        sequence_output = outputs[0]
+
+        logits = self.qa_outputs(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
