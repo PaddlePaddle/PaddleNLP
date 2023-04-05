@@ -19,7 +19,6 @@ from typing import List
 
 import numpy as np
 import paddle
-from parameterized import parameterized
 
 from paddlenlp.transformers.deberta.configuration import DebertaConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
@@ -79,9 +78,9 @@ class BertCompatibilityTest(unittest.TestCase):
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the paddle model
-            from paddlenlp.transformers import BertModel
+            from paddlenlp.transformers.deberta.modeling import DebertaModel
 
-            paddle_model = BertModel.from_pretrained(
+            paddle_model = DebertaModel.from_pretrained(
                 "hf-internal-testing/tiny-random-DebertaModel", from_hf_hub=True, cache_dir=tempdir
             )
             paddle_model.eval()
@@ -116,7 +115,8 @@ class BertCompatibilityTest(unittest.TestCase):
             torch_model.save_pretrained(tempdir)
 
             # 2. forward the paddle model
-            from paddlenlp.transformers import DebertaModel, model_utils
+            from paddlenlp.transformers import model_utils
+            from paddlenlp.transformers.deberta.modeling import DebertaModel
 
             model_utils.ENABLE_TORCH_CHECKPOINT = False
 
@@ -142,7 +142,7 @@ class BertCompatibilityTest(unittest.TestCase):
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
 
             # 2. forward the paddle model
-            from paddlenlp.transformers import DebertaModel
+            from paddlenlp.transformers.deberta.modeling import DebertaModel
 
             paddle_model = DebertaModel.from_pretrained(tempdir)
             paddle_model.eval()
@@ -153,47 +153,6 @@ class BertCompatibilityTest(unittest.TestCase):
                     paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     rtol=1e-4,
-                )
-            )
-
-    @parameterized.expand(
-        [
-            ("DebertaModel",),
-        ]
-    )
-    @require_package("transformers", "torch")
-    def test_bert_classes_from_local_dir(self, class_name, pytorch_class_name: str | None = None):
-        pytorch_class_name = pytorch_class_name or class_name
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
-
-            # 2. forward the torch model
-            import torch
-            import transformers
-
-            torch_model_class = getattr(transformers, pytorch_class_name)
-            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
-            torch_model.eval()
-
-            torch_model.save_pretrained(tempdir)
-            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
-
-            # 3. forward the paddle model
-            from paddlenlp import transformers
-
-            paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir)
-            paddle_model.eval()
-
-            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
-
-            self.assertTrue(
-                np.allclose(
-                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    atol=1e-3,
                 )
             )
 
