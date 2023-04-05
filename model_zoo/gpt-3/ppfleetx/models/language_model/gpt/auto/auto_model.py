@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import collections
-
+import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
 import paddle.incubate as incubate
@@ -25,6 +25,7 @@ import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from ppfleetx.utils.log import logger
 
 from ..dygraph.processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -35,6 +36,12 @@ from ..dygraph.processor import (
     RepetitionPenaltyLogitsProcessor,
 )
 
+try:
+    from paddle.incubate.nn.memory_efficient_attention import (
+        memory_efficient_attention,
+    )
+except:
+    memory_efficient_attention = None
 
 class MultiHeadAttention(nn.Layer):
     """
@@ -62,6 +69,7 @@ class MultiHeadAttention(nn.Layer):
         recompute_granularity="full",
         mesh=None,
         mesh_idx=None,
+        use_memory_attn=False,
     ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -75,6 +83,7 @@ class MultiHeadAttention(nn.Layer):
         self.recompute_granularity = recompute_granularity
         self.mesh = mesh
         self.mesh_idx = mesh_idx
+        self.use_memory_attn = use_memory_attn if memory_efficient_attention else None
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -180,6 +189,23 @@ class MultiHeadAttention(nn.Layer):
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
+    def _memory_efficient_attention(self, q, k, v, attn_mask=None):
+        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
+        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
+        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
+        scale_qk_coeff = self.head_dim**-0.5
+        out = memory_efficient_attention(
+            q, 
+            k, 
+            v, 
+            attn_mask, 
+            self.dropout, 
+            scale_qk_coeff, 
+            self.training
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        return out 
+        
     def core_attn(self, q, k, v, attn_mask=None):
         # scale dot product attention
         product = paddle.matmul(x=q, y=k, transpose_y=True) * self.head_dim**-0.5
@@ -199,7 +225,6 @@ class MultiHeadAttention(nn.Layer):
         # combine heads
         out = tensor.transpose(out, perm=[0, 2, 1, 3])
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-
         return out, weights
 
     def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
@@ -221,11 +246,25 @@ class MultiHeadAttention(nn.Layer):
             else:
                 q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.use_recompute and self.recompute_granularity == "core_attn":
-            out, weights = auto.recompute(self.core_attn)(q, k, v, attn_mask=attn_mask)
+        if self.use_memory_attn:
+            attn_func = self._memory_efficient_attention
         else:
-            out, weights = self.core_attn(q, k, v, attn_mask=attn_mask)
+            attn_func = self.core_attn
+    
+        if self.use_recompute and self.recompute_granularity == "core_attn":
+            attn_outs = auto.recompute(attn_func)(q, k, v, attn_mask=attn_mask)
+        else:
+            attn_outs = attn_func(q, k, v, attn_mask=attn_mask)
 
+        if self.need_weights:
+            assert(not self.use_memory_attn, "the output of memory attn doesn't have weights")
+            
+        if self.use_memory_attn:
+            out = attn_outs
+        else:
+            out = attn_outs[0]
+            weights = attn_outs[1]
+            
         auto.shard_tensor(self.out_proj.weight, self.mesh[self.mesh_idx], [self.mesh.mp, None])
 
         # project to output
@@ -294,6 +333,7 @@ class TransformerDecoder(nn.Layer):
 
         if self.norm is not None:
             output = self.norm(output)
+            
         return output if use_cache is False else (output, new_caches)
 
     def gen_cache(self, memory, do_zip=False):
@@ -334,6 +374,7 @@ class TransformerDecoderLayer(nn.Layer):
         recompute_granularity="full",
         mesh=None,
         mesh_idx=None,
+        use_memory_attn=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -362,6 +403,7 @@ class TransformerDecoderLayer(nn.Layer):
             recompute_granularity=recompute_granularity,
             mesh=mesh,
             mesh_idx=mesh_idx,
+            use_memory_attn=use_memory_attn,
         )
 
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -481,6 +523,7 @@ class GPTModelAuto(nn.Layer):
         use_recompute=False,
         recompute_granularity="full",
         mesh=None,
+        use_memory_attn=False,
     ):
 
         super(GPTModelAuto, self).__init__()
@@ -495,6 +538,13 @@ class GPTModelAuto(nn.Layer):
             raise RuntimeError("AutoPrallel modeling need `mesh` to annotate distributed attribute.")
         self.mesh = mesh
 
+        if use_memory_attn:
+            if memory_efficient_attention:
+                logger.info("Memory-attntion enabled.")
+            else:
+                use_memory_attn = False
+                logger.warning("Memory-attntion is not support in this Paddle version.")
+            
         self.embeddings = GPTEmbeddings(
             vocab_size,
             hidden_size,
@@ -526,6 +576,7 @@ class GPTModelAuto(nn.Layer):
                     recompute_granularity=recompute_granularity,
                     mesh=self.mesh,
                     mesh_idx=stages[i],
+                    use_memory_attn=use_memory_attn,
                 )
             )
 

@@ -8,7 +8,7 @@ Global:
 
 
 Engine:
-  max_steps: 500000
+  max_steps: 10000
   num_train_epochs: 1
   accumulate_steps:
   logging_freq: 1
