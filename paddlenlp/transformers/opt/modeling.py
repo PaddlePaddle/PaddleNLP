@@ -237,7 +237,7 @@ class OPTPretrainedModel(PretrainedModel):
     pretrained_init_configuration = OPT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = OPT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -284,8 +284,6 @@ class OPTModel(OPTPretrainedModel):
         for i in range(config.num_hidden_layers):
             decoder_layers.append(TransformerDecoderLayer(config))
         self.decoder = TransformerDecoder(config, decoder_layers)
-
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def forward(

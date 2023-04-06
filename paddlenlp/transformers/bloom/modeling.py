@@ -628,7 +628,7 @@ class BloomPreTrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _no_split_modules = ["BloomBlock"]
 
-    def init_weights(self, module):
+    def _init_weights(self, module):
         """Initialize the weights."""
         if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.set_value(
@@ -793,9 +793,6 @@ class BloomModel(BloomPreTrainedModel):
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -1036,7 +1033,6 @@ class BloomForPretraining(BloomPreTrainedModel):
         super().__init__(config)
         self.bloom = BloomModel(config)
         self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
-        self.apply(self.init_weights)
         self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
@@ -1074,9 +1070,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.bloom = BloomModel(config)
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(pad_token_id=config.pad_token_id, mp_degree=config.mp_degree)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1191,9 +1184,6 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
         self.num_labels = config.num_labels
         self.bloom = BloomModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1313,9 +1303,6 @@ class BloomForTokenClassification(BloomPreTrainedModel):
             classifier_dropout = 0.1
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(
         self,
