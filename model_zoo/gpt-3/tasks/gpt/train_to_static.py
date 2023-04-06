@@ -36,6 +36,17 @@ if __name__ == "__main__":
     module = build_module(cfg)
     config.print_config(cfg)
 
+    amp_config = cfg.Engine.mix_precision
+    amp_enable = amp_config["enable"]
+    amp_dtype = amp_config.get("dtype", "float16")
+    amp_level = amp_config.get("level", "O2")
+    use_main_grad = amp_config.get("use_main_grad", False)
+    scale_loss = amp_config["scale_loss"]
+    custom_black_list = amp_config["custom_black_list"]
+    custom_white_list = amp_config["custom_white_list"]
+
+    scaler = paddle.amp.GradScaler(init_loss_scaling=scale_loss)
+
     train_data_loader = build_dataloader(cfg.Data, "Train")
     eval_data_loader = build_dataloader(cfg.Data, "Eval")
 
@@ -54,10 +65,34 @@ if __name__ == "__main__":
     max_steps = cfg.Engine.max_steps
     for step, batch in enumerate(train_data_loader()):
         tokens, position_ids, labels, loss_mask = batch
-        preds = model(tokens, position_ids)
-        loss = module.loss_fn(preds, labels, loss_mask)
+
+        with paddle.amp.auto_cast(
+            amp_enable,
+            custom_black_list=custom_black_list,
+            custom_white_list=custom_white_list,
+            dtype=amp_dtype,
+            level=amp_level,
+        ):
+            preds = model(tokens, position_ids)
+            loss = module.loss_fn(preds, labels, loss_mask)
+
+        if amp_enable and amp_dtype == "float16":
+            loss = scaler.scale(loss)
+
         loss.backward()
-        optimizer.step()
+
+        if amp_enable and amp_dtype == "float16":
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
+
         optimizer.clear_grad()
         lr_scheduler.step(global_batch_size)
-        print("step: %d/%d\t" % (step, max_steps), "loss:%.6f\t" % loss.numpy()[0], "lr:%.6g" % optimizer.get_lr())
+
+        print(
+            "step: %d/%d\t" % (step, max_steps),
+            "loss:%.6f\t" % loss.numpy()[0],
+            "lr:%.6g\t" % optimizer.get_lr(),
+            "loss_scale:%.6f" % scaler._scale.numpy()[0],
+        )

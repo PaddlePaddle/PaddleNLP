@@ -18,4 +18,3 @@ python tasks/gpt/train_to_static.py \
     -c ./ppfleetx/configs/nlp/gpt/pretrain_gpt_345M_single_card.yaml \
     -o Global.micro_batch_size=4 \
     -o Global.local_batch_size=4 \
-    -o Engine.mix_precision.enable=False \
