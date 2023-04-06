@@ -20,7 +20,10 @@ import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from ppfleetx.core.engine import BasicEngine
 from ppfleetx.core.module import BasicModule
-from ppfleetx.optims import build_lr_scheduler, build_optimizer
+try:
+    from ppfleetx.optims import build_lr_scheduler, build_optimizer
+except Exception:
+    pass
 from ppfleetx.utils.log import logger
 from ppfleetx.utils.version import version_check
 

@@ -59,7 +59,11 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+try:
+    from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+except:
+    FusedDropoutAdd = None
+FusedDropoutAdd = None
 
 
 def get_attr(layer, name):
@@ -570,8 +574,12 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
-        self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
+        if not FusedDropoutAdd:
+            self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+        else:
+            self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
+            self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
 
         self.activation = getattr(F, activation)
 
@@ -595,7 +603,10 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add1(tgt, residual)
+            if not FusedDropoutAdd:
+                tgt = residual + self.dropout1(tgt)
+            else:
+                tgt = self.fused_dropout_add1(tgt, residual)
 
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -605,7 +616,10 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
+            if not FusedDropoutAdd:
+                tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
+            else:
+                tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)

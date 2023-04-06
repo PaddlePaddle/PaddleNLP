@@ -20,11 +20,11 @@ rm -rf $log_dir
 DIRECTORY=./auto_infer
 if [ ! -d "$DIRECTORY" ]; then
   echo "start download ckpt"
-  wget -O https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_auto_345M.tar.gz
-  tar -zxvf GPT_auto_345M.tar.gz
+  wget https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
+  tar -zxvf GPT_345M_FP16.tar.gz
 fi
 
 python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
     ./tools/auto_export.py \
     -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_single_card.yaml \
-    -o Engine.save_load.ckpt_dir=./auto_infer/auto
+    -o Engine.save_load.ckpt_dir=./pretrained/auto

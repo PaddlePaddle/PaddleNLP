@@ -25,7 +25,8 @@ def get_device_and_mapping():
         "gpu": paddle.is_compiled_with_cuda(),
         "xpu": paddle.is_compiled_with_xpu(),
         "rocm": paddle.is_compiled_with_rocm(),
-        "npu": paddle.is_compiled_with_npu() or paddle.is_compiled_with_custom_device("npu"),
+        # "npu": paddle.is_compiled_with_npu() or paddle.is_compiled_with_custom_device("npu"),
+        "npu": paddle.is_compiled_with_npu(),
         "cpu": True,
     }
     for d, v in suppoted_device_map.items():
