@@ -127,7 +127,7 @@ class MLMPromptTokenizer(object):
         Create the max sequence length of each part, where the longest part is truncated first.
         """
         text_length = sum([len(x) for x in part_text])
-        num_special_token = self.tokenizer.num_special_tokens_to_add()
+        num_special_token = self.tokenizer.num_special_tokens_to_add(pair=False)
         max_length = self.max_length - num_special_token
         if text_length <= max_length:
             return [None] * len(part_text)

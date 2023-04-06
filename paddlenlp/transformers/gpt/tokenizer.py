@@ -13,16 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import shutil
 from functools import lru_cache
 
-import json
 import jieba
-import shutil
 import sentencepiece as spm
 from paddle.utils import try_import
 
-from .. import PretrainedTokenizer, AddedToken
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = [
     "GPTTokenizer",
@@ -200,6 +200,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return [self._convert_token_to_id(token) for token in tokens]
     '''
 
+    '''
     def convert_ids_to_tokens(self, ids):
         """
         Converts a single index or a sequence of indices to a token or a
@@ -227,6 +228,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
         return tokens
+    '''
 
     @property
     def vocab_size(self):

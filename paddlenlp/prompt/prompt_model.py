@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from typing import Any, Dict, Optional
 
 import paddle
 from paddle.static import InputSpec
 
+from ..transformers.generation_utils import GenerationMixin
 from ..transformers.model_outputs import (
     MaskedLMOutput,
     MultipleChoiceModelOutput,
@@ -141,6 +141,134 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         if self.verbalizer is not None:
             params += [p for p in self.verbalizer.parameters()]
         return params
+
+    def get_input_spec(self):
+        template_keywords = self.template.extract_template_keywords(self.template.prompt)
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+        ]
+        if "mask" in template_keywords:
+            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
+        if "soft" in template_keywords:
+            # Add placeholder for argument `masked_positions` if not exists.
+            if "mask" not in template_keywords:
+                input_spec.append(None)
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
+            if "encoder" in template_keywords:
+                input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
+        return input_spec
+
+
+class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
+    """
+    PromptModel for classification tasks.
+    """
+
+    def __init__(
+        self,
+        model: paddle.nn.Layer,
+        template: Template,
+        verbalizer: Optional[Verbalizer] = None,
+        freeze_plm: bool = False,
+        freeze_dropout: bool = False,
+        max_predict_len: int = 32,
+    ):
+        super(PromptModelForGeneration, self).__init__()
+        self.plm = model
+        self.template = template
+        self.verbalizer = verbalizer
+        self.freeze_plm = freeze_plm
+        self.freeze_dropout = freeze_dropout
+        if self.freeze_plm:
+            for param in self.plm.parameters():
+                param.stop_gradient = True
+            if self.freeze_dropout:
+                self.plm.eval()
+        self.forward_keys = signature(self.plm.forward)
+        self._mask_token_id = self.template.tokenizer.mask_token_id
+        self._pad_token_id = self.template.tokenizer.pad_token_id
+        if isinstance(self.template, PrefixTemplate):
+            self.plm = self.template.process_model(self.plm)
+            self.forward_keys.append("past_key_values")
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
+
+    def forward(
+        self,
+        input_ids: paddle.Tensor,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        masked_positions: Optional[paddle.Tensor] = None,
+        soft_token_ids: Optional[paddle.Tensor] = None,
+        encoder_ids: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
+        return_dict: Optional[bool] = None,
+        **kwargs: Dict[str, Any]
+    ):
+
+        return_dict = return_dict if return_dict is not None else False
+        if soft_token_ids is None:
+            outputs = self.plm(input_ids)
+            return outputs
+
+        return_hidden_states = kwargs.get("return_hidden_states", False)
+        input_dict = {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "position_ids": position_ids,
+            "masked_positions": masked_positions,
+            "soft_token_ids": soft_token_ids,
+            "attention_mask": attention_mask,
+            "encoder_ids": encoder_ids,
+            "labels": labels,
+            **kwargs,
+        }
+        input_dict = self.template.process_batch(input_dict)
+        input_dict = {**input_dict, **kwargs}
+        model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
+        if "masked_positions" in model_inputs:
+            model_inputs.pop("masked_positions")
+        if "cache" in self.forward_keys:
+            model_inputs["cache"] = []
+            for i in range(len(model_inputs["past_key_values"])):
+                from paddlenlp.transformers.gpt.modeling import MultiHeadAttention
+
+                model_inputs["cache"].append(
+                    MultiHeadAttention.Cache(
+                        k=model_inputs["past_key_values"][i][0], v=model_inputs["past_key_values"][i][1]
+                    )
+                )
+            model_inputs.pop("past_key_values")
+        model_outputs = self.plm(**model_inputs, return_dict=True, use_cache=True)
+
+        logits = model_outputs.logits
+        shift_logits = logits[..., :-1, :]
+        mask = input_dict["token_type_ids"] == 1
+        labels = labels * mask
+        shift_labels = labels[..., 1:]
+        loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=0, reduction="sum")
+        loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+        num = int(paddle.count_nonzero(shift_labels.reshape((-1,))))
+        loss = loss / num
+
+        if not return_dict:
+            output = (logits,)
+            if return_hidden_states:
+                output = output + (model_outputs.logits,)
+            if loss is not None:
+                return (loss,) + output
+            if isinstance(output, (list, tuple)) and len(output) == 1:
+                output = output[0]
+            return output
+
+        return MaskedLMOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=model_outputs.logits,
+        )
 
     def get_input_spec(self):
         template_keywords = self.template.extract_template_keywords(self.template.prompt)
