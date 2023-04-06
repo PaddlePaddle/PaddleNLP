@@ -391,12 +391,12 @@ class SoftVerbalizer(Verbalizer):
         self.bias_name = bias_name[end_index - 1] if bias_name is not None else None
         if is_linear:
             module = getattr(self.head, self.weight_name)
-            setattr(self.head, self.weight_name, nn.Linear(module.weight.shape[0], len(self.labels), bias_attr=False))
-            getattr(self.head, self.weight_name).weight.set_value(self._create_init_weight(module.weight))
+            setattr(self.head, self.weight_name, nn.Linear(len(self.labels), module.weight.shape[1], bias_attr=False))
+            getattr(self.head, self.weight_name).weight.set_value(self._create_init_weight(module.weight).T)
         else:
             module = paddle.to_tensor(getattr(self.head, self.weight_name))
             new_head = nn.Linear(len(self.labels), module.shape[1], bias_attr=False)
-            new_head.weight.set_value(self._create_init_weight(module.T).T)
+            new_head.weight.set_value(self._create_init_weight(module).T)
 
             setattr(self.head, self.weight_name, new_head.weight)
             getattr(self.head, self.weight_name).stop_gradient = False
@@ -417,8 +417,8 @@ class SoftVerbalizer(Verbalizer):
             bias = self.aggregate(bias, token_mask, aggr_type)
             return bias
         else:
-            word_shape = [weight.shape[0], *token_ids.shape]
-            weight = paddle.index_select(weight, token_ids.reshape([-1]), axis=1).reshape(word_shape)
+            word_shape = [weight.shape[1], *token_ids.shape]
+            weight = paddle.index_select(weight, token_ids.reshape([-1]), axis=0).reshape(word_shape)
             weight = self.aggregate(weight, token_mask, aggr_type)
             return weight
 
