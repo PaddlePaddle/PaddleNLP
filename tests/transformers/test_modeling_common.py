@@ -710,8 +710,8 @@ class ModelTesterMixin:
             all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
 
             for old_attribute, new_attribute in all_maps.items():
-                old_value = getattr(model, old_attribute)
-                new_value = getattr(model, new_attribute)
+                old_value = getattr(model.config, old_attribute)
+                new_value = getattr(model.config, new_attribute)
 
                 # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
                 if type(new_value) != type(old_value):
