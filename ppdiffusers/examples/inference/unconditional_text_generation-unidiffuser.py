@@ -20,8 +20,8 @@ from ppdiffusers.models import CaptionDecoder, UViTModel
 generator = paddle.Generator().manual_seed(0)
 
 pipe = UniDiffuserTextGenerationPipeline(
-    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
-    caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
+    unet=UViTModel.from_pretrained("thu-ml/unidiffuser/unet"),
+    caption_decoder=CaptionDecoder.from_pretrained("thu-ml/unidiffuser/caption_decoder"),
     scheduler=None,
 )
 

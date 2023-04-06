@@ -23,8 +23,8 @@ generator = paddle.Generator().manual_seed(0)
 pipe = UniDiffuserTextVariationPipeline(
     text_encoder=CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14"),
     tokenizer=CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14"),
-    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
-    caption_decoder=CaptionDecoder(pretrained_path="models/caption_decoder.pdparams"),
+    unet=UViTModel.from_pretrained("thu-ml/unidiffuser/unet"),
+    caption_decoder=CaptionDecoder.from_pretrained("thu-ml/unidiffuser/caption_decoder"),
     scheduler=None,
 )
 

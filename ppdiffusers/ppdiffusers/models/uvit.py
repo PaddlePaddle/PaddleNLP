@@ -19,18 +19,11 @@ import einops
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn.initializer import Constant, TruncatedNormal
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..utils import BaseOutput
-from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
+from .embeddings import TimestepEmbedding, Timesteps
 from .modeling_utils import ModelMixin
-from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
-
-# Common initializations
-ones_ = Constant(value=1.0)
-zeros_ = Constant(value=0.0)
-trunc_normal_ = TruncatedNormal(std=0.02)
 
 
 def drop_path(input, drop_prob: float = 0.0, training: bool = False):
@@ -88,7 +81,7 @@ class Mlp(nn.Layer):
 
 def timestep_embedding(timesteps, dim, max_period=10000):
     """
-    Create sinusoidal timestep embeddings.
+    Create sinusoidal timestep embeddings, diff with ./embeddings.py get_timestep_embedding
     Args:
         timesteps: a 1-D Tensor of N indices, one per batch element.
                       These may be fractional.
@@ -199,7 +192,7 @@ class Block(nn.Layer):
 
 
 class PatchEmbed(nn.Layer):
-    """Image to Patch Embedding"""
+    """Image to Patch Embedding, no need adding pos_embed, diff with ./embeddings.py PatchEmbed"""
 
     def __init__(self, patch_size, in_chans=3, embed_dim=768):
         super().__init__()
@@ -226,15 +219,14 @@ class UViTModelOutput(BaseOutput):
     sample_text: paddle.Tensor
 
 
-# class UViTModel(ModelMixin, ConfigMixin):
-class UViTModel(nn.Layer):
+class UViTModel(ModelMixin, ConfigMixin):
     r"""
     UViTModel is a unet-stype ViT model that takes in a noisy sample and a timestep and returns sample shaped output.
     Note that the different is the
 
     """
 
-    # @register_to_config
+    @register_to_config
     def __init__(
         self,
         img_size=64,
@@ -250,12 +242,10 @@ class UViTModel(nn.Layer):
         drop_rate=0.0,
         attn_drop_rate=0.0,
         norm_layer=nn.LayerNorm,
-        mlp_time_embed=False,
-        use_checkpoint=False,
         text_dim=64,
         num_text_tokens=77,
         clip_img_dim=512,
-        pretrained_path=None,
+        use_checkpoint=False,
     ):
         super().__init__()
 
@@ -264,33 +254,12 @@ class UViTModel(nn.Layer):
         self.embed_dim = embed_dim
 
         self.patch_embed = PatchEmbed(patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        self.img_size = (img_size, img_size) if isinstance(img_size, int) else img_size  # the default img size
+        self.img_size = (img_size, img_size) if isinstance(img_size, int) else img_size
         assert self.img_size[0] % patch_size == 0 and self.img_size[1] % patch_size == 0
         self.num_patches = (self.img_size[0] // patch_size) * (self.img_size[1] // patch_size)
 
-        self.time_img_embed = (
-            nn.Sequential(
-                nn.Linear(embed_dim, 4 * embed_dim),
-                nn.SiLU(),
-                nn.Linear(4 * embed_dim, embed_dim),
-            )
-            if mlp_time_embed
-            else nn.Identity()
-        )
-
-        self.time_text_embed = (
-            nn.Sequential(
-                nn.Linear(embed_dim, 4 * embed_dim),
-                nn.SiLU(),
-                nn.Linear(4 * embed_dim, embed_dim),
-            )
-            if mlp_time_embed
-            else nn.Identity()
-        )
-
         self.text_embed = nn.Linear(text_dim, embed_dim)
         self.text_out = nn.Linear(embed_dim, text_dim)
-
         self.clip_img_embed = nn.Linear(clip_img_dim, embed_dim)
         self.clip_img_out = nn.Linear(embed_dim, clip_img_dim)
 
@@ -298,7 +267,8 @@ class UViTModel(nn.Layer):
         self.num_tokens = 1 + 1 + num_text_tokens + 1 + self.num_patches
 
         self.pos_embed = self.create_parameter(
-            shape=(1, self.num_tokens, embed_dim), default_initializer=Constant(value=0.0)
+            shape=(1, self.num_tokens, embed_dim),
+            default_initializer=nn.initializer.Constant(0.0),
         )
 
         self.pos_drop = nn.Dropout(p=pos_drop_rate)
@@ -354,44 +324,28 @@ class UViTModel(nn.Layer):
         self.patch_dim = patch_size**2 * in_chans
         self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias_attr=True)
 
-        trunc_normal_(self.pos_embed)
-        self.apply(self._init_weights)
-
         self.token_embedding = nn.Embedding(2, embed_dim)
-        self.pos_embed_token = self.create_parameter(shape=(1, 1, embed_dim), default_initializer=Constant(value=0.0))
-
-        if pretrained_path:
-            self.set_dict(paddle.load(pretrained_path))
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                zeros_(m.bias)
-        elif isinstance(m, nn.LayerNorm):
-            zeros_(m.bias)
-            ones_(m.weight)
-
-    def no_weight_decay(self):
-        return {"pos_embed"}
+        self.pos_embed_token = self.create_parameter(
+            shape=(1, 1, embed_dim), default_initializer=nn.initializer.Constant(0.0)
+        )
 
     def forward(
         self,
-        img,
-        clip_img,
-        text,
-        t_img,
-        t_text,
-        data_type,
-        return_dict=True,
+        img: paddle.Tensor,
+        clip_img: paddle.Tensor,
+        text: paddle.Tensor,
+        t_img: paddle.Tensor,
+        t_text: paddle.Tensor,
+        data_type: paddle.Tensor,
+        return_dict=False,  # TODO: nf
     ):
         _, _, H, W = img.shape
         img = self.patch_embed(img)
         clip_img = self.clip_img_embed(clip_img)
         text = self.text_embed(text)
 
-        t_img_token = self.time_img_embed(timestep_embedding(t_img, self.embed_dim)).unsqueeze(axis=1)
-        t_text_token = self.time_text_embed(timestep_embedding(t_text, self.embed_dim)).unsqueeze(axis=1)
+        t_img_token = timestep_embedding(t_img, self.embed_dim).unsqueeze(axis=1)
+        t_text_token = timestep_embedding(t_text, self.embed_dim).unsqueeze(axis=1)
         token_embed = self.token_embedding(data_type).unsqueeze(axis=1)
 
         x = paddle.concat((t_img_token, t_text_token, token_embed, text, clip_img, img), axis=1)
@@ -439,9 +393,7 @@ class UViTModel(nn.Layer):
         sample_clip_img = self.clip_img_out(clip_img_out)
         sample_text = self.text_out(text_out)
 
-        return sample_img, sample_clip_img, sample_text
+        if not return_dict:
+            return (sample_img, sample_clip_img, sample_text)
 
-        # if not return_dict:
-        #     return (sample_img, sample_clip_img, sample_text)
-
-        # return UViTModelOutput(sample_img=sample_img, sample_clip_img=sample_clip_img, sample_text=sample_text)
+        return UViTModelOutput(sample_img=sample_img, sample_clip_img=sample_clip_img, sample_text=sample_text)

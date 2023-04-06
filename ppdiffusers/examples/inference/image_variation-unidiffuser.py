@@ -24,7 +24,7 @@ generator = paddle.Generator().manual_seed(0)
 pipe = UniDiffuserImageVariationPipeline(
     image_encoder=CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32"),
     image_feature_extractor=CLIPFeatureExtractor.from_pretrained("openai/clip-vit-base-patch32"),
-    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
+    unet=UViTModel.from_pretrained("thu-ml/unidiffuser/unet"),
     vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     scheduler=None,
 )

@@ -20,7 +20,7 @@ from ppdiffusers.pipelines import UniDiffuserImageGenerationPipeline
 generator = paddle.Generator().manual_seed(0)
 
 pipe = UniDiffuserImageGenerationPipeline(
-    unet=UViTModel(pretrained_path="models/uvit_v1.pdparams"),
+    unet=UViTModel.from_pretrained("thu-ml/unidiffuser/unet"),
     vae=AutoencoderKL.from_pretrained("CompVis/stable-diffusion-v1-4/vae"),
     scheduler=None,
 )
