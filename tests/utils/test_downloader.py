@@ -83,8 +83,8 @@ class DynamicCommunityTest(unittest.TestCase):
         download_module = importlib.import_module("paddlenlp.utils.downloader")
         self.old_url = download_module.COMMUNITY_MODEL_PREFIX
 
-        os.environ["COMMUNITY_MODEL_NAME"] = "community_test"
-        new_url = f"https://bj.bcebos.com/paddlenlp/models/{os.getenv('COMMUNITY_MODEL_NAME', 'community')}"
+        os.environ["COMMUNITY_MODEL_NAME"] = "https://bj.bcebos.com/paddlenlp/models/community_test"
+        new_url = os.getenv("COMMUNITY_MODEL_NAME", "community")
         self._refresh_community_url(new_url)
 
     def tearDown(self) -> None:
