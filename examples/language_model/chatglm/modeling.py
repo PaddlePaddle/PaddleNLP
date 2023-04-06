@@ -15,42 +15,74 @@
 from __future__ import annotations
 
 import math
+import re
 from functools import partial
 from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from configuration import (
-    GLM130B_PRETRAINED_INIT_CONFIGURATION,
-    GLM130B_PRETRAINED_RESOURCE_FILES_MAP,
-    GLM130BConfig,
-)
+from configuration import ChatGLMConfig
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast, ModelOutput
 from paddlenlp.utils.converter import StateDictNameMapping
 from paddlenlp.utils.env import CONFIG_NAME
-from paddlenlp.utils.initializer import normal_, ones_, zeros_
+from paddlenlp.utils.log import logger
 
 __all__ = [
-    "GLM130BModel",
-    "GLM130BPretrainedModel",
+    "ChatGLMModel",
+    "ChatGLMPretrainedModel",
 ]
 
 
+class PrefixEncoder(nn.Layer):
+    """
+    The prefix encoder for P-Tuning v2.
+    Input shape: [batch_size, prefix_length]
+    Output shape: [batch_size, prefix_length, 2 * num_layers * hidden_size]
+    """
+
+    def __init__(self, config):
+        super().__init__()
+        self.prefix_projection = config.prefix_projection
+        if self.prefix_projection:
+            # Use a two-layer MLP to encode the prefix
+            self.embedding = nn.Embedding(config.pre_seq_len, config.hidden_size)
+            self.trans = nn.Sequential(
+                nn.Linear(config.hidden_size, config.hidden_size),
+                nn.Tanh(),
+                nn.Linear(config.hidden_size, config.num_layers * config.hidden_size * 2),
+            )
+        else:
+            self.embedding = nn.Embedding(config.pre_seq_len, config.num_layers * config.hidden_size * 2)
+
+    def forward(self, prefix: paddle.Tensor):
+        if self.prefix_projection:
+            prefix_tokens = self.embedding(prefix)
+            past_key_values = self.trans(prefix_tokens)
+        else:
+            past_key_values = self.embedding(prefix)
+        return past_key_values
+
+
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000, dtype=paddle.float16):
+    def __init__(self, hidden_size, base=10000, dtype=paddle.float16, learnable=False):
         super().__init__()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         inv_freq = inv_freq.astype(dtype)
-        self.register_buffer("inv_freq", inv_freq)
-        self.max_seq_len_cached = None
-        self.cos_cached = None
-        self.sin_cached = None
+        self.learnable = learnable
+        if learnable:
+            self.inv_freq = nn.Parameter(inv_freq)
+            self.max_seq_len_cached = None
+        else:
+            self.register_buffer("inv_freq", inv_freq)
+            self.max_seq_len_cached = None
+            self.cos_cached = None
+            self.sin_cached = None
         self.dtype = dtype
 
     def forward(self, x, seq_dim=1, seq_len=None):
@@ -58,7 +90,7 @@ class RotaryEmbeddings(nn.Layer):
             seq_len = x.shape[seq_dim]
         # x.shape = [b, s, n, h/n/2]
         if self.max_seq_len_cached is None or (seq_len > self.max_seq_len_cached):
-            self.max_seq_len_cached = seq_len
+            self.max_seq_len_cached = None if self.learnable else seq_len
             # [s]
             t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
             # [s, h/n/2]
@@ -75,19 +107,28 @@ class RotaryEmbeddings(nn.Layer):
                 cos_cached = cos_cached.astype(self.dtype)
                 sin_cached = sin_cached.astype(self.dtype)
 
-            self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            if self.learnable:
+                return cos_cached, sin_cached
 
+            self.cos_cached, self.sin_cached = cos_cached, sin_cached
         return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
 
+    def _apply(self, fn):
+        if self.cos_cached is not None:
+            self.cos_cached = fn(self.cos_cached)
+        if self.sin_cached is not None:
+            self.sin_cached = fn(self.sin_cached)
+        return super()._apply(fn)
 
-class GLM130BAttention(nn.Layer):
+
+class ChatGLMAttention(nn.Layer):
     """
     Self-attention layer performs multiple attention to jointly attending to
     information from different representation subspaces.
     """
 
-    def __init__(self, config: GLM130BConfig):
-        super(GLM130BAttention, self).__init__()
+    def __init__(self, config: ChatGLMConfig):
+        super(ChatGLMAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
@@ -97,7 +138,18 @@ class GLM130BAttention(nn.Layer):
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
-        self.attention_scale = config.attention_scale
+        self.position_encoding_2d = config.position_encoding_2d
+        self.rotary_emb = RotaryEmbeddings(
+            self.hidden_size // (self.num_attention_heads * 2)
+            if self.position_encoding_2d
+            else self.hidden_size // self.num_attention_heads,
+            base=10000,
+            dtype=paddle.float16,
+            learnable=False,
+        )
+        self.scale_mask_softmax = None
+
+        self.attention_scale = config.attention_scale  # True
 
         if config.tensor_parallel_degree > 1:
             self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
@@ -111,19 +163,8 @@ class GLM130BAttention(nn.Layer):
             self.query_key_value = nn.Linear(config.hidden_size, 3 * config.hidden_size)
             self.dense = nn.Linear(config.hidden_size, config.hidden_size)
 
-        self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
-        self.output_dropout = nn.Dropout(config.output_dropout_prob)
-
-    def _transpose_for_scores(self, inputs: Tensor):
-        """
-        Transpose a 3D tensor [b, s, n/p*h/n] into a 4D tensor [b, n/p, s, h/n],
-        where b means batch_size, s means sequence_length, n means num_attention_heads,
-        h means hidden_size and p means number of partitions.
-        """
-        new_shape = [*inputs.shape[:2], self.num_attention_heads, self.attention_head_size]
-        outputs = inputs.reshape(new_shape)
-        outputs = paddle.transpose(outputs, [1, 0, 2, 3])
-        return outputs
+        # self.attention_dropout = nn.Dropout(config.attention_dropout_prob)
+        # self.output_dropout = nn.Dropout(config.output_dropout_prob)
 
     def _rotate_half(self, x):
         x1, x2 = paddle.chunk(x, 2, axis=-1)
@@ -192,22 +233,18 @@ class GLM130BAttention(nn.Layer):
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeddings)
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-        cache_kv = None
-        if use_cache:
-            cache_kv = (
-                paddle.stack([k_layer, v_layer], axis=0)
-                .transpose([2, 1, 0, 3, 4])
-                .reshape([batch_size, seq_length, num_heads * hidden_size * 2])
-            )
-        if use_cache and cache is not None:
-            cache = cache.expand([batch_size, -1, -1]).reshape([batch_size, cache.shape[1], 2, num_heads, hidden_size])
-            # [2, c, b, n, h/n]
-            cache = cache.transpose([2, 1, 0, 3, 4])
+
+        if cache is not None:
             cache_k, cache_v = cache[0], cache[1]
             # [s + c, b, n, h/n]
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
+
+        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
+
+        cache_kv = None
+        if use_cache:
+            cache_kv = (k_layer, v_layer)
 
         attention_scale_coeff = float(label_id) + 1.0
         if self.attention_scale:
@@ -226,13 +263,18 @@ class GLM130BAttention(nn.Layer):
         # [b, n, s, s]
         attention_scores = attention_scores.reshape(output_shape)
 
-        ltor_mask = ltor_mask.astype(attention_scores.dtype)
-        attention_scores = paddle.multiply(attention_scores, 1.0 - ltor_mask)
-        attention_scores = attention_scores + (-10000.0) * ltor_mask
-        attention_scores = attention_scores.astype("float32") * attention_scale_coeff
+        if self.scale_mask_softmax:
+            self.scale_mask_softmax.scale = attention_scale_coeff
+            attention_probs = self.scale_mask_softmax(attention_scores, ltor_mask)
+        else:
+            if not (ltor_mask == 0).all():
+                ltor_mask = ltor_mask.astype(attention_scores.dtype)
+                attention_scores = paddle.multiply(attention_scores, 1.0 - ltor_mask)
+                attention_scores = attention_scores + (-10000.0) * ltor_mask
+            attention_scores = attention_scores.astype("float32") * attention_scale_coeff
 
-        attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = self.attention_dropout(attention_probs).astype(self.config.paddle_dtype)
+            attention_probs = F.softmax(attention_scores, axis=-1)
+            attention_probs = attention_probs.astype(self.config.paddle_dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
@@ -253,24 +295,24 @@ class GLM130BAttention(nn.Layer):
         context_layer = context_layer.reshape(new_context_shape)
 
         output = self.dense(context_layer)
-        output = self.output_dropout(output)
-        return output, cache_kv
+
+        return output, cache_kv, attention_probs
 
 
-class GLM130BBlock(nn.Layer):
+class ChatGLMBlock(nn.Layer):
     """
     The Transformer layer.
     """
 
-    def __init__(self, config: GLM130BConfig, layer_id: int):
-        super(GLM130BBlock, self).__init__()
+    def __init__(self, config: ChatGLMConfig, layer_id: int):
+        super(ChatGLMBlock, self).__init__()
         self.config = config
         self.layer_id = layer_id
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
-        self.attention = GLM130BAttention(config)
+        self.attention = ChatGLMAttention(config)
 
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
-        self.mlp = GLM130BMLP(config)
+        self.mlp = ChatGLMMLP(config)
 
     def forward(
         self,
@@ -283,9 +325,9 @@ class GLM130BBlock(nn.Layer):
     ):
         layernorm_output = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
-        cache = self.input_layernorm(cache) if cache is not None else None
+        # cache = self.input_layernorm(cache) if cache is not None else None
         # Self attention
-        attention_output, cache = self.attention(
+        attention_output, cache, _ = self.attention(
             layernorm_output, ltor_mask, position_ids, rotary_embeddings, cache, self.layer_id
         )
         # Residual connection
@@ -300,21 +342,26 @@ class GLM130BBlock(nn.Layer):
         return output, cache
 
 
-class GLM130BMLP(nn.Layer):
-    def __init__(self, config: GLM130BConfig):
-        super(GLM130BMLP, self).__init__()
-        inner_hidden_size = config.hidden_size * 4 // 3 * 2
+class ChatGLMMLP(nn.Layer):
+    def __init__(self, config: ChatGLMConfig):
+        super(ChatGLMMLP, self).__init__()
+
+        if config.inner_hidden_size is None:
+            inner_hidden_size = config.hidden_size * 4
+        else:
+            inner_hidden_size = config.inner_hidden_size
+
         if config.tensor_parallel_degree > 1:
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
-                config.hidden_size, inner_hidden_size * 2, has_bias=True, gather_output=False
+                config.hidden_size, inner_hidden_size, has_bias=True, gather_output=False
             )
             self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
                 inner_hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
             )
         else:
-            self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size * 2)
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size)
             self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
-        self.dropout = nn.Dropout(config.output_dropout_prob)
+        # self.dropout = nn.Dropout(config.output_dropout_prob)
         self.activation = self.geglue if self.config.activation == "geglu" else self.gelu
 
     def geglu(self, x):
@@ -329,21 +376,21 @@ class GLM130BMLP(nn.Layer):
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
         intermediate_parallel = self.activation(intermediate_parallel)
         output = self.dense_4h_to_h(intermediate_parallel)
-        output = self.dropout(output)
+        # output = self.dropout(output)
         return output
 
 
-class GLM130BStack(nn.Layer):
+class ChatGLMStack(nn.Layer):
     """
     GLM Transformer
     """
 
-    def __init__(self, config: GLM130BConfig):
-        super(GLM130BStack, self).__init__()
+    def __init__(self, config: ChatGLMConfig):
+        super(ChatGLMStack, self).__init__()
         self.config = config
         self.hidden_size = config.hidden_size
         self.enable_recompute = config.recompute
-        self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
+        # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
@@ -358,15 +405,70 @@ class GLM130BStack(nn.Layer):
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
             )
 
-        attention_head_size = config.hidden_size // config.num_attention_heads
-        if config.position_encoding_2d:
-            attention_head_size = attention_head_size // 2
-        self.rotary_embeddings = RotaryEmbeddings(attention_head_size, base=10000, dtype=config.paddle_dtype)
         self.layers = nn.LayerList()
         for index in range(config.num_hidden_layers):
-            self.layers.append(GLM130BBlock(config, index))
+            self.layers.append(ChatGLMBlock(config, index))
 
         self.final_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
+
+        if self.config.pre_seq_len is not None:
+            for param in self.parameters():
+                param.requires_grad = False
+            self.prefix_tokens = paddle.arange(self.pre_seq_len, dtype="int64")
+            self.prefix_encoder = PrefixEncoder(config)
+            self.dropout = nn.Dropout(0.1)
+
+    def get_prompt(self, batch_size, dtype=paddle.float16):
+        prefix_tokens = self.prefix_tokens.unsqueeze(0).expand([batch_size, -1])
+        past_key_values = self.prefix_encoder(prefix_tokens).astype(dtype)
+        past_key_values = past_key_values.reshape(
+            batch_size,
+            self.config.pre_seq_len,
+            self.config.num_layers * 2,
+            self.config.num_attention_heads,
+            self.config.hidden_size // self.config.num_attention_heads,
+        )
+        # seq_len, b, nh, hidden_size
+        past_key_values = self.dropout(past_key_values)
+        past_key_values = past_key_values.transpose([2, 1, 0, 3, 4]).split(2)
+        # past_key_values = [(v[0], v[1]) for v in past_key_values]
+        return past_key_values
+
+    def get_masks(self, input_ids):
+        batch_size, seq_length = input_ids.shape
+        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
+        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
+        for i, context_length in enumerate(context_lengths):
+            attention_mask[i, :, :context_length] = 1
+        attention_mask = attention_mask.unsqueeze(1)
+        attention_mask = (attention_mask < 0.5).astype("bool")
+        return attention_mask
+
+    def get_position_ids(self, input_ids, mask_positions, gmask=False):
+        batch_size, seq_length = input_ids.shape
+        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
+        if self.position_encoding_2d:
+            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
+            for i, context_length in enumerate(context_lengths):
+                position_ids[i, context_length:] = mask_positions[i]
+            block_position_ids = [
+                paddle.concat(
+                    (
+                        paddle.zeros(context_length, dtype="int64"),
+                        paddle.arange(seq_length - context_length, dtype="int64") + 1,
+                    )
+                )
+                for context_length in context_lengths
+            ]
+            block_position_ids = paddle.stack(block_position_ids, axis=0)
+            position_ids = paddle.stack((position_ids, block_position_ids), axis=1)
+        else:
+            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
+            if not gmask:
+                for i, context_length in enumerate(context_lengths):
+                    position_ids[context_length:] = mask_positions[i]
+
+        return position_ids
 
     @paddle.jit.not_to_static
     def recompute_training(
@@ -388,76 +490,89 @@ class GLM130BStack(nn.Layer):
         input_ids: Tensor,
         position_ids: Tensor,
         attention_mask: Tensor,
-        memory_states: Optional[Tensor] = None,
+        inputs_embeds: Tensor = None,
+        past_key_values: Optional[Tensor] = None,
+        use_cache: bool = False,
     ):
 
-        batch_size, query_length = input_ids.shape
-        word_embeddings = self.word_embeddings(input_ids)
-        # memory_length = memory_states[0].shape[1] if memory_states is not None else 0
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape[:2]
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape[:2]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
 
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        if past_key_values is None:
+            if self.config.pre_seq_len is not None:
+                past_key_values = self.get_prompt(batch_size=input_ids.shape[0], dtype=inputs_embeds.dtype)
+            else:
+                past_key_values = tuple([None] * len(self.config.num_layers))
+
+            if attention_mask is None:
+                attention_mask = self.get_masks(input_ids)
+
+            if position_ids is None:
+                MASK, gMASK = 150000, 150001
+                mask_token = MASK if MASK in input_ids else gMASK
+                use_gmask = False if MASK in input_ids else gMASK
+
+                mask_positions = [seq.tolist().index(mask_token) for seq in input_ids]
+                position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
+
+        if self.config.pre_seq_len is not None and attention_mask is not None:
+            prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
+            prefix_attention_mask = (prefix_attention_mask < 0.5).astype("bool")
+            attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
+
+        hidden_states = inputs_embeds  # .transpose([0, 1, 2])
+
+        cache = [] if use_cache else None
         if attention_mask is None:
-            attention_mask = paddle.ones([1, 1])
+            attention_mask = paddle.zeros([1, 1]).astype("bool")
 
-        hidden_states = self.embedding_dropout(word_embeddings)
-
-        memory_layers = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
-            mem_i = memory_states[i] if memory_states else None
+            cache_i = past_key_values[i]
 
             if self.enable_recompute:
                 hidden_states = self.recompute_training(
-                    layer, hidden_states, attention_mask, position_ids, cache=mem_i
+                    layer, hidden_states, attention_mask, position_ids, cache=cache_i
                 )
             else:
-                hidden_states = layer(hidden_states, attention_mask, position_ids, self.rotary_embeddings, cache=mem_i)
+                hidden_states = layer(
+                    hidden_states, attention_mask, position_ids, self.rotary_embeddings, cache=cache_i
+                )
 
-            memory_layers.append(hidden_states.detach())
+            if use_cache:
+                cache.append(hidden_states.detach())
 
         output = self.final_layernorm(hidden_states)
-        memory_layers = self.update_memories(memory_layers, memory_states)
-        return (output, memory_layers)
-
-    def update_memories(self, hiddens, cache):
-        memory_length = cache[0].shape[1] if cache else 0
-        query_length = hiddens[0].shape[1]
-        new_memory_length = memory_length + query_length
-
-        new_memories = []
-        for i in range(len(hiddens)):
-            if new_memory_length <= query_length or cache is None:
-                new_memories.append(hiddens[i][-new_memory_length:])
-            else:
-                new_memories.append(paddle.concat([cache[i][:, -memory_length:], hiddens[i]], axis=1))
-        return new_memories
+        return (output, cache)
 
 
-class GLM130BPretrainedModel(PretrainedModel):
+class ChatGLMPretrainedModel(PretrainedModel):
     """
-    An abstarct class for pretrained GLM models. It provides GLM related
+    An abstarct class for pretrained ChatGLM models. It provides GLM related
     `model_config_file`, `resource_file_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    base_model_prefix = "glm-130b"
-    config_class = GLM130BConfig
+    base_model_prefix = "chatglm"
+    config_class = ChatGLMConfig
     model_config_file = CONFIG_NAME
-    resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_init_configuration = GLM130B_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = GLM130B_PRETRAINED_RESOURCE_FILES_MAP
+    # resource_files_names = {"model_state": "model_state.pdparams"}
+    # pretrained_init_configuration = ChatGLM_PRETRAINED_INIT_CONFIGURATION
+    # pretrained_resource_files_map = ChatGLM_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
-        if isinstance(layer, nn.Linear):
-            normal_(layer.weight, mean=0.0, std=self.config.initializer_range)
-            if layer.bias is not None:
-                zeros_(layer.bias)
-        elif isinstance(layer, nn.Embedding):
-            normal_(layer.weight, mean=0.0, std=self.config.initializer_range)
-        elif isinstance(layer, nn.LayerNorm):
-            ones_(layer.weight)
-            zeros_(layer.bias)
+        return None
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config):
@@ -514,7 +629,7 @@ class GLM130BPretrainedModel(PretrainedModel):
 
 
 @register_base_model
-class GLM130BModel(GLM130BPretrainedModel):
+class ChatGLMModel(ChatGLMPretrainedModel):
     r"""
     The GLM Model transformer can behave as an encoder (with only self-attention) as well as a decoder, where
     a layer of cross-attention is added between the self-attention layers, following the architecture
@@ -527,18 +642,12 @@ class GLM130BModel(GLM130BPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     """
 
-    def __init__(self, config: GLM130BConfig):
-        super(GLM130BModel, self).__init__(config)
+    def __init__(self, config: ChatGLMConfig):
+        super(ChatGLMModel, self).__init__(config)
         self.config = config
         self.output_predict = config.output_predict
-        self.transformer = GLM130BStack(config)
+        self.transformer = ChatGLMStack(config)
         self.apply(self.init_weights)
-
-    def get_input_embeddings(self):
-        return self.word_embeddings
-
-    def set_input_embeddings(self, value):
-        self.word_embeddings = value
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output):
         hcg = fleet.get_hybrid_communicate_group()
@@ -597,42 +706,17 @@ class GLM130BModel(GLM130BPretrainedModel):
         attention_mask: Tensor = None,
         past_key_values=None,
         inputs_embeds: Tensor = None,
-        cache: Tensor = None,
         use_cache: bool = None,
         return_dict: bool = None,
     ):
-        batch_size, seq_len = input_ids.shape[:2]
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
-        elif input_ids is not None:
-            batch_size, seq_length = input_ids.shape[:2]
-        elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape[:2]
-        else:
-            raise ValueError("You have to specify either input_ids or inputs_embeds")
-
-        if past_key_values is None:
-            past_key_values = tuple([None] * len(self.layers))
-            seq = input_ids[0].tolist()
-
-            if attention_mask is None:
-                attention_mask = self.get_masks(seq)
-
-            if position_ids is None:
-                MASK, gMASK = 150000, 150001
-                mask_token = MASK if MASK in input_ids else gMASK
-                use_gmask = False if MASK in input_ids else gMASK
-
-                mask_position = paddle.where(seq == mask_token)[0]
-                position_ids = self.get_position_ids(seq=seq, mask_position=mask_position, gmask=use_gmask)
-
         logits, hidden_layers = self.transformer(
             input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            memory_states=cache,
+            inputs_embeds=inputs_embeds,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
         )
         if self.output_predict:
             if self.config.tensor_parallel_degree > 1:
@@ -649,3 +733,142 @@ class GLM130BModel(GLM130BPretrainedModel):
             return (logits, hidden_layers)
 
         return ModelOutput(logits=logits, cache=hidden_layers)
+
+
+class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
+    def __init__(self, config: ChatGLMConfig):
+        super().__init__(config)
+
+        self.max_sequence_length = config.max_sequence_length
+
+        self.position_encoding_2d = config.position_encoding_2d
+
+        self.transformer = ChatGLMModel(config)
+
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False, dtype=paddle.float16)
+
+        self.config = config
+
+    def get_output_embeddings(self):
+        return self.lm_head
+
+    def set_output_embeddings(self, new_embeddings):
+        self.lm_head = new_embeddings
+
+    def prepare_inputs_for_generation(self, input_ids, position_ids, attention_mask, past_key_values, cache, **kwargs):
+        batch_size, seq_length = input_ids.shape
+        MASK, gMASK = 150000, 150001
+        mask_token = MASK if MASK in input_ids else gMASK
+        use_gmask = False if MASK in input_ids else gMASK
+        seqs = input_ids.tolist()
+        mask_positions = [seq.index(mask_token) for seq in seqs]
+
+        if cache is not None or past_key_values is not None:
+            last_token = input_ids[:, -1].unsqueeze(-1)
+            if attention_mask is not None and attention_mask.dtype == paddle.bool:
+                attention_mask = attention_mask[:, :, -1:]
+            else:
+                attention_mask = None
+            if position_ids is not None:
+                position_ids = position_ids[..., -1:]
+            else:
+                context_lengths = [seq.index(self.config.bos_token_id) for seq in seqs]
+                if self.position_encoding_2d:
+                    position_ids = paddle.to_tensor(
+                        [
+                            [mask_position, seq_length - context_length]
+                            for mask_position, context_length in zip(mask_positions, context_lengths)
+                        ],
+                        dtype="int64",
+                    ).unsqueeze(-1)
+                else:
+                    position_ids = paddle.to_tensor(
+                        [mask_position for mask_position in mask_positions], dtype="int64"
+                    ).unsqueeze(-1)
+
+            if cache is None:
+                cache = past_key_values
+            return {
+                "input_ids": last_token,
+                "past_key_values": cache,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+            }
+        else:
+            if attention_mask is not None and attention_mask.dtype != paddle.bool:
+                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not bool")
+                attention_mask = None
+            if attention_mask is None:
+                attention_mask = self.get_masks(input_ids, device=input_ids.device)
+            if position_ids is None:
+                position_ids = self.get_position_ids(
+                    input_ids, device=input_ids.device, mask_positions=mask_positions, gmask=use_gmask
+                )
+
+            return {
+                "input_ids": input_ids,
+                "past_key_values": cache,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+            }
+
+    def forward(
+        self, input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels, use_cache, return_dict
+    ):
+        transformer_outputs = self.transformer(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            return_dict=return_dict,
+        )
+
+        hidden_states = transformer_outputs[0]
+
+        lm_logits = self.lm_head(hidden_states).transpose([1, 0, 2])
+        loss = None
+        if labels is not None:
+            shift_logits = lm_logits[..., :-1, :]
+            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
+            shift_labels = labels[..., 1:].reshape([-1])
+            loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+
+        if not return_dict:
+            if loss is not None:
+                return (loss, lm_logits, transformer_outputs[1:])
+            else:
+                return (lm_logits, transformer_outputs[1:])
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+        )
+
+    @staticmethod
+    def _reorder_cache(cache, beam_idx):
+        return tuple(
+            (
+                layer_past[0].index_select(1, beam_idx),
+                layer_past[1].index_select(1, beam_idx),
+            )
+            for layer_past in cache
+        )
+
+    def process_response(self, response):
+        response = response.strip()
+        response = response.replace("[[训练时间]]", "2023年")
+        punkts = [
+            [",", "，"],
+            ["!", "！"],
+            [":", "："],
+            [";", "；"],
+            ["\?", "？"],
+        ]
+        for item in punkts:
+            response = re.sub(r"([\u4e00-\u9fff])%s" % item[0], r"\1%s" % item[1], response)
+            response = re.sub(r"%s([\u4e00-\u9fff])" % item[0], r"%s\1" % item[1], response)
+        return response

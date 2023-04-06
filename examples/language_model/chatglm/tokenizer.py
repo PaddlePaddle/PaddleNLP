@@ -14,12 +14,18 @@
 
 """Tokenization classes for ChatGLM."""
 import os
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import icetk.sentencepiece_model_pb2 as sp_model
+import numpy as np
 from icetk.text_tokenizer import TextTokenizer
 
 from paddlenlp.transformers.tokenization_utils import PreTrainedTokenizer
+from paddlenlp.transformers.tokenization_utils_base import (
+    BatchEncoding,
+    EncodedInput,
+    PaddingStrategy,
+)
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "THUDM/chatglm-6b": 2048,
@@ -265,6 +271,10 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         spaces_between_special_tokens: bool = True,
         **kwargs
     ) -> str:
+        if not isinstance(token_ids, list):
+            token_ids = [token_ids]
+        if len(token_ids) == 0:
+            return ""
         if isinstance(token_ids[0], list):
             tokens = []
             for single_token_ids in token_ids:
@@ -330,10 +340,9 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         Returns:
             `List[int]`: List of [input IDs](../glossary#input-ids) with the appropriate special tokens.
         """
-        if token_ids_1 is not None:
-            token_ids_0 += token_ids_1
         mask_ids = self.sp_tokenizer[self.mask_token]
         gmask_ids = self.sp_tokenizer[self.gMASK_token]
+        eop_id = self.sp_tokenizer[self.eop_token]
         if mask_ids not in token_ids_0 and gmask_ids not in token_ids_0:
             token_ids_0 += [gmask_ids]
 
@@ -342,4 +351,86 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
 
         token_ids_0 += [self.sp_tokenizer[self.bos_token]]
 
+        if token_ids_1 is not None:
+            if not token_ids_1 or token_ids_1[-1] != eop_id:
+                token_ids_1 += [eop_id]
+            token_ids_0 += token_ids_1
+
         return token_ids_0
+
+    def _pad(
+        self,
+        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
+        max_length: Optional[int] = None,
+        padding_strategy=PaddingStrategy.DO_NOT_PAD,
+        pad_to_multiple_of: Optional[int] = None,
+        return_attention_mask: Optional[bool] = None,
+    ) -> dict:
+
+        # Load from model defaults
+        bos_token_id = self.sp_tokenizer[self.bos_token]
+        mask_token_id = self.sp_tokenizer[self.mask_token]
+        gmask_token_id = self.sp_tokenizer[self.gmask_token]
+        assert self.padding_side == "left"
+
+        required_input = encoded_inputs[self.model_input_names[0]]
+        seq_length = len(required_input)
+
+        if padding_strategy == PaddingStrategy.LONGEST:
+            max_length = len(required_input)
+
+        if max_length is not None and pad_to_multiple_of is not None and (max_length % pad_to_multiple_of != 0):
+            max_length = ((max_length // pad_to_multiple_of) + 1) * pad_to_multiple_of
+
+        needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
+
+        # Initialize attention mask if not present.
+        if max_length is not None:
+            if "attention_mask" not in encoded_inputs:
+                if bos_token_id in required_input:
+                    context_length = required_input.index(bos_token_id)
+                else:
+                    context_length = seq_length
+                attention_mask = np.ones((1, seq_length, seq_length))
+                attention_mask = np.tril(attention_mask)
+                attention_mask[:, :, :context_length] = 1
+                attention_mask = np.bool_(attention_mask < 0.5)
+                encoded_inputs["attention_mask"] = attention_mask
+
+            if "position_ids" not in encoded_inputs:
+                position_ids = np.arange(seq_length, dtype=np.int64)
+                mask_token = mask_token_id if mask_token_id in required_input else gmask_token_id
+                if mask_token in required_input:
+                    mask_position = required_input.index(mask_token)
+                    position_ids[context_length:] = mask_position
+                block_position_ids = np.concatenate(
+                    [
+                        np.zeros(context_length, dtype=np.int64),
+                        np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+                    ]
+                )
+                encoded_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+
+        if needs_to_be_padded:
+            difference = max_length - len(required_input)
+
+            if "attention_mask" in encoded_inputs:
+                encoded_inputs["attention_mask"] = np.pad(
+                    encoded_inputs["attention_mask"],
+                    pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                    mode="constant",
+                    constant_values=True,
+                )
+            if "token_type_ids" in encoded_inputs:
+                encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
+                    "token_type_ids"
+                ]
+            if "special_tokens_mask" in encoded_inputs:
+                encoded_inputs["special_tokens_mask"] = [1] * difference + encoded_inputs["special_tokens_mask"]
+            if "position_ids" in encoded_inputs:
+                encoded_inputs["position_ids"] = np.pad(
+                    encoded_inputs["position_ids"], pad_width=[(0, 0), (difference, 0)]
+                )
+            encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
+
+        return encoded_inputs

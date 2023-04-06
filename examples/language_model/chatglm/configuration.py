@@ -80,6 +80,9 @@ class ChatGLMConfig(PretrainedConfig):
         max_sequence_length=2048,
         inner_hidden_size=16384,
         position_encoding_2d=True,
+        quantization_bit=0,
+        pre_seq_len=None,
+        prefix_projection=False,
         **kwargs
     ):
         self.num_layers = num_layers
@@ -94,4 +97,7 @@ class ChatGLMConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.pad_token_id = pad_token_id
         self.position_encoding_2d = position_encoding_2d
+        self.quantization_bit = quantization_bit
+        self.pre_seq_len = pre_seq_len
+        self.prefix_projection = prefix_projection
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
