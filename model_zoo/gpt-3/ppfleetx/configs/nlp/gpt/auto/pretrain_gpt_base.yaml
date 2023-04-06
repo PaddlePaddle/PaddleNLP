@@ -14,8 +14,6 @@ Engine:
   eval_iters: 10
   test_iters:
   mix_precision:
-    enable: True
-    dtype: "float16"
     level: "o2"
     scale_loss: 32768.0
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
@@ -25,6 +23,9 @@ Engine:
     output_dir: ./output
     ckpt_dir:
 
+FusedPasses:
+  enable: True
+  fused_passes_list: ["fuse_adamw"]
 
 Model:
   module: "GPTModuleAuto"

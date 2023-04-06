@@ -511,14 +511,13 @@ def process_auto_strategy(config):
     # amp config
     amp_cfg = config.Engine.get("mix_precision", {})
     amp = strategy.amp
-    amp.enable = amp_cfg.get("enable", False)
-    amp.dtype = amp_cfg.get("dtype", "float16")
-    amp.level = amp_cfg.get("level", "o2")
+    amp.enable = amp_cfg.get("level", "") in ["o1", "o2", "o3"]
+    amp.use_pure_fp16 = amp_cfg.get("level", "") in ["o2", "o3"]
+    amp.use_optimizer_fp16 = amp_cfg.get("level", "") in ["o3"]
+    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
     amp.init_loss_scaling = amp_cfg.get("scale_loss", 32768)
     amp.custom_black_list = amp_cfg.get("custom_black_list", [])
     amp.custom_white_list = amp_cfg.get("custom_white_list", [])
-    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
-    amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
 
     # recompute config
     if config.get("Model", None) is not None:
@@ -568,6 +567,11 @@ def process_auto_strategy(config):
     tuning.run_after_tuning = tuning_cfg.get("run_after_tuning", True)
     tuning.debug = tuning_cfg.get("debug", True)
 
+    fused_passes_cfg = config.get("FusedPasses", {})
+    fused_passes = strategy.fused_passes
+    fused_passes.enable = fused_passes_cfg.get("enable", False)
+    fused_passes.fused_passes_list = fused_passes_cfg.get("fused_passes_list", [])
+
     engine_cfg = config["Engine"]
     engine_cfg["strategy"] = strategy
 
@@ -580,9 +584,7 @@ def process_auto_ckpt_dir(config):
 
     assert (
         os.path.isdir(ckpt_dir) is False
-    ), "Wrong setting of ckpt_dir!ckpt_dir can't be a folder, but {} is a folder. Your `ckpt_dir` should be `dirname/prefix` like `output/auto` if your model path is `output/auto_dist0.pdparams`".format(
-        ckpt_dir
-    )
+    ), "Wrong setting of ckpt_dir!ckpt_dir can't be a folder," "but {} is a folder".format(ckpt_dir)
 
     assert os.path.exists(ckpt_dir) is False, (
         "Wrong setting of ckpt_dir,"

@@ -36,14 +36,16 @@ function _set_params(){
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
     use_recompute=${11:-"False"}    # (可选)是否打开recompute
-    verbose=${12:-"3"}         # (可选)是否打印性能数据
-    logging_freq=${13:-"100000"} # (可选)loss打印频率
-    sharding_degree=${14:-"1"}      # (可选)
-    sharding_stage=${15:-"1"}       # (可选)sharding case
+    use_passes=${12:-"False"}       # (可选)是否使用pass优化
+    verbose=${13:-"3"}         # (可选)是否打印性能数据
+    logging_freq=${14:-"100000"} # (可选)loss打印频率
+    sharding_degree=${15:-"1"}      # (可选)
+    sharding_stage=${16:-"1"}       # (可选)sharding case
     
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
+    echo "device: ${device}"
     arr=(${device})
     num_gpu_devices=${#arr[*]}
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}  # （必填） TRAIN_LOG_DIR  benchmark框架设置该参数为全局变量
@@ -77,23 +79,24 @@ function _train(){
 
     local_batch_size=`expr ${global_batch_size} / ${dp_degree} / ${sharding_degree}`
     num_attention_heads=16 #"gpt2-medium-en"
-    if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_attention_heads=4; fi #"gpt2-small-en"
+    # if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_attention_heads=4; fi #"gpt2-small-en"
     num_layers=24 #"gpt2-medium-en"
-    if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_layers=4; fi #"gpt2-small-en"
-    use_pure_fp16=False # fp32
-    if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
+    # if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_layers=4; fi #"gpt2-small-en"
+    use_pure_fp16="" # fp32
+    if [ "fp16" = ${fp_item} ]; then use_pure_fp16="o2"; fi
     train_cmd="-o Global.seed=1234 \
                -o Global.local_batch_size=${local_batch_size} \
                -o Global.micro_batch_size=${micro_batch_size} \
                -o Engine.max_steps=${max_iter} \
                -o Engine.eval_freq=100000 \
-               -o Engine.mix_precision.enable=${use_pure_fp16} \
+               -o Engine.mix_precision.level=${use_pure_fp16} \
                -o Engine.save_load.save_steps=100000 \
                -o Model.hidden_size=1024 \
                -o Model.num_layers=${num_layers} \
                -o Model.num_attention_heads=${num_attention_heads} \
-               -o Model.type_vocab_size=1 \
+               -o Model.type_vocab_size=16 \
                -o Model.use_recompute=${use_recompute} \
+               -o FusedPasses.enable=${use_passes} \
                -o Distributed.dp_degree=${dp_degree} \
                -o Distributed.mp_degree=${mp_degree} \
                -o Distributed.pp_degree=${pp_degree} \
@@ -113,14 +116,14 @@ function _train(){
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 ${PADDLE_RANK_OPTION}\
-            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=${CUDA_VISIBLE_DEVICES} ${PADDLE_RANK_OPTION}\
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
         workerlog_id=0
         ;;
-    DP2-MP2-PP2) echo "run run_mode: ${run_mode}"
+    DP1-MP8-PP1) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
         workerlog_id_1=4
         workerlog_id_2=6
@@ -149,7 +152,8 @@ function _train(){
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
-source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+# source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+echo "start run"
 _set_params $@
-#_train       # 如果只产出训练log,不解析,可取消注释
-_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+_train       # 如果只产出训练log,不解析,可取消注释
+# _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
