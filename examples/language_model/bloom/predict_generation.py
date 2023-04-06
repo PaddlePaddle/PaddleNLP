@@ -16,7 +16,7 @@ from __future__ import annotations
 import paddle
 from utils import load_model
 
-from paddlenlp.transformers import AutoTokenizer, BloomForGeneration
+from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
 
 
 def parse_arguments():
@@ -24,6 +24,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", default="bigscience/bloom-560m", help="The directory of model.")
+    parser.add_argument("--save_onepiece_model_path", default=None, help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
@@ -45,10 +46,7 @@ class Predictor(object):
         self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
         self.args = args
-
-        self.model = load_model(args, BloomForGeneration)
-
-        self.model.config.dtype = self.model.config.dtype or "float16"
+        self.model = load_model(args, BloomForCausalLM)
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -66,10 +64,27 @@ class Predictor(object):
         return inputs_tensor
 
     def infer(self, inputs):
-        with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
-            result = self.model(
+        if self.model.config.dtype == "float32" or self.model.config.dtype is None:
+            result = self.model.generate(
                 **inputs,
+                max_length=self.args.max_length,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+                decode_strategy="sampling",
+                top_k=1,
             )
+        else:
+            with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
+                result = self.model.generate(
+                    **inputs,
+                    max_length=self.args.max_length,
+                    bos_token_id=self.tokenizer.bos_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    decode_strategy="sampling",
+                    top_k=1,
+                )
         result = result[0]
         return result
 
@@ -87,6 +102,12 @@ class Predictor(object):
         output = self.postprocess(infer_result)
         return output
 
+    def save_onepiece_model(self, save_onepiece_model_path):
+        self.model.save_pretrained(save_dir=save_onepiece_model_path, merge_tensor_parallel=True)
+        paddle.distributed.barrier()
+        self.tokenizer.save_pretrained(save_onepiece_model_path)
+        paddle.distributed.barrier()
+
 
 def predict():
     args = parse_arguments()
@@ -101,6 +122,8 @@ def predict():
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
             print("{}\n{}".format(text, result))
+    if args.save_onepiece_model_path is not None:
+        predictor.save_onepiece_model(args.save_onepiece_model_path)
 
 
 if __name__ == "__main__":
