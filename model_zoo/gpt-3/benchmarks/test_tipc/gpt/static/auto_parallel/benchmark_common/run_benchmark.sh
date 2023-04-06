@@ -113,16 +113,19 @@ function _train(){
     else
         PADDLE_RANK_OPTION=""
     fi
+
+    mylog=mylog
+
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=${CUDA_VISIBLE_DEVICES} ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=${CUDA_VISIBLE_DEVICES} ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
         workerlog_id=0
         ;;
     DP1-MP8-PP1) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
         workerlog_id_1=4
@@ -131,6 +134,7 @@ function _train(){
     *) echo "choose run_mode "; exit 1;
     esac
     cd ../
+    rm -rf ${mylog}/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
@@ -152,8 +156,8 @@ function _train(){
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
-# source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 echo "start run"
 _set_params $@
-_train       # 如果只产出训练log,不解析,可取消注释
-# _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+# _train       # 如果只产出训练log,不解析,可取消注释
+_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开

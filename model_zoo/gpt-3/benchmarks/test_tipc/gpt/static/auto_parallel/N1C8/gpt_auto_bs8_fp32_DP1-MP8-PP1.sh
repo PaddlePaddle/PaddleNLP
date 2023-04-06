@@ -25,7 +25,7 @@ max_iter=1000
 use_recompute=False
 verbose=3
 logging_freq=1
-use_passes=True
+use_passes=False
 
 model=gpt
 

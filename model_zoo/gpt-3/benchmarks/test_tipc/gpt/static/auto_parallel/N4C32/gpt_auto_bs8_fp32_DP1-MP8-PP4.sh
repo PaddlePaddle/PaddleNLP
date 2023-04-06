@@ -16,7 +16,7 @@ model_item=gpt_auto_fused_optimizer
 fp_item=fp16
 dp_degree=1
 mp_degree=8
-pp_degree=1
+pp_degree=4
 micro_batch_size=8
 global_batch_size=8
 run_mode=DP1-MP8-PP1
@@ -25,7 +25,7 @@ max_iter=1000
 use_recompute=False
 verbose=3
 logging_freq=1
-use_passes=True
+use_passes=False
 
 model=gpt
 

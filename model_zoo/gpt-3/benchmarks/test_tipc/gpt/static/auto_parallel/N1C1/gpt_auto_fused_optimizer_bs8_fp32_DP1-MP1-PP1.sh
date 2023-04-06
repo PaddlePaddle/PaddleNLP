@@ -21,7 +21,7 @@ micro_batch_size=8
 global_batch_size=8
 run_mode=DP1-MP1-PP1
 device_num=N1C1
-max_iter=500
+max_iter=1000
 use_recompute=False
 verbose=3
 logging_freq=1
@@ -30,7 +30,7 @@ use_passes=True
 model=gpt
 
 cd ./benchmarks
-# bash ./test_tipc/gpt/static/auto_parallel/benchmark_common/prepare.sh
+bash ./test_tipc/gpt/static/auto_parallel/benchmark_common/prepare.sh
 # run
 CUDA_VISIBLE_DEVICES=5 bash ./test_tipc/gpt/static/auto_parallel/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num} \
 ${max_iter} ${use_recompute} ${use_passes} ${verbose} ${logging_freq} 2>&1;
