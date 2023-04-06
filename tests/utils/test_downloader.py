@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import os
 import unittest
 from tempfile import TemporaryDirectory
@@ -65,12 +66,30 @@ class LockFileTest(unittest.TestCase):
 class DynamicCommunityTest(unittest.TestCase):
     # only exist in dynamic community test directory
     model_name = "__internal_testing__/bert-dynamic-community"
+    download_related_modules = [
+        "paddlenlp.utils.downloader",
+        "paddlenlp.transformers.model_utils",
+        "paddlenlp.transformers.configuration_utils",
+        "paddlenlp.transformers.auto.modeling",
+        "paddlenlp.transformers.auto.configuration",
+    ]
+
+    def _refresh_community_url(self, value):
+        for module_name in self.download_related_modules:
+            module = importlib.import_module(module_name)
+            module.COMMUNITY_MODEL_PREFIX = value
 
     def setUp(self) -> None:
+        download_module = importlib.import_module("paddlenlp.utils.downloader")
+        self.old_url = download_module.COMMUNITY_MODEL_PREFIX
+
         os.environ["COMMUNITY_MODEL_NAME"] = "community_test"
+        new_url = f"https://bj.bcebos.com/paddlenlp/models/{os.getenv('COMMUNITY_MODEL_NAME', 'community')}"
+        self._refresh_community_url(new_url)
 
     def tearDown(self) -> None:
         os.environ.pop("COMMUNITY_MODEL_NAME", None)
+        self._refresh_community_url(self.old_url)
 
     def test_bert_init(self):
         from paddlenlp.transformers import BertModel
