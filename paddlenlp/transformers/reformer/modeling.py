@@ -1992,7 +1992,7 @@ class ReformerPretrainedModel(PretrainedModel):
         tie_word_embeddings = (
             self.tie_word_embeddings
             if hasattr(self, "tie_word_embeddings")
-            else self.config.get("tie_word_embeddings", False)
+            else self.reformer.config.get("tie_word_embeddings", False)
         )
         if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings") and tie_word_embeddings:
             output_embeddings = self.get_output_embeddings()
@@ -2288,10 +2288,10 @@ class ReformerModel(ReformerPretrainedModel):
 
         # if needs padding
         least_common_mult_chunk_length = _get_least_common_mult_chunk_len(
-            self.attn_layers, self.lsh_attn_chunk_length, self.local_attn_chunk_length
+            self.config.attn_layers, self.config.lsh_attn_chunk_length, self.config.local_attn_chunk_length
         )
         min_chunk_length = _get_min_chunk_len(
-            self.attn_layers, self.lsh_attn_chunk_length, self.local_attn_chunk_length
+            self.config.attn_layers, self.config.lsh_attn_chunk_length, self.config.local_attn_chunk_length
         )
 
         must_pad_to_match_chunk_length = (

@@ -300,7 +300,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -667,7 +667,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
             - `logits` (Tensor):
                 A tensor containing the hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length, num_classes].
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length, num_labels].
 
             - `mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
@@ -689,7 +689,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                     return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
 
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
-                model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
+                model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_labels=2)
 
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
@@ -727,7 +727,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
 
     def __init__(self, config: ErnieDocConfig):
         super(ErnieDocForQuestionAnswering, self).__init__(config)
-        self.ernie_doc = ErnieDocModel(config)  # allow ernie_doc to be config
+        self.ernie_doc = ErnieDocModel(config)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob,
             mode="upscale_in_train",

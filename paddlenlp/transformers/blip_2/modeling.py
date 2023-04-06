@@ -990,7 +990,7 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         # positions we want to attend and -10000.0 for masked positions.
         # Since we are adding it to the raw scores before the softmax, this is
         # effectively the same as removing these entirely.
-        extended_attention_mask = extended_attention_mask.cast(dtype=self.dtype)  # fp16 compatibility
+        extended_attention_mask = extended_attention_mask.cast(dtype=self.config.dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         return extended_attention_mask
 
@@ -1011,7 +1011,9 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         # /transformer/transformer_layers.py#L270
         # encoder_extended_attention_mask = (encoder_extended_attention_mask ==
         # encoder_extended_attention_mask.transpose(-1, -2))
-        encoder_extended_attention_mask = encoder_extended_attention_mask.cast(dtype=self.dtype)  # fp16 compatibility
+        encoder_extended_attention_mask = encoder_extended_attention_mask.cast(
+            dtype=self.config.dtype
+        )  # fp16 compatibility
         encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4
 
         return encoder_extended_attention_mask
@@ -1049,7 +1051,7 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         elif head_mask.ndim == 2:
             head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # We can specify head_mask for each layer
         assert head_mask.ndim == 5, f"head_mask.dim != 5, instead {head_mask.dim()}"
-        head_mask = head_mask.cast(dtype=self.dtype)  # switch to float if need + fp16 compatibility
+        head_mask = head_mask.cast(dtype=self.config.dtype)  # switch to float if need + fp16 compatibility
         return head_mask
 
     def forward(
