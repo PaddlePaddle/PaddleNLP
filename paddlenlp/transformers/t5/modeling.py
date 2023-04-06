@@ -628,7 +628,7 @@ class T5PretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
-
+        # paddle 单卡 到 tp
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -648,21 +648,19 @@ class T5PretrainedModel(PretrainedModel):
                 "decoder.block.0.layer.0.SelfAttention.q.weight": partial(fn, is_column=True),
                 "decoder.block.0.layer.0.SelfAttention.k.weight": partial(fn, is_column=True),
                 "decoder.block.0.layer.0.SelfAttention.v.weight": partial(fn, is_column=True),
-                "decoder.block.0.layer.1.EncDecAttention.q.weight": partial(fn, is_column=True),
-                "decoder.block.0.layer.1.EncDecAttention.k.weight": partial(fn, is_column=True),
-                "decoder.block.0.layer.1.EncDecAttention.v.weight": partial(fn, is_column=True),
                 # Row Linear
                 "encoder.block.0.layer.0.SelfAttention.o.weight": partial(fn, is_column=False),
                 "decoder.block.0.layer.0.SelfAttention.o.weight": partial(fn, is_column=False),
-                "decoder.block.0.layer.1.EncDecAttention.o.weight": partial(fn, is_column=False),
                 "encoder.block.0.layer.1.DenseReluDense.wo.weight": partial(fn, is_column=False),
                 "decoder.block.0.layer.2.DenseReluDense.wo.weight": partial(fn, is_column=False),
                 "shared.weight": partial(fn, is_column=False),
-                # 'transformer.layers.0.attention.dense.bias',
-                # "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
-                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
-                # "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
             }
+            # mv T5LayerCrossAttention here
+            base_actions["decoder.block.0.layer.1.EncDecAttention.q.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.k.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.v.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.o.weight"] = partial(fn, is_column=False)
+
             if config.feed_forward_proj == "relu":
                 base_actions["encoder.block.0.layer.1.DenseReluDense.wi.weight"] = partial(fn, is_column=True)
                 base_actions["decoder.block.0.layer.2.DenseReluDense.wi.weight"] = partial(fn, is_column=True)
@@ -670,6 +668,13 @@ class T5PretrainedModel(PretrainedModel):
                 for i in range(2):
                     base_actions[f"encoder.block.0.layer.1.DenseReluDense.wi_{i}.weight"] = partial(fn, is_column=True)
                     base_actions[f"decoder.block.0.layer.2.DenseReluDense.wi_{i}.weight"] = partial(fn, is_column=True)
+
+            final_actions["encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True
+            )
+            final_actions["decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True
+            )
 
             for key, action in base_actions.items():
                 if "block.0." in key:
@@ -685,6 +690,7 @@ class T5PretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_name_mappings(cls, config: T5Config) -> list[StateDictNameMapping]:
+        # 转换 torch 到 paddle
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["shared.weight", "shared.weight"],
@@ -1279,7 +1285,11 @@ class T5Model(T5PretrainedModel):
         self.d_ff = config.d_ff
         self.tie_word_embeddings = config.tie_word_embeddings
         if config.tensor_parallel_degree > 1:
-            self.shared = fleet.meta_parallel.VocabParallelEmbedding(config.vocab_size, config.d_model)
+            self.shared = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.d_model,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
         else:
             self.shared = nn.Embedding(config.vocab_size, config.d_model)
         encoder_config = copy.deepcopy(config)
