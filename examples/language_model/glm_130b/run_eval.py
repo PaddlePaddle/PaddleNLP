@@ -72,28 +72,35 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         end_idx = start_idx + self.seq_len - 2  # gmask, sop
         tokens = self.tokens[start_idx:end_idx]
 
-        prompt_length = self.seq_len - 1 - self.overlapping_eval
+        prompt_length = self.seq_len - 2 - self.overlapping_eval
         prompt, text = tokens[:prompt_length], tokens[prompt_length:]
 
-        input_len = len(prompt) + 2
+        input_len = len(prompt) + 1
 
-        input_ids = np.array(
-            prompt
-            + [self.mask_idx, self.sop_idx]
-            + text
-            + [self.pad_idx] * (self.seq_len - 2 - len(prompt) - len(text))
-        )
+        input_ids = np.array(prompt + [self.mask_idx, self.sop_idx] + text[:-1])
         attention_mask = np.tri(self.seq_len, self.seq_len, dtype=np.int64)
-        attention_mask[:input_len, :input_len] = 1
+        attention_mask[:, :input_len] = 1
+        attention_mask[input_len + len(text) :, :] = 0
+        attention_mask[:, input_len + len(text) :] = 0
         attention_mask = attention_mask[None, :, :]
 
         position_ids = np.arange(0, self.seq_len, dtype=np.int64)
-        position_ids[input_len:] = np.where(input_ids == self.mask_idx)[0]
+        position_ids[input_len + len(text) :] = 0
 
         loss_mask = np.zeros(self.seq_len, dtype="float32")
         loss_mask[input_len : input_len + len(text)] = 1.0
 
-        targets = np.array(input_ids.tolist())
+        targets = np.array(prompt + [self.mask_idx] + text)
+        if len(input_ids) > self.seq_len:
+            input_ids = input_ids[len(input_ids) - self.seq_len :]
+        if len(input_ids) < self.seq_len:
+            input_ids = np.concatenate([input_ids, np.ones([self.seq_len - len(input_ids)]) * self.pad_idx])
+        if len(targets) > self.seq_len:
+            targets = targets[len(targets) - self.seq_len :]
+        if len(targets) < self.seq_len:
+            targets = np.concatenate([targets, np.ones([self.seq_len - len(targets)]) * self.pad_idx])
+        input_ids = input_ids.astype("int64")
+        targets = targets.astype("int64")
 
         return [input_ids, loss_mask, attention_mask < 0.5, position_ids, targets]
 
@@ -117,20 +124,24 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
         inputs = inputs + [self.mask_idx, self.sop_idx]
         input_len = len(inputs)
         input_ids = inputs + labels[:-1]
-        if len(input_ids) > self.seq_len - 1:
-            input_ids = input_ids[-(self.seq_len - 1) :]
-        pred_index = len(input_ids)
+        cut_length = len(input_ids) - self.seq_len
+        if cut_length > 0:
+            input_ids = input_ids[cut_length:]
         if len(input_ids) < self.seq_len:
             input_ids = input_ids + [self.pad_idx] * (self.seq_len - len(input_ids))
         input_ids = np.array(input_ids)
-        attention_mask = np.tri(self.seq_len, self.seq_len).reshape([1, self.seq_len, self.seq_len])
-        attention_mask[:, :input_len] = 1
+        attention_mask = np.tri(self.seq_len, self.seq_len)
+        attention_mask[:, : input_len - 1] = 1
+        attention_mask[input_len + len(labels) - 1 :, :] = 0
+        attention_mask[:, input_len + len(labels) - 1 :] = 0
+        attention_mask = attention_mask[None, :, :]
         position_ids = np.arange(0, self.seq_len, dtype=np.int64)
-        position_ids[input_len:] = np.where(input_ids == self.mask_idx)[0]
+        position_ids[input_len + len(labels) - 1 :] = 0
         loss_mask = np.zeros(self.seq_len, dtype="float32")
-        loss_mask[input_len : input_len + len(labels)] = 1.0
-        targets = np.array(input_ids.tolist())
-        targets[pred_index] = labels[-1]
+        loss_mask[input_len - 1 : input_len - 1 + len(labels)] = 1.0
+        targets = np.zeros(self.seq_len, dtype="int64")
+        targets[: len(inputs) - 1] = inputs[:-1]
+        targets[len(inputs) - 1 : len(inputs) - 1 + len(labels)] = labels
 
         return [input_ids, loss_mask, attention_mask < 0.5, position_ids, targets]
 

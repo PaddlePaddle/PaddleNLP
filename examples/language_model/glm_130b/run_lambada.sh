@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m paddle.distributed.launch --gpus 6,7 run_eval.py \
---model_path local_random_path_mp \
+python -m paddle.distributed.launch --gpus 0,1,2,3,4,5,6,7 run_eval.py \
+--model_path /local_path/glm-130b \
 --eval_path ./lambada_test.jsonl \
 --cloze_eval True \
---batch_size 8 \
+--batch_size 16 \
 --device gpu \
---logging_steps 10 \
---tensor_parallel_degree 2 \
+--logging_steps 1 \
+--seq_length 512 \
 --output_dir mp_ckpt 
