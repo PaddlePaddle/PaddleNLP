@@ -11,34 +11,35 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import argparse
-import tkinter
-from tkinter import Label, Tk, PhotoImage, Entry, LEFT, W, END, Button, E
-import time
-import threading
 import json
+import os
+import threading
+import time
 import uuid
-import yaml
-from attrdict import AttrDict
+from tkinter import END, LEFT, Button, E, Entry, Label, PhotoImage, Tk, W
+
 import _locale
 import jieba
 import paddle
+import websocket
+import yaml
+from attrdict import AttrDict
+from subword_nmt import subword_nmt
+
 from paddlenlp.data import Vocab
 from paddlenlp.transformers import position_encoding_init
 from paddlenlp.utils.log import logger
-from subword_nmt import subword_nmt
-import websocket
 
 open_speech = True
 try:
     from pyaudio import PyAudio, paInt16
-except ImportError as e:
+except ImportError:
     open_speech = False
     logger.warning("No module named 'pyaudio', so no audio demo.")
 
-import const
-from model_demo import SimultaneousTransformerDemo
+import const  # noqa: E402
+from model_demo import SimultaneousTransformerDemo  # noqa: E402
 
 # By default, the Windows system opens the file with GBK code,
 # and the subword_nmt package does not support setting open encoding,

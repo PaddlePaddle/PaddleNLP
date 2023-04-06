@@ -54,24 +54,28 @@ class LabelStudioDataConverter(object):
         utc_examples = []
         for example in raw_examples:
             raw_text = example["data"]["text"].split(self.text_separator)
-            raw_label = example["annotations"][0]["result"][0]["value"]["choices"][0]
             if len(raw_text) < 1:
                 continue
             elif len(raw_text) == 1:
                 raw_text.append("")
             elif len(raw_text) > 2:
                 raw_text = ["".join(raw_text[:-1]), raw_text[-1]]
-            if raw_label not in self.options:
-                raise ValueError(
-                    f"Label `{raw_label}` not found in label candidates `options`. Please recheck the data."
-                )
+
+            label_list = []
+            for raw_label in example["annotations"][0]["result"][0]["value"]["choices"]:
+                if raw_label not in self.options:
+                    raise ValueError(
+                        f"Label `{raw_label}` not found in label candidates `options`. Please recheck the data."
+                    )
+                label_list.append(np.where(np.array(self.options) == raw_label)[0].tolist()[0])
+
             utc_examples.append(
                 {
                     "text_a": raw_text[0],
                     "text_b": raw_text[1],
                     "question": "",
                     "choices": self.options,
-                    "labels": np.where(np.array(self.options) == raw_label)[0].tolist()[0],
+                    "labels": label_list,
                 }
             )
         return utc_examples

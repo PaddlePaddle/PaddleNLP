@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-
 from model import SimNet
 from utils import preprocess_prediction_data
+
+from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -49,7 +48,7 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
         results(obj:`dict`): All the predictions labels.
     """
 
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batches = [data[idx : idx + batch_size] for idx in range(0, len(data), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(

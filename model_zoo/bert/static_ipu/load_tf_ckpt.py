@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import os
-import numpy as np
 from logging import getLogger
+
+import numpy as np
 
 logger = getLogger(__name__)
 
@@ -129,7 +130,7 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
 
             # Otherwise just copy the positional embeddings over and over again as is done in longformer
             elif max_pos < args.max_position_embeddings:
-                logger.warning(f"Not enough positional embeddings in checkpoint, copying to match length...")
+                logger.warning("Not enough positional embeddings in checkpoint, copying to match length...")
                 array = array[np.mod(np.arange(args.max_position_embeddings), max_pos)]
 
         initializers[mapping[name]] = array.copy()

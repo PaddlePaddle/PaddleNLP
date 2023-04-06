@@ -12,8 +12,9 @@ FastTokenizer库在C++、Python端提供ErnieFastTokenizer接口，用户只需�
 
 ## 详细分词示例文档
 
-[C++ 分词示例](./cpp)
-[Python 分词示例](./python)
+[C++ 分词示例](./cpp/README.md)
+
+[Python 分词示例](./python/README.md)
 
 ## 参考文献
 

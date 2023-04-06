@@ -12,27 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import time
-import random
-import argparse
-import numpy as np
-from scipy import stats
 from functools import partial
 
+import numpy as np
 import paddle
-import paddle.nn.functional as F
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from data import convert_example, create_dataloader, read_text_pair, read_text_single
+from model import DiffCSE, Encoder
+from utils import eval_metric, set_seed
 from visualdl import LogWriter
 
-from model import DiffCSE, Encoder
-from utils import set_seed, eval_metric
-from data import read_text_single, read_text_pair, convert_example, create_dataloader
+import paddlenlp as ppnlp
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import LinearDecayWithWarmup
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["train", "eval", "infer"], default="infer", help="Select which mode to run model, defaults to infer.")
 parser.add_argument("--encoder_name", type=str, help="The sentence_encoder name or path that you wanna train based on.")
@@ -43,7 +40,7 @@ parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embed
 parser.add_argument("--train_set_file", type=str, help="The full path of train_set_file.")
 parser.add_argument("--eval_set_file", type=str, help="The full path of eval_set_file.")
 parser.add_argument("--infer_set_file", type=str, help="The full path of infer_set_file.")
-parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded when doing evalution/inference.")
+parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded when doing evaluation/inference.")
 parser.add_argument("--save_dir", default="./checkpoints", type=str, help="The directory where the model checkpoints will be written.")
 parser.add_argument("--log_dir", default=None, type=str, help="The directory where log will be written.")
 parser.add_argument("--save_infer_path", default="./infer_result.txt", type=str, help="The save directory where the inference result will be written.")
@@ -54,14 +51,14 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--epochs", default=1, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--temp", default=0.05, type=float, help="Temperature for softmax.")
 parser.add_argument("--mlm_probability", default=0.15, type=float, help="The ratio for masked language model.")
 parser.add_argument("--lambda_weight", default=0.15, type=float, help="The weight for RTD loss.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def do_infer(model, tokenizer, data_loader):
@@ -251,7 +248,7 @@ if __name__ == "__main__":
         gen_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.generator_name)
         dis_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.discriminator_name)
 
-        # intializing DiffCSE model
+        # initializing DiffCSE model
         model = DiffCSE(
             encoder_name=args.encoder_name,
             generator_name=args.generator_name,
@@ -270,7 +267,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
         dev_batchify_fn = lambda samples, fn=Tuple(
@@ -278,7 +275,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
@@ -319,7 +316,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
@@ -357,7 +354,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
 

@@ -13,13 +13,8 @@
 # limitations under the License.
 
 import os
-import re
-import subprocess
-import sys
-import multiprocessing
 
-import setuptools
-from setuptools import setup, Distribution, Extension
+from setuptools import Distribution, setup
 from setuptools.command.install import install
 
 

@@ -14,28 +14,32 @@
 """
  This file is used to fine-tune pretrained models
 """
-from functools import partial
 import argparse
 import os
 import random
-import time
 import sys
+import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("..")
 sys.path.append("../../..")
-from roberta.modeling import RobertaForSequenceClassification
+from roberta.modeling import RobertaForSequenceClassification  # noqa: E402
 
 sys.path.remove("../../..")
 sys.path.remove("..")
-from utils import convert_example
+from utils import convert_example  # noqa: E402
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--base_model", type=str, choices=["roberta_base", "roberta_large"])
@@ -57,7 +61,7 @@ parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initi
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument(
-    "--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process."
+    "--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process."
 )
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")

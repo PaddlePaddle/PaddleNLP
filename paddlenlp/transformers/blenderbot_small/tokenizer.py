@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..gpt.tokenizer import GPTTokenizer
 import re
+
+from ..gpt.tokenizer import GPTTokenizer
 
 __all__ = ["BlenderbotSmallTokenizer"]
 
@@ -102,6 +103,7 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
             pad_token=pad_token,
             eos_token=eos_token,
             eol_token=eol_token,
+            **kwargs,
         )
         self.pat = r"\S+\n?"  # String matching pattern of BlenderbotSmall is different from Blenderbot
         self.unk_id = self.encoder[unk_token]
@@ -124,7 +126,6 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
         token = re.sub(r"\s{2,}", " ", token)
         if "\n" in token:
             token = token.replace("\n", self.eol_token)
-
         tokens = token.split(" ")
         words = []
         for token in tokens:

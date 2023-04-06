@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import numpy as np
-import paddle
 import torch
+from reprod_log import ReprodDiffHelper, ReprodLogger
+from torch.optim import AdamW
+from transformers.optimization import get_scheduler as get_hf_scheduler
 
 # define paddle scheduler
 from paddlenlp.transformers import (
@@ -22,9 +24,6 @@ from paddlenlp.transformers import (
     LinearDecayWithWarmup,
     PolyDecayWithWarmup,
 )
-from reprod_log import ReprodDiffHelper, ReprodLogger
-from torch.optim import AdamW
-from transformers.optimization import get_scheduler as get_hf_scheduler
 
 scheduler_type2cls = {
     "linear": LinearDecayWithWarmup,
@@ -45,10 +44,10 @@ def get_paddle_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,

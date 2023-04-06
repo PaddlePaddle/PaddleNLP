@@ -35,7 +35,7 @@ from .log import logger
 
 __all__ = ["get_weights_path_from_url"]
 
-COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community"
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 DOWNLOAD_RETRY_LIMIT = 3
 DOWNLOAD_CHECK = False
@@ -139,7 +139,7 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
 
 
 def get_path_from_url_with_filelock(
-    url: str, root_dir: str, md5sum: Optional[str] = None, check_exist: bool = True
+    url: str, root_dir: str, md5sum: Optional[str] = None, check_exist: bool = True, timeout: float = -1
 ) -> str:
     """construct `get_path_from_url` for `model_utils` to enable downloading multiprocess-safe
 
@@ -148,6 +148,7 @@ def get_path_from_url_with_filelock(
         root_dir (str): the local download path
         md5sum (str, optional): md5sum string for file. Defaults to None.
         check_exist (bool, optional): whether check the file is exist. Defaults to True.
+        timeout (int, optional): the timeout for downloading. Defaults to -1.
 
     Returns:
         str: the path of downloaded file
@@ -163,7 +164,7 @@ def get_path_from_url_with_filelock(
 
     os.makedirs(os.path.dirname(lock_file_path), exist_ok=True)
 
-    with FileLock(lock_file_path):
+    with FileLock(lock_file_path, timeout=timeout):
         result = get_path_from_url(url=url, root_dir=root_dir, md5sum=md5sum, check_exist=check_exist)
     return result
 
@@ -174,8 +175,7 @@ def _download(url, path, md5sum=None):
     url (str): download url
     path (str): download to given path
     """
-    if not osp.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
     fname = osp.split(url)[-1]
     fullname = osp.join(path, fname)

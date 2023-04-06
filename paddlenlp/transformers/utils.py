@@ -17,11 +17,13 @@ import functools
 import inspect
 import os
 import warnings
-from typing import TYPE_CHECKING, Optional, Type
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, ContextManager, List, Optional, Type
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
+import paddle
 from paddle.nn import Layer
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
@@ -210,16 +212,23 @@ def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cac
         from_hf_hub (bool): if load from huggingface hub
         cache_dir (str): cache_dir for models
     """
-    if cache_dir is not None:
-        return cache_dir
-
     if os.path.isdir(pretrained_model_name_or_path):
         return pretrained_model_name_or_path
 
+    # hf hub library takes care of appending the model name so we don't append the model name
     if from_hf_hub:
-        return os.path.join(HF_CACHE_HOME, pretrained_model_name_or_path)
-
-    return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        if cache_dir is not None:
+            return cache_dir
+        else:
+            return HF_CACHE_HOME
+    else:
+        if cache_dir is not None:
+            # since model_clas.from_pretrained calls config_clas.from_pretrained, the model_name may get appended twice
+            if cache_dir.endswith(pretrained_model_name_or_path):
+                return cache_dir
+            else:
+                return os.path.join(cache_dir, pretrained_model_name_or_path)
+        return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 
 
 def find_transformer_model_type(model_class: Type) -> str:
@@ -278,3 +287,25 @@ def find_transformer_model_class_by_name(model_name: str) -> Optional[Type[Pretr
             return obj
     logger.debug(f"can not find model_class<{model_name}>")
     return None
+
+
+def is_paddle_support_lazy_init():
+    return hasattr(paddle, "LazyGuard")
+
+
+class ContextManagers:
+    """
+    Wrapper for `contextlib.ExitStack` which enters a collection of context managers. Adaptation of `ContextManagers`
+    in the `fastcore` library.
+    """
+
+    def __init__(self, context_managers: List[ContextManager]):
+        self.context_managers = context_managers
+        self.stack = ExitStack()
+
+    def __enter__(self):
+        for context_manager in self.context_managers:
+            self.stack.enter_context(context_manager)
+
+    def __exit__(self, *args, **kwargs):
+        self.stack.__exit__(*args, **kwargs)

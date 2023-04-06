@@ -24,4 +24,4 @@ pipe.remove_unused_weights()
 
 text_to_image_strength = 0.75
 image = pipe(prompt=text, image=image, text_to_image_strength=text_to_image_strength).images[0]
-image.save("versatile-diffusion-red_car.png")
+image.save("dual_text_and_image_guided_generation-versatile_diffusion-result.png")

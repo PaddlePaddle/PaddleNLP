@@ -13,11 +13,9 @@
 # limitations under the License.
 """Contains various utility functions for Dynet models."""
 
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-
 import numpy as np
+import paddle
+import paddle.nn.functional as F
 
 
 def compute_loss(gold_seq, scores, index_to_token_maps, gold_tok_to_id, noise=0.00000001):
@@ -40,7 +38,6 @@ def compute_loss(gold_seq, scores, index_to_token_maps, gold_tok_to_id, noise=0.
     assert len(gold_seq) == len(scores) == len(index_to_token_maps)
 
     losses = []
-    predicted_sql = []
     for i, gold_tok in enumerate(gold_seq):
         score = scores[i]
         token_map = index_to_token_maps[i]

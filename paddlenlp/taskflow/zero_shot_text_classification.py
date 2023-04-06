@@ -17,10 +17,11 @@ from typing import Any, Dict, List, Union
 
 import numpy as np
 from paddle.static import InputSpec
+from scipy.special import expit as np_sigmoid
+from scipy.special import softmax as np_softmax
 
-from paddlenlp.prompt import PromptDataCollatorWithPadding, UTCTemplate
-from paddlenlp.transformers import UTC, AutoTokenizer
-
+from ..prompt import PromptDataCollatorWithPadding, UTCTemplate
+from ..transformers import UTC, AutoTokenizer
 from .task import Task
 from .utils import static_mode_guard
 
@@ -231,6 +232,28 @@ class ZeroShotTextClassificationTask(Task):
                 "dcb0f3257830c0eb1f2de47f2d86f89a",
             ],
         },
+        "__internal_testing__/tiny-random-utc": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/model_state.pdparams",
+                "d303b59447be690530c35c73f8fd03cd",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/config.json",
+                "3420a6638a7c73c6239eb1d7ca1bc5fe",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/vocab.txt",
+                "97eb0ec5a5890c8190e10e251af2e133",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-utc/tokenizer_config.json",
+                "258fc552c15cec90046066ca122899e2",
+            ],
+        },
     }
 
     def __init__(self, task: str, model: str, schema: list = None, **kwargs):
@@ -241,6 +264,7 @@ class ZeroShotTextClassificationTask(Task):
         self._batch_size = kwargs.get("batch_size", 1)
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
         self._num_workers = kwargs.get("num_workers", 0)
+        self._single_label = kwargs.get("single_label", False)
 
         self._check_task_files()
         self._construct_tokenizer()
@@ -249,15 +273,12 @@ class ZeroShotTextClassificationTask(Task):
 
     def _set_utc_schema(self, schema):
         if schema is None:
-            self._question = None
             self._choices = None
         elif isinstance(schema, list):
-            self._question = ""
             self._choices = schema
         elif isinstance(schema, dict) and len(schema) == 1:
-            for key, value in schema.items():
-                self._question = key
-                self._choices = value
+            for key in schema:
+                self._choices = schema[key]
         else:
             raise ValueError(f"Invalid schema: {schema}.")
 
@@ -289,10 +310,7 @@ class ZeroShotTextClassificationTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        if self.from_hf_hub:
-            self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
-        else:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
         self._template = UTCTemplate(self._tokenizer, self._max_seq_len)
 
@@ -304,9 +322,9 @@ class ZeroShotTextClassificationTask(Task):
         if isinstance(inputs, list):
             input_list = []
             for example in inputs:
-                data = {"text_a": "", "text_b": "", "choices": self._choices, "question": self._question}
+                data = {"text_a": "", "text_b": "", "choices": self._choices}
                 if isinstance(example, dict):
-                    for k, v in example.items():
+                    for k in example:
                         if k in data:
                             data[k] = example[k]
                 elif isinstance(example, str):
@@ -327,8 +345,6 @@ class ZeroShotTextClassificationTask(Task):
                     raise ValueError("Invalid inputs, input `text_a` and `text_b` are both missing or empty.")
                 if not isinstance(data["choices"], list) or len(data["choices"]) < 2:
                     raise ValueError("Invalid inputs, label candidates should be a list with length >= 2.")
-                if not isinstance(data["question"], str):
-                    raise ValueError("Invalid inputs, prompt question should be a string.")
                 input_list.append(data)
         else:
             raise TypeError("Invalid input format!")
@@ -380,33 +396,29 @@ class ZeroShotTextClassificationTask(Task):
 
         return outputs
 
-    @staticmethod
-    def sigmoid(z):
-        return 1 / (1 + np.exp(-z))
-
     def _postprocess(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         This function converts the model logits output to class score and predictions
         """
         outputs = []
-        for logits in inputs["batch_logits"]:
-            scores = self.sigmoid(np.array(logits))
+        for text, logits in zip(inputs["text"], inputs["batch_logits"]):
             output = {}
-            output["predictions"] = []
-            for i, class_score in enumerate(scores[0]):
-                if class_score > self._pred_threshold:
-                    output["predictions"].append({"label": i, "score": class_score})
-            outputs.append(output)
+            if len(text["text_a"]) > 0:
+                output["text_a"] = text["text_a"]
+            if len(text["text_b"]) > 0:
+                output["text_b"] = text["text_b"]
 
-        for i, output in enumerate(outputs):
-            if len(inputs["text"][i]["text_a"]) > 0:
-                output["text_a"] = inputs["text"][i]["text_a"]
-            if len(inputs["text"][i]["text_b"]) > 0:
-                output["text_b"] = inputs["text"][i]["text_b"]
-            for j, pred in enumerate(output["predictions"]):
-                output["predictions"][j] = {
-                    "label": inputs["text"][i]["choices"][pred["label"]],
-                    "score": pred["score"],
-                }
+            if self._single_label:
+                scores = np_softmax(logits, axis=-1)
+                labels = np.argmax(logits, axis=-1)
+                for score, label in zip(scores, labels):
+                    output["predictions"] = [{"label": text["choices"][label], "score": score[label]}]
+            else:
+                scores = np_sigmoid(logits)
+                output["predictions"] = []
+                for i, class_score in enumerate(scores[0]):
+                    if class_score > self._pred_threshold:
+                        output["predictions"].append({"label": text["choices"][i], "score": class_score})
+            outputs.append(output)
 
         return outputs

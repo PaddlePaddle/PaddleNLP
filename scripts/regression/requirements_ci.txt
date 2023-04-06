@@ -29,3 +29,10 @@ cma
 paddleocr
 fast_tokenizer_python
 https://paddle-qa.bj.bcebos.com/PaddleSlim/paddleslim-0.0.0.dev0-py3-none-any.whl
+tool_helpers
+emoji
+ftfy
+unidecode
+onnxruntime
+sacremoses
+

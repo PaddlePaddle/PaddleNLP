@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
+import itertools
 import logging
 import re
-import itertools
 
 import numpy as np
-
 from text2sql.utils import text_utils
 
 # the max matching ngram
@@ -137,7 +133,7 @@ class Relations(object):
             self.relation_ids[name] = len(self.relation_ids)
             logging.debug("relation: %s --> %d", name, self.relation_ids[name])
 
-        ##< TODO: add_relation('[UNK]')
+        # < TODO: add_relation('[UNK]')
 
         def add_rel_dist(name, max_dist):
             for i in range(-max_dist, max_dist + 1):
@@ -347,7 +343,7 @@ def compute_cell_value_linking(tokens, db):
         try:
             float(word)
             return True
-        except:
+        except Exception:
             return False
 
     def check_cell_match(word, cells):
@@ -458,7 +454,7 @@ def build_relation_matrix(other_links, total_length, q_length, c_length, c_bound
             raise e
 
         if i_type[0] == "question":
-            ################ relation of question-to-* ####################
+            # relation of question-to-*
             if j_type[0] == "question":  # relation qq
                 _set_relation(("qq_dist", clamp(j - i, RELATIONS.qq_max_dist)))
             elif j_type[0] == "column":  # relation qc
@@ -470,12 +466,12 @@ def build_relation_matrix(other_links, total_length, q_length, c_length, c_bound
                 rel = _get_qt_links(i, j_real)
                 _set_relation("qt" + rel)
         elif i_type[0] == "column":
-            ################ relation of column-to-* ####################
-            if j_type[0] == "question":  ## relation cq
+            # relation of column-to-*
+            if j_type[0] == "question":  # relation cq
                 i_real = i_type[1]
                 rel = _get_qc_links(j, i_real)
                 _set_relation("cq" + rel)
-            elif j_type[0] == "column":  ## relation cc
+            elif j_type[0] == "column":  # relation cc
                 col1, col2 = i_type[1], j_type[1]
                 if col1 == col2:
                     _set_relation(("cc_dist", clamp(j - i, RELATIONS.cc_max_dist)))
@@ -489,7 +485,7 @@ def build_relation_matrix(other_links, total_length, q_length, c_length, c_bound
                             _set_relation("cc_foreign_key_backward")
                     if RELATIONS.cc_table_match and _table_id(db, col1) == _table_id(db, col2):
                         _set_relation("cc_table_match")
-            elif j_type[0] == "table":  ## relation ct
+            elif j_type[0] == "table":  # relation ct
                 col, table = i_type[1], j_type[1]
                 _set_relation("ct_default")
                 if RELATIONS.ct_foreign_key and _match_foreign_key(db, col, table):
@@ -504,7 +500,7 @@ def build_relation_matrix(other_links, total_length, q_length, c_length, c_bound
                     elif col_table is None:
                         _set_relation("ct_any_table")
         elif i_type[0] == "table":
-            ################ relation of table-to-* ####################
+            # relation of table-to-*
             if j_type[0] == "question":
                 i_real = i_type[1]
                 rel = _get_qt_links(j, i_real)
@@ -548,15 +544,15 @@ if __name__ == "__main__":
     q = "帮 我 查 一 下 大众 帕 萨 特 的 轴距 和 能源 类型 分别 是 什么 , 叫 什么 名 ？".split(" ")
     for i, tok in enumerate(q):
         print(i, tok)
-    ##header = Header(['名称', '品牌', '轴距', '能源类型'], ['text', 'text', 'real', 'text'])
-    ##print(header.names)
-    ##print(compute_schema_linking(q, header))
+    # header = Header(['名称', '品牌', '轴距', '能源类型'], ['text', 'text', 'real', 'text'])
+    # print(header.names)
+    # print(compute_schema_linking(q, header))
 
-    ##q = '帮 我 查 一 下 大众 轴距 大于 10 米 的 车 能源 类型 分别 是 什么 ？'.split(' ')
-    ##for i, tok in enumerate(q):
-    ##    print(i, tok)
-    ##rows = [['帕萨特', '大众', '10', '汽油车'],
-    ##        ['伊兰特', '现代', '10', '汽油车'],
-    ##        ['GL8', '别克', '10', '汽油车']]
-    ##table = Table('tid1', 'tname', 'title', header, rows)
-    ##print(compute_cell_value_linking(q, table))
+    # q = '帮 我 查 一 下 大众 轴距 大于 10 米 的 车 能源 类型 分别 是 什么 ？'.split(' ')
+    # for i, tok in enumerate(q):
+    #    print(i, tok)
+    # rows = [['帕萨特', '大众', '10', '汽油车'],
+    #        ['伊兰特', '现代', '10', '汽油车'],
+    #        ['GL8', '别克', '10', '汽油车']]
+    # table = Table('tid1', 'tname', 'title', header, rows)
+    # print(compute_cell_value_linking(q, table))

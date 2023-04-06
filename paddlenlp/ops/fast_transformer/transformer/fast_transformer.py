@@ -1483,12 +1483,14 @@ class FasterBART(BartPretrainedModel):
         num_beams=4,
         top_k=1,
         top_p=0.0,
+        temperature=1.0,
         decode_strategy="beam_search",
         bos_token_id=None,
         eos_token_id=None,
         pad_token_id=None,
         decoder_start_token_id=None,
-        max_length=256,
+        min_length=0,
+        max_length=20,
         diversity_rate=0.0,
         length_penalty=0.6,
         num_return_sequences=1,
@@ -1521,6 +1523,7 @@ class FasterBART(BartPretrainedModel):
             seq_len = expanded_kwargs["seq_len"]
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
+
         return self.decoding(
             enc_output=encoder_output,
             memory_seq_lens=seq_len,
@@ -1532,6 +1535,8 @@ class FasterBART(BartPretrainedModel):
             pad_token_id=pad_token_id,
             top_p=top_p,
             max_out_len=max_length,
+            min_out_len=min_length,
+            temperature=temperature,
             diversity_rate=diversity_rate,
             alpha=length_penalty,
             early_stopping=early_stopping,

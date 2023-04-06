@@ -49,7 +49,7 @@ Anaconda是一个开源的Python发行版本，其包含了conda、Python等180�
 
 按如上方式配置后，即可在环境中使用PaddleNLP了，命令行输入python回车后，import paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。
 
-2、Linux/Mac安装安装Anaconda
+2、Linux/Mac安装Anaconda
 >>>>>>>>>
 
 第一步 下载

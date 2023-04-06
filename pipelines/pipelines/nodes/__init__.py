@@ -31,11 +31,17 @@ from pipelines.nodes.file_converter import (
     PDFToTextOCRConverter,
     TextConverter,
 )
+from pipelines.nodes.other import JoinDocuments
 from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
 from pipelines.nodes.question_generator import QuestionGenerator
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
-from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
+from pipelines.nodes.retriever import (
+    BaseRetriever,
+    BM25Retriever,
+    DensePassageRetriever,
+    MultiModalRetriever,
+)
 from pipelines.nodes.sentiment_analysis import (
     SentaProcessor,
     SentaVisualization,

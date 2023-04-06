@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import paddle
 
 from ppdiffusers import DDIMScheduler, LDMSuperResolutionPipeline, UNet2DModel, VQModel
 from ppdiffusers.utils import PIL_INTERPOLATION, floats_tensor, load_image, slow
+from ppdiffusers.utils.testing_utils import require_paddle
 
 
 class LDMSuperResolutionPipelineFastTests(unittest.TestCase):
@@ -28,8 +29,7 @@ class LDMSuperResolutionPipelineFastTests(unittest.TestCase):
     def dummy_image(self):
         batch_size = 1
         num_channels = 3
-        sizes = (32, 32)
-
+        sizes = 32, 32
         image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
@@ -64,48 +64,44 @@ class LDMSuperResolutionPipelineFastTests(unittest.TestCase):
         unet = self.dummy_uncond_unet
         scheduler = DDIMScheduler()
         vqvae = self.dummy_vq_model
-
         ldm = LDMSuperResolutionPipeline(unet=unet, vqvae=vqvae, scheduler=scheduler)
         ldm.set_progress_bar_config(disable=None)
-
         init_image = self.dummy_image
-
         generator = paddle.Generator().manual_seed(0)
-        image = ldm(init_image, generator=generator, num_inference_steps=2, output_type="numpy").images
-
+        image = ldm(image=init_image, generator=generator, num_inference_steps=2, output_type="numpy").images
         image_slice = image[0, -3:, -3:, -1]
-
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [
-                0.12982192635536194,
-                0.8338450193405151,
-                0.46506837010383606,
-                0.5459575653076172,
-                0.666222095489502,
-                0.38444048166275024,
-                0.7219546437263489,
-                0.571929931640625,
-                0.36579442024230957,
-            ]
+            [0.12982202, 0.8338444, 0.46506804, 0.5459576, 0.6662215, 0.38444045, 0.72195464, 0.5719301, 0.36579454]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+
+    def test_inference_superresolution_fp16(self):
+        unet = self.dummy_uncond_unet
+        scheduler = DDIMScheduler()
+        vqvae = self.dummy_vq_model
+        unet = unet.to(dtype=paddle.float16)
+        vqvae = vqvae.to(dtype=paddle.float16)
+        ldm = LDMSuperResolutionPipeline(unet=unet, vqvae=vqvae, scheduler=scheduler)
+        ldm.set_progress_bar_config(disable=None)
+        init_image = self.dummy_image
+        image = ldm(init_image, num_inference_steps=2, output_type="numpy").images
+        assert image.shape == (1, 64, 64, 3)
 
 
 @slow
+@require_paddle
 class LDMSuperResolutionPipelineIntegrationTests(unittest.TestCase):
     def test_inference_superresolution(self):
-        init_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/teddy_bear_pool.png")
+        init_image = load_image(
+            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/vq_diffusion/teddy_bear_pool.png"
+        )
         init_image = init_image.resize((64, 64), resample=PIL_INTERPOLATION["lanczos"])
-
-        ldm = LDMSuperResolutionPipeline.from_pretrained("CompVis/ldm-super-resolution-4x-openimages")
+        ldm = LDMSuperResolutionPipeline.from_pretrained("duongna/ldm-super-resolution")
         ldm.set_progress_bar_config(disable=None)
-
         generator = paddle.Generator().manual_seed(0)
-        image = ldm(init_image, generator=generator, num_inference_steps=20, output_type="numpy").images
-
+        image = ldm(image=init_image, generator=generator, num_inference_steps=20, output_type="numpy").images
         image_slice = image[0, -3:, -3:, -1]
-
         assert image.shape == (1, 256, 256, 3)
-        expected_slice = np.array([0.7418, 0.7472, 0.7424, 0.7422, 0.7463, 0.726, 0.7382, 0.7248, 0.6828])
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
+        expected_slice = np.array([0.7644, 0.7679, 0.7642, 0.7633, 0.7666, 0.756, 0.7425, 0.7257, 0.6907])
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.05

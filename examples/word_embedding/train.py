@@ -11,20 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
 import argparse
 import os
 import os.path as osp
-
-import paddle
-import paddle.nn as nn
-import paddlenlp
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.embeddings import TokenEmbedding
-from paddlenlp.data import JiebaTokenizer, Vocab, Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset
+from functools import partial
 
 import data
+import paddle
+import paddle.nn as nn
+
+import paddlenlp
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import load_dataset
+from paddlenlp.embeddings import TokenEmbedding
+from paddlenlp.utils.downloader import get_path_from_url
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -74,7 +74,7 @@ class BoWModel(nn.Layer):
     """
     This class implements the Bag of Words Classification Network model to classify texts.
     At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
+    a word embedding. Then, we encode these representations with a `BoWEncoder`.
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     Args:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    # Constructs the newtork.
+    # Constructs the network.
     model = BoWModel(
         vocab_size=len(vocab),
         num_classes=len(train_ds.label_list),

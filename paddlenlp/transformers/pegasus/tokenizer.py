@@ -16,11 +16,10 @@
 import collections
 import os
 import re
+
 import jieba
-import shutil
-from paddle.utils import try_import
-from .. import PretrainedTokenizer, AddedToken
-from .. import BasicTokenizer, WordpieceTokenizer
+
+from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 from ..tokenizer_utils import _is_punctuation
 
 __all__ = ["PegasusChineseTokenizer"]
@@ -28,6 +27,9 @@ __all__ = ["PegasusChineseTokenizer"]
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": 1024,
     "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": 1024,
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": 1024,
+    "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": 1024,
+    "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": 1024,
 }
 
 
@@ -120,7 +122,15 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}
-    pretrained_resource_files_map = {}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": "",
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": "",
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1": "",
+            "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA": "",
+            "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA": "",
+        },
+    }
     pretrained_init_configuration = {}
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
@@ -267,7 +277,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
             \u3015\u3016\u3017\u3018\u3019\u301a\u301b\u301c\u301d\u301e\u301f\u3030\u303e\u303f\u2013\u2014\
             \u2018\u2019\u201b\u201c\u201d\u201e\u201f\u2026\u2027\ufe4f\ufe51\ufe54\u00b7\uff01\uff1f\uff61\u3002"
 
-    def convert_ids_to_tokens(self, ids, skip_special_tokens):
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
         Converts a single index or a sequence of indices in a token or a sequence of tokens, using the vocabulary and
         added tokens.
@@ -339,7 +349,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
 
     def _special_token_mask(self, seq):
         all_special_ids = set(self.all_special_ids)  # call it once instead of inside list comp
-        # all_special_ids.remove(self.unk_token_id)  # <unk> is only sometimes special
+        all_special_ids.remove(self.unk_token_id)  # <unk> is only sometimes special
 
         return [1 if x in all_special_ids else 0 for x in seq]
 
@@ -358,3 +368,9 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
     def num_special_tokens_to_add(self, pair=False):
         """Just EOS"""
         return 1
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        if offset_mapping_1 is None:
+            return offset_mapping_0 + [(0, 0)]
+
+        return offset_mapping_0 + offset_mapping_1 + [(0, 0)]

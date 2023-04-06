@@ -13,20 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import sys
-import logging
-import pandas as pd
 from json import JSONDecodeError
 from pathlib import Path
-import streamlit as st
-from annotated_text import annotation
-from markdown import markdown
-import socket
 
-sys.path.append("ui")
-from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
-from utils import pipelines_files
+import pandas as pd
+import streamlit as st
+from markdown import markdown
+from utils import pipelines_files, pipelines_is_ready, semantic_search, upload_doc
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP", "衡量酒水的价格的因素有哪些?")
@@ -57,7 +53,7 @@ def upload():
     for data_file in data_files:
         # Upload file
         if data_file and data_file.name not in st.session_state.upload_files["uploaded_files"]:
-            raw_json = upload_doc(data_file)
+            upload_doc(data_file)
             st.session_state.upload_files["uploaded_files"].append(data_file.name)
     # Save the uploaded files
     st.session_state.upload_files["uploaded_files"] = list(set(st.session_state.upload_files["uploaded_files"]))
@@ -114,16 +110,11 @@ def main():
         for data_file in st.session_state.upload_files["uploaded_files"]:
             st.sidebar.write(str(data_file) + " &nbsp;&nbsp; ✅ ")
 
-    hs_version = ""
-    try:
-        hs_version = f" <small>(v{pipelines_version()})</small>"
-    except Exception:
-        pass
     # Load csv into pandas dataframe
     try:
         df = pd.read_csv(EVAL_LABELS, sep=";")
     except Exception:
-        st.error(f"The eval file was not found.")
+        st.error("The eval file was not found.")
         sys.exit(f"The eval file was not found under `{EVAL_LABELS}`.")
 
     # Search bar
@@ -179,7 +170,7 @@ def main():
                 st.session_state.results, st.session_state.raw_json = semantic_search(
                     question, top_k_reader=top_k_reader, top_k_retriever=top_k_retriever
                 )
-            except JSONDecodeError as je:
+            except JSONDecodeError:
                 st.error("👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?")
                 return
             except Exception as e:

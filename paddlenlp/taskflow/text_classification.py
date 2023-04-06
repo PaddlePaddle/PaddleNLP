@@ -217,28 +217,36 @@ class TextClassificationTask(Task):
 
     def _construct_id2label(self):
         if "id2label" in self.kwargs:
-            self.id2label = self.kwargs["id2label"]
+            id2label = self.kwargs["id2label"]
         elif os.path.exists(os.path.join(self._task_path, "id2label.json")):
             id2label_path = os.path.join(self._task_path, "id2label.json")
             with open(id2label_path) as fb:
-                self.id2label = json.load(fb)
+                id2label = json.load(fb)
             logger.info(f"Load id2label from {id2label_path}.")
         elif self.model == "prompt" and os.path.exists(os.path.join(self._task_path, "verbalizer_config.json")):
             label_list = sorted(list(self._verbalizer.label_words.keys()))
-            self.id2label = {}
+            id2label = {}
             for i, l in enumerate(label_list):
-                self.id2label[i] = l
+                id2label[i] = l
             logger.info("Load id2label from verbalizer.")
         elif self.model == "finetune" and os.path.exists(os.path.join(self._task_path, CONFIG_NAME)):
             config_path = os.path.join(self._task_path, CONFIG_NAME)
             with open(config_path) as fb:
-                id2label = json.load(fb)["id2label"]
+                config = json.load(fb)
+                if "id2label" in config:
+                    id2label = config["id2label"]
+                    logger.info(f"Load id2label from {config_path}.")
+                else:
+                    id2label = None
+        else:
+            id2label = None
+
+        if id2label is None:
+            self.id2label = id2label
+        else:
             self.id2label = {}
             for i in id2label:
                 self.id2label[int(i)] = id2label[i]
-            logger.info(f"Load id2label from {config_path}.")
-        else:
-            self.id2label = None
 
     def _preprocess(self, inputs: Union[str, List[str]]) -> Dict[str, Any]:
         """
@@ -258,7 +266,11 @@ class TextClassificationTask(Task):
             collator = PromptDataCollatorWithPadding(
                 self._tokenizer, padding=True, return_tensors="np", return_attention_mask=True
             )
-            template_inputs = [self._template({"text_a": x}) for x in inputs]
+            part_text = "text"
+            for part in self._template.prompt:
+                if "text" in part:
+                    part_text = part["text"]
+            template_inputs = [self._template({part_text: x}) for x in inputs]
             batches = [template_inputs[idx : idx + batch_size] for idx in range(0, len(template_inputs), batch_size)]
         else:
             raise NotImplementedError(
@@ -289,6 +301,14 @@ class TextClassificationTask(Task):
         }
         with static_mode_guard():
             for batch in inputs["batches"]:
+                if "attention_mask" in batch:
+                    input_name = "attention_mask"
+                    if batch[input_name].ndim == 2:
+                        batch[input_name] = (1 - batch[input_name][:, np.newaxis, np.newaxis, :]) * -1e4
+                    elif batch[input_name].ndim != 4:
+                        raise ValueError(
+                            "Expect attention mask with ndim=2 or 4, but get ndim={}".format(batch[input_name].ndim)
+                        )
                 if self._predictor_type == "paddle-inference":
                     for i, input_name in enumerate(self.predictor.get_input_names()):
                         self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
@@ -297,15 +317,6 @@ class TextClassificationTask(Task):
                 else:
                     input_dict = {}
                     for input_name in self.input_handler:
-                        if input_name == "attention_mask":
-                            if batch[input_name].ndim == 2:
-                                batch[input_name] = (1 - batch[input_name][:, np.newaxis, np.newaxis, :]) * -1e4
-                            elif batch[input_name].ndim != 4:
-                                raise ValueError(
-                                    "Expect attention mask with ndim=2 or 4, but get ndim={}".format(
-                                        batch[input_name].ndim
-                                    )
-                                )
                         input_dict[input_name] = batch[input_name].astype(dtype_dict[input_name])
                     logits = self.predictor.run(None, input_dict)[0].tolist()
                 outputs["batch_logits"].append(logits)

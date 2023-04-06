@@ -149,7 +149,7 @@ class CNNEncoder(nn.Layer):
         num_filter(int):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
-        ngram_filter_sizes(Tuple[int], optinal):
+        ngram_filter_sizes(Tuple[int], optional):
             This specifies both the number of convolutional layers we will create and their sizes.  The
             default of `(2, 3, 4, 5)` will have four convolutional layers, corresponding to encoding
             ngrams of size 2 to 5 with some number of filters.
@@ -260,7 +260,7 @@ class CNNEncoder(nn.Layer):
                 Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
                 Tensor containing the features of the input sequence.
             mask (Tensor, optional):
-                Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`.
+                Shape should be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`.
                 Its each elements identify whether the corresponding input token is padding or not.
                 If True, not padding token. If False, padding token.
                 Defaults to `None`.
@@ -319,7 +319,7 @@ class GRUEncoder(nn.Layer):
             Defaults to 1.
         direction (str, optional):
             The direction of the network. It can be "forward" and "bidirect"
-            (it means bidirection network). If "bidirect", it is a birectional GRU,
+            (it means bidirection network). If "bidirect", it is a bidirectional GRU,
             and returns the concat output from both directions.
             Defaults to "forward".
         dropout (float, optional):
@@ -504,7 +504,7 @@ class LSTMEncoder(nn.Layer):
             Defaults to 1.
         direction (str, optional):
             The direction of the network. It can be "forward" or "bidirect" (it means bidirection network).
-            If "bidirect", it is a birectional LSTM, and returns the concat output from both directions.
+            If "bidirect", it is a bidirectional LSTM, and returns the concat output from both directions.
             Defaults to "forward".
         dropout (float, optional):
             If non-zero, introduces a Dropout layer on the outputs of each LSTM layer
@@ -688,7 +688,7 @@ class RNNEncoder(nn.Layer):
             Defaults to 1.
         direction (str, optional):
             The direction of the network. It can be "forward" and "bidirect"
-            (it means bidirection network). If "biderect", it is a birectional RNN,
+            (it means bidirection network). If "bidirect", it is a bidirectional RNN,
             and returns the concat output from both directions. Defaults to "forward"
         dropout (float, optional):
             If non-zero, introduces a Dropout layer on the outputs of each RNN layer

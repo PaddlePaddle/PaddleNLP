@@ -129,11 +129,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
         The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
         `model.forward()` method are automatically removed.
 
-    eval_dataset（`paddle.io.Dataset`，可选）：
+    eval_dataset（`paddle.io.Dataset` 或 `Dict[str, paddle.io.Dataset]`，可选）：
         用于评估的数据集。如果是 `datasets.Dataset`，那么
         `model.forward()` 不需要的输入字段会被自动删除。
+        如果它是一个字典，则将对字典中每个数据集进行评估，
+        并将字典中的键添加到评估指标名称前。
 
-        The dataset to use for evaluation.
+        The dataset to use for evaluation. If it is a [`~datasets.Dataset`], columns not accepted by the
+        `model.forward()` method are automatically removed. If it is a dictionary, it will evaluate on each
+        dataset prepending the dictionary key to the metric name.
 
     tokenizer（[`PretrainedTokenizer`]，可选）：
         用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
@@ -244,6 +248,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
                         Number of updates steps to accumulate before
                         performing a backward/update pass. (default: 1)
+
+  --eval_accumulation_steps
+                        在将结果移动到CPU之前，累积输出张量的预测步骤数。如果如果未设置，
+                        则在移动到CPU之前，整个预测都会在GPU上累积（速度更快需要更多的显存）。
+                        （`int`，可选，默认为 None 不设置）
+
+                        Number of predictions steps to accumulate the output tensors for,
+                        before moving the results to the CPU. If left unset, the whole predictions are
+                        accumulated on GPU before being moved to the CPU (faster butrequires more memory)
+                        (default: None)
 
   --learning_rate
                         优化器的初始学习率, （`float`，可选，默认为 5e-05）

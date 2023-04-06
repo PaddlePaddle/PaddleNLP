@@ -15,12 +15,11 @@
 
 __all__ = ["FunnelTokenizer"]
 
-from collections.abc import Iterable
 import os
-from ..bert.tokenizer import BertTokenizer
-from .. import BasicTokenizer, WordpieceTokenizer
-from .. import PretrainedTokenizer
 import unicodedata
+
+from .. import BasicTokenizer, WordpieceTokenizer
+from ..bert.tokenizer import BertTokenizer
 from ..tokenizer_utils import _is_control
 
 
@@ -234,7 +233,7 @@ class FunnelTokenizer(BertTokenizer):
 
         Args:
             token_ids_0 (List[int]): List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): List of ids of the second sequence.
+            token_ids_1 (List[int], optional): List of ids of the second sequence.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 

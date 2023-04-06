@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import collections
 import sys
+
+import numpy as np
 import paddle
 from paddle.utils import try_import
-from paddle.metric import Metric
-from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_best_indexes
+
+from paddlenlp.metrics.dureader import (
+    _compute_softmax,
+    _get_best_indexes,
+    get_final_text,
+)
 
 # Metric for ERNIE-DOCs
 
@@ -220,7 +225,6 @@ class EM_AND_F1(object):
         for instance in ground_truth:
             total_count += 1
             query_id = instance["id"]
-            query_text = instance["question"].strip()
             answers = instance["answers"]
             if query_id not in prediction:
                 sys.stderr.write("Unanswered question: {}\n".format(query_id))
@@ -342,7 +346,6 @@ def compute_qa_predictions(
             nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         total_scores = []
-        best_non_null_entry = None
         for entry in nbest:
             total_scores.append(entry.start_logit + entry.end_logit)
 

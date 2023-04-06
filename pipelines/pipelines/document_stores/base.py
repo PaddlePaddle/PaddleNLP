@@ -13,25 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Generator, Optional, Dict, List, Set, Union
-
-import logging
 import collections
-import numpy as np
-from itertools import islice
+import logging
 from abc import abstractmethod
+from itertools import islice
 from pathlib import Path
+from typing import Dict, Generator, List, Optional, Set, Union
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal  # type: ignore
+import numpy as np
 
-from pipelines.schema import Document, Label
-from pipelines.nodes.base import BaseComponent
+from pipelines.document_stores.utils import (
+    eval_data_from_json,
+    eval_data_from_jsonl,
+    squad_json_to_jsonl,
+)
 from pipelines.errors import DuplicateDocumentError
+from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.preprocessor import PreProcessor
-from pipelines.document_stores.utils import eval_data_from_json, eval_data_from_jsonl, squad_json_to_jsonl
+from pipelines.schema import Document, FilterType, Label
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +289,37 @@ class BaseDocumentStore(BaseComponent):
     ) -> List[Document]:
         pass
 
+    def query_by_embedding_batch(
+        self,
+        query_embs: Union[List[np.ndarray], np.ndarray],
+        filters: Optional[Union[FilterType, List[Optional[FilterType]]]] = None,
+        top_k: int = 10,
+        index: Optional[str] = None,
+        return_embedding: Optional[bool] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[List[Document]]:
+        if isinstance(filters, list):
+            if len(filters) != len(query_embs):
+                raise Exception(
+                    "Number of filters does not match number of query_embs. Please provide as many filters"
+                    " as query_embs or a single filter that will be applied to each query_emb."
+                )
+        else:
+            filters = [filters] * len(query_embs)
+        results = []
+        for query_emb, filter in zip(query_embs, filters):
+            results.append(
+                self.query_by_embedding(
+                    query_emb=query_emb,
+                    filters=filter,
+                    top_k=top_k,
+                    index=index,
+                    return_embedding=return_embedding,
+                    headers=headers,
+                )
+            )
+        return results
+
     @abstractmethod
     def get_label_count(self, index: Optional[str] = None, headers: Optional[Dict[str, str]] = None) -> int:
         pass
@@ -338,28 +368,28 @@ class BaseDocumentStore(BaseComponent):
         # TODO improve support for PreProcessor when adding eval data
         if preprocessor is not None:
             assert preprocessor.split_by != "sentence", (
-                f"Split by sentence not supported.\n"
-                f"Please set 'split_by' to either 'word' or 'passage' in the supplied PreProcessor."
+                "Split by sentence not supported.\n"
+                "Please set 'split_by' to either 'word' or 'passage' in the supplied PreProcessor."
             )
-            assert preprocessor.split_respect_sentence_boundary == False, (
-                f"split_respect_sentence_boundary not supported yet.\n"
-                f"Please set 'split_respect_sentence_boundary' to False in the supplied PreProcessor."
+            assert preprocessor.split_respect_sentence_boundary is False, (
+                "split_respect_sentence_boundary not supported yet.\n"
+                "Please set 'split_respect_sentence_boundary' to False in the supplied PreProcessor."
             )
             assert preprocessor.split_overlap == 0, (
-                f"Overlapping documents are currently not supported when adding eval data.\n"
-                f"Please set 'split_overlap=0' in the supplied PreProcessor."
+                "Overlapping documents are currently not supported when adding eval data.\n"
+                "Please set 'split_overlap=0' in the supplied PreProcessor."
             )
-            assert preprocessor.clean_empty_lines == False, (
-                f"clean_empty_lines currently not supported when adding eval data.\n"
-                f"Please set 'clean_empty_lines=False' in the supplied PreProcessor."
+            assert preprocessor.clean_empty_lines is False, (
+                "clean_empty_lines currently not supported when adding eval data.\n"
+                "Please set 'clean_empty_lines=False' in the supplied PreProcessor."
             )
-            assert preprocessor.clean_whitespace == False, (
-                f"clean_whitespace is currently not supported when adding eval data.\n"
-                f"Please set 'clean_whitespace=False' in the supplied PreProcessor."
+            assert preprocessor.clean_whitespace is False, (
+                "clean_whitespace is currently not supported when adding eval data.\n"
+                "Please set 'clean_whitespace=False' in the supplied PreProcessor."
             )
-            assert preprocessor.clean_header_footer == False, (
-                f"clean_header_footer is currently not supported when adding eval data.\n"
-                f"Please set 'clean_header_footer=False' in the supplied PreProcessor."
+            assert preprocessor.clean_header_footer is False, (
+                "clean_header_footer is currently not supported when adding eval data.\n"
+                "Please set 'clean_header_footer=False' in the supplied PreProcessor."
             )
 
         file_path = Path(filename)

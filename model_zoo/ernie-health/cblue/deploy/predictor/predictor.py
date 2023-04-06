@@ -13,17 +13,19 @@
 # limitations under the License.
 
 import os
-import six
 import time
-import numpy as np
-from sklearn.metrics import f1_score
 
-import paddle
-import paddle2onnx
+import numpy as np
 import onnxruntime as ort
+import paddle2onnx
+import six
+
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    normalize_chars,
+    tokenize_special_chars,
+)
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.transformers import normalize_chars, tokenize_special_chars
 
 
 class InferBackend(object):
@@ -56,8 +58,8 @@ class InferBackend(object):
             providers = ["CUDAExecutionProvider"]
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
-                from onnxconverter_common import float16
                 import onnx
+                from onnxconverter_common import float16
 
                 fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
@@ -88,10 +90,7 @@ class InferBackend(object):
                 assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
-                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                    "Please run the following commands to reinstall: \n "
-                    "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
+                    """The environment for GPU inference is not set properly. \nA possible cause is that you had installed both onnxruntime and onnxruntime-gpu. \nPlease run the following commands to reinstall: \n1) pip uninstall -y onnxruntime onnxruntime-gpu  \n2) pip install onnxruntime-gpu"""
                 )
         logger.info(">>> [InferBackend] Engine Created ...")
 
@@ -144,7 +143,7 @@ class EHealthPredictor(object):
     def performance(self, encoded_inputs):
         nums = len(encoded_inputs["input_ids"])
         start_time = time.time()
-        infer_result = self.infer_batch(preprocess_result)
+        infer_result = self.infer_batch(preprocess_result)  # noqa
         total_time = time.time() - start_time
         logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" % (nums, total_time, 1000 * total_time / nums))
 

@@ -1,0 +1,25 @@
+version: '1.1.0'
+
+components:    # define all the building-blocks for Pipeline
+  - name: DocumentStore
+    type: ElasticsearchDocumentStore  # consider using Milvus2DocumentStore or WeaviateDocumentStore for scaling to large number of documents
+    params:
+      host: localhost
+      port: 9200
+      index: wukong_test
+      embedding_dim: 768
+  - name: Retriever
+    type: MultiModalRetriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      top_k: 10
+      query_embedding_model: PaddlePaddle/ernie_vil-2.0-base-zh
+      document_embedding_models:
+        image: PaddlePaddle/ernie_vil-2.0-base-zh
+
+pipelines:
+  - name: query  
+    type: Query
+    nodes:
+      - name: Retriever
+        inputs: [Query]

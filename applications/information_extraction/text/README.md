@@ -145,7 +145,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
 可配置参数说明：
-* `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
+* `device`: 训练设备，可选择 'cpu'、'gpu'、'npu' 其中的一种；默认为 GPU 训练。
 * `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认10。
 * `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
 * `eval_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
@@ -180,6 +180,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 python evaluate.py \
     --model_path ./checkpoint/model_best \
     --test_path ./data/dev.txt \
+    --device gpu \
     --batch_size 16 \
     --max_seq_len 512
 ```
@@ -191,6 +192,7 @@ python evaluate.py \
     --model_path ./checkpoint/model_best \
     --test_path ./data/dev.txt \
     --batch_size 16 \
+    --device gpu \
     --max_seq_len 512 \
     --multilingual
 ```
@@ -225,6 +227,7 @@ python evaluate.py \
 
 可配置参数说明：
 
+- `device`: 评估设备，可选择 'cpu'、'gpu'、'npu' 其中的一种；默认为 GPU 评估。
 - `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。

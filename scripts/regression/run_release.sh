@@ -26,6 +26,7 @@ export log_path=${nlp_dir}/logs
 ####################################
 # for paddlenlp env
 python -c 'import sys; print(sys.version_info[:])'
+python -c 'import nltk; nltk.download("punkt")'
 set -x
 python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 nlp1_build (){
@@ -95,7 +96,7 @@ else
     P0case_EXCODE=0
 fi
 if [ $P0case_EXCODE -ne 0 ] ; then
-    cd logs
+    cd model_logs/
     FF=`ls *_FAIL*|wc -l`
     echo -e "\033[31m ---- P0case failed number: ${FF} \033[0m"
     ls *_FAIL*

@@ -13,18 +13,16 @@
 # limitations under the License.
 
 import json
-import time
 
-import paddle
 import numpy as np
-
-from paddlenlp.transformers import AutoTokenizer
 
 # triton_python_backend_utils is available in every Triton Python model. You
 # need to use this module to create inference requests and responses. It also
 # contains some utility functions for extracting information from model_config
 # and converting Triton input/output types to numpy types.
 import triton_python_backend_utils as pb_utils
+
+from paddlenlp.transformers import AutoTokenizer
 
 
 class TritonPythonModel(object):
@@ -35,7 +33,7 @@ class TritonPythonModel(object):
     def initialize(self, args):
         """`initialize` is called only once when the model is being loaded.
         Implementing `initialize` function is optional. This function allows
-        the model to intialize any state associated with this model.
+        the model to initialize any state associated with this model.
         Parameters
         ----------
         args : dict

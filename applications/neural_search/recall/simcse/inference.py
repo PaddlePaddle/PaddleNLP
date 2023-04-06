@@ -12,24 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-import argparse
 import os
-import sys
-import random
-import time
+from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.utils.log import logger
-
-from model import SimCSE
 from data import create_dataloader
-from tqdm import tqdm
+from model import SimCSE
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):

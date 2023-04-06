@@ -13,12 +13,12 @@
 # limitations under the License.
 
 from abc import abstractmethod
-import time
+
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
 from data import InputExample
+
+from paddlenlp.utils.log import logger
 
 
 class Template(nn.Layer):
@@ -72,7 +72,7 @@ class Template(nn.Layer):
         idx = []
         for p in self.template:
             if "shortenable" in p:
-                idx.append(1 if d["shortenable"] else 0)
+                idx.append(1 if p["shortenable"] else 0)
             else:
                 idx.append(1 if "text" in p else 0)
         return idx
@@ -170,8 +170,8 @@ class Template(nn.Layer):
                 else:
                     raise ValueError(
                         """
-                        Template's part attribute '{}' is registered but not 
-                        initialized. Try using template.{} = [...] to 
+                        Template's part attribute '{}' is registered but not
+                        initialized. Try using template.{} = [...] to
                         initialize or create a get_default_{}(self)
                         method in your template.""".format(
                             name, name, name

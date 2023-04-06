@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import math
-import numpy
-import warnings
-from paddle import Tensor
+
 from paddle.optimizer.lr import LRScheduler
 
 

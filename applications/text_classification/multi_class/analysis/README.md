@@ -3,7 +3,6 @@
 **目录**
    * [Analysis模块介绍](#Analysis模块介绍)
    * [环境准备](#环境准备)
-   * [模型评估](#模型评估)
    * [可解释性分析](#可解释性分析)
         * [单词级别可解释性分析](#单词级别可解释性分析)
         * [句子级别可解释性分析](#句子级别可解释性分析)
@@ -14,9 +13,8 @@
 
 ## Analysis模块介绍
 
-Analysis模块提供了**模型评估、可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
+Analysis模块提供了**可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
 
-- **模型评估：** 对整体分类情况和每个类别分别进行评估，并打印预测错误样本，帮助开发者分析模型表现找到训练和预测数据中存在的问题。
 
 - **可解释性分析：** 基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)提供单词和句子级别的模型可解释性分析，帮助理解模型预测结果。
 
@@ -30,8 +28,7 @@ Analysis模块提供了**模型评估、可解释性分析、数据优化**等�
 
 ```text
 analysis/
-├── evaluate.py # 评估脚本
-├── sent_interpret.py # 句子级别可解释性分析脚本
+├── sent_interpret.ipynb # 句子级别可解释性分析脚本
 ├── word_interpret.py # 单词级别可解释性分析notebook
 ├── sparse.py # 稀疏数据筛选脚本
 ├── dirty.py # 脏数据清洗脚本
@@ -54,61 +51,6 @@ pip install trustai==0.1.12
 pip install interpretdl==0.7.0
 ```
 
-## 模型评估
-
-我们使用训练好的模型计算模型的在开发集的准确率，同时打印每个类别数据量及表现：
-
-```shell
-python evaluate.py \
-    --device "gpu" \
-    --dataset_dir "../data" \
-    --params_path "../checkpoint" \
-    --max_seq_length 128 \
-    --batch_size 32 \
-    --bad_case_file "bad_case.txt"
-```
-
-默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
-
-可支持配置的参数：
-
-* `device`: 选用什么设备进行训练，可选择cpu、gpu、xpu、npu；默认为"gpu"。
-* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含dev.txt和label.txt文件;默认为None。
-* `params_path`：保存训练模型的目录；默认为"../checkpoint/"。
-* `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
-* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
-* `bad_case_path`：开发集中预测错误样本保存路径；默认为"/bad_case.txt"。
-
-输出打印示例：
-
-```text
-[2022-08-10 06:28:37,219] [    INFO] - -----Evaluate model-------
-[2022-08-10 06:28:37,220] [    INFO] - Dev dataset size: 1955
-[2022-08-10 06:28:37,220] [    INFO] - Accuracy in dev dataset: 81.79%
-[2022-08-10 06:28:37,221] [    INFO] - Top-2 accuracy in dev dataset: 92.48%
-[2022-08-10 06:28:37,222] [    INFO] - Top-3 accuracy in dev dataset: 97.24%
-[2022-08-10 06:28:37,222] [    INFO] - Class name: 病情诊断
-[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 80.32 | recall: 86.46 | F1 score 83.28
-[2022-08-10 06:28:37,223] [    INFO] - ----------------------------
-[2022-08-10 06:28:37,223] [    INFO] - Class name: 治疗方案
-[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 88.46 | recall: 94.08 | F1 score 91.18
-...
-```
-
-预测错误的样本保存在bad_case.txt文件中：
-
-```text
-Text	Label	Prediction
-您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？	其他	注意事项
-输卵管粘连的基本检查	其他	就医建议
-会是胎动么？	其他	病情诊断
-经常干呕恶心，这是生病了吗	其他	病情诊断
-菏泽哪个医院治疗白癜风比较好?怎么治好	就医建议	治疗方案
-...
-```
-
 ## 可解释性分析
 "模型为什么会预测出这个结果?"是文本分类任务开发者时常遇到的问题，如何分析错误样本(bad case)是文本分类任务落地中重要一环，本项目基于TrustAI开源了基于词级别和句子级别的模型可解释性分析方法，帮助开发者更好地理解文本分类模型与数据，有助于后续的模型优化与数据清洗标注。
 
@@ -123,25 +65,6 @@ Text	Label	Prediction
 ### 句子级别可解释性分析
 本项目基于特征相似度（[FeatureSimilarity](https://arxiv.org/abs/2104.04128)）算法，计算对样本预测结果正影响的训练数据，帮助理解模型的预测结果与训练集数据的关系。
 
-待分析数据文件`interpret_input_file`应为以下三种格式中的一种：
-**格式一：包括文本、标签、预测结果**
-```text
-<文本>'\t'<标签>'\t'<预测结果>
-...
-```
-
-**格式二：包括文本、标签**
-```text
-<文本>'\t'<标签>
-...
-```
-
-**格式三：只包括文本**
-```text
-<文本>
-准予原告胡某甲与被告韩某甲离婚。
-...
-```
 
 我们可以运行代码，得到支持样本模型预测结果的训练数据：
 ```shell
@@ -161,7 +84,7 @@ python sent_interpret.py \
 
 可支持配置的参数：
 
-* `device`: 选用什么设备进行训练，可可选择cpu、gpu、xpu、npu；默认为"gpu"。
+* `device`: 选用什么设备进行训练，可选择cpu、gpu、xpu、npu；默认为"gpu"。
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含dev.txt和label.txt文件;默认为None。
 * `params_path`：保存训练模型的目录；默认为"../checkpoint/"。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
@@ -172,17 +95,6 @@ python sent_interpret.py \
 * `interpret_input_file`：本地数据集中待分析文件名；默认为"bad_case.txt"。
 * `interpret_result_file`：保存句子级别可解释性结果文件名；默认为"sent_interpret.txt"。
 
-可解释性结果保存在 `interpret_result_file` 文件中：
-```text
-text: 您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？
-predict label: 注意事项
-label: 其他
-examples with positive influence
-support1 text: 感冒期间钙产品要继续服用吗? 钙尔奇就可以，也可以吃婴儿吃的乳钙	label: 注意事项	score: 0.96602
-support2 text: 打喷嚏可以吃布洛芬缓释胶囊么	label: 注意事项	score: 0.95687
-support3 text: 孕后期可以足疗吗	label: 注意事项	score: 0.94021
-...
-```
 ## 数据优化
 
 ### 稀疏数据筛选方案

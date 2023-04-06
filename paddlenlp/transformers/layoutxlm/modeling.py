@@ -16,18 +16,16 @@
 
 import copy
 import math
+
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
 import paddle.nn.functional as F
-from paddle.nn import Layer
-from paddle.nn import CrossEntropyLoss
+from paddle.nn import CrossEntropyLoss, Layer
 
 from paddlenlp.utils.log import logger
+
 from .. import PretrainedModel, register_base_model
-from .visual_backbone import build_resnet_fpn_backbone
-from .visual_backbone import build_resnet_backbone
-from .visual_backbone import read_config
+from .visual_backbone import build_resnet_fpn_backbone, read_config
 
 __all__ = [
     "LayoutXLMModel",
@@ -959,7 +957,7 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         )
         seq_length = input_ids.shape[1]
         # sequence out and image out
-        sequence_output, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output = outputs[0][:, :seq_length]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
@@ -1262,10 +1260,10 @@ class REDecoder(nn.Layer):
             )
             positive_relations_repeat = positive_relations.unsqueeze(axis=0).tile([len(all_possible_relations), 1, 1])
             mask = paddle.all(all_possible_relations_repeat == positive_relations_repeat, axis=2)
-            negative_mask = paddle.any(mask, axis=1) == False
+            negative_mask = paddle.any(mask, axis=1) is False
             negative_relations = all_possible_relations[negative_mask]
 
-            positive_mask = paddle.any(mask, axis=0) == True
+            positive_mask = paddle.any(mask, axis=0) is True
             positive_relations = positive_relations[positive_mask]
             if negative_mask.sum() > 0:
                 reordered_relations = paddle.concat([positive_relations, negative_relations])
@@ -1406,7 +1404,7 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
             head_mask=head_mask,
         )
         seq_length = input_ids.shape[1]
-        sequence_output, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output = outputs[0][:, :seq_length]
 
         sequence_output = self.dropout(sequence_output)
         loss, pred_relations = self.extractor(sequence_output, entities, relations)

@@ -12,33 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import numpy as np
-from os.path import isfile, join
 import argparse
-import logging
+import os
 import time
 from functools import partial
 
-import hnswlib
 import paddle
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.utils.log import logger
-
 from ance.model import SemanticIndexANCE
-from data import get_latest_checkpoint, get_latest_ann_data
-from data import convert_example, create_dataloader
-from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
+from data import (
+    convert_example,
+    create_dataloader,
+    gen_id2corpus,
+    gen_text_file,
+    get_latest_ann_data,
+    get_latest_checkpoint,
+)
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 
 # Required parameters
-parser.add_argument("--similar_text_pair_file", default=None, type=str,required=True, help="The train_set tsv file that each line is simialr text pair")
+parser.add_argument("--similar_text_pair_file", default=None, type=str, required=True, help="The train_set tsv file that each line is simialr text pair")
 parser.add_argument("--corpus_file", default=None, type=str, required=True, help="The corpus file that each line is a text for buinding indexing")
 parser.add_argument("--save_dir", default=None, type=str, required=True, help="Saved model dir, will look for latest checkpoint dir in here")
 parser.add_argument("--ann_data_dir", default=None, type=str, required=True, help="The output directory where the training data will be written")
@@ -97,13 +97,11 @@ def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
                 text_index = args.batch_size * batch_index + row_index
 
                 hard_neg_samples = recalled_idx[row_index][-1 * args.num_negative_sample :]
-                hard_neg_sims = cosine_sims[row_index][-1 * args.num_negative_sample :]
 
                 for idx, hard_neg_doc_idx in enumerate(hard_neg_samples):
                     text = text_list[text_index]["text"]
                     similar_text = text2similar_text[text]
                     hard_neg_sample = id2corpus[hard_neg_doc_idx]
-                    cosine_sim = 1.0 - hard_neg_sims[idx]
                     f.write("{}\t{}\t{}\n".format(text, similar_text, hard_neg_sample))
 
     succeed_flag_file = os.path.join(new_ann_data_path, "succeed_flag_file")

@@ -503,7 +503,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         Args:
             token_ids_0 (List[int]):
                 A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optinal):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs. Defaults to None.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
@@ -597,9 +597,7 @@ class RobertaTokenizer:
             return RobertaBPETokenizer.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         else:
             # Assuming from community-contributed pretrained models
-            config_file = os.path.join(
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file
-            )
+            config_file = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file])
             default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
                 resolved_config_file = get_path_from_url(config_file, default_root)

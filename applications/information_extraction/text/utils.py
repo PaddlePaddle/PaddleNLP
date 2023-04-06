@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import math
 import json
 import random
-from tqdm import tqdm
+from typing import List, Optional
 
 import numpy as np
 import paddle
+
 from paddlenlp.utils.log import logger
 
 
@@ -43,18 +42,12 @@ def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
+    shuffle = True if mode == "train" else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      return_list=True)
+        sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, return_list=True)
     return dataloader
 
 
@@ -72,35 +65,34 @@ def reader(data_path, max_seq_len=512):
     """
     read json
     """
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             json_line = json.loads(line)
-            content = json_line['content'].strip()
-            prompt = json_line['prompt']
+            content = json_line["content"].strip()
+            prompt = json_line["prompt"]
             # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
             # It include three summary tokens.
             if max_seq_len <= len(prompt) + 3:
-                raise ValueError(
-                    "The value of max_seq_len is too small, please set a larger value"
-                )
+                raise ValueError("The value of max_seq_len is too small, please set a larger value")
             max_content_len = max_seq_len - len(prompt) - 3
             if len(content) <= max_content_len:
                 yield json_line
             else:
-                result_list = json_line['result_list']
+                result_list = json_line["result_list"]
                 json_lines = []
                 accumulate = 0
                 while True:
                     cur_result_list = []
                     for result in result_list:
-                        if result['end'] - result['start'] > max_content_len:
+                        if result["end"] - result["start"] > max_content_len:
                             logger.warning(
                                 "result['end'] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned"
                             )
-                        if result['start'] + 1 <= max_content_len < result[
-                                'end'] and result['end'] - result[
-                                    'start'] <= max_content_len:
-                            max_content_len = result['start']
+                        if (
+                            result["start"] + 1 <= max_content_len < result["end"]
+                            and result["end"] - result["start"] <= max_content_len
+                        ):
+                            max_content_len = result["start"]
                             break
 
                     cur_content = content[:max_content_len]
@@ -109,40 +101,30 @@ def reader(data_path, max_seq_len=512):
                     while True:
                         if len(result_list) == 0:
                             break
-                        elif result_list[0]['end'] <= max_content_len:
-                            if result_list[0]['end'] > 0:
+                        elif result_list[0]["end"] <= max_content_len:
+                            if result_list[0]["end"] > 0:
                                 cur_result = result_list.pop(0)
                                 cur_result_list.append(cur_result)
                             else:
-                                cur_result_list = [
-                                    result for result in result_list
-                                ]
+                                cur_result_list = [result for result in result_list]
                                 break
                         else:
                             break
 
-                    json_line = {
-                        'content': cur_content,
-                        'result_list': cur_result_list,
-                        'prompt': prompt
-                    }
+                    json_line = {"content": cur_content, "result_list": cur_result_list, "prompt": prompt}
                     json_lines.append(json_line)
 
                     for result in result_list:
-                        if result['end'] <= 0:
+                        if result["end"] <= 0:
                             break
-                        result['start'] -= max_content_len
-                        result['end'] -= max_content_len
+                        result["start"] -= max_content_len
+                        result["end"] -= max_content_len
                     accumulate += max_content_len
                     max_content_len = max_seq_len - len(prompt) - 3
                     if len(res_content) == 0:
                         break
                     elif len(res_content) < max_content_len:
-                        json_line = {
-                            'content': res_content,
-                            'result_list': result_list,
-                            'prompt': prompt
-                        }
+                        json_line = {"content": res_content, "result_list": result_list, "prompt": prompt}
                         json_lines.append(json_line)
                         break
                     else:
@@ -152,7 +134,20 @@ def reader(data_path, max_seq_len=512):
                     yield json_line
 
 
-def convert_example(example, tokenizer, max_seq_len, multilingual=False):
+def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length: List[int]) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    cur_length = len(examples[0]["input_ids"])
+    max_length = default_max_length
+    for max_length_option in sorted(dynamic_max_length):
+        if cur_length <= max_length_option:
+            max_length = max_length_option
+            break
+    return max_length
+
+
+def convert_example(
+    example, tokenizer, max_seq_len, multilingual=False, dynamic_max_length: Optional[List[int]] = None
+):
     """
     example: {
         title
@@ -161,15 +156,49 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
         result_list
     }
     """
-    encoded_inputs = tokenizer(text=[example["prompt"]],
-                               text_pair=[example["content"]],
-                               truncation=True,
-                               max_seq_len=max_seq_len,
-                               pad_to_max_seq_len=True,
-                               return_attention_mask=True,
-                               return_position_ids=True,
-                               return_dict=False,
-                               return_offsets_mapping=True)
+    if dynamic_max_length is not None:
+        temp_encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_seq_len,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        max_length = get_dynamic_max_length(
+            examples=temp_encoded_inputs, default_max_length=max_seq_len, dynamic_max_length=dynamic_max_length
+        )
+        # always pad to max_length
+        encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_length,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        start_ids = [0.0 for x in range(max_length)]
+        end_ids = [0.0 for x in range(max_length)]
+    else:
+        encoded_inputs = tokenizer(
+            text=[example["prompt"]],
+            text_pair=[example["content"]],
+            truncation=True,
+            max_seq_len=max_seq_len,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_dict=False,
+            return_offsets_mapping=True,
+        )
+        start_ids = [0.0 for x in range(max_seq_len)]
+        end_ids = [0.0 for x in range(max_seq_len)]
+
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -181,8 +210,6 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
             continue
         offset_mapping[index][0] += bias
         offset_mapping[index][1] += bias
-    start_ids = [0.0 for x in range(max_seq_len)]
-    end_ids = [0.0 for x in range(max_seq_len)]
     for item in example["result_list"]:
         start = map_offset(item["start"] + bias, offset_mapping)
         end = map_offset(item["end"] - 1 + bias, offset_mapping)
@@ -193,7 +220,7 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
             "input_ids": encoded_inputs["input_ids"],
             "position_ids": encoded_inputs["position_ids"],
             "start_positions": start_ids,
-            "end_positions": end_ids
+            "end_positions": end_ids,
         }
     else:
         tokenized_output = {
@@ -202,6 +229,6 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
             "position_ids": encoded_inputs["position_ids"],
             "attention_mask": encoded_inputs["attention_mask"],
             "start_positions": start_ids,
-            "end_positions": end_ids
+            "end_positions": end_ids,
         }
     return tokenized_output

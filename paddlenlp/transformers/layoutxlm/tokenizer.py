@@ -14,15 +14,12 @@
 # limitations under the License.
 """ Tokenization classes for LayoutXLM model."""
 
-import itertools
-from dataclasses import dataclass, field
-from collections import OrderedDict
 from typing import List, Optional
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, AddedToken
-from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
+from .. import AddedToken, PretrainedTokenizer
+from ..tokenizer_utils import _is_control, _is_punctuation, _is_whitespace
 
 SPIECE_UNDERLINE = "▁"
 
