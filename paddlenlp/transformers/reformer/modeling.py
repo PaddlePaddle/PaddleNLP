@@ -1992,7 +1992,7 @@ class ReformerPretrainedModel(PretrainedModel):
         tie_word_embeddings = (
             self.tie_word_embeddings
             if hasattr(self, "tie_word_embeddings")
-            else self.config.get("tie_word_embeddings", False)
+            else self.reformer.config.get("tie_word_embeddings", False)
         )
         if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings") and tie_word_embeddings:
             output_embeddings = self.get_output_embeddings()

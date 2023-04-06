@@ -685,7 +685,8 @@ class BigBirdLMPredictionHead(Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.activation)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=1e-12)
-        self.decoder_weight = (
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder.weight = (
             self.create_parameter(
                 shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
             )
@@ -693,7 +694,7 @@ class BigBirdLMPredictionHead(Layer):
             else config.embedding_weights
         )
         self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+            shape=[config.vocab_size], dtype=self.decoder.weight.dtype, is_bias=True
         )
 
     def forward(self, hidden_states, masked_positions=None):
@@ -704,7 +705,7 @@ class BigBirdLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
@@ -1500,7 +1501,6 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
     Args:
         BigBird (:class:`BigBirdModel`):
             An instance of :class:`BigBirdModel`.
-
     """
 
     def __init__(self, config: BigBirdConfig):
@@ -1509,6 +1509,10 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
         self.lm_head = BigBirdLMPredictionHead(config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,
@@ -1612,6 +1616,10 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
         self.lm_head = BigBirdLMPredictionHead(config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,

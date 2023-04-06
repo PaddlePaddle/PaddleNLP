@@ -166,17 +166,6 @@ class ElectraPretrainedModel(PretrainedModel):
         """
         # Initialize weights
         self.apply(self._init_weights)
-        # Tie weights if needed
-        self.tie_weights()
-
-    def tie_weights(self):
-        """
-        Tie the weights between the input embeddings and the output embeddings.
-        """
-        if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings"):
-            output_embeddings = self.get_output_embeddings()
-            if output_embeddings is not None:
-                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
 
     def _init_weights(self, layer):
         """Initialize the weights"""
@@ -194,29 +183,6 @@ class ElectraPretrainedModel(PretrainedModel):
             layer._epsilon = getattr(self, "layer_norm_eps", 1e-12)
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
-
-    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        """Tie or clone layer weights"""
-        if output_embeddings.weight.shape == input_embeddings.weight.shape:
-            output_embeddings.weight = input_embeddings.weight
-        elif output_embeddings.weight.shape == input_embeddings.weight.t().shape:
-            output_embeddings.weight.set_value(input_embeddings.weight.t())
-        else:
-            raise ValueError(
-                "when tie input/output embeddings, the shape of output embeddings: {}"
-                "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".format(
-                    output_embeddings.weight.shape, input_embeddings.weight.shape, input_embeddings.weight.t().shape
-                )
-            )
-        if getattr(output_embeddings, "bias", None) is not None:
-            if output_embeddings.weight.shape[-1] != output_embeddings.bias.shape[0]:
-                raise ValueError(
-                    "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
-                    "please check output_embeddings configuration".format(
-                        output_embeddings.weight.shape[-1], output_embeddings.bias.shape[0]
-                    )
-                )
 
 
 @register_base_model
@@ -993,6 +959,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
         self.init_weights()
+        # Tie weights if needed
+        self.tie_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:

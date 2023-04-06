@@ -397,7 +397,6 @@ def register_base_model(cls):
 
 class BackboneMixin:
     def forward_with_filtered_kwargs(self, *args, **kwargs):
-
         signature = dict(inspect.signature(self.forward).parameters)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
@@ -591,6 +590,30 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             Optional[Embedding]: the otuput embedding of model
         """
         return None
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        tie_word_embeddings = (
+            self.tie_word_embeddings
+            if hasattr(self, "tie_word_embeddings")
+            else self.config.get("tie_word_embeddings", False)
+        )
+
+        if tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            input_embeddings = self.get_input_embeddings()
+            if output_embeddings is not None and input_embeddings is not None:
+                if input_embeddings.weight.shape == output_embeddings.weight.shape:
+                    output_embeddings.weight = input_embeddings.weight
+                else:
+                    raise ValueError(
+                        "when tie input/output embeddings, the shape of output embeddings: {}"
+                        "should be equal to shape of input embeddings: {}".format(
+                            input_embeddings.weight.shape, output_embeddings.weight.shape
+                        )
+                    )
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
@@ -1225,7 +1248,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
                 if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
