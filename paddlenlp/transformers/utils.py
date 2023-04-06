@@ -15,19 +15,32 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import hashlib
 import importlib
 import inspect
 import os
+import shutil
 import warnings
 from contextlib import ExitStack
+from pathlib import Path
 from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
+
+from filelock import FileLock
+
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    download_check,
+    get_path_from_url_with_filelock,
+    is_url,
+    url_file_exists,
+)
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
 import paddle
 import tqdm
-from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub import try_to_load_from_cache
 from huggingface_hub.utils import EntryNotFoundError
 from paddle.nn import Layer
 from requests.exceptions import HTTPError
@@ -335,19 +348,152 @@ def convert_file_size_to_int(size: Union[int, str]):
     raise ValueError("`size` is not in a valid format. Use an integer followed by the unit, e.g., '5GB'.")
 
 
+def paddlenlp_hub_download(
+    repo_id: str,
+    filename: str,
+    *,
+    subfolder: Optional[str] = None,
+    cache_dir: Union[str, Path, None] = None,
+    local_dir: Union[str, Path, None] = None,
+) -> str:
+
+    # check in cache_dir
+    weight_file_path = os.path.join(cache_dir, filename)
+    if os.path.exists(weight_file_path):
+        logger.info(f"Already cached {weight_file_path}")
+        return weight_file_path
+
+    # Download from custom model url
+    if is_url(repo_id):
+        # check wether the target file exist in the comunity bos server
+        if url_file_exists(repo_id):
+            print("Downloading {repo_id}")
+            weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
+            # # check the downloaded weight file and registered weight file name
+            download_check(repo_id, "paddlenlp_hub_download")
+
+            # make sure that model states names: model_states.pdparams
+            new_weight_file_path = os.path.join(os.path.split(weight_file_path)[0], filename)
+
+            if weight_file_path != new_weight_file_path:
+                # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
+                lock_file_name = hashlib.md5((repo_id + cache_dir).encode("utf-8")).hexdigest()
+                # create `.lock` private directory in the cache dir
+                lock_file_path = os.path.join(cache_dir, ".lock", lock_file_name)
+
+                with FileLock(lock_file_path):
+                    if not os.path.exists(new_weight_file_path):
+                        shutil.move(weight_file_path, new_weight_file_path)
+
+                weight_file_path = new_weight_file_path
+
+            return weight_file_path
+
+        return None
+
+    # find in community repo
+    community_model_file_path = "/".join([COMMUNITY_MODEL_PREFIX, repo_id, filename])
+    assert is_url(community_model_file_path)
+
+    # check wether the target file exist in the comunity bos server
+    if url_file_exists(community_model_file_path):
+        print("Downloading {community_model_file_path}")
+        weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
+        # # check the downloaded weight file and registered weight file name
+        download_check(community_model_file_path, "paddlenlp_hub_download")
+        return weight_file_path
+
+    return None
+
+
+# Return value when trying to load a file from cache but the file does not exist in the distant repo.
+_CACHED_NO_EXIST = object()
+
+
+def cached_file(
+    path_or_repo_id: Union[str, os.PathLike],
+    filename: str,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    subfolder: str = "",
+    _raise_exceptions_for_missing_entries: bool = True,
+    _raise_exceptions_for_connection_errors: bool = True,
+):
+    """
+    Tries to locate a file in a local folder and repo, downloads and cache it if necessary.
+    Args:
+        path_or_repo_id (`str` or `os.PathLike`):
+            This can be either:
+            - a string, the *model id* of a model repo on huggingface.co.
+            - a path to a *directory* potentially containing the file.
+        filename (`str`):
+            The name of the file to locate in `path_or_repo`.
+        cache_dir (`str` or `os.PathLike`, *optional*):
+            Path to a directory in which a downloaded pretrained model configuration should be cached if the standard
+            cache should not be used.
+        subfolder (`str`, *optional*, defaults to `""`):
+            In case the relevant files are located inside a subfolder of the model repo on huggingface.co, you can
+            specify the folder name here.
+
+    Returns:
+        `Optional[str]`: Returns the resolved file (to the cache folder if downloaded from a repo).
+    Examples:
+    ```python
+    # Download a model weight from the Hub and cache it.
+    model_weights_file = cached_file("bert-base-uncased", "pytorch_model.bin")
+    ```
+    """
+
+    if subfolder is None:
+        subfolder = ""
+
+    path_or_repo_id = str(path_or_repo_id)
+    full_filename = os.path.join(subfolder, filename)
+    if os.path.isdir(path_or_repo_id):
+        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
+        if not os.path.isfile(resolved_file):
+            if _raise_exceptions_for_missing_entries:
+                raise EnvironmentError(
+                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
+                    f"'https://huggingface.co/{path_or_repo_id}/' for available files."
+                )
+            else:
+                return None
+        return resolved_file
+
+    if cache_dir is None:
+        # cache_dir = TRANSFORMERS_CACHE
+        cache_dir = os.path.join(MODEL_HOME, ".cache")
+    if isinstance(cache_dir, Path):
+        cache_dir = str(cache_dir)
+
+    try:
+        # Load from URL or cache if already cached
+        # import pdb;pdb.set_trace()
+        resolved_file = paddlenlp_hub_download(
+            path_or_repo_id,
+            filename,
+            subfolder=None if len(subfolder) == 0 else subfolder,
+            # revision=revision,
+            cache_dir=cache_dir,
+        )
+    except HTTPError as err:
+        # First we try to see if we have a cached version (not up to date):
+        resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
+        if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
+            return resolved_file
+        if not _raise_exceptions_for_connection_errors:
+            return None
+
+        raise EnvironmentError(f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}")
+
+    return resolved_file
+
+
 def get_checkpoint_shard_files(
     pretrained_model_name_or_path,
     index_filename,
     cache_dir=None,
-    force_download=False,
-    proxies=None,
-    resume_download=False,
-    local_files_only=False,
-    use_auth_token=None,
-    user_agent=None,
-    revision=None,
     subfolder="",
-    _commit_hash=None,
 ):
     """
     For a given model:
@@ -381,42 +527,20 @@ def get_checkpoint_shard_files(
     # Check if the model is already cached or not. We only try the last checkpoint, this should cover most cases of
     # downloaded (if interrupted).
     last_shard = try_to_load_from_cache(
-        pretrained_model_name_or_path, shard_filenames[-1], cache_dir=cache_dir, revision=_commit_hash
+        pretrained_model_name_or_path,
+        shard_filenames[-1],
+        cache_dir=cache_dir,
     )
 
-    show_progress_bar = last_shard is None or force_download
+    show_progress_bar = last_shard is None
     for shard_filename in tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
-            # Load from URL
-            # cached_filename = cached_file(
-            #     pretrained_model_name_or_path,
-            #     shard_filename,
-            #     cache_dir=cache_dir,
-            #     force_download=force_download,
-            #     proxies=proxies,
-            #     resume_download=resume_download,
-            #     local_files_only=local_files_only,
-            #     use_auth_token=use_auth_token,
-            #     user_agent=user_agent,
-            #     revision=revision,
-            #     subfolder=subfolder,
-            #     _commit_hash=_commit_hash,
-            # )
-
-            cached_filename = hf_hub_download(
+            cached_filename = paddlenlp_hub_download(
                 pretrained_model_name_or_path,
                 shard_filename,
                 subfolder=None if len(subfolder) == 0 else subfolder,
-                revision=revision,
                 cache_dir=cache_dir,
-                user_agent=user_agent,
-                force_download=force_download,
-                proxies=proxies,
-                resume_download=resume_download,
-                use_auth_token=use_auth_token,
-                local_files_only=local_files_only,
             )
-
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:
