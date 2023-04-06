@@ -199,7 +199,7 @@ class ControlNet(nn.Layer):
 
     @paddle.no_grad()
     def decode_control_image(self, controlnet_cond=None, **kwargs):
-        return 255 * (controlnet_cond.transpose([0, 2, 3, 1]) * 2.0 - 1.0).cast("float32").numpy().round()
+        return (255 * controlnet_cond.transpose([0, 2, 3, 1])).cast("float32").numpy().round()
 
     @paddle.no_grad()
     def log_image(
