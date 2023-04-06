@@ -1499,19 +1499,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
-        dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1529,6 +1518,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
+
+        # PretrainedConfig auto contains dtype field
+        dtype = kwargs.pop("dtype", config.get("dtype", None))
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+
+                # do hacking for `init_weights`
+                if hasattr(cls, "init_weights") or dtype in ["bfloat16", "float16"]:
+                    cls.init_weights = lambda *_, **__: None
+            if dtype:
+                init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
