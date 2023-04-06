@@ -36,7 +36,7 @@ from .log import logger
 __all__ = ["get_weights_path_from_url"]
 
 
-COMMUNITY_MODEL_PREFIX = f"https://bj.bcebos.com/paddlenlp/models/{os.getenv('COMMUNITY_MODEL_NAME', 'community')}"
+COMMUNITY_MODEL_PREFIX = os.getenv("COMMUNITY_MODEL_PREFIX", "https://bj.bcebos.com/paddlenlp/models/community")
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 DOWNLOAD_RETRY_LIMIT = 3
 DOWNLOAD_CHECK = False
