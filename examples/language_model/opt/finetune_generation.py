@@ -105,10 +105,10 @@ def main():
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
+            target_modules=[".*q_proj.*", ".*k_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
-            merge_weights=True,
+            merge_weights=False,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
