@@ -19,8 +19,6 @@ import os
 import unittest
 from tempfile import TemporaryDirectory
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-
 
 class LockFileTest(unittest.TestCase):
     test_url = (
@@ -28,6 +26,8 @@ class LockFileTest(unittest.TestCase):
     )
 
     def test_downloading_with_exist_file(self):
+
+        from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
         with TemporaryDirectory() as tempdir:
             lock_file_name = hashlib.md5((self.test_url + tempdir).encode("utf-8")).hexdigest()
@@ -44,6 +44,8 @@ class LockFileTest(unittest.TestCase):
 
     def test_downloading_with_opened_exist_file(self):
 
+        from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+
         with TemporaryDirectory() as tempdir:
             lock_file_name = hashlib.md5((self.test_url + tempdir).encode("utf-8")).hexdigest()
             lock_file_path = os.path.join(tempdir, ".lock", lock_file_name)
@@ -58,3 +60,45 @@ class LockFileTest(unittest.TestCase):
             _ = os.open(lock_file_path, open_mode)
             config_file = get_path_from_url_with_filelock(self.test_url, root_dir=tempdir)
             self.assertIsNotNone(config_file)
+
+
+class DynamicCommunityTest(unittest.TestCase):
+    # only exist in dynamic community test directory
+    model_name = "__internal_testing__/bert-dynamic-community"
+
+    def setUp(self) -> None:
+        os.environ["COMMUNITY_MODEL_NAME"] = "community_test"
+
+    def tearDown(self) -> None:
+        os.environ.pop("COMMUNITY_MODEL_NAME", None)
+
+    def test_bert_init(self):
+        from paddlenlp.transformers import BertModel
+
+        model = BertModel.from_pretrained(self.model_name)
+        self.assertIsNotNone(model)
+
+    def test_community_url(self):
+        from paddlenlp.utils.downloader import (
+            COMMUNITY_MODEL_PREFIX,
+            is_url,
+            url_file_exists,
+        )
+
+        # copy from: https://github.com/PaddlePaddle/PaddleNLP/blob/1c8a4f13bc9ad5ad9e2aa3fc9b5e844d39a66977/paddlenlp/transformers/model_utils.py#L706
+
+        community_model_file_path = "/".join([COMMUNITY_MODEL_PREFIX, self.model_name, "model_state.pdparams"])
+        self.assertTrue(is_url(community_model_file_path))
+        self.assertTrue(url_file_exists(community_model_file_path))
+
+    def test_auto_from_pretrained(self):
+        from paddlenlp.transformers import AutoConfig, AutoModel, AutoTokenizer
+
+        model = AutoModel.from_pretrained(self.model_name)
+        self.assertIsNotNone(model)
+
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.assertIsNotNone(tokenizer)
+
+        config = AutoConfig.from_pretrained(self.model_name)
+        self.assertIsNotNone(config)
