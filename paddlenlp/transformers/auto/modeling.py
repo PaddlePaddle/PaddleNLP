@@ -25,7 +25,7 @@ from paddlenlp.transformers import *  # noqa
 from paddlenlp.transformers.configuration_utils import is_standard_config
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
-    get_path_from_url,
+    get_path_from_url_with_filelock,
     hf_file_exists,
     url_file_exists,
 )
@@ -347,10 +347,10 @@ class _BaseAutoModelClass:
             )
             try:
                 if url_file_exists(standard_community_url):
-                    resolved_vocab_file = get_path_from_url(standard_community_url, cache_dir)
+                    resolved_vocab_file = get_path_from_url_with_filelock(standard_community_url, cache_dir)
                 elif url_file_exists(legacy_community_url):
                     logger.info("Standard config do not exist, loading from legacy config")
-                    resolved_vocab_file = get_path_from_url(legacy_community_url, cache_dir)
+                    resolved_vocab_file = get_path_from_url_with_filelock(legacy_community_url, cache_dir)
                 else:
                     raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
             except RuntimeError as err:
