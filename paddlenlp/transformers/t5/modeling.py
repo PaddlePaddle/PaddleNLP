@@ -796,8 +796,110 @@ class T5PretrainedModel(PretrainedModel):
 
             model_mappings.extend(layer_mappings)
 
+        import numpy as np
+
+        from paddlenlp.transformers.conversion_utils import (
+            naive_merged_qkv_to_tensor_parallel_qkv,
+            split_tensor_parallel_weight,
+        )
+
+        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+            if transpose:
+                x = np.transpose(x, [1, 0])
+            if is_old_qkv:
+                assert is_column, "QKV vectors should be column parallel linear."
+                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
+            return split_tensor_parallel_weight(
+                x,
+                tensor_parallel_degree=config.tensor_parallel_degree,
+                tensor_parallel_rank=config.tensor_parallel_rank,
+                is_column=is_column,
+            )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "encoder.block.0.layer.0.SelfAttention.q.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                "encoder.block.0.layer.0.SelfAttention.k.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                "encoder.block.0.layer.0.SelfAttention.v.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                "decoder.block.0.layer.0.SelfAttention.q.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                "decoder.block.0.layer.0.SelfAttention.k.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                "decoder.block.0.layer.0.SelfAttention.v.weight": partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                ),
+                # Row Linear
+                "encoder.block.0.layer.0.SelfAttention.o.weight": partial(
+                    fn, is_column=False, transpose=True, is_old_qkv=False
+                ),
+                "decoder.block.0.layer.0.SelfAttention.o.weight": partial(
+                    fn, is_column=False, transpose=True, is_old_qkv=False
+                ),
+                "encoder.block.0.layer.1.DenseReluDense.wo.weight": partial(
+                    fn, is_column=False, transpose=True, is_old_qkv=False
+                ),
+                "decoder.block.0.layer.2.DenseReluDense.wo.weight": partial(
+                    fn, is_column=False, transpose=True, is_old_qkv=False
+                ),
+                "shared.weight": partial(fn, is_column=False, transpose=False, is_old_qkv=False),
+            }
+            # mv T5LayerCrossAttention here
+            base_actions["decoder.block.0.layer.1.EncDecAttention.q.weight"] = partial(
+                fn, is_column=True, transpose=True, is_old_qkv=False
+            )
+            base_actions["decoder.block.0.layer.1.EncDecAttention.k.weight"] = partial(
+                fn, is_column=True, transpose=True, is_old_qkv=False
+            )
+            base_actions["decoder.block.0.layer.1.EncDecAttention.v.weight"] = partial(
+                fn, is_column=True, transpose=True, is_old_qkv=False
+            )
+            base_actions["decoder.block.0.layer.1.EncDecAttention.o.weight"] = partial(
+                fn, is_column=False, transpose=True, is_old_qkv=False
+            )
+
+            if config.feed_forward_proj == "relu":
+                base_actions["encoder.block.0.layer.1.DenseReluDense.wi.weight"] = partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                )
+                base_actions["decoder.block.0.layer.2.DenseReluDense.wi.weight"] = partial(
+                    fn, is_column=True, transpose=True, is_old_qkv=False
+                )
+            elif config.feed_forward_proj == "gated-gelu":
+                for i in range(2):
+                    base_actions[f"encoder.block.0.layer.1.DenseReluDense.wi_{i}.weight"] = partial(
+                        fn, is_column=True, transpose=True, is_old_qkv=False
+                    )
+                    base_actions[f"decoder.block.0.layer.2.DenseReluDense.wi_{i}.weight"] = partial(
+                        fn, is_column=True, transpose=True, is_old_qkv=False
+                    )
+
+            final_actions["encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True, transpose=False, is_old_qkv=False
+            )
+            final_actions["decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True, transpose=False, is_old_qkv=False
+            )
+
+            for key, action in base_actions.items():
+                if "block.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("block.0.", f"block.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
         if config.tensor_parallel_degree > 1:
-            tp_split_mappings = cls._get_tensor_parallel_mappings(config)
+            tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
             for mapping in model_mappings:
                 if mapping[1] in tp_split_mappings:
                     if len(mapping) == 3:
