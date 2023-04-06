@@ -74,6 +74,7 @@ MAPPING_NAMES = OrderedDict(
         ("Ernie", "ernie"),
         ("FNet", "fnet"),
         ("Funnel", "funnel"),
+        ("Llama", "llama"),
         ("LayoutXLM", "layoutxlm"),
         ("LayoutLMv2", "layoutlmv2"),
         ("LayoutLM", "layoutlm"),
