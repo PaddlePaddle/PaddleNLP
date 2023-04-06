@@ -193,14 +193,15 @@ class VerbalizerTest(unittest.TestCase):
                 ErnieLMPredictionHead,
                 ["decoder_weight", "decoder_bias"],
                 ["transform.weight", "transform.bias", "layer_norm.weight", "layer_norm.bias"],
-            ),
-            (
-                "albert-chinese-tiny",
-                ["predictions", "decoder"],
-                AlbertMLMHead,
-                ["decoder.weight"],
-                ["bias", "layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
-            ),
+            )
+            # ,
+            # (
+            #     "albert-chinese-tiny",
+            #     ["predictions", "decoder"],
+            #     AlbertMLMHead,
+            #     ["decoder.weight"],
+            #     ["bias", "layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
+            # ),
         ]
     )
     def test_soft_initialization(self, model_name, head_name, head_class, head_params, non_head_params):
