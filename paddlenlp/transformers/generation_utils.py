@@ -1266,10 +1266,14 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
-            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
 
-            # To hundle the logits is a ModelOutput
-            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
+
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1406,11 +1410,13 @@ class GenerationMixin(object):
                     )
 
                 group_input_ids = input_ids[batch_group_indices]
-                outputs = outputs[0] if isinstance(outputs, tuple) else outputs
-                # select outputs of beams of current group only
 
-                # To hundle the logits is a ModelOutput
-                logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+                if isinstance(outputs, tuple):
+                    logits = outputs[0]
+                elif isinstance(outputs, ModelOutput):
+                    logits = outputs.logits
+                else:
+                    logits = outputs
 
                 logits = logits[:, -1, :]
                 logits = paddle.index_select(logits, paddle.to_tensor(batch_group_indices))
