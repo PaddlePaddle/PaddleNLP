@@ -887,6 +887,7 @@ class BloomModel(BloomPreTrainedModel):
             use_cache,
             output_attentions,
             alibi,
+            use_reentrant=False,
         )
         return hidden_states
 
