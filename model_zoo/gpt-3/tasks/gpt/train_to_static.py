@@ -46,6 +46,8 @@ if __name__ == "__main__":
     custom_white_list = amp_config["custom_white_list"]
 
     scaler = paddle.amp.GradScaler(init_loss_scaling=scale_loss)
+    if amp_level == "O2":
+        module.model = paddle.amp.decorate(models=module.model, dtype=amp_dtype, level=amp_level)
 
     train_data_loader = build_dataloader(cfg.Data, "Train")
     eval_data_loader = build_dataloader(cfg.Data, "Eval")
@@ -77,9 +79,10 @@ if __name__ == "__main__":
             loss = module.loss_fn(preds, labels, loss_mask)
 
         if amp_enable and amp_dtype == "float16":
-            loss = scaler.scale(loss)
-
-        loss.backward()
+            scaled = scaler.scale(loss)
+            scaled.backward()
+        else:
+            loss.backward()
 
         if amp_enable and amp_dtype == "float16":
             scaler.step(optimizer)
