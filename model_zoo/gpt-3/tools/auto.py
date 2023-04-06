@@ -14,13 +14,9 @@
 
 from __future__ import absolute_import, division, print_function
 
-import copy
 import os
-import random
 import sys
 
-import numpy as np
-import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
@@ -31,7 +27,6 @@ from ppfleetx.core import AutoEngine
 from ppfleetx.data import build_auto_dataset
 from ppfleetx.models import build_module
 from ppfleetx.utils import config
-from ppfleetx.utils.log import logger
 
 # init_logger()
 

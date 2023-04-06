@@ -40,11 +40,12 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
     eval_iters: 10
     test_iters:
     mix_precision:
+      enable: True
+      dtype: "float16"
       level: "o2"
       scale_loss: 32768.0
       custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
       custom_white_list: ["lookup_table", "lookup_table_v2"]
-      use_fp16_guard: False
     save_load:
       output_dir: ./output
       ckpt_dir:
@@ -60,10 +61,12 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 | eval_freq         | 模型评估间隔，以epoch为粒度                  |
 | eval_iters        | 模型评估时训练评估测试集的轮数                |
 | test_iters        | 模型测试或推理时的轮数                       |
+| enable            | 是否使用混合精度的类型，可选: `True` `False`   |
+| dtype             | 使用混合精度的类型，可选: `float16` `bfloat16`|
 | level             | 使用混合精度训练的等级，可选 `o1` `o2` `o3`   |
-| scale_loss        | 使用混合精度下，loss的放缩比例                  |
-| custom_black_list | 自定义算子黑名单。这个名单中的算子在支持float16计算时会被认为是数值危险的，它们的影响也可能会在下游操作中观察到。这些算子通常不会转为float16计算。 |
-| custom_white_list | 自定义算子白名单。这个名单中的算子在支持float16计算时会被认为是数值安全的，并且对性能至关重要。如果设置了白名单，该名单中的算子会使用float16计算。|
+| scale_loss        | 使用混合精度float16下，loss的放缩比例         |
+| custom_black_list | 自定义算子黑名单。这个名单中的算子在支持float16/bfloat16计算时会被认为是数值危险的，它们的影响也可能会在下游操作中观察到。这些算子通常不会转为float16/bfloat16计算。 |
+| custom_white_list | 自定义算子白名单。这个名单中的算子在支持float16/bfloat16计算时会被认为是数值安全的，并且对性能至关重要。如果设置了白名单，该名单中的算子会使用float16/bfloat16计算。|
 | output_dir        | 指定输出文件                              |
 | ckpt_dir          | checkpoint的加载目录                      |
 

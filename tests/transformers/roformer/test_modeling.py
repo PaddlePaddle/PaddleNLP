@@ -338,6 +338,7 @@ class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerModel
     use_labels = False
     return_dict = False
+    test_tie_weights = True
 
     all_model_classes = (
         RoFormerModel,

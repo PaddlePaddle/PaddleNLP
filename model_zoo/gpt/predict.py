@@ -18,12 +18,15 @@
 # https://github.com/jm12138/CPM-Generate-Paddle
 
 import sys
-import argparse
-import numpy as np
 
+import numpy as np
 import paddle
-from paddlenlp.transformers import GPTModel, GPTForGreedyGeneration
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTForGreedyGeneration,
+    GPTTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {

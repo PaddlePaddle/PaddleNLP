@@ -1189,10 +1189,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(self, self.base_model_prefix).config[name]
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class GPTForTokenClassification(GPTPretrainedModel):
@@ -1203,7 +1200,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
     Args:
         gpt (:class:`GPTModel`):
             An instance of GPTModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of GPT.
@@ -1213,7 +1210,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
 
     def __init__(self, config: GPTConfig):
         super(GPTForTokenClassification, self).__init__(config)
-        self.num_classes = config.num_labels
+        self.num_labels = config.num_labels
 
         self.gpt = GPTModel(config)  # allow gpt to be config
         dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
@@ -1264,7 +1261,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
 
             Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
             returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -1300,7 +1297,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
 
         if not return_dict:
             if isinstance(sequence_output, input_type):
@@ -1325,15 +1322,15 @@ class GPTForSequenceClassification(GPTPretrainedModel):
     Args:
         gpt (:class:`GPTModel`):
             An instance of GPTModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
 
     """
 
     def __init__(self, config: GPTConfig):
         super(GPTForSequenceClassification, self).__init__(config)
-
-        self.gpt = GPTModel(config)  # allow gpt to be config
+        self.num_labels = config.num_labels
+        self.gpt = GPTModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
@@ -1382,7 +1379,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
             Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
             returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -1435,12 +1432,12 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = MSELoss()
                 loss = loss_fct(pooled_logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = CrossEntropyLoss()
-                loss = loss_fct(pooled_logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(pooled_logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)

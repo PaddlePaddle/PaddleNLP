@@ -136,7 +136,7 @@ class BloomConfig(PretrainedConfig):
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
         self.mp_degree = mp_degree
-        self.pp_degree = mp_degree
+        self.pp_degree = pp_degree
         self.mp_rank = mp_rank
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
