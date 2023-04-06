@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
+import paddle.nn as nn
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..utils import BaseOutput, logging
@@ -119,7 +120,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         conv_in_kernel = 3
         conv_out_kernel = 3
         conv_in_padding = (conv_in_kernel - 1) // 2
-        self.conv_in = paddle.nn.Conv2D(
+        self.conv_in = nn.Conv2D(
             in_channels=in_channels,
             out_channels=block_out_channels[0],
             kernel_size=conv_in_kernel,
@@ -135,8 +136,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             in_channels=block_out_channels[0],
             num_layers=1,
         )
-        self.down_blocks = paddle.nn.LayerList(sublayers=[])
-        self.up_blocks = paddle.nn.LayerList(sublayers=[])
+        self.down_blocks = nn.LayerList(sublayers=[])
+        self.up_blocks = nn.LayerList(sublayers=[])
         if isinstance(attention_head_dim, int):
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
         output_channel = block_out_channels[0]
@@ -203,19 +204,19 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
         if norm_num_groups is not None:
-            self.conv_norm_out = paddle.nn.GroupNorm(
+            self.conv_norm_out = nn.GroupNorm(
                 num_groups=norm_num_groups,
                 num_channels=block_out_channels[0],
                 epsilon=norm_eps,
                 weight_attr=None,
                 bias_attr=None,
             )
-            self.conv_act = paddle.nn.Silu()
+            self.conv_act = nn.Silu()
         else:
             self.conv_norm_out = None
             self.conv_act = None
         conv_out_padding = (conv_out_kernel - 1) // 2
-        self.conv_out = paddle.nn.Conv2D(
+        self.conv_out = nn.Conv2D(
             in_channels=block_out_channels[0],
             out_channels=out_channels,
             kernel_size=conv_out_kernel,
@@ -238,7 +239,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         """
         sliceable_head_dims = []
 
-        def fn_recursive_retrieve_slicable_dims(module: paddle.nn.Layer):
+        def fn_recursive_retrieve_slicable_dims(module: nn.Layer):
             if hasattr(module, "set_attention_slice"):
                 sliceable_head_dims.append(module.sliceable_head_dim)
             for child in module.children():
@@ -262,7 +263,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             if size is not None and size > dim:
                 raise ValueError(f"size {size} has to be smaller or equal to {dim}.")
 
-        def fn_recursive_set_attention_slice(module: paddle.nn.Layer, slice_size: List[int]):
+        def fn_recursive_set_attention_slice(module: nn.Layer, slice_size: List[int]):
             if hasattr(module, "set_attention_slice"):
                 module.set_attention_slice(slice_size.pop())
             for child in module.children():

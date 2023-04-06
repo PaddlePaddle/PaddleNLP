@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import paddle
+import paddle.nn as nn
 
 from .resnet import Downsample2D, ResnetBlock2D, TemporalConvLayer, Upsample2D
 from .transformer_2d import Transformer2DModel
@@ -132,7 +133,7 @@ def get_up_block(
     raise ValueError(f"{up_block_type} does not exist.")
 
 
-class UNetMidBlock3DCrossAttn(paddle.nn.Layer):
+class UNetMidBlock3DCrossAttn(nn.Layer):
     def __init__(
         self,
         in_channels: int,
@@ -210,10 +211,10 @@ class UNetMidBlock3DCrossAttn(paddle.nn.Layer):
                 )
             )
             temp_convs.append(TemporalConvLayer(in_channels, in_channels, dropout=0.1))
-        self.resnets = paddle.nn.LayerList(sublayers=resnets)
-        self.temp_convs = paddle.nn.LayerList(sublayers=temp_convs)
-        self.attentions = paddle.nn.LayerList(sublayers=attentions)
-        self.temp_attentions = paddle.nn.LayerList(sublayers=temp_attentions)
+        self.resnets = nn.LayerList(sublayers=resnets)
+        self.temp_convs = nn.LayerList(sublayers=temp_convs)
+        self.attentions = nn.LayerList(sublayers=attentions)
+        self.temp_attentions = nn.LayerList(sublayers=temp_attentions)
 
     def forward(
         self,
@@ -240,7 +241,7 @@ class UNetMidBlock3DCrossAttn(paddle.nn.Layer):
         return hidden_states
 
 
-class CrossAttnDownBlock3D(paddle.nn.Layer):
+class CrossAttnDownBlock3D(nn.Layer):
     def __init__(
         self,
         in_channels: int,
@@ -310,12 +311,12 @@ class CrossAttnDownBlock3D(paddle.nn.Layer):
                     norm_num_groups=resnet_groups,
                 )
             )
-        self.resnets = paddle.nn.LayerList(sublayers=resnets)
-        self.temp_convs = paddle.nn.LayerList(sublayers=temp_convs)
-        self.attentions = paddle.nn.LayerList(sublayers=attentions)
-        self.temp_attentions = paddle.nn.LayerList(sublayers=temp_attentions)
+        self.resnets = nn.LayerList(sublayers=resnets)
+        self.temp_convs = nn.LayerList(sublayers=temp_convs)
+        self.attentions = nn.LayerList(sublayers=attentions)
+        self.temp_attentions = nn.LayerList(sublayers=temp_attentions)
         if add_downsample:
-            self.downsamplers = paddle.nn.LayerList(
+            self.downsamplers = nn.LayerList(
                 sublayers=[
                     Downsample2D(
                         out_channels, use_conv=True, out_channels=out_channels, padding=downsample_padding, name="op"
@@ -355,7 +356,7 @@ class CrossAttnDownBlock3D(paddle.nn.Layer):
         return hidden_states, output_states
 
 
-class DownBlock3D(paddle.nn.Layer):
+class DownBlock3D(nn.Layer):
     def __init__(
         self,
         in_channels: int,
@@ -392,10 +393,10 @@ class DownBlock3D(paddle.nn.Layer):
                 )
             )
             temp_convs.append(TemporalConvLayer(out_channels, out_channels, dropout=0.1))
-        self.resnets = paddle.nn.LayerList(sublayers=resnets)
-        self.temp_convs = paddle.nn.LayerList(sublayers=temp_convs)
+        self.resnets = nn.LayerList(sublayers=resnets)
+        self.temp_convs = nn.LayerList(sublayers=temp_convs)
         if add_downsample:
-            self.downsamplers = paddle.nn.LayerList(
+            self.downsamplers = nn.LayerList(
                 sublayers=[
                     Downsample2D(
                         out_channels, use_conv=True, out_channels=out_channels, padding=downsample_padding, name="op"
@@ -419,7 +420,7 @@ class DownBlock3D(paddle.nn.Layer):
         return hidden_states, output_states
 
 
-class CrossAttnUpBlock3D(paddle.nn.Layer):
+class CrossAttnUpBlock3D(nn.Layer):
     def __init__(
         self,
         in_channels: int,
@@ -490,12 +491,12 @@ class CrossAttnUpBlock3D(paddle.nn.Layer):
                     norm_num_groups=resnet_groups,
                 )
             )
-        self.resnets = paddle.nn.LayerList(sublayers=resnets)
-        self.temp_convs = paddle.nn.LayerList(sublayers=temp_convs)
-        self.attentions = paddle.nn.LayerList(sublayers=attentions)
-        self.temp_attentions = paddle.nn.LayerList(sublayers=temp_attentions)
+        self.resnets = nn.LayerList(sublayers=resnets)
+        self.temp_convs = nn.LayerList(sublayers=temp_convs)
+        self.attentions = nn.LayerList(sublayers=attentions)
+        self.temp_attentions = nn.LayerList(sublayers=temp_attentions)
         if add_upsample:
-            self.upsamplers = paddle.nn.LayerList(
+            self.upsamplers = nn.LayerList(
                 sublayers=[Upsample2D(out_channels, use_conv=True, out_channels=out_channels)]
             )
         else:
@@ -533,7 +534,7 @@ class CrossAttnUpBlock3D(paddle.nn.Layer):
         return hidden_states
 
 
-class UpBlock3D(paddle.nn.Layer):
+class UpBlock3D(nn.Layer):
     def __init__(
         self,
         in_channels: int,
@@ -571,10 +572,10 @@ class UpBlock3D(paddle.nn.Layer):
                 )
             )
             temp_convs.append(TemporalConvLayer(out_channels, out_channels, dropout=0.1))
-        self.resnets = paddle.nn.LayerList(sublayers=resnets)
-        self.temp_convs = paddle.nn.LayerList(sublayers=temp_convs)
+        self.resnets = nn.LayerList(sublayers=resnets)
+        self.temp_convs = nn.LayerList(sublayers=temp_convs)
         if add_upsample:
-            self.upsamplers = paddle.nn.LayerList(
+            self.upsamplers = nn.LayerList(
                 sublayers=[Upsample2D(out_channels, use_conv=True, out_channels=out_channels)]
             )
         else:

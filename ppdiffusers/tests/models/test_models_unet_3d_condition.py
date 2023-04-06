@@ -20,7 +20,7 @@ import paddle
 from ppdiffusers.models import UNet3DConditionModel
 from ppdiffusers.models.attention_processor import LoRAAttnProcessor
 from ppdiffusers.utils import floats_tensor, logging
-from ppdiffusers.utils.import_utils import is_xformers_available
+from ppdiffusers.utils.import_utils import is_ppxformers_available
 
 from ..test_modeling_common import ModelTesterMixin
 
@@ -92,7 +92,7 @@ class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     @unittest.skipIf(
-        not is_xformers_available(), reason="XFormers attention is only available with CUDA and `xformers` installed"
+        not is_ppxformers_available(), reason="XFormers attention is only available with CUDA and `xformers` installed"
     )
     def test_xformers_enable_works(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
@@ -154,7 +154,7 @@ class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         assert output is not None
 
     @unittest.skipIf(
-        not is_xformers_available(), reason="XFormers attention is only available with CUDA and `xformers` installed"
+        not is_ppxformers_available(), reason="XFormers attention is only available with CUDA and `xformers` installed"
     )
     def test_lora_xformers_on_off(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()

@@ -809,7 +809,7 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     return out.reshape([-1, channel, out_h, out_w])
 
 
-class TemporalConvLayer(paddle.nn.Layer):
+class TemporalConvLayer(nn.Layer):
     """
     Temporal convolutional layer that can be used for video (sequence of images) input Code mostly copied from:
     https://github.com/modelscope/modelscope/blob/1509fdb973e5871f37148a4b5e5964cafd43e64d/modelscope/models/multi_modal/video_synthesis/unet_sd.py#L1016
@@ -820,28 +820,28 @@ class TemporalConvLayer(paddle.nn.Layer):
         out_dim = out_dim or in_dim
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.conv1 = paddle.nn.Sequential(
-            paddle.nn.GroupNorm(num_groups=32, num_channels=in_dim, epsilon=1e-05, weight_attr=None, bias_attr=None),
-            paddle.nn.Silu(),
-            paddle.nn.Conv3D(in_channels=in_dim, out_channels=out_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        self.conv1 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=in_dim),
+            nn.Silu(),
+            nn.Conv3D(in_channels=in_dim, out_channels=out_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
         )
-        self.conv2 = paddle.nn.Sequential(
-            paddle.nn.GroupNorm(num_groups=32, num_channels=out_dim, epsilon=1e-05, weight_attr=None, bias_attr=None),
-            paddle.nn.Silu(),
-            paddle.nn.Dropout(p=dropout),
-            paddle.nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        self.conv2 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
         )
-        self.conv3 = paddle.nn.Sequential(
-            paddle.nn.GroupNorm(num_groups=32, num_channels=out_dim, epsilon=1e-05, weight_attr=None, bias_attr=None),
-            paddle.nn.Silu(),
-            paddle.nn.Dropout(p=dropout),
-            paddle.nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        self.conv3 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
         )
-        self.conv4 = paddle.nn.Sequential(
-            paddle.nn.GroupNorm(num_groups=32, num_channels=out_dim, epsilon=1e-05, weight_attr=None, bias_attr=None),
-            paddle.nn.Silu(),
-            paddle.nn.Dropout(p=dropout),
-            paddle.nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        self.conv4 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
         )
         zeros_(self.conv4[-1].weight)
         zeros_(self.conv4[-1].bias)

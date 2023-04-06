@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import paddle
+import paddle.nn as nn
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..utils import BaseOutput
@@ -79,11 +80,9 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
         self.attention_head_dim = attention_head_dim
         inner_dim = num_attention_heads * attention_head_dim
         self.in_channels = in_channels
-        self.norm = paddle.nn.GroupNorm(
-            num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-06, weight_attr=None, bias_attr=None
-        )
-        self.proj_in = paddle.nn.Linear(in_features=in_channels, out_features=inner_dim)
-        self.transformer_blocks = paddle.nn.LayerList(
+        self.norm = nn.GroupNorm(num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-06, affine=True)
+        self.proj_in = nn.Linear(in_features=in_channels, out_features=inner_dim)
+        self.transformer_blocks = nn.LayerList(
             sublayers=[
                 BasicTransformerBlock(
                     inner_dim,
@@ -99,7 +98,7 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
                 for d in range(num_layers)
             ]
         )
-        self.proj_out = paddle.nn.Linear(in_features=inner_dim, out_features=in_channels)
+        self.proj_out = nn.Linear(in_features=inner_dim, out_features=in_channels)
 
     def forward(
         self,

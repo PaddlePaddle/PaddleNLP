@@ -92,38 +92,6 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         self.register_modules(vae=vae, text_encoder=text_encoder, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
-    def enable_vae_slicing(self):
-        """
-        Enable sliced VAE decoding.
-
-        When this option is enabled, the VAE will split the input tensor in slices to compute decoding in several
-        steps. This is useful to save some memory and allow larger batch sizes.
-        """
-        self.vae.enable_slicing()
-
-    def disable_vae_slicing(self):
-        """
-        Disable sliced VAE decoding. If `enable_vae_slicing` was previously invoked, this method will go back to
-        computing decoding in one step.
-        """
-        self.vae.disable_slicing()
-
-    def enable_vae_tiling(self):
-        """
-        Enable tiled VAE decoding.
-
-        When this option is enabled, the VAE will split the input tensor into tiles to compute decoding and encoding in
-        several steps. This is useful to save a large amount of memory and to allow the processing of larger images.
-        """
-        self.vae.enable_tiling()
-
-    def disable_vae_tiling(self):
-        """
-        Disable tiled VAE decoding. If `enable_vae_tiling` was previously invoked, this method will go back to
-        computing decoding in one step.
-        """
-        self.vae.disable_tiling()
-
     def _encode_prompt(
         self,
         prompt,
@@ -137,7 +105,7 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         Encodes the prompt into text encoder hidden states.
 
         Args:
-             prompt (`str` or `List[str]`, *optional*):
+            prompt (`str` or `List[str]`, *optional*):
                 prompt to be encoded
             num_images_per_prompt (`int`):
                 number of images that should be generated per prompt
@@ -450,7 +418,7 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 noise_pred = noise_pred.transpose(perm=[0, 2, 1, 3, 4]).reshape((bsz * frames, channel, width, height))
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
                 latents = (
-                    latents[(None), :].reshape((bsz, frames, channel, width, height)).transpose(perm=[0, 2, 1, 3, 4])
+                    latents[None, :].reshape((bsz, frames, channel, width, height)).transpose(perm=[0, 2, 1, 3, 4])
                 )
                 if i == len(timesteps) - 1 or i + 1 > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
                     progress_bar.update()
@@ -461,8 +429,6 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             video = video_tensor
         else:
             video = tensor2vid(video_tensor)
-        if hasattr(self, "final_offload_hook") and self.final_offload_hook is not None:
-            self.final_offload_hook.offload()
         if not return_dict:
             return (video,)
         return TextToVideoSDPipelineOutput(frames=video)
