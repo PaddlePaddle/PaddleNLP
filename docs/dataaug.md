@@ -592,7 +592,7 @@ SentenceBackTranslate 参数介绍：
         “beam_search”策略中的beam值。 默认为 4。
 
     use_faster (bool)：
-        是否使用FasterGeneration进行加速。默认为True。
+        是否使用FasterGeneration进行加速。默认为False。
 
     decode_strategy (str)：
         生成中的解码策略。 目前支持三种解码策略：“greedy_search”、“sampling”和“beam_search”。 默认为“beam_search”。
