@@ -18,12 +18,14 @@ import cv2
 import gradio as gr
 import paddle
 from annotator.openpose import OpenposePaddleDetector
+from annotator.ppdet_hrnet import PPDetDetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import StableDiffusionControlNetPipeline
 
 apply_openpose = OpenposePaddleDetector()
+apply_ppdetpose = PPDetDetector()
 
 
 pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_openpose", safety_checker=None)
@@ -47,7 +49,7 @@ def process(
 ):
     with paddle.no_grad():
         input_image = HWC3(input_image)
-        detected_map, _ = apply_openpose(resize_image(input_image, detect_resolution), hand)
+        detected_map, _ = apply_ppdetpose(input_image, detect_resolution, hand)
         detected_map = HWC3(detected_map)
         img = resize_image(input_image, image_resolution)
         H, W, C = img.shape
