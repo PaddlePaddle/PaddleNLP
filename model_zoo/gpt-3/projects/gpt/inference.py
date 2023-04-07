@@ -21,7 +21,6 @@ import sys
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
-from ppfleetx_ops import topp_sampling
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../")))
