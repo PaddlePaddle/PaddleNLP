@@ -86,16 +86,7 @@ else:
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
     from .unclip import UnCLIPImageVariationPipeline, UnCLIPPipeline
-    from .unidiffuser import (
-        UniDiffuserImageGenerationPipeline,
-        UniDiffuserImageToTextPipeline,
-        UniDiffuserImageVariationPipeline,
-        UniDiffuserJointGenerationPipeline,
-        UniDiffuserPipeline,
-        UniDiffuserTextGenerationPipeline,
-        UniDiffuserTextToImagePipeline,
-        UniDiffuserTextVariationPipeline,
-    )
+    from .unidiffuser import UniDiffuserPipeline
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,

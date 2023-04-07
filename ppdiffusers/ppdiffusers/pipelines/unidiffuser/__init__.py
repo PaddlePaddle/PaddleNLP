@@ -48,22 +48,8 @@ try:
 except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import (
         CaptionDecoder,
-        UniDiffuserImageGenerationPipeline,
-        UniDiffuserImageToTextPipeline,
-        UniDiffuserImageVariationPipeline,
-        UniDiffuserJointGenerationPipeline,
         UniDiffuserPipeline,
-        UniDiffuserTextGenerationPipeline,
-        UniDiffuserTextToImagePipeline,
-        UniDiffuserTextVariationPipeline,
     )
 else:
     from .caption_decoder import CaptionDecoder
     from .pipeline_unidiffuser import UniDiffuserPipeline
-    from .pipeline_unidiffuser_i import UniDiffuserImageGenerationPipeline
-    from .pipeline_unidiffuser_i2t import UniDiffuserImageToTextPipeline
-    from .pipeline_unidiffuser_i2t2i import UniDiffuserImageVariationPipeline
-    from .pipeline_unidiffuser_joint import UniDiffuserJointGenerationPipeline
-    from .pipeline_unidiffuser_t import UniDiffuserTextGenerationPipeline
-    from .pipeline_unidiffuser_t2i import UniDiffuserTextToImagePipeline
-    from .pipeline_unidiffuser_t2i2t import UniDiffuserTextVariationPipeline

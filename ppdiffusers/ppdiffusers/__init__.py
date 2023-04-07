@@ -167,13 +167,6 @@ else:
         UniDiffuserImageVariationPipeline,
         UniDiffuserJointGenerationPipeline,
         UniDiffuserPipeline,
-        UniDiffuserTextGenerationPipeline,
-        UniDiffuserTextToImagePipeline,
-        UniDiffuserTextVariationPipeline,
-        VersatileDiffusionDualGuidedPipeline,
-        VersatileDiffusionImageVariationPipeline,
-        VersatileDiffusionPipeline,
-        VersatileDiffusionTextToImagePipeline,
         VQDiffusionPipeline,
     )
     from .pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
