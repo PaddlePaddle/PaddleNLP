@@ -509,11 +509,11 @@ class UniDiffuserPipeline(DiffusionPipeline):
 
         elif mode == "t2i":
             img_vae_latents, img_clip_latents = self._split(latents, height, width)
-            t_text = paddle.zeros(t.shape[0], dtype=paddle.int32)
+            t_text = paddle.zeros([t.shape[0]], dtype=paddle.int32)
             img_vae_out, img_clip_out, text_out = self.unet(
-                img_vae_latents,
-                img_clip_latents,
-                text=prompt_embeds,
+                img_vae_latents,  # [1, 4, 64, 64]
+                img_clip_latents,  # [1, 1, 512]
+                text=prompt_embeds,  # [1, 77, 64]
                 t_img=t,
                 t_text=t_text,
                 data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
@@ -610,7 +610,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         image_vae_latents,
         image_clip_latents,
         prompt_embeds,
-        timesteps,
         num_inference_steps,
         extra_step_kwargs,
         guidance_scale,
@@ -620,6 +619,10 @@ class UniDiffuserPipeline(DiffusionPipeline):
         callback,
         callback_steps,
     ):
+        # Set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
+
         # Prepare latent variables
         if mode == "joint":
             latents = self._combine_joint(image_vae_latents, image_clip_latents, prompt_embeds)
@@ -778,10 +781,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 clip_latents,
             )
 
-        # Set timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
-
         # Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
@@ -792,7 +791,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 image_vae_latents,
                 image_clip_latents,
                 prompt_embeds,
-                timesteps,
                 num_inference_steps,
                 extra_step_kwargs,
                 guidance_scale,
@@ -809,7 +807,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 image_vae_latents,
                 image_clip_latents,
                 prompt_embeds,
-                timesteps,
                 num_inference_steps,
                 extra_step_kwargs,
                 guidance_scale,
@@ -826,7 +823,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 image_vae_latents,
                 image_clip_latents,
                 prompt_embeds,
-                timesteps,
                 num_inference_steps,
                 extra_step_kwargs,
                 guidance_scale,
@@ -856,7 +852,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                     image_vae_latents,
                     image_clip_latents,
                     prompt_embeds,
-                    timesteps,
                     num_inference_steps,
                     extra_step_kwargs,
                     guidance_scale,
@@ -878,7 +873,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                     image_vae_latents,
                     image_clip_latents,
                     text_latents,
-                    timesteps,
                     num_inference_steps,
                     extra_step_kwargs,
                     guidance_scale,

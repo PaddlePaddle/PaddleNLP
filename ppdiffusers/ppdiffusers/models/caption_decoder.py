@@ -125,19 +125,10 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                     tokens = tokens.expand([beam_size, *tokens.shape[1:]])
                     tokens = paddle.concat((tokens, next_tokens), axis=1)
             else:
-                # TODO: nf
-                mask = paddle.cast(is_stopped, "int32")
-                logits[mask] = -float(np.inf)
-                logits[mask, 0] = 0
+                logits[is_stopped] = -float(np.inf)
+                logits[is_stopped, 0] = 0
                 scores_sum = scores[:, None] + logits
-                incerse_mask = ~is_stopped
-                incerse_mask = paddle.cast(incerse_mask, "int32")
-                seq_lengths[incerse_mask] += 1
-
-                # logits[is_stopped] = -float(np.inf)
-                # logits[is_stopped, 0] = 0
-                # scores_sum = scores[:, None] + logits
-                # seq_lengths[~is_stopped] += 1
+                seq_lengths[~is_stopped] += 1
                 scores_sum_average = scores_sum / seq_lengths[:, None]
                 scores_sum_average, next_tokens = scores_sum_average.reshape([-1]).topk(beam_size, -1)
                 next_tokens_source = next_tokens // scores_sum.shape[1]

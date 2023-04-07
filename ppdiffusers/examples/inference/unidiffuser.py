@@ -28,8 +28,8 @@ from ppdiffusers.utils import load_image
 
 generator = paddle.Generator().manual_seed(0)
 
-mode = "t2i"
-# mode = "i2t"
+# mode = "t2i"
+mode = "i2t"
 # mode = "t2i2t"
 # mode = "i2t2i"
 # mode = "joint"
