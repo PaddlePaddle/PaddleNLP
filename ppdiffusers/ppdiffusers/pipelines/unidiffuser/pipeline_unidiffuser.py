@@ -19,7 +19,6 @@ import einops
 import numpy as np
 import paddle
 import PIL
-from IPython import embed
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
@@ -28,11 +27,12 @@ from paddlenlp.transformers import (
     CLIPVisionModelWithProjection,
 )
 
-from ...models import AutoencoderKL, CaptionDecoder, UViTModel
+from ...models import AutoencoderKL, UViTModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DPMSolverMultistepScheduler
-from ...utils import PIL_INTERPOLATION, deprecate, logging, randn_tensor
+from ...utils import deprecate, logging, randn_tensor
 from . import ImageTextPipelineOutput
+from .caption_decoder import CaptionDecoder
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -99,8 +99,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         self.image_encoder_clip_img_dim = 512
         self.text_encoder_seq_len = tokenizer.model_max_length  # 77
         self.text_encoder_text_dim = 64
-        # self.text_encoder_hidden_size = text_encoder.config.hidden_size # 768
-        # self.image_encoder_hidden_size = image_encoder.config.hidden_size # 768
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
@@ -120,6 +118,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
 
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.check_inputs
     def check_inputs(
         self,
         prompt,
@@ -130,7 +129,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         prompt_embeds=None,
         negative_prompt_embeds=None,
     ):
-        # Check inputs before running the generative process.
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
@@ -255,13 +253,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
     ):
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
-
         if prompt_embeds is None:
             text_inputs = self.tokenizer(
                 prompt,
@@ -274,17 +265,11 @@ class UniDiffuserPipeline(DiffusionPipeline):
             )
             prompt_embeds = self.text_encoder(input_ids=text_inputs.input_ids)
             prompt_embeds = prompt_embeds.last_hidden_state
-        # bs_embed, seq_len, _ = prompt_embeds.shape
-        # # duplicate text embeddings for each generation per prompt, using mps friendly method
-        # prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt, 1])
-        # prompt_embeds = prompt_embeds.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+
         return prompt_embeds
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_instruct_pix2pix.StableDiffusionInstructPix2PixPipeline.prepare_image_latents
-    # Rename: prepare_image_latents()
-    def encode_image_vae_latents(
-        self, image, batch_size, num_images_per_prompt, dtype, do_classifier_free_guidance=False, generator=None
-    ):
+    def encode_image_vae_latents(self, image, batch_size, num_images_per_prompt, dtype, generator=None):
         if not isinstance(image, (paddle.Tensor, PIL.Image.Image, list)):
             raise ValueError(
                 f"`image` has to be of type `paddle.Tensor`, `PIL.Image.Image` or list but is {type(image)}"
@@ -329,7 +314,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
     def encode_image_clip_latents(
         self,
         image,
-        resolution,
         batch_size,
         num_images_per_prompt,
         dtype,
@@ -350,14 +334,8 @@ class UniDiffuserPipeline(DiffusionPipeline):
             ]
             image_latents = paddle.concat(image_latents, axis=0)
         else:
-            # TODO: figure out self.image_feature_extractor.preprocess kwargs
-            # inputs = self.image_feature_extractor.preprocess(
-            #     image, do_center_crop=True, crop_size=resolution, return_tensors="pd"
-            # )
             inputs = self.image_feature_extractor(images=image, return_tensors="pd").pixel_values
-            # inputs.pixel_values # [1, 3, 512, 512]
-            image_latents = self.image_encoder(inputs).image_embeds  # self.image_encoder(**inputs)
-            image_latents = image_latents.unsqueeze(1)
+            image_latents = self.image_encoder(inputs).image_embeds.unsqueeze(1)
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] == 0:
             # expand image_latents for batch_size
@@ -385,9 +363,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
             )
         return image_latents
 
-    # Note that the CLIP latents are not decoded for image generation.
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
-    # Rename: decode_latents() -> decode_image_latents()
     def decode_image_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         with paddle.amp.auto_cast():
@@ -456,16 +432,12 @@ class UniDiffuserPipeline(DiffusionPipeline):
         prompt_embeds,
         img_vae,
         img_clip,
-        timesteps,
+        N,
         guidance_scale,
-        generator,
         height,
         width,
         data_type=1,
     ):
-        _betas = stable_diffusion_beta_schedule()
-        N = len(_betas)  # 1000
-
         if mode == "joint":
             img_vae_latents, img_clip_latents, text_latents = self._split_joint(latents, height, width)
             img_vae_out, img_clip_out, text_out = self.unet(
@@ -508,9 +480,9 @@ class UniDiffuserPipeline(DiffusionPipeline):
             img_vae_latents, img_clip_latents = self._split(latents, height, width)
             t_text = paddle.zeros([t.shape[0]], dtype=paddle.int32)
             img_vae_out, img_clip_out, text_out = self.unet(
-                img_vae_latents,  # [1, 4, 64, 64]
-                img_clip_latents,  # [1, 1, 512]
-                text=prompt_embeds,  # [1, 77, 64]
+                img_vae_latents,
+                img_clip_latents,
+                text=prompt_embeds,
                 t_img=t,
                 t_text=t_text,
                 data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
@@ -538,7 +510,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
             img_vae_out, img_clip_out, text_out = self.unet(
                 img_vae,
                 img_clip,
-                text=latents,  # [1, 77, 768] 64
+                text=latents,
                 t_img=t_img,
                 t_text=t,
                 data_type=paddle.zeros_like(t_img, dtype=paddle.int32) + data_type,
@@ -560,8 +532,8 @@ class UniDiffuserPipeline(DiffusionPipeline):
 
         elif mode == "t":
             img_vae_out, img_clip_out, text_out = self.unet(
-                img_vae,  # paddle.randn([x.shape[0], *z_shape])
-                img_clip,  # paddle.randn([x.shape[0], 1, clip_img_dim])
+                img_vae,
+                img_clip,
                 text=latents,
                 t_img=paddle.ones_like(t) * N,
                 t_text=t,
@@ -616,10 +588,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         callback,
         callback_steps,
     ):
-        # Set timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
-
         # Prepare latent variables
         if mode == "joint":
             latents = self._combine_joint(image_vae_latents, image_clip_latents, prompt_embeds)
@@ -627,6 +595,13 @@ class UniDiffuserPipeline(DiffusionPipeline):
             latents = self._combine(image_vae_latents, image_clip_latents)
         elif mode in ["i2t", "t"]:
             latents = prompt_embeds
+
+        # Set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
+
+        _betas = stable_diffusion_beta_schedule()
+        N = len(_betas)  # 1000
 
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -640,9 +615,8 @@ class UniDiffuserPipeline(DiffusionPipeline):
                     prompt_embeds,
                     image_vae_latents,
                     image_clip_latents,
-                    timesteps,
+                    N,
                     guidance_scale,
-                    generator,
                     height,
                     width,
                 )
@@ -699,12 +673,15 @@ class UniDiffuserPipeline(DiffusionPipeline):
         width = width or self.unet.config.img_size * self.vae_scale_factor
 
         # 1. Check inputs. Raise error if not correct
-        self.check_inputs(
-            prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
-        )
+        self.check_inputs(prompt, height, width, callback_steps)
 
         # 2. Define call parameters
         batch_size = self._infer_batch_size(mode, prompt, prompt_embeds, image, num_samples)
+        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+        # corresponds to doing no classifier free guidance.
+        do_classifier_free_guidance = guidance_scale > 1.0
+        do_classifier_free_guidance = False  # TODO
 
         # 3. Encode input prompt if available; otherwise prepare text latents
         if mode in ["t2i"]:
@@ -713,7 +690,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
             prompt_embeds = self._encode_prompt(
                 prompt,
                 num_images_per_prompt,
-                False,  # don't support standard classifier-free guidance for now
+                do_classifier_free_guidance,
                 negative_prompt,
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
@@ -737,21 +714,19 @@ class UniDiffuserPipeline(DiffusionPipeline):
             assert image is not None
             # 4.1. Encode images, if available
             # Encode image using VAE
-            image_vae = preprocess(image)  # [1, 3, 512, 512]
+            image_vae = preprocess(image)
             height, width = image_vae.shape[2:]
             image_vae_latents = self.encode_image_vae_latents(
                 image_vae,
                 batch_size,
                 num_prompts_per_image,  # not num_images_per_prompt
                 prompt_embeds.dtype,
-                False,  # Copied from InstructPix2Pix, don't use their version of CFG
                 generator,
-            )  #  [1, 4, 64, 64]
+            )
 
             # Encode image using CLIP
             image_clip_latents = self.encode_image_clip_latents(
                 image,
-                height,  # assume image is square for now...
                 batch_size,
                 num_prompts_per_image,  # not num_images_per_prompt
                 prompt_embeds.dtype,
@@ -778,10 +753,10 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 clip_latents,
             )
 
-        # Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+        # 5. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
-        # Denoising loop
+        # 6. Prepare timesteps and Denoising loop
         if mode in ["i", "t", "i2t", "t2i", "joint"]:
             outs = self._denoising_sample_fn(
                 mode,
@@ -798,7 +773,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 callback_steps,
             )
         elif mode in ["i2t2i"]:
-            # do i2t first
+            # 'i2t2i' should do 'i2t' first
             outs = self._denoising_sample_fn(
                 "i2t",
                 image_vae_latents,
@@ -814,7 +789,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 callback_steps,
             )
         elif mode in ["t2i2t"]:
-            # do t2i first
+            # 't2i2t' should do 't2i' first
             outs = self._denoising_sample_fn(
                 "t2i",
                 image_vae_latents,
@@ -832,6 +807,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
         else:
             raise ValueError
 
+        # 7. Generate image or text and Post-processing
         gen_image = None
         gen_text = None
         if mode == "joint":
@@ -842,8 +818,9 @@ class UniDiffuserPipeline(DiffusionPipeline):
         elif mode in ["t2i", "i", "t2i2t"]:
             image_vae_latents, image_clip_latents = outs
             if mode in ["t2i", "i"]:
-                gen_image = self.decode_image_latents(image_vae_latents)  #  [1, 4, 64, 64]
+                gen_image = self.decode_image_latents(image_vae_latents)
             else:
+                # 't2i2t' should do 'i2t' later
                 text_latents = self._denoising_sample_fn(
                     "i2t",
                     image_vae_latents,
@@ -861,10 +838,11 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 gen_text = self.caption_decoder.generate_captions(text_latents)
 
         elif mode in ["i2t", "t", "i2t2i"]:
-            text_latents = outs  # [1, 77, 64]
+            text_latents = outs
             if mode in ["i2t", "t"]:
                 gen_text = self.caption_decoder.generate_captions(text_latents)
             else:
+                # 'i2t2i' should do 't2i' later
                 image_vae_latents, image_clip_latents = self._denoising_sample_fn(
                     "t2i",
                     image_vae_latents,
@@ -879,9 +857,9 @@ class UniDiffuserPipeline(DiffusionPipeline):
                     callback,
                     callback_steps,
                 )
-                gen_image = self.decode_image_latents(image_vae_latents)  #  [1, 4, 64, 64]
+                gen_image = self.decode_image_latents(image_vae_latents)
 
-        # Convert gen_image to PIL
+        # 8. Convert gen_image to PIL, gen_text has no else processing
         if output_type == "pil" and gen_image is not None:
             gen_image = self.numpy_to_pil(gen_image)
 

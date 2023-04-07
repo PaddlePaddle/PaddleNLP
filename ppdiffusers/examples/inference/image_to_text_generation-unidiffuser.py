@@ -16,7 +16,8 @@ import paddle
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
 from ppdiffusers import UniDiffuserImageToTextPipeline
-from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
+from ppdiffusers.models import AutoencoderKL, UViTModel
+from ppdiffusers.pipelines.unidiffuser import CaptionDecoder
 from ppdiffusers.utils import load_image
 
 generator = paddle.Generator().manual_seed(0)

@@ -54,7 +54,6 @@ except OptionalDependencyNotAvailable:
 else:
     from .models import (
         AutoencoderKL,
-        CaptionDecoder,
         ControlNetModel,
         LitEma,
         ModelMixin,
@@ -98,6 +97,7 @@ else:
         DEISMultistepScheduler,
         DPMSolverMultistepScheduler,
         DPMSolverSinglestepScheduler,
+        DPMSolverUniDiffuserScheduler,
         EulerAncestralDiscreteScheduler,
         EulerDiscreteScheduler,
         HeunDiscreteScheduler,

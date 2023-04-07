@@ -21,8 +21,8 @@ from paddle.nn import functional as F
 
 from paddlenlp.transformers import GPTConfig, GPTLMHeadModel, GPTTokenizer
 
-from ..configuration_utils import ConfigMixin, register_to_config
-from .modeling_utils import ModelMixin
+from ...configuration_utils import ConfigMixin, register_to_config
+from ...models.modeling_utils import ModelMixin
 
 
 class CaptionDecoder(ModelMixin, ConfigMixin):

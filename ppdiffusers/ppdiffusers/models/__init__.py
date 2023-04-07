@@ -19,7 +19,6 @@ from ..utils.import_utils import is_paddle_available
 
 if is_paddle_available():
     from .autoencoder_kl import AutoencoderKL
-    from .caption_decoder import CaptionDecoder
     from .controlnet import ControlNetModel
     from .dual_transformer_2d import DualTransformer2DModel
     from .ema import LitEma

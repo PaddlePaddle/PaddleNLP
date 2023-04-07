@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional
 
 import einops
 import paddle
@@ -22,81 +21,9 @@ import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..utils import BaseOutput
-from .embeddings import TimestepEmbedding, Timesteps
+from .attention import BasicTransformerBlock, DropPath, Mlp
+from .embeddings import PatchEmbed, get_timestep_embedding
 from .modeling_utils import ModelMixin
-
-
-def drop_path(input, drop_prob: float = 0.0, training: bool = False):
-    """
-    Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
-
-    Comment by Ross Wightman: This is the same as the DropConnect impl I created for EfficientNet, etc networks,
-    however, the original name is misleading as 'Drop Connect' is a different form of dropout in a separate paper...
-    See discussion: https://github.com/tensorflow/tpu/issues/494#issuecomment-532968956 ... I've opted for changing the
-    layer and argument names to 'drop path' rather than mix DropConnect as a layer name and use 'survival rate' as the
-    argument.
-    """
-    if drop_prob == 0.0 or not training:
-        return input
-    keep_prob = 1 - drop_prob
-    shape = (input.shape[0],) + (1,) * (input.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
-    random_tensor = keep_prob + paddle.rand(shape, dtype=input.dtype)
-    random_tensor = paddle.floor(random_tensor)  # binarize
-    output = (input / keep_prob) * random_tensor
-    return output
-
-
-class DropPath(nn.Layer):
-    """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks)."""
-
-    def __init__(self, drop_prob: Optional[float] = None) -> None:
-        super().__init__()
-        self.drop_prob = drop_prob
-
-    def forward(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
-        return drop_path(hidden_states, self.drop_prob, self.training)
-
-    def extra_repr(self) -> str:
-        return "p={}".format(self.drop_prob)
-
-
-class Mlp(nn.Layer):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = act_layer()
-        self.fc2 = nn.Linear(hidden_features, out_features)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
-def timestep_embedding(timesteps, dim, max_period=10000):
-    """
-    Create sinusoidal timestep embeddings, diff with ./embeddings.py get_timestep_embedding
-    Args:
-        timesteps: a 1-D Tensor of N indices, one per batch element.
-                      These may be fractional.
-        dim: the dimension of the output.
-        max_period: controls the minimum frequency of the embeddings.
-    return:
-        embedding: an [N x dim] Tensor of positional embeddings.
-    """
-    half = dim // 2
-    freqs = paddle.exp(-math.log(max_period) * paddle.arange(start=0, end=half, dtype=paddle.float32) / half)
-    args = timesteps[:, None].astype("float32") * freqs[None]
-    embedding = paddle.concat([paddle.cos(args), paddle.sin(args)], axis=-1)
-    if dim % 2:
-        embedding = paddle.concat([embedding, paddle.zeros_like(embedding[:, :1])], axis=-1)
-    return embedding
 
 
 def unpatchify(x, in_chans):
@@ -156,7 +83,6 @@ class Block(nn.Layer):
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
         skip=False,
-        use_checkpoint=False,
     ):
         super().__init__()
         self.norm1 = norm_layer(dim) if skip else None
@@ -170,15 +96,8 @@ class Block(nn.Layer):
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         self.skip_linear = nn.Linear(2 * dim, dim) if skip else None
-        self.use_checkpoint = use_checkpoint
 
     def forward(self, x, skip=None):
-        if self.use_checkpoint:  # TODO: use_checkpoint
-            return paddle.utils.checkpoint(self._forward, x, skip)
-        else:
-            return self._forward(x, skip)
-
-    def _forward(self, x, skip=None):
         if self.skip_linear is not None:
             x = self.skip_linear(paddle.concat([x, skip], axis=-1))
             x = self.norm1(x)
@@ -188,21 +107,6 @@ class Block(nn.Layer):
         x = x + self.drop_path(self.mlp(x))
         x = self.norm3(x)
 
-        return x
-
-
-class PatchEmbed(nn.Layer):
-    """Image to Patch Embedding, no need adding pos_embed, diff with ./embeddings.py PatchEmbed"""
-
-    def __init__(self, patch_size, in_chans=3, embed_dim=768):
-        super().__init__()
-        self.patch_size = patch_size
-        self.proj = nn.Conv2D(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-
-    def forward(self, x):
-        _, _, H, W = x.shape
-        assert H % self.patch_size == 0 and W % self.patch_size == 0
-        x = self.proj(x).flatten(2).transpose([0, 2, 1])
         return x
 
 
@@ -248,13 +152,19 @@ class UViTModel(ModelMixin, ConfigMixin):
         use_checkpoint=False,
     ):
         super().__init__()
-
         self.in_chans = in_chans
         self.patch_size = patch_size
         self.embed_dim = embed_dim
 
-        self.patch_embed = PatchEmbed(patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         self.img_size = (img_size, img_size) if isinstance(img_size, int) else img_size
+        self.patch_embed = PatchEmbed(
+            height=self.img_size[0],
+            width=self.img_size[1],
+            patch_size=patch_size,
+            in_channels=in_chans,
+            embed_dim=embed_dim,
+            add_pos_embed=False,
+        )
         assert self.img_size[0] % patch_size == 0 and self.img_size[1] % patch_size == 0
         self.num_patches = (self.img_size[0] // patch_size) * (self.img_size[1] // patch_size)
 
@@ -284,7 +194,6 @@ class UViTModel(ModelMixin, ConfigMixin):
                     drop=drop_rate,
                     attn_drop=attn_drop_rate,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint,
                 )
                 for _ in range(depth // 2)
             ]
@@ -299,7 +208,6 @@ class UViTModel(ModelMixin, ConfigMixin):
             drop=drop_rate,
             attn_drop=attn_drop_rate,
             norm_layer=norm_layer,
-            use_checkpoint=use_checkpoint,
         )
 
         self.out_blocks = nn.LayerList(
@@ -314,7 +222,6 @@ class UViTModel(ModelMixin, ConfigMixin):
                     attn_drop=attn_drop_rate,
                     norm_layer=norm_layer,
                     skip=True,
-                    use_checkpoint=use_checkpoint,
                 )
                 for _ in range(depth // 2)
             ]
@@ -344,8 +251,8 @@ class UViTModel(ModelMixin, ConfigMixin):
         clip_img = self.clip_img_embed(clip_img)
         text = self.text_embed(text)
 
-        t_img_token = timestep_embedding(t_img, self.embed_dim).unsqueeze(axis=1)
-        t_text_token = timestep_embedding(t_text, self.embed_dim).unsqueeze(axis=1)
+        t_img_token = get_timestep_embedding(t_img, self.embed_dim, True, 0).unsqueeze(axis=1)
+        t_text_token = get_timestep_embedding(t_text, self.embed_dim, True, 0).unsqueeze(axis=1)
         token_embed = self.token_embedding(data_type).unsqueeze(axis=1)
 
         x = paddle.concat((t_img_token, t_text_token, token_embed, text, clip_img, img), axis=1)
@@ -358,7 +265,8 @@ class UViTModel(ModelMixin, ConfigMixin):
 
         if H == self.img_size[0] and W == self.img_size[1]:
             pass
-        else:  # interpolate the positional embedding when the input image is not of the default shape
+        else:
+            # interpolate the positional embedding when the input image is not of the default shape
             pos_embed_others, pos_embed_patches = paddle.split(
                 pos_embed, [1 + 1 + 1 + num_text_tokens + 1, self.num_patches], axis=1
             )

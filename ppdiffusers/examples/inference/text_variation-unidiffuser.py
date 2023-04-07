@@ -16,7 +16,8 @@ import paddle
 
 from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from ppdiffusers import UniDiffuserTextVariationPipeline
-from ppdiffusers.models import CaptionDecoder, UViTModel
+from ppdiffusers.models import UViTModel
+from ppdiffusers.pipelines.unidiffuser import CaptionDecoder
 
 generator = paddle.Generator().manual_seed(0)
 

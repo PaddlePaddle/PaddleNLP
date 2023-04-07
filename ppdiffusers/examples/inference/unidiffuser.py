@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# mode = "t2i"
+# mode = "i2t"
+mode = "joint"
+# mode = "i"
+# mode = "t"
+# mode = "t2i2t"
+# mode = "i2t2i"
+
 import paddle
 
 from paddlenlp.transformers import (
@@ -20,21 +29,13 @@ from paddlenlp.transformers import (
     CLIPTokenizer,
     CLIPVisionModelWithProjection,
 )
-from ppdiffusers import DPMSolverMultistepScheduler, UniDiffuserPipeline
-
-scheduler = DPMSolverMultistepScheduler()
-from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
+from ppdiffusers import DPMSolverUniDiffuserScheduler, UniDiffuserPipeline
+from ppdiffusers.models import AutoencoderKL, UViTModel
+from ppdiffusers.pipelines.unidiffuser import CaptionDecoder
 from ppdiffusers.utils import load_image
 
+scheduler = DPMSolverUniDiffuserScheduler()
 generator = paddle.Generator().manual_seed(0)
-
-mode = "t2i"
-# mode = "i2t"
-# mode = "joint"
-# mode = "i"
-# mode = "t"
-# mode = "t2i2t"
-# mode = "i2t2i"
 
 pipe = UniDiffuserPipeline(
     image_encoder=CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32"),

@@ -47,6 +47,7 @@ try:
         raise OptionalDependencyNotAvailable()
 except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import (
+        CaptionDecoder,
         UniDiffuserImageGenerationPipeline,
         UniDiffuserImageToTextPipeline,
         UniDiffuserImageVariationPipeline,
@@ -57,6 +58,7 @@ except OptionalDependencyNotAvailable:
         UniDiffuserTextVariationPipeline,
     )
 else:
+    from .caption_decoder import CaptionDecoder
     from .pipeline_unidiffuser import UniDiffuserPipeline
     from .pipeline_unidiffuser_i import UniDiffuserImageGenerationPipeline
     from .pipeline_unidiffuser_i2t import UniDiffuserImageToTextPipeline

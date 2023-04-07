@@ -18,10 +18,11 @@ from typing import Callable, List, Optional, Union
 
 import paddle
 
-from ...models import CaptionDecoder, UViTModel
+from ...models import UViTModel
 from ...pipeline_utils import DiffusionPipeline, TextPipelineOutput
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
+from .caption_decoder import CaptionDecoder
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
 from .unidiffuser_common import stable_diffusion_beta_schedule
 

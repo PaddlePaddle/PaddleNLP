@@ -23,10 +23,11 @@ import PIL
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
 
-from ...models import AutoencoderKL, CaptionDecoder, UViTModel
+from ...models import AutoencoderKL, UViTModel
 from ...pipeline_utils import DiffusionPipeline, TextPipelineOutput
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
+from .caption_decoder import CaptionDecoder
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
 from .unidiffuser_common import (
     combine,

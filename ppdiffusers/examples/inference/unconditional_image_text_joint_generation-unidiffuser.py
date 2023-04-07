@@ -15,7 +15,8 @@
 import paddle
 
 from ppdiffusers import UniDiffuserJointGenerationPipeline
-from ppdiffusers.models import AutoencoderKL, CaptionDecoder, UViTModel
+from ppdiffusers.models import AutoencoderKL, UViTModel
+from ppdiffusers.pipelines.unidiffuser import CaptionDecoder
 
 generator = paddle.Generator().manual_seed(0)
 
