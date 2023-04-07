@@ -211,11 +211,11 @@ electra(){
 cd ${nlp_dir}/model_zoo/electra/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/BookCorpus.tar.gz && tar -xzvf BookCorpus.tar.gz
-time (python -u ./run_pretrain.py \
+time (python -m paddle.distributed.launch run_pretrain.py \
     --model_type electra \
     --model_name_or_path chinese-electra-small \
     --input_dir ./BookCorpus/ \
-    --output_dir ./pretrain_model/ \
+    --output_dir pretrain_model/ \
     --max_predictions_per_seq 20 \
     --per_device_train_batch_size 2 \
     --per_device_train_batch_size 2 \
@@ -227,12 +227,12 @@ time (python -u ./run_pretrain.py \
     --do_train true \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
-time (python -u ./get_ft_model.py \
-    --model_dir ./pretrain_model/ \>${log_path}/electra_get_ft_model) >>${log_path}/electra_get_ft_model 2>&1
+time (python -m paddle.distributed.launch get_ft_model.py \
+    --model_dir pretrain_model/ \>${log_path}/electra_get_ft_model) >>${log_path}/electra_get_ft_model 2>&1
 print_info $? electra_get_ft_model
-time (python -m paddle.distributed.launch ./run_glue.py \
+time (python -m paddle.distributed.launch run_glue.py \
     --model_type electra \
-    --model_name_or_path  ./pretrain_model/ \
+    --model_name_or_path  pretrain_model/ \
     --task_name SST-2 \
     --max_seq_length 128 \
     --per_device_train_batch_size 32   \
