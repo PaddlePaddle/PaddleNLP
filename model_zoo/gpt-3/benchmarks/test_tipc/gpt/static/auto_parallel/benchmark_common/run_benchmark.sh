@@ -127,22 +127,19 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=0
         ;;
     DP1-MP8-PP1) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=0
         ;;
     DP4-MP8-PP1) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=0
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
@@ -163,7 +160,6 @@ function _train(){
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
         rm ${log_file}
         cp mylog/workerlog.${workerlog_id_1} ${log_file}
-        cp mylog/workerlog.${workerlog_id_2} ${log_file}_2
     fi
 }
 
