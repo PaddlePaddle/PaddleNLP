@@ -210,7 +210,6 @@ time (python -m paddle.distributed.launch  --log_dir log  run_pretrain.py --mode
 electra(){
 cd ${nlp_dir}/model_zoo/electra/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-export DATA_DIR=./BookCorpus/
 wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/BookCorpus.tar.gz && tar -xzvf BookCorpus.tar.gz
 time (python -u ./run_pretrain.py \
     --model_type electra \
@@ -231,7 +230,7 @@ print_info $? electra_pretrain
 time (python -u ./get_ft_model.py \
     --model_dir ./pretrain_model/ \>${log_path}/electra_get_ft_model) >>${log_path}/electra_get_ft_model 2>&1
 print_info $? electra_get_ft_model
-time (python -m paddle.distributed.launch run_glue.py \
+time (python -m paddle.distributed.launch ./run_glue.py \
     --model_type electra \
     --model_name_or_path  ./pretrain_model/ \
     --task_name SST-2 \
