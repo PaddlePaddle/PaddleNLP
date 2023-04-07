@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import os.path as osp
 from dataclasses import dataclass, field
 from typing import Optional
-import copy
-import yaml
-import os.path as osp
 
-from paddlenlp.data import Stack, Tuple, Pad
+import yaml
 
 TASKS = [
     "SequenceClassification",

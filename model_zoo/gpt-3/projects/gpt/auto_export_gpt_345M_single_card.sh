@@ -17,7 +17,7 @@
 log_dir=log_345m_mp1
 rm -rf $log_dir
 
-DIRECTORY=./auto_infer
+DIRECTORY=./pretrained
 if [ ! -d "$DIRECTORY" ]; then
   echo "start download ckpt"
   wget https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz

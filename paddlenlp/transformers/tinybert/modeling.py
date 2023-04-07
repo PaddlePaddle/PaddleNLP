@@ -14,21 +14,25 @@
 # limitations under the License.
 
 from typing import Optional, Tuple
-from paddle import Tensor
+
 import paddle
 import paddle.nn as nn
+from paddle import Tensor
 
-from ..bert.modeling import BertPooler, BertEmbeddings
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
-from ..configuration_utils import PretrainedConfig
-
+from ..bert.modeling import BertEmbeddings, BertPooler
 from ..model_outputs import (
-    BaseModelOutputWithPooling,
     BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    QuestionAnsweringModelOutput,
     MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
     tuple_output,
+)
+from .configuration import (
+    TINYBERT_PRETRAINED_INIT_CONFIGURATION,
+    TINYBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    TinyBertConfig,
 )
 
 __all__ = [
@@ -50,102 +54,13 @@ class TinyBertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "tinybert-4l-312d": {
-            "vocab_size": 30522,
-            "hidden_size": 312,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 12,
-            "intermediate_size": 1200,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "tinybert-6l-768d": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "tinybert-4l-312d-v2": {
-            "vocab_size": 30522,
-            "hidden_size": 312,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 12,
-            "intermediate_size": 1200,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "tinybert-6l-768d-v2": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "tinybert-4l-312d-zh": {
-            "vocab_size": 21128,
-            "hidden_size": 312,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 12,
-            "intermediate_size": 1200,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "tinybert-6l-768d-zh": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "tinybert-4l-312d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams",
-            "tinybert-6l-768d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d.pdparams",
-            "tinybert-4l-312d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
-            "tinybert-6l-768d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
-            "tinybert-4l-312d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh.pdparams",
-            "tinybert-6l-768d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = TinyBertConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
+
+    pretrained_init_configuration = TINYBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = TINYBERT_PRETRAINED_RESOURCE_FILES_MAP
+
     base_model_prefix = "tinybert"
 
     def init_weights(self, layer):
@@ -157,14 +72,12 @@ class TinyBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.tinybert.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-12
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -180,110 +93,38 @@ class TinyBertModel(TinyBertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `TinyBertModel`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `TinyBertModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
-            is the dimensionality of the sequence in `TinyBertModel`.
-            Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids` passed when calling `~ transformers.TinyBertModel`.
-            Defaults to `16`.
+        config (:class:`TinyBertConfig`):
+            An instance of TinyBertConfig used to construct TinyBertModel.
 
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to `0.02`.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`TinyBertPretrainedModel.init_weights()` for how weights are initialized in `TinyBertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-        fit_size (int, optional):
-            Dimensionality of the output layer of `fit_dense(s)`, which is the hidden size of the teacher model.
-            `fit_dense(s)` means a hidden states' transformation from student to teacher.
-            `fit_dense(s)` will be generated when bert model is distilled during the training, and will not be generated
-            during the prediction process.
-            `fit_denses` is used in v2 models and it has `num_hidden_layers+1` layers.
-            `fit_dense` is used in other pretraining models and it has one linear layer.
-            Defaults to `768`.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        initializer_range=0.02,
-        pad_token_id=0,
-        fit_size=768,
-    ):
-        super(TinyBertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
+    def __init__(self, config: TinyBertConfig):
+        super(TinyBertModel, self).__init__(config)
 
-        # TODO(wj-Mcat): construct config temporary
-        # to be removed when TinyBertConfig is completed
-        config = PretrainedConfig(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            # the default pool_act is `tanh`
-            pool_act="tanh",
-        )
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+
         self.embeddings = BertEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
+            act_dropout=0.0,
         )
 
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
 
         self.pooler = BertPooler(config)
         # fit_dense(s) means a hidden states' transformation from student to teacher.
         # `fit_denses` is used in v2 model, and `fit_dense` is used in other pretraining models.
-        self.fit_denses = nn.LayerList([nn.Linear(hidden_size, fit_size) for i in range(num_hidden_layers + 1)])
-        self.fit_dense = nn.Linear(hidden_size, fit_size)
+        self.fit_denses = nn.LayerList(
+            [nn.Linear(config.hidden_size, config.fit_size) for i in range(config.num_hidden_layers + 1)]
+        )
+        self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self) -> nn.Embedding:
@@ -469,14 +310,14 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
     TinyBert Model with pretraining tasks on top.
 
     Args:
-        tinybert (:class:`TinyBertModel`):
-            An instance of :class:`TinyBertModel`.
+        config (:class:`TinyBertConfig`):
+            An instance of TinyBertConfig used to construct TinyBertForPretraining.
 
     """
 
-    def __init__(self, tinybert):
-        super(TinyBertForPretraining, self).__init__()
-        self.tinybert: TinyBertModel = tinybert
+    def __init__(self, config: TinyBertConfig):
+        super(TinyBertForPretraining, self).__init__(config)
+        self.tinybert = TinyBertModel(config)
         self.apply(self.init_weights)
 
     def forward(
@@ -548,22 +389,18 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        tinybert (:class:`TinyBertModel`):
-            An instance of TinyBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of TinyBert.
-            If None, use the same value as `hidden_dropout_prob` of `TinyBertModel`
-            instance `tinybert`. Defaults to `None`.
+        config (:class:`TinyBertConfig`):
+            An instance of TinyBertConfig used to construct TinyBertForSequenceClassification.
     """
 
-    def __init__(self, tinybert, num_classes=2, dropout=None):
-        super(TinyBertForSequenceClassification, self).__init__()
-        self.tinybert = tinybert
-        self.num_classes = num_classes
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.tinybert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], num_classes)
+    def __init__(self, config: TinyBertConfig):
+        super(TinyBertForSequenceClassification, self).__init__(config)
+        self.tinybert = TinyBertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.activation = nn.ReLU()
         self.apply(self.init_weights)
 
@@ -593,8 +430,8 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 See :class:`TinyBertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -643,12 +480,12 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -672,14 +509,15 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
     designed for question-answering tasks like SQuAD.
 
     Args:
-        tinybert (`TinyBertModel`):
-            An instance of `TinyBertModel`.
+    Args:
+        config (:class:`TinyBertConfig`):
+            An instance of TinyBertConfig used to construct TinyBertForQuestionAnswering.
     """
 
-    def __init__(self, tinybert):
-        super(TinyBertForQuestionAnswering, self).__init__()
-        self.tinybert = tinybert  # allow tinybert to be config
-        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 2)
+    def __init__(self, config: TinyBertConfig):
+        super(TinyBertForQuestionAnswering, self).__init__(config)
+        self.tinybert = TinyBertModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(
@@ -800,22 +638,19 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        tinybert (:class:`TinyBertModel`):
-            An instance of TinyBertModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Tinybert.
-            If None, use the same value as `hidden_dropout_prob` of `TinyBertModel`
-            instance `tinybert`. Defaults to None.
+    Args:
+        config (:class:`TinyBertConfig`):
+            An instance of TinyBertConfig used to construct TinyBertForMultipleChoice.
     """
 
-    def __init__(self, tinybert, num_choices=2, dropout=None):
-        super(TinyBertForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.tinybert = tinybert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.tinybert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 1)
+    def __init__(self, config: TinyBertConfig):
+        super(TinyBertForMultipleChoice, self).__init__(config)
+        self.num_choices = config.num_choices
+        self.tinybert = TinyBertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(

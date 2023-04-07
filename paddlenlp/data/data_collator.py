@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import random
 import warnings
 from collections.abc import Mapping
@@ -361,9 +362,11 @@ class DataCollatorForSeq2Seq:
     return_tensors: str = "pd"
 
     def __call__(self, features, return_tensors=None):
+        # Deep copy to avoid modifying features in-place
+        batch = copy.deepcopy(features)
         if return_tensors is None:
             return_tensors = self.return_tensors
-        labels = [feature["labels"] for feature in features] if "labels" in features[0].keys() else None
+        labels = [feature["labels"] for feature in batch] if "labels" in batch[0].keys() else None
         # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
         # same length to return tensors.
         if labels is not None:
@@ -376,7 +379,7 @@ class DataCollatorForSeq2Seq:
                 )
 
             padding_side = self.tokenizer.padding_side
-            for feature in features:
+            for feature in batch:
                 remainder = [self.label_pad_token_id] * (max_label_length - len(feature["labels"]))
                 if isinstance(feature["labels"], list):
                     feature["labels"] = (
@@ -387,8 +390,8 @@ class DataCollatorForSeq2Seq:
                 else:
                     feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
 
-        features = self.tokenizer.pad(
-            features,
+        batch = self.tokenizer.pad(
+            batch,
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
@@ -401,10 +404,9 @@ class DataCollatorForSeq2Seq:
             and self.model is not None
             and hasattr(self.model, "prepare_decoder_input_ids_from_labels")
         ):
-            decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(labels=features["labels"])
-            features["decoder_input_ids"] = decoder_input_ids
-
-        return features
+            decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(labels=batch["labels"])
+            batch["decoder_input_ids"] = decoder_input_ids
+        return batch
 
 
 def _paddle_collate_batch(examples, tokenizer, pad_to_multiple_of: Optional[int] = None):

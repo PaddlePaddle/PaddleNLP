@@ -12,24 +12,164 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import copy
 import inspect
 import os
 import random
 import shutil
+import subprocess
 import tempfile
+import time
 import unittest
 from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
+import paddle.fluid as fluid
+from paddle.distributed.utils.launch_utils import (
+    TrainerProc,
+    find_free_ports,
+    get_cluster,
+    watch_local_trainers,
+)
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
 
 from ..testing_utils import slow
+
+
+def get_cluster_from_args(selected_gpus):
+    cluster_node_ips = "127.0.0.1"
+    node_ip = "127.0.0.1"
+
+    node_ips = [x.strip() for x in cluster_node_ips.split(",")]
+
+    node_ips.index(node_ip)
+
+    free_ports = None
+
+    free_ports = find_free_ports(len(selected_gpus))
+    if free_ports is not None:
+        free_ports = list(free_ports)
+
+    trainer_endpoints = []
+    for ip in node_ips:
+        trainer_endpoints.append(["%s:%d" % (ip, port) for port in free_ports])
+    return get_cluster(node_ips, node_ip, trainer_endpoints, selected_gpus)
+
+
+def get_gpus(selected_gpus):
+    selected_gpus = [x.strip() for x in selected_gpus.split(",")]
+    return selected_gpus
+
+
+def start_local_trainers_cpu(trainer_endpoints, training_script, training_script_args, log_dir=None):
+    current_env = copy.copy(os.environ.copy())
+    current_env.pop("http_proxy", None)
+    current_env.pop("https_proxy", None)
+
+    procs = []
+    n_rank = len(trainer_endpoints)
+    print(trainer_endpoints)
+    for rank_id, endpoint in enumerate(trainer_endpoints):
+        proc_env = {
+            "PADDLE_DISTRI_BACKEND": "gloo",
+            "PADDLE_TRAINER_ID": "%d" % rank_id,
+            "PADDLE_CURRENT_ENDPOINT": "%s" % endpoint,
+            "PADDLE_TRAINERS_NUM": "%d" % n_rank,
+            "PADDLE_TRAINER_ENDPOINTS": ",".join(trainer_endpoints),
+        }
+
+        current_env.update(proc_env)
+
+        print("trainer proc env:{}".format(current_env))
+
+        assert os.getenv("WITH_COVERAGE", "OFF") == "OFF", "Gloo don't support WITH_COVERAGE."
+        cmd = "python -u " + training_script
+
+        print("start trainer proc:{} env:{}".format(cmd, proc_env))
+
+        fn = None
+
+        proc = subprocess.Popen(cmd.split(" "), env=current_env)
+
+        tp = TrainerProc()
+        tp.proc = proc
+        tp.rank = rank_id
+        tp.log_fn = fn
+        tp.cmd = cmd
+
+        procs.append(tp)
+
+    return procs
+
+
+def start_local_trainers(
+    cluster,
+    pod,
+    training_script,
+    training_script_args="",
+    eager_mode=True,
+    allocator_strategy="auto_growth",
+    log_dir=None,
+    without_http_proxy=True,
+):
+    current_env = copy.copy(os.environ.copy())
+    # paddle broadcast ncclUniqueId use socket, and
+    # proxy maybe make trainers unreachable, so delete them.
+    # if we set them to "", grpc will log error message "bad uri"
+    # so just delete them.
+
+    # current_env.pop("http_proxy", None)
+    # current_env.pop("https_proxy", None)
+
+    # parse args
+    if isinstance(training_script_args, dict):
+        training_script_args = [f"--{k} {v}" for k, v in training_script_args.items()]
+
+    if isinstance(training_script_args, list):
+        training_script_args = " ".join(training_script_args)
+
+    procs = []
+    for t in pod.trainers:
+        proc_env = {
+            "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
+            "PADDLE_TRAINER_ID": "%d" % t.rank,
+            "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
+            "PADDLE_TRAINERS_NUM": "%d" % cluster.trainers_nranks(),
+            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints()),
+        }
+
+        proc_env["FLAGS_allocator_strategy"] = allocator_strategy
+        if allocator_strategy == "auto_growth":
+            proc_env["FLAGS_fraction_of_gpu_memory_to_use"] = "0.1"
+
+        current_env.update(proc_env)
+
+        if os.getenv("WITH_COVERAGE", "OFF") == "ON":
+            cmd = "python -m coverage run --branch -p " + training_script
+        else:
+            cmd = f"python -u {training_script} {training_script_args}"
+
+        print("start trainer proc:{} env:{}".format(cmd, proc_env))
+
+        fn = None
+
+        proc = subprocess.Popen(cmd.split(" "), env=current_env)
+
+        tp = TrainerProc()
+        tp.proc = proc
+        tp.rank = t.rank
+        tp.log_fn = fn
+        tp.cmd = cmd
+
+        procs.append(tp)
+
+    return procs
 
 
 def ids_tensor(shape, vocab_size, dtype="int32"):
@@ -68,6 +208,7 @@ class ModelTesterMixin:
     test_mismatched_shapes = True
     test_missing_keys = True
     test_model_compatibility_keys = True
+    test_tie_weights = False
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
@@ -526,7 +667,6 @@ class ModelTesterMixin:
         self.assertTrue(len(model.model_name_list) != 0)
 
     def test_pretrained_config_save_load(self):
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return
 
@@ -548,7 +688,6 @@ class ModelTesterMixin:
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return None
 
@@ -571,14 +710,64 @@ class ModelTesterMixin:
             all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
 
             for old_attribute, new_attribute in all_maps.items():
-                old_value = getattr(model, old_attribute)
-                new_value = getattr(model, new_attribute)
+                old_value = getattr(model.config, old_attribute)
+                new_value = getattr(model.config, new_attribute)
 
                 # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
                 if type(new_value) != type(old_value):
                     continue
 
                 self.assertEqual(old_value, new_value)
+
+    def test_tie_weight(self):
+        # test whether id of input_embeding equal id of output_embeding ?
+        if not self.test_tie_weights:
+            return
+
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            if "CausalLM" not in model_class.__name__ and "MaskedLM" not in model_class.__name__:
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            tie_word_embeddings = (
+                model.tie_word_embeddings
+                if hasattr(model, "tie_word_embeddings")
+                else model.config.get("tie_word_embeddings", False)
+            )
+
+            if not tie_word_embeddings:
+                continue
+
+            if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
+                try:
+                    input_embeddings = model.get_input_embeddings()
+                except NotImplementedError:
+                    continue
+
+                try:
+                    output_embeddings = model.get_output_embeddings()
+                except NotImplementedError:
+                    continue
+
+                if input_embeddings is not None and output_embeddings is not None:
+                    if hasattr(output_embeddings, "weight"):
+                        output_embeddings_weight = output_embeddings.weight
+                    else:
+                        output_embeddings_weight = output_embeddings
+
+                    if hasattr(input_embeddings, "weight"):
+                        input_embeddings_weight = input_embeddings.weight
+                    else:
+                        input_embeddings_weight = input_embeddings
+
+                    print(
+                        "model name :{},id is{},{}".format(
+                            model_class, id(output_embeddings_weight), id(input_embeddings_weight)
+                        )
+                    )
+                    self.assertEqual(id(output_embeddings_weight), id(input_embeddings_weight))
 
 
 class ModelTesterPretrainedMixin:
@@ -662,3 +851,44 @@ class ModelTesterPretrainedMixin:
                 new_model = self.base_model_class.from_pretrained(tempdirname)
 
                 check_two_model_parameter(model, new_model)
+
+
+class DistributedTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.gpus = "0,1"
+
+    def get_world_size(self):
+        return len(self.gpus.split(","))
+
+    def run_on_gpu(
+        self,
+        training_script,
+        training_script_args=None,
+        gpus: str = "0,1",
+        eager_mode=True,
+        allocator_strategy="auto_growth",
+    ):
+        if not fluid.core.is_compiled_with_cuda() or fluid.core.get_cuda_device_count() == 0:
+            return
+
+        cluster = None
+        pod = None
+
+        cluster, pod = get_cluster_from_args(get_gpus(gpus))
+
+        procs = start_local_trainers(
+            cluster,
+            pod,
+            eager_mode=eager_mode,
+            allocator_strategy=allocator_strategy,
+            training_script=training_script,
+            training_script_args=training_script_args,
+        )
+
+        while True:
+            alive = watch_local_trainers(procs, cluster.trainers_endpoints())
+
+            if not alive:
+                print("Local procs complete, POD info:{}".format(pod))
+                break
+            time.sleep(3)

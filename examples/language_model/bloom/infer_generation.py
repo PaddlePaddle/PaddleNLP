@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import distutils.util
 import os
 
 import fastdeploy as fd
 import numpy as np
-from transformers import AutoTokenizer
 
-# from utils import left_padding
+from paddlenlp.transformers import AutoTokenizer
 
 
 def parse_arguments():
@@ -26,8 +27,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
-    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
+    parser.add_argument("--model_prefix", type=str, default="bloom", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -131,8 +131,14 @@ class Predictor(object):
         return fd.Runtime(option)
 
     def preprocess(self, input_text):
-        inputs = self.tokenizer(input_text)
-        inputs = left_padding(inputs, self.tokenizer.pad_token_id)
+        inputs = self.tokenizer(
+            input_text,
+            return_tensors="np",
+            padding=True,
+            max_length="max_length",
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
         input_ids_name = self.runtime.get_input_info(0).name
         input_map = {
             input_ids_name: np.array(inputs["input_ids"], dtype="int64"),
@@ -159,15 +165,20 @@ class Predictor(object):
         return output
 
 
-if __name__ == "__main__":
+def main():
     args = parse_arguments()
     predictor = Predictor(args)
+    tokenizer = predictor.tokenizer
     all_texts = [
-        "答案：年基准利率4.35%</s>上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。</s>在已知答案的前提下，问题：",
-        "答案：U系列</s>上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下，问题：",
+        f"答案：年基准利率4.35% {tokenizer.eos_token}上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。{tokenizer.eos_token}在已知答案的前提下，问题：",
+        f"答案：U系列{tokenizer.eos_token}上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。{tokenizer.eos_token}在已知答案的前提下，问题：",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
             print("{} \n {}".format(text, result))
+
+
+if __name__ == "__main__":
+    main()
