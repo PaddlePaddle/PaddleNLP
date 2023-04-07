@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=gpt_auto_fused_optimizer
+model_item=gpt_auto
 fp_item=fp16
 dp_degree=4
 mp_degree=8
