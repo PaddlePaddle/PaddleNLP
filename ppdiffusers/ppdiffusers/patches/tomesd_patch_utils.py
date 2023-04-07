@@ -217,7 +217,10 @@ def compute_merge(x: paddle.Tensor, tome_info: Dict[str, Any]) -> Tuple[Callable
         w = int(math.ceil(original_w / downsample))
         h = int(math.ceil(original_h / downsample))
         r = int(x.shape[1] * args["ratio"])
-        m, u = bipartite_soft_matching_random2d(x, w, h, args["sx"], args["sy"], r, not args["use_rand"])
+        # If the batch size is odd, then it's not possible for promted and unprompted images to be in the same
+        # batch, which causes artifacts with use_rand, so force it to be off.
+        use_rand = False if x.shape[0] % 2 == 1 else args["use_rand"]
+        m, u = bipartite_soft_matching_random2d(x, w, h, args["sx"], args["sy"], r, not use_rand)
     else:
         m, u = (do_nothing, do_nothing)
 
