@@ -509,6 +509,25 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         self.assertListEqual(expected_output_sentence, batch_out_sentence)
         self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
 
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+
+        attention_mask = paddle.zeros_like(input_ids, dtype=paddle.int64)
+
+        # generate max 3 tokens
+        max_length = 3
+
+        if config.eos_token_id or config.pad_token_id:
+            config["pad_token_id"] = config["eos_token_id"]
+
+        return config, input_ids, attention_mask, max_length
+
     @slow
     def test_model_from_pretrained(self):
         for model_name in OPT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:

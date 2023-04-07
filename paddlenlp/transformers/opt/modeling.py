@@ -851,7 +851,7 @@ class OPTModel(OPTPretrainedModel):
         )
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e9, diagonal=1)
+        causal_mask = paddle.tensor.triu(paddle.ones((input_shape[-1], input_shape[-1])) * -1e4, diagonal=1)
         if past_key_values_length > 0:
             causal_mask = paddle.concat(
                 [

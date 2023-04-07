@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
+from data import DataCollatorForSupervisedDataset, convert_example
 from utils import OPTTrainer, compute_metrics
 
-from data import DataCollatorForSupervisedDataset, convert_example
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint

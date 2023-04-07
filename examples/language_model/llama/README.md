@@ -36,21 +36,17 @@ model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3,4,5,6,7" finetune_generation.py \
-    --model_name_or_path ./llama-7b \
-    --output_dir output \
-    --max_seq_len 1024 \
-    --micro_batch_size 8 \
-    --global_batch_size 32 \
-    --sharding_degree 4 \
-    --mp_degree 2 \
-    --dp_degree 1 \
-    --pp_degree 1 \
-    --global_batch_size 4 \
-    --micro_batch_size 4 \
-    --output_dir output \
-    --max_steps 200 \
-    --use_pure_fp16 True \
-    --device gpu
+    --model_name_or_path llama-7b \
+    --num_train_epochs 3 \
+    --learning_rate 3e-5 \
+    --save_steps 1000 \
+    --recompute \
+    --do_train \
+    --output_dir ./checkpoints/ \
+    --per_device_train_batch_size 8 \
+    --overwrite_output_dir \
+    --save_total_limit 1 \
+    --tensor_parallel_degree 8
 ```
 
 <a name="3"></a>
@@ -59,7 +55,7 @@ python -u  -m paddle.distributed.fleet.launch \
 
 ```shell
 python export_generation_model.py \
-    --model_path output/200/splits_mp_02_sharding_04 \
+    --model_path checkpoints/ \
     --output_path inference/llama
 ```
 
@@ -71,4 +67,17 @@ python export_generation_model.py \
 python infer_generation.py \
     --model_dir inference \
     --model_prefix llama
+```
+
+结果：
+
+```text
+answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>
+
+question: What was von Miller's job title?
+--------------------
+answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>
+
+question: How many total tackles did von Miller get in the Super Bowl?
+--------------------
 ```
