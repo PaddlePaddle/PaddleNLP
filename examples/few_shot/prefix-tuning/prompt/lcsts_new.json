@@ -1,5 +1,0 @@
-{
-    "template": [
-        {"text": "{'prefix':'文本摘要'}{'text':'source'}{'sep'}{'text':'target', 'token_type': 1}"}
-    ]
-}

@@ -19,7 +19,7 @@ from typing import Optional
 
 import paddle
 from paddle.static import InputSpec
-from utils import compute_metrics, load_prompt_arguments, new_PromptTrainer
+from utils import PromptTrainerForGeneration, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -34,28 +34,10 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArguments:
-    prompt_path: str = field(default="prompt/eprstmt.json", metadata={"help": "Path to the defined prompts."})
-    prompt_index: int = field(default=0, metadata={"help": "The index of defined prompt for training."})
-    augment_type: str = field(
-        default=None,
-        metadata={
-            "help": "The strategy used for data augmentation, including `swap`, `delete`, `insert`, `subsitute`."
-        },
+    prompt: str = field(
+        default="{'prefix':'文本摘要'}{'text':'text'}{'sep'}{'text':'labels', 'token_type': 1}",
+        metadata={"help": "Add prompt.'文本摘要'、'text' variable and 'labels' immutable."},
     )
-    num_augment: str = field(
-        default=5, metadata={"help": "Number of augmented data per example, which works when `augment_type` is set."}
-    )
-    word_augment_percent: str = field(
-        default=0.1,
-        metadata={
-            "help": "Percentage of augmented words in sequences, used for `swap`, `delete`, `insert`, `subsitute`."
-        },
-    )
-    augment_method: str = field(default="mlm", metadata={"help": "Strategy used for `insert` and `subsitute`."})
-    do_label: bool = field(
-        default=False, metadata={"help": "Whether to label unsupervised data in unlabeled datasets"}
-    )
-    do_test: bool = field(default=False, metadata={"help": "Whether to evaluate model on public test datasets."})
 
 
 @dataclass
@@ -90,7 +72,6 @@ def main():
     # Parse the arguments.
     parser = PdArgumentParser((ModelArguments, DataArguments, PromptTuningArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    data_args = load_prompt_arguments(data_args)
 
     training_args.generation_max_length = model_args.max_target_length
     training_args.predict_with_generate = model_args.predict_with_generate
@@ -111,27 +92,34 @@ def main():
         attention_probs_dropout_prob=model_args.dropout,
     )
 
-    # Define template for preprocess and verbalizer for postprocess.
+    # Define template for preprocess.
     template = PrefixTemplate(data_args.prompt, tokenizer, training_args.max_seq_length, model)
     logger.info("Using template: {}".format(template.prompt))
 
     # Load datasets.
     train_ds, dev_ds = load_dataset("lcsts_new")
-    dev_ds_label = dev_ds.map(lambda x: {x["target"]}, dev_ds)
-    train_ds, dev_ds = load_dataset("lcsts_new")
+
+    def convert_label_keyword(input_dict):
+        if "text" not in input_dict:
+            input_dict["text"] = input_dict.pop("source")
+        if "labels" not in input_dict:
+            input_dict["labels"] = input_dict.pop("target")
+        return input_dict
+
+    train_ds.map(convert_label_keyword)
+    dev_ds.map(convert_label_keyword)
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForGeneration(
         model,
         template,
-        verbalizer=None,
         freeze_plm=training_args.freeze_plm,
         freeze_dropout=training_args.freeze_dropout,
         max_predict_len=training_args.generation_max_length,
     )
 
-    dev_compute_metrics = partial(compute_metrics, tokenizer=tokenizer, labels=dev_ds_label)
-    trainer = new_PromptTrainer(
+    dev_compute_metrics = partial(compute_metrics, tokenizer=tokenizer)
+    trainer = PromptTrainerForGeneration(
         model=prompt_model,
         tokenizer=tokenizer,
         args=training_args,

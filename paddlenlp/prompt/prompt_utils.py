@@ -86,16 +86,6 @@ class PromptDataCollatorWithPadding:
         for key in features[0]:
             if key not in self.default_model_input_names:
                 values = [b[key] for b in features if key in b]
-                if key == "target":
-                    batch_size, _ = batch["soft_token_ids"].shape
-                    soft_token_ids = paddle.masked_select(batch["soft_token_ids"], batch["soft_token_ids"] > 0)
-                    soft_token_ids = soft_token_ids.reshape([batch_size, -1])
-                    _, soft_len = soft_token_ids.shape
-                    input_ids = paddle.concat(
-                        [batch["input_ids"][:, 0].unsqueeze(1), batch["input_ids"][:, soft_len + 1 :]], axis=1
-                    )
-                    batch["labels"] = input_ids
-                    continue
                 if len(values) < len(features):
                     continue
                 if key == "masked_positions":
@@ -122,6 +112,16 @@ class PromptDataCollatorWithPadding:
                         max_num_label = max([len(x) for x in values])
                         for index, value in enumerate(values):
                             values[index] = value + [-100] * (max_num_label - len(value))
+                    if isinstance(values[0], str):
+                        batch_size, _ = batch["soft_token_ids"].shape
+                        soft_token_ids = paddle.masked_select(batch["soft_token_ids"], batch["soft_token_ids"] > 0)
+                        soft_token_ids = soft_token_ids.reshape([batch_size, -1])
+                        _, soft_len = soft_token_ids.shape
+                        input_ids = paddle.concat(
+                            [batch["input_ids"][:, 0].unsqueeze(1), batch["input_ids"][:, soft_len + 1 :]], axis=1
+                        )
+                        batch["labels"] = input_ids
+                        continue
                 elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)

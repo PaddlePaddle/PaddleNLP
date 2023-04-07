@@ -19,6 +19,7 @@ from paddle.static import InputSpec
 
 from ..transformers.generation_utils import GenerationMixin
 from ..transformers.model_outputs import (
+    CausalLMOutputWithCrossAttentions,
     MaskedLMOutput,
     MultipleChoiceModelOutput,
     SequenceClassifierOutput,
@@ -171,7 +172,6 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         self,
         model: paddle.nn.Layer,
         template: Template,
-        verbalizer: Optional[Verbalizer] = None,
         freeze_plm: bool = False,
         freeze_dropout: bool = False,
         max_predict_len: int = 32,
@@ -179,7 +179,6 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         super(PromptModelForGeneration, self).__init__()
         self.plm = model
         self.template = template
-        self.verbalizer = verbalizer
         self.freeze_plm = freeze_plm
         self.freeze_dropout = freeze_dropout
         if self.freeze_plm:
@@ -200,15 +199,12 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         input_ids: paddle.Tensor,
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        attention_mask: Optional[paddle.Tensor] = None,
-        masked_positions: Optional[paddle.Tensor] = None,
         soft_token_ids: Optional[paddle.Tensor] = None,
         encoder_ids: Optional[paddle.Tensor] = None,
         labels: Optional[paddle.Tensor] = None,
         return_dict: Optional[bool] = None,
         **kwargs: Dict[str, Any]
     ):
-
         return_dict = return_dict if return_dict is not None else False
         if soft_token_ids is None:
             outputs = self.plm(input_ids)
@@ -219,9 +215,7 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
             "position_ids": position_ids,
-            "masked_positions": masked_positions,
             "soft_token_ids": soft_token_ids,
-            "attention_mask": attention_mask,
             "encoder_ids": encoder_ids,
             "labels": labels,
             **kwargs,
@@ -229,8 +223,6 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         input_dict = self.template.process_batch(input_dict)
         input_dict = {**input_dict, **kwargs}
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
-        if "masked_positions" in model_inputs:
-            model_inputs.pop("masked_positions")
         if "cache" in self.forward_keys:
             model_inputs["cache"] = []
             for i in range(len(model_inputs["past_key_values"])):
@@ -251,8 +243,6 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         shift_labels = labels[..., 1:]
         loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=0, reduction="sum")
         loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
-        num = int(paddle.count_nonzero(shift_labels.reshape((-1,))))
-        loss = loss / num
 
         if not return_dict:
             output = (logits,)
@@ -264,27 +254,9 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
                 output = output[0]
             return output
 
-        return MaskedLMOutput(
+        return CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
+            past_key_values=model_outputs.past_key_values,
             hidden_states=model_outputs.logits,
         )
-
-    def get_input_spec(self):
-        template_keywords = self.template.extract_template_keywords(self.template.prompt)
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
-        ]
-        if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
-        if "soft" in template_keywords:
-            # Add placeholder for argument `masked_positions` if not exists.
-            if "mask" not in template_keywords:
-                input_spec.append(None)
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
-            if "encoder" in template_keywords:
-                input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
-        return input_spec

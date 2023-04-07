@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 
 import numpy as np
 import paddle
@@ -21,18 +20,8 @@ from paddlenlp.metrics import BLEU
 from paddlenlp.prompt import PromptTrainer
 
 
-def load_prompt_arguments(args):
-    """
-    Load prompt and label words according to prompt index.
-    """
-    with open(args.prompt_path, "r", encoding="utf-8") as fp:
-        configs = json.load(fp)
-        args.prompt = configs["template"][args.prompt_index]["text"]
-        return args
-
-
 # Define the metric function.
-def compute_metrics(eval_preds, tokenizer, labels):
+def compute_metrics(eval_preds, tokenizer):
 
     all_preds = []
     all_labels = []
@@ -68,7 +57,7 @@ def compute_metrics(eval_preds, tokenizer, labels):
     return {"rougel": rougel}
 
 
-class new_PromptTrainer(PromptTrainer):
+class PromptTrainerForGeneration(PromptTrainer):
     def __init__(
         self,
         model,
@@ -82,7 +71,7 @@ class new_PromptTrainer(PromptTrainer):
         callbacks=None,
         optimizers=(None, None),
     ):
-        super(new_PromptTrainer, self).__init__(
+        super(PromptTrainerForGeneration, self).__init__(
             model=model,
             criterion=criterion,
             args=args,
@@ -94,6 +83,7 @@ class new_PromptTrainer(PromptTrainer):
             callbacks=callbacks,
             optimizers=optimizers,
         )
+        self.verbalizer = None
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
