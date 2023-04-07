@@ -107,6 +107,9 @@ from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .llama.configuration import *
+from .llama.modeling import *
+from .llama.tokenizer import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
@@ -124,6 +127,7 @@ from .megatronbert.tokenizer import *
 from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .prophetnet.configuration import *
 from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
@@ -142,6 +146,7 @@ from .reformer.tokenizer import *
 from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
+from .rembert.configuration import *
 from .roformer.modeling import *
 from .roformer.configuration import *
 from .roformer.tokenizer import *

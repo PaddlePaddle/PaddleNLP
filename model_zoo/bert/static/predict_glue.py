@@ -17,11 +17,10 @@ import os
 from functools import partial
 
 import paddle
-from paddle import inference
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
+from run_glue import METRIC_CLASSES, MODEL_CLASSES, convert_example
 
-from run_glue import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
 
 
 def parse_args():

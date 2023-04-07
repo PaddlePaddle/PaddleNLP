@@ -13,13 +13,10 @@
 # limitations under the License.
 
 import argparse
-import os
 import time
 
 import numpy as np
-import paddle
 import paddle.distributed.fleet as fleet
-import ppfleetx_ops
 from ppfleetx.core.engine.inference_engine import InferenceEngine
 
 
@@ -49,7 +46,7 @@ def predict(engine, data, args):
         for _ in range(args.iter):
             engine.predictor.run()
         end = time.perf_counter()
-        print(f"batch {args.iter} run time: {1000 * (end - start) / args.iter}ms")
+        print(f"batch {data.shape} run time: {1000 * (end - start) / args.iter}ms")
 
         return {name: engine.predictor.get_output_handle(name).copy_to_cpu() for name in engine.output_names()}
 
