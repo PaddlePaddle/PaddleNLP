@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import paddle
-from modeling import LlamaForCausalLM
-from tokenizer import LlamaTokenizer
+
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 paddle.seed(100)
 
@@ -22,11 +22,11 @@ paddle.set_default_dtype("float16")
 # paddle.set_default_dtype("float32")
 # paddle.set_device("cpu")
 
-model = LlamaForCausalLM.from_pretrained("./llama-7b", load_state_as_np=True)
+model = AutoModelForCausalLM.from_pretrained("./llama-7b", load_state_as_np=True)
 
 model.eval()
 
-tokenizer = LlamaTokenizer.from_pretrained(
+tokenizer = AutoTokenizer.from_pretrained(
     "./llama-7b",
     add_bos_token=False,
 )

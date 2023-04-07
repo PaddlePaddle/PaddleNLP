@@ -58,7 +58,7 @@ class TestCharAug(unittest.TestCase):
         for t in self.types:
             if t == "mlm":
                 aug = CharSubstitute(
-                    "mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab"
+                    "mlm", create_n=create_n, model_name="__internal_testing__/tiny-random-ernie", vocab="test_vocab"
                 )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
@@ -79,7 +79,9 @@ class TestCharAug(unittest.TestCase):
     def test_char_insert(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = CharInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab")
+                aug = CharInsert(
+                    "mlm", create_n=create_n, model_name="__internal_testing__/tiny-random-ernie", vocab="test_vocab"
+                )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue

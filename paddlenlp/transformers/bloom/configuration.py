@@ -86,7 +86,7 @@ class BloomConfig(PretrainedConfig):
     ```"""
     model_type = "bloom"
     attribute_map: Dict[str, str] = {}  # noqa: F811
-    attribute_map = {"n_layer": "num_hidden_layers", "n_head": "num_attention_heads", "n_embed": "hidden_size"}
+    attribute_map = {"num_attention_heads": "n_head", "n_embed": "hidden_size"}
 
     pretrained_init_configuration = BLOOM_PRETRAINED_INIT_CONFIGURATION
 
@@ -110,17 +110,17 @@ class BloomConfig(PretrainedConfig):
         pretraining_tp=1,  # TP rank used when training with megatron
         dtype="float16",
         slow_but_exact=False,
-        mp_degree=1,
-        pp_degree=1,
-        mp_rank=0,
         use_recompute=False,
         use_pure_fp16=False,
         **kwargs,
     ):
-        self.vocab_size = vocab_size
-        self.hidden_size = hidden_size
-        self.n_layer = n_layer
+
         self.n_head = n_head
+        self.hidden_size = hidden_size
+
+        super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, pad_token_id=pad_token_id, **kwargs)
+        self.vocab_size = vocab_size
+        self.n_layer = n_layer
         self.masked_softmax_fusion = masked_softmax_fusion
         self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
@@ -135,10 +135,5 @@ class BloomConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.dtype = dtype
         self.slow_but_exact = slow_but_exact
-        self.mp_degree = mp_degree
-        self.pp_degree = pp_degree
-        self.mp_rank = mp_rank
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
-
-        super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, pad_token_id=pad_token_id, **kwargs)

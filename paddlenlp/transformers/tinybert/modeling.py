@@ -430,8 +430,8 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 See :class:`TinyBertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -480,12 +480,12 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)

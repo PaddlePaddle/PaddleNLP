@@ -419,6 +419,7 @@ class ElectraModelTester:
 )
 class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     test_resize_embeddings = False
+    test_tie_weights = True
     base_model_class = ElectraModel
 
     use_labels = False

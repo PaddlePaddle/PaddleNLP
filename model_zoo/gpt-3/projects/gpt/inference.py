@@ -15,6 +15,15 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
+import os
+import time
+import sys
+import numpy as np
+import paddle
+import paddle.distributed.fleet as fleet
+
+__dir__ = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath(os.path.join(__dir__, "../")))
 
 import paddle.distributed.fleet as fleet
 from ppfleetx.core.engine.inference_engine import InferenceEngine
