@@ -16,7 +16,7 @@ import paddle
 from paddle import nn
 
 from ...configuration_utils import ConfigMixin, register_to_config
-from ...modeling_utils import ModelMixin
+from ...models import ModelMixin
 
 
 class UnCLIPTextProjModel(ModelMixin, ConfigMixin):
@@ -54,7 +54,10 @@ class UnCLIPTextProjModel(ModelMixin, ConfigMixin):
         self.encoder_hidden_states_proj = nn.Linear(clip_embeddings_dim, cross_attention_dim)
         self.text_encoder_hidden_states_norm = nn.LayerNorm(cross_attention_dim)
 
-    def forward(self, *, image_embeddings, text_embeddings, text_encoder_hidden_states, do_classifier_free_guidance):
+    def forward(self, *, image_embeddings, prompt_embeds, text_encoder_hidden_states, do_classifier_free_guidance):
+
+        image_embeddings = image_embeddings.cast(self.dtype)
+
         if do_classifier_free_guidance:
             # Add the classifier free guidance embeddings to the image embeddings
             image_embeddings_batch_size = image_embeddings.shape[0]
@@ -65,15 +68,15 @@ class UnCLIPTextProjModel(ModelMixin, ConfigMixin):
             image_embeddings = paddle.concat([classifier_free_guidance_embeddings, image_embeddings], axis=0)
 
         # The image embeddings batch size and the text embeddings batch size are equal
-        assert image_embeddings.shape[0] == text_embeddings.shape[0]
+        assert image_embeddings.shape[0] == prompt_embeds.shape[0]
 
-        batch_size = text_embeddings.shape[0]
+        batch_size = prompt_embeds.shape[0]
 
         # "Specifically, we modify the architecture described in Nichol et al. (2021) by projecting and
         # adding CLIP embeddings to the existing timestep embedding, ...
-        time_projected_text_embeddings = self.embedding_proj(text_embeddings)
+        time_projected_prompt_embeds = self.embedding_proj(prompt_embeds)
         time_projected_image_embeddings = self.clip_image_embeddings_project_to_time_embeddings(image_embeddings)
-        additive_clip_time_embeddings = time_projected_image_embeddings + time_projected_text_embeddings
+        additive_clip_time_embeddings = time_projected_image_embeddings + time_projected_prompt_embeds
 
         # ... and by projecting CLIP embeddings into four
         # extra tokens of context that are concatenated to the sequence of outputs from the GLIDE text encoder"

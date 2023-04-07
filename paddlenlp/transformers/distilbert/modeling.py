@@ -16,7 +16,14 @@
 import paddle
 import paddle.nn as nn
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    DISTILBERT_PRETRAINED_INIT_CONFIGURATION,
+    DISTILBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    DistilBertConfig,
+)
 
 __all__ = [
     "DistilBertModel",
@@ -34,14 +41,12 @@ class BertEmbeddings(nn.Layer):
     token_type embeddings.
     """
 
-    def __init__(
-        self, vocab_size, hidden_size=768, hidden_dropout_prob=0.0, max_position_embeddings=512, type_vocab_size=16
-    ):
+    def __init__(self, config: DistilBertConfig):
         super(BertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, position_ids=None):
         if position_ids is None:
@@ -68,43 +73,11 @@ class DistilBertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "distilbert-base-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "distilbert-base-cased": {
-            "vocab_size": 28996,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "distilbert-base-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-uncased.pdparams",
-            "distilbert-base-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-cased.pdparams",
-        }
-    }
+    pretrained_init_configuration = DISTILBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = DISTILBERT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "distilbert"
+    config_class = DistilBertConfig
+    model_config_file = CONFIG_NAME
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -115,9 +88,7 @@ class DistilBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.distilbert.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -166,9 +137,6 @@ class DistilBertModel(DistilBertPretrainedModel):
         max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
             sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `16`.
         initializer_range (float, optional):
             The standard deviation of the normal initializer.
             Defaults to `0.02`.
@@ -183,37 +151,21 @@ class DistilBertModel(DistilBertPretrainedModel):
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        initializer_range=0.02,
-        pad_token_id=0,
-    ):
-        super(DistilBertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = BertEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size
-        )
+    def __init__(self, config: DistilBertConfig):
+        super(DistilBertModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = BertEmbeddings(config)
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -259,9 +211,15 @@ class DistilBertModel(DistilBertPretrainedModel):
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(self.encoder.layers[0].norm1.weight.dtype) * -1e4, axis=[1, 2]
             )
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
+                    self.encoder.layers[0].norm1.weight.dtype
+                )
+                attention_mask = (1.0 - attention_mask) * -1e4
         embedding_output = self.embeddings(input_ids=input_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
-
         return encoder_outputs
 
 
@@ -271,24 +229,20 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
     sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        distilbert (:class:`DistilBertModel`):
-            An instance of DistilBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of DistilBert.
-            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
-            instance `distilbert`. Defaults to None.
+        config (:class:`DistilBertConfig`):
+            An instance of DistilBertConfig used to construct DistilBertForSequenceClassification.
     """
 
-    def __init__(self, distilbert, num_classes=2, dropout=None):
-        super(DistilBertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.distilbert = distilbert  # allow bert to be config
-        self.pre_classifier = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["hidden_size"])
+    def __init__(self, config: DistilBertConfig):
+        super(DistilBertForSequenceClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.distilbert = DistilBertModel(config)
+        self.pre_classifier = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.ReLU()
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.distilbert.config["hidden_size"], num_classes)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -340,19 +294,17 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        distilbert (:class:`DistilBertModel`):
-            An instance of DistilBertModel.
-        dropout (float, optional):
-            The dropout probability for output of DistilBert.
-            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
-            instance `distilbert`. Defaults to None.
+        config (:class:`DistilBertConfig`):
+            An instance of DistilBertConfig used to construct DistilBertForQuestionAnswering.
     """
 
-    def __init__(self, distilbert, dropout=None):
-        super(DistilBertForQuestionAnswering, self).__init__()
-        self.distilbert = distilbert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.distilbert.config["hidden_size"], 2)
+    def __init__(self, config: DistilBertConfig):
+        super(DistilBertForQuestionAnswering, self).__init__(config)
+        self.distilbert = DistilBertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -410,22 +362,18 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        distilbert (:class:`DistilBertModel`):
-            An instance of DistilBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of DistilBert.
-            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
-            instance `distilbert`. Defaults to None.
+        config (:class:`DistilBertConfig`):
+            An instance of DistilBertConfig used to construct DistilBertForTokenClassification.
     """
 
-    def __init__(self, distilbert, num_classes=2, dropout=None):
-        super(DistilBertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.distilbert = distilbert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.distilbert.config["hidden_size"], num_classes)
+    def __init__(self, config: DistilBertConfig):
+        super(DistilBertForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.distilbert = DistilBertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -471,17 +419,17 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
     DistilBert Model with a `language modeling` head on top.
 
     Args:
-        distilbert (:class:`DistilBertModel`):
-            An instance of DistilBertModel.
+        config (:class:`DistilBertConfig`):
+            An instance of DistilBertConfig used to construct DistilBertForMaskedLM
     """
 
-    def __init__(self, distilbert):
-        super(DistilBertForMaskedLM, self).__init__()
-        self.distilbert = distilbert
-        self.vocab_transform = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["hidden_size"])
+    def __init__(self, config: DistilBertConfig):
+        super(DistilBertForMaskedLM, self).__init__(config)
+        self.distilbert = DistilBertModel(config)
+        self.vocab_transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.GELU()
-        self.vocab_layer_norm = nn.LayerNorm(self.distilbert.config["hidden_size"])
-        self.vocab_projector = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["vocab_size"])
+        self.vocab_layer_norm = nn.LayerNorm(config.hidden_size)
+        self.vocab_projector = nn.Linear(config.hidden_size, config.vocab_size)
 
         self.apply(self.init_weights)
 

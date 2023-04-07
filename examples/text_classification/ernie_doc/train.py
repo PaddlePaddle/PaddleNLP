@@ -13,24 +13,34 @@
 # limitations under the License.
 
 import argparse
-from collections import defaultdict
 import os
 import random
-from functools import partial
 import time
+from collections import defaultdict
+from functools import partial
+
 import numpy as np
 import paddle
 import paddle.nn as nn
+from data import (
+    ClassifierIterator,
+    HYPTextPreprocessor,
+    ImdbTextPreprocessor,
+    to_json_file,
+)
+from metrics import F1
+from modeling import ErnieDocForSequenceClassification
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
-from modeling import ErnieDocForSequenceClassification
-from paddlenlp.transformers import ErnieDocTokenizer, ErnieDocBPETokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import layerwise_lr_decay
-from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
-from metrics import F1
+from paddlenlp.transformers import (
+    ErnieDocBPETokenizer,
+    ErnieDocTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -94,7 +104,6 @@ def evaluate(model, metric, data_loader, memories):
 
     probs_dict = defaultdict(list)
     label_dict = dict()
-    global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
         input_ids, position_ids, token_type_ids, attn_mask, labels, qids, gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids, position_ids, attn_mask)

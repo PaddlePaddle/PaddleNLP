@@ -17,8 +17,8 @@ import os
 from shutil import copyfile
 from typing import List, Optional, Tuple
 
+import numpy as np
 import paddle
-import paddle.nn.functional as F
 import sentencepiece as spm
 from scipy.linalg import block_diag
 
@@ -68,33 +68,33 @@ class GLMTokenizerMixin:
 
         division = len(context_id)
         mask_position = context_id.index(self.mask_token_id)
-        token = paddle.to_tensor(context_id, dtype="int64")
-        attention_mask = [context["attention_mask"].expand([division, -1])]
-        position_id = paddle.arange(division, dtype="int64")
-        block_position_id = paddle.zeros([division], dtype="int64")
+        token = np.array(context_id, dtype="int64")
+        attention_mask = [context["attention_mask"].repeat(division, axis=0)]
+        position_id = np.arange(division, dtype="int64")
+        block_position_id = np.zeros([division], dtype="int64")
 
         choice_ids, choice_indices = [], []
 
         for choice_str in choices:
-            choice = paddle.to_tensor(
+            choice = np.array(
                 self(choice_str, add_special_tokens=False, padding=False)["input_ids"],
                 dtype="int64",
             )
             choice_ids.append(choice)
 
-            choice_indices.append(paddle.arange(len(token), len(token) + len(choice), dtype="int64"))
-            attention_mask.append(paddle.tril(paddle.ones([len(choice), len(choice)], dtype="int64")))
+            choice_indices.append(np.arange(len(token), len(token) + len(choice), dtype="int64"))
+            attention_mask.append(np.tril(np.ones([len(choice), len(choice)], dtype="int64")))
 
-            token = paddle.concat([token, paddle.to_tensor([self.sop_token_id], dtype="int64"), choice[:-1]])
-            position_id = paddle.concat([position_id, paddle.to_tensor([mask_position] * len(choice), dtype="int64")])
-            block_position_id = paddle.concat([block_position_id, paddle.arange(1, len(choice) + 1, dtype="int64")])
+            token = np.concatenate([token, np.array([self.sop_token_id], dtype="int64"), choice[:-1]])
+            position_id = np.concatenate([position_id, np.array([mask_position] * len(choice), dtype="int64")])
+            block_position_id = np.concatenate([block_position_id, np.arange(1, len(choice) + 1, dtype="int64")])
 
-        attention_mask = paddle.to_tensor(block_diag(*[x.tolist() for x in attention_mask]))
-        attention_mask[division:, :division] = context["attention_mask"].unsqueeze(0)
+        attention_mask = np.array(block_diag(*[x.tolist() for x in attention_mask]))
+        attention_mask[division:, :division] = context["attention_mask"][None, :]
 
         return {
             "input_ids": token,
-            "position_ids": paddle.stack([position_id, block_position_id]),
+            "position_ids": np.stack([position_id, block_position_id]),
             "attention_mask": attention_mask,
             "choice_ids": choice_ids,
             "choice_indices": choice_indices,
@@ -102,10 +102,10 @@ class GLMTokenizerMixin:
 
     def _pad_batch(self, tokens, position_ids, attention_mask, max_seq_length):
         pad_length = max_seq_length - len(tokens)
-        attention_mask = F.pad(attention_mask, [0, pad_length, 0, pad_length], mode="constant", value=0)
-        tokens = paddle.concat([tokens, paddle.zeros([pad_length], dtype="int64")])
+        attention_mask = np.pad(attention_mask, [0, pad_length, 0, pad_length], mode="constant", constant_values=0)
+        tokens = np.concatenate([tokens, np.zeros([pad_length], dtype="int64")])
         if pad_length > 0:
-            position_ids = paddle.concat([position_ids, position_ids[..., -1:].expand([-1, pad_length])], axis=-1)
+            position_ids = np.concatenate([position_ids, position_ids[..., -1:].repeat(pad_length, axis=1)], axis=-1)
         return tokens, position_ids, attention_mask
 
     def _collate(self, samples):
@@ -126,9 +126,9 @@ class GLMTokenizerMixin:
             choice_target_ids_batch.append(sample["choice_indices"])
         return BatchEncoding(
             {
-                "input_ids": paddle.stack(token_batch),
-                "position_ids": paddle.stack(position_id_batch),
-                "attention_mask": paddle.stack(attention_mask_batch).unsqueeze(1),
+                "input_ids": np.stack(token_batch),
+                "position_ids": np.stack(position_id_batch),
+                "attention_mask": np.stack(attention_mask_batch).unsqueeze(1),
                 "choice_ids": choices_batch,
                 "choice_indices": choice_target_ids_batch,
             }
@@ -168,57 +168,53 @@ class GLMTokenizerMixin:
             labels = [target[1:] for target in targets]
             targets = [target + [self.pad_token_id] * (max_gen_length + 1 - len(target)) for target in targets]
             labels = [label + [self.pad_token_id] * (max_gen_length - len(label)) for label in labels]
-            targets = paddle.to_tensor(targets, dtype=input_ids.dtype)
-            loss_mask = paddle.logical_and(targets != self.pad_token_id, targets != self.eop_token_id).astype("int64")
-            labels = paddle.to_tensor(labels, dtype=input_ids.dtype)
-            labels = paddle.concat([paddle.zeros([batch_size, seq_length], dtype=labels.dtype), labels], axis=1)
+            targets = np.array(targets, dtype="int64")
+            loss_mask = np.logical_and(targets != self.pad_token_id, targets != self.eop_token_id).astype("int64")
+            labels = np.array(labels, dtype="int64")
+            labels = np.concatenate([np.zeros([batch_size, seq_length], dtype="int64"), labels], axis=1)
 
         for i in range(batch_size):
             mask_positions = []
             for mask_id in mask_ids:
-                mask_positions += (input_ids[i] == mask_id).nonzero(as_tuple=True)[0].squeeze(1).tolist()
+                mask_positions += np.nonzero(input_ids[i] == mask_id)[0].tolist()
             if not mask_positions:
                 raise ValueError("Cannot find mask token in the input.")
             mask_positions.sort()
             mask_pos = mask_positions[0]
             position_ids.append(position_id + [mask_pos] * max_gen_length)
             block_position_ids.append(block_position_id + list(range(1, max_gen_length + 1)))
-        position_ids = paddle.to_tensor(position_ids, dtype=input_ids.dtype)
-        block_position_ids = paddle.to_tensor(block_position_ids, dtype=input_ids.dtype)
-        position_ids = paddle.stack([position_ids, block_position_ids], axis=1)
+        position_ids = np.array(position_ids, dtype="int64")
+        block_position_ids = np.array(block_position_ids, dtype="int64")
+        position_ids = np.stack([position_ids, block_position_ids], axis=1)
 
         attention_mask = model_input.attention_mask
-        attention_mask = attention_mask.unsqueeze(1).expand([-1, seq_length + max_gen_length, -1])
-        generation_attention_mask = (
-            paddle.concat(
-                [
-                    paddle.zeros([seq_length, max_gen_length], dtype=attention_mask.dtype),
-                    paddle.tril(paddle.ones([max_gen_length, max_gen_length], dtype=attention_mask.dtype)),
-                ],
-                axis=0,
-            )
-            .unsqueeze(0)
-            .expand([batch_size, -1, -1])
-        )
-        attention_mask = paddle.concat([attention_mask, generation_attention_mask], axis=2).unsqueeze(1)
+        attention_mask = attention_mask[:, None, :].repeat(seq_length + max_gen_length, axis=1)
+        generation_attention_mask = np.concatenate(
+            [
+                np.zeros([seq_length, max_gen_length], dtype=attention_mask.dtype),
+                np.tril(np.ones([max_gen_length, max_gen_length], dtype=attention_mask.dtype)),
+            ],
+            axis=0,
+        )[None, :, :].repeat(batch_size, axis=0)
+        attention_mask = np.concatenate([attention_mask, generation_attention_mask], axis=2)[:, None, :, :]
 
         if targets is None:
-            input_ids = paddle.concat(
-                [input_ids, paddle.full([batch_size, 1], self.sop_token_id, dtype=input_ids.dtype)], axis=-1
+            input_ids = np.concatenate(
+                [input_ids, np.full([batch_size, 1], self.sop_token_id, dtype=input_ids.dtype)], axis=-1
             )
         else:
-            loss_mask = paddle.concat([paddle.zeros_like(input_ids), loss_mask], axis=1)
-            input_ids = paddle.concat([input_ids, targets[:, :-1]], axis=1)
+            loss_mask = np.concatenate([np.zeros_like(input_ids), loss_mask], axis=1)
+            input_ids = np.concatenate([input_ids, targets[:, :-1]], axis=1)
             loss_mask = loss_mask[:, : len(input_ids[0])]
 
         batch = {"input_ids": input_ids, "position_ids": position_ids}
         if labels is None:
-            batch["generation_attention_mask"] = attention_mask
+            batch["attention_mask"] = attention_mask
         else:
             batch["attention_mask"] = attention_mask
             batch["loss_mask"] = loss_mask
             batch["label_ids"] = labels
-        return BatchEncoding(batch)
+        return BatchEncoding(batch, tensor_type="np")
 
 
 class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):

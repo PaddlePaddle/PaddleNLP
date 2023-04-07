@@ -11,25 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
 import argparse
-import os
-import random
-import time
+from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
+from model import ErnieForCSC
+from utils import convert_example, create_dataloader, parse_decode, read_test_ds
 
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad, Vocab
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
-
-from model import ErnieForCSC
-from utils import read_test_ds, convert_example, create_dataloader, is_chinese_char, parse_decode
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -37,7 +29,7 @@ parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choic
 parser.add_argument("--ckpt_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 parser.add_argument("--test_file", type=str, default="test.txt", help="test set file")
 parser.add_argument("--predict_file", type=str, default="predict.txt", help="predict result file")

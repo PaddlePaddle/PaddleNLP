@@ -25,7 +25,7 @@ from paddlenlp.transformers import *  # noqa
 from paddlenlp.transformers.configuration_utils import is_standard_config
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
-    get_path_from_url,
+    get_path_from_url_with_filelock,
     hf_file_exists,
     url_file_exists,
 )
@@ -48,7 +48,6 @@ __all__ = [
     "AutoGenerator",
     "AutoDiscriminator",
     "AutoModelForConditionalGeneration",
-    "AutoModelForImageGeneration",
 ]
 
 MAPPING_NAMES = OrderedDict(
@@ -75,6 +74,7 @@ MAPPING_NAMES = OrderedDict(
         ("Ernie", "ernie"),
         ("FNet", "fnet"),
         ("Funnel", "funnel"),
+        ("Llama", "llama"),
         ("LayoutXLM", "layoutxlm"),
         ("LayoutLMv2", "layoutlmv2"),
         ("LayoutLM", "layoutlm"),
@@ -121,6 +121,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlipText", "blip"),
         ("BlipVision", "blip"),
         ("Blip", "blip"),
+        ("Bloom", "bloom"),
     ]
 )
 
@@ -140,7 +141,13 @@ MAPPING_TASKS = OrderedDict(
         ("Generator", "AutoGenerator"),
         ("Discriminator", "AutoDiscriminator"),
         ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
-        ("ForImageGeneration", "AutoModelForImageGeneration"),
+    ]
+)
+
+MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
+    [
+        # Model for Causal LM mapping
+        ("opt", "OPTForCausalLM"),
     ]
 )
 
@@ -149,7 +156,7 @@ def get_name_mapping(task="Model"):
     """
     Task can be 'Backbone', 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
     'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
-    'Generator', 'Discriminator', 'ForConditionalGeneration', 'ForImageGeneration'.
+    'Generator', 'Discriminator', 'ForConditionalGeneration'
     """
     NAME_MAPPING = OrderedDict()
     for key, value in MAPPING_NAMES.items():
@@ -340,10 +347,10 @@ class _BaseAutoModelClass:
             )
             try:
                 if url_file_exists(standard_community_url):
-                    resolved_vocab_file = get_path_from_url(standard_community_url, cache_dir)
+                    resolved_vocab_file = get_path_from_url_with_filelock(standard_community_url, cache_dir)
                 elif url_file_exists(legacy_community_url):
                     logger.info("Standard config do not exist, loading from legacy config")
-                    resolved_vocab_file = get_path_from_url(legacy_community_url, cache_dir)
+                    resolved_vocab_file = get_path_from_url_with_filelock(legacy_community_url, cache_dir)
                 else:
                     raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
             except RuntimeError as err:
@@ -1025,48 +1032,5 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
                 model = AutoModelForConditionalGeneration.from_pretrained('./my_bart/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartForConditionalGeneration'>
-        """
-        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-
-
-class AutoModelForImageGeneration(_BaseAutoModelClass):
-    """
-    AutoModelForImageGeneration.
-    """
-
-    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
-    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
-    _name_mapping = get_name_mapping("ForImageGeneration")
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
-        """
-        Creates an instance of `AutoModelForImageGeneration`. Model weights are loaded
-        by specifying name of a built-in pretrained model, or a community contributed model,
-        or a local file directory path.
-
-        Args:
-            pretrained_model_name_or_path (str): See :class:`AutoModel`.
-            *args (tuple): See :class:`AutoModel`.
-            **kwargs (dict): See :class:`AutoModel`.
-
-        Returns:
-            PretrainedModel: An instance of `AutoModelForImageGeneration`.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import AutoModelForImageGeneration
-
-                # Name of built-in pretrained model
-                model = AutoModelForImageGeneration.from_pretrained('dalle-mini')
-                print(type(model))
-                # <class 'paddlenlp.transformers.dallebart.modeling.DalleBartForImageGeneration'>
-
-
-                # Load from local directory path
-                model = AutoModelForImageGeneration.from_pretrained('./my_dalle_mini/')
-                print(type(model))
-                # <class 'paddlenlp.transformers.dallebart.modeling.DalleBartForImageGeneration'>
         """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

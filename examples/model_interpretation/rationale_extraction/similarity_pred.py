@@ -12,39 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import sys
-import time
-import logging
-import json
-import collections
-from random import random
-from tqdm import tqdm
-from functools import reduce, partial
-from pathlib import Path
-import numpy as np
-import logging
 import argparse
+import json
+import os
+import sys
+from functools import partial
+from pathlib import Path
 
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad, Dict, Vocab
-from paddlenlp.datasets import load_dataset, DatasetBuilder
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+from tqdm import tqdm
 
-sys.path.append("../task/similarity")
-from LIME.lime_text import LimeTextExplainer
+from paddlenlp.data import Dict, Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("..")
-from roberta.modeling import RobertaForSequenceClassification
+from roberta.modeling import RobertaForSequenceClassification  # noqa: E402
 
 sys.path.remove("..")
-from simnet.utils import CharTokenizer, preprocess_data
-from simnet.model import SimNet
+from simnet.model import SimNet  # noqa: E402
+from simnet.utils import CharTokenizer, preprocess_data  # noqa: E402
 
 sys.path.remove("../task/similarity")
 sys.path.append("../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+)
 
 sys.path.remove("../..")
 

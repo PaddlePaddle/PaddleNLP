@@ -1736,14 +1736,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class T5EncoderModel(T5PretrainedModel):

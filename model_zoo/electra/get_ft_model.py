@@ -18,12 +18,6 @@ import os
 
 import paddle
 
-# from paddlenlp.transformers import ElectraForTotalPretraining, ElectraDiscriminator, ElectraGenerator, ElectraModel
-# from paddlenlp.transformers import ElectraTokenizer
-#
-# MODEL_CLASSES = {"electra": (ElectraForTotalPretraining, ElectraTokenizer), }
-
-
 def get_md5sum(file_path):
     md5sum = None
     if os.path.isfile(file_path):

@@ -12,22 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 
 import numpy as np
 
-from paddlenlp.utils.log import logger
-
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--similar_text_pair", type=str, default='', help="The full path of similat pair file")
-parser.add_argument("--recall_result_file", type=str, default='', help="The full path of recall result file")
-parser.add_argument("--recall_num", type=int, default=10, help="Most similair number of doc recalled from corpus per query")
-
-
+parser.add_argument("--similar_text_pair", type=str, default="", help="The full path of similat pair file")
+parser.add_argument("--recall_result_file", type=str, default="", help="The full path of recall result file")
+parser.add_argument(
+    "--recall_num", type=int, default=10, help="Most similair number of doc recalled from corpus per query"
+)
 args = parser.parse_args()
-# yapf: enable
 
 
 def recall(rs, N=10):
