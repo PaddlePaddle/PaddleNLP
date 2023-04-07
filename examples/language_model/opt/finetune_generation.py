@@ -17,12 +17,11 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from utils import OPTTrainer
+from utils import OPTTrainer, compute_metrics
 
 from data import DataCollatorForSupervisedDataset, convert_example
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import GPTTokenizer, OPTForCausalLM
 from paddlenlp.utils.log import logger
@@ -130,24 +129,27 @@ def main():
 
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
-    def compute_metrics(eval_preds):
-        rouge1 = Rouge1()
-        rouge2 = Rouge2()
-        rougel = RougeL()
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = eval_preds.predictions
+        preds = [x[x != -100] for x in preds]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
 
-        # for pred in predictions:
+        all_preds = [pred.strip() for pred in all_preds]
+        all_labels = [label.strip() for label in all_labels]
+        all_preds = [pred.strip("question:") for pred in all_preds]
+        all_labels = [label.strip("question:") for label in all_labels]
 
-        rouge1_score = rouge1.score(predictions, references)
-        rouge2_score = rouge2.score(predictions, references)
-        for pred, ref in zip(predictions, references):
-            rougel.add_inst(pred, [ref])
-        return {
-            "rouge1": rouge1_score,
-            "rouge2": rouge2_score,
-            "rougel": rougel.score(),
-        }
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
+
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
+    )
 
     trainer = OPTTrainer(
         model=model,
@@ -155,7 +157,7 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_func,
         do_generation=True,
         data_collator=collate_fn,
     )

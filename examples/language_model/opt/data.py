@@ -13,13 +13,15 @@
 # limitations under the License.
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
 import paddle
 
-from paddlenlp.data import Pad
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
+
+IGNORE_INDEX = -100
 
 
 def convert_example(
@@ -29,9 +31,6 @@ def convert_example(
     max_target_length,
     is_train=False,
 ):
-    """
-    Convert an example into necessary features.
-    """
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -39,50 +38,75 @@ def convert_example(
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     context = example["context"]
     question = example["question"]
-    answer = (example.get("answers", []) or ["there is no answer"])[0]
+    try:
+        answer = example["answers"][0]
+    except:
+        print(example["context"])
+        print(example["question"])
+        print(example["answers"])
+        print(example["answer_starts"])
+        print(example["is_impossible"])
 
-    input_seq = f"answer: {answer} context: {context} {tokenizer.eos_token}"
-    output_seq = f"question: {question} {tokenizer.eos_token}"
+    input_seq = f"answer: {answer} context: {context} </s>"
+    output_seq = f"question: {question} </s>"
 
-    # 1. tokenize input-tokens
-    input_tokens = tokenizer.tokenize(input_seq)[:max_source_length]
+    source_tokenized = tokenizer(
+        input_seq,
+        return_tensors="pd",
+        max_length=max_source_length,
+        truncation=True,
+    )
 
-    # 2. tokenize output tokens
-    output_tokens = tokenizer.tokenize(output_seq)[:max_target_length]
+    source_input_ids_len = (
+        source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
+    )
 
-    # 3. concat the inputs
-    tokens = input_tokens + output_tokens
+    example_tokenized = tokenizer(
+        input_seq + output_seq,
+        return_tensors="pd",
+        max_length=max_source_length + max_target_length,
+        truncation=True,
+    )
 
-    labels = [-100] * len(input_tokens) + tokenizer.convert_tokens_to_ids(output_tokens)
+    input_ids = example_tokenized["input_ids"][0]
+    labels = deepcopy(input_ids)
+    labels[:source_input_ids_len] = IGNORE_INDEX
 
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    return {
-        "input_ids": input_ids,
-        "labels": labels,
-    }
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
+    )
 
 
-def pad_sequence(inputs, pad_index=0):
-    outputs = Pad(pad_val=pad_index)(inputs)
-    output_tensor = paddle.to_tensor(outputs)
-    return output_tensor
+def left_padding(inputs, pad_id):
+    max_length = 0
+    for ids in inputs:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(values, max_length, to_pad_id):
+        res = []
+        for value in values:
+            res.append(extend_max_lenth(value.tolist(), max_length, to_pad_id))
+        return res
+
+    res = extend_filed(inputs, max_length, pad_id)
+    return paddle.to_tensor(res)
 
 
 @dataclass
 class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
-    tokenizer: PretrainedTokenizerBase = None
-    inf_tensor = paddle.to_tensor(-1e4, dtype="float32")
-    zero_tensor = paddle.to_tensor(0, dtype="float32")
+    tokenizer: PretrainedTokenizerBase
 
     def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
 
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
-        input_ids = pad_sequence(input_ids, pad_index=self.tokenizer.pad_token_id)
-        labels = pad_sequence(labels, pad_index=-100)
-        return dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=paddle.where(input_ids != self.tokenizer.pad_token_id, self.inf_tensor, self.zero_tensor),
-        )
+        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
+        labels = left_padding(labels, pad_id=IGNORE_INDEX)
+
+        attention_mask = input_ids.equal(paddle.to_tensor(self.tokenizer.pad_token_id)) * 1e-4
+        return dict(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
