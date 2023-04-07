@@ -312,6 +312,7 @@ function gpt_export_345M_mp2() {
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
         -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_mp2.yaml \
+        -o Generation.use_topp_sampling=False \
         -o Engine.save_load.ckpt_dir=./pretrained/inference_model \
         >>${log_path}/$FUNCNAME 2>&1
     python -m paddle.distributed.launch --devices "0,1" \
