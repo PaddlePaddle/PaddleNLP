@@ -65,27 +65,36 @@ class ChatGLMConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "chatglm"
+    attribute_map = {"num_layers": "num_hidden_layers"}
 
     def __init__(
         self,
-        vocab_size=150528,
+        vocab_size=130528,
         hidden_size=4096,
-        num_layers=28,
+        num_hidden_layers=28,
         num_attention_heads=32,
         layernorm_epsilon=1e-5,
         use_cache=False,
-        bos_token_id=150004,
-        eos_token_id=150005,
-        pad_token_id=0,
+        bos_token_id=130004,
+        eos_token_id=130005,
+        pad_token_id=3,
+        mask_token_id=130000,
+        gmask_token_id=130001,
         max_sequence_length=2048,
         inner_hidden_size=16384,
         position_encoding_2d=True,
         quantization_bit=0,
         pre_seq_len=None,
         prefix_projection=False,
+        output_predict=True,
+        recompute=False,
+        attention_scale=True,
+        activation="gelu",
+        paddle_dtype="float16",
+        num_image_tokens=0,
         **kwargs
     ):
-        self.num_layers = num_layers
+        self.num_hidden_layers = num_hidden_layers
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_attention_heads = num_attention_heads
@@ -96,8 +105,16 @@ class ChatGLMConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.pad_token_id = pad_token_id
+        self.mask_token_id = mask_token_id
+        self.gmask_token_id = gmask_token_id
         self.position_encoding_2d = position_encoding_2d
         self.quantization_bit = quantization_bit
         self.pre_seq_len = pre_seq_len
         self.prefix_projection = prefix_projection
+        self.output_predict = output_predict
+        self.recompute = recompute
+        self.attention_scale = attention_scale
+        self.activation = activation
+        self.paddle_dtype = paddle_dtype
+        self.num_image_tokens = num_image_tokens
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)

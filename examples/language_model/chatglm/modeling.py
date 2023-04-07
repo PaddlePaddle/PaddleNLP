@@ -139,7 +139,7 @@ class ChatGLMAttention(nn.Layer):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
-        self.rotary_emb = RotaryEmbeddings(
+        self.rotary_embeddings = RotaryEmbeddings(
             self.hidden_size // (self.num_attention_heads * 2)
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
@@ -149,7 +149,7 @@ class ChatGLMAttention(nn.Layer):
         )
         self.scale_mask_softmax = None
 
-        self.attention_scale = config.attention_scale  # True
+        self.attention_scale = config.attention_scale
 
         if config.tensor_parallel_degree > 1:
             self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
@@ -181,16 +181,14 @@ class ChatGLMAttention(nn.Layer):
         k = k * cos + self._rotate_half(k) * sin
         return q, k
 
-    def _core_attention(
-        self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor, rotary_embeddings: RotaryEmbeddings = None
-    ):
+    def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor):
         # Set store_true, position_encoding_2d=False by default.
         if self.config.position_encoding_2d:
             # [s, b, n, h/n/2]
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
             # [s, 1, h/n]
-            cos, sin = rotary_embeddings(q1, seq_len=position_ids.max() + 1)
+            cos, sin = self.rotary_embeddings(q1, seq_len=position_ids.max() + 1)
             # [s, b]
             position_ids, block_position_ids = position_ids[:, 0, :].transpose([1, 0]), position_ids[
                 :, 1, :
@@ -205,7 +203,7 @@ class ChatGLMAttention(nn.Layer):
             # [s, b]
             position_ids = position_ids.transpose([1, 0])
             # [s, 1, h/n]
-            cos, sin = rotary_embeddings(q_layer, seq_len=position_ids.max() + 1)
+            cos, sin = self.rotary_embeddings(q_layer, seq_len=position_ids.max() + 1)
             # [s, b, n, h/n]
             q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
         return q_layer, k_layer
@@ -215,10 +213,9 @@ class ChatGLMAttention(nn.Layer):
         hidden_states: Tensor,
         ltor_mask: Tensor,
         position_ids: Tensor,
-        rotary_embeddings: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
-        label_id=0,
+        layer_id=0,
     ):
         hidden_states = hidden_states.transpose([1, 0, 2])
         # [s, b, h]
@@ -232,7 +229,7 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h//n]
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
-        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeddings)
+        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids)
 
         if cache is not None:
             cache_k, cache_v = cache[0], cache[1]
@@ -246,7 +243,7 @@ class ChatGLMAttention(nn.Layer):
         if use_cache:
             cache_kv = (k_layer, v_layer)
 
-        attention_scale_coeff = float(label_id) + 1.0
+        attention_scale_coeff = float(layer_id) + 1.0
         if self.attention_scale:
             # [s, b, n, h/n]
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
@@ -319,7 +316,6 @@ class ChatGLMBlock(nn.Layer):
         hidden_states: Tensor,
         ltor_mask: Tensor,
         position_ids: Tensor,
-        rotary_embeddings: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
     ):
@@ -328,7 +324,12 @@ class ChatGLMBlock(nn.Layer):
         # cache = self.input_layernorm(cache) if cache is not None else None
         # Self attention
         attention_output, cache, _ = self.attention(
-            layernorm_output, ltor_mask, position_ids, rotary_embeddings, cache, self.layer_id
+            hidden_states=layernorm_output,
+            ltor_mask=ltor_mask,
+            position_ids=position_ids,
+            cache=cache,
+            use_cache=use_cache,
+            layer_id=self.layer_id,
         )
         # Residual connection
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
@@ -345,7 +346,7 @@ class ChatGLMBlock(nn.Layer):
 class ChatGLMMLP(nn.Layer):
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMMLP, self).__init__()
-
+        self.config = config
         if config.inner_hidden_size is None:
             inner_hidden_size = config.hidden_size * 4
         else:
@@ -388,6 +389,7 @@ class ChatGLMStack(nn.Layer):
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMStack, self).__init__()
         self.config = config
+        self.position_encoding_2d = config.position_encoding_2d
         self.hidden_size = config.hidden_size
         self.enable_recompute = config.recompute
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
@@ -454,7 +456,7 @@ class ChatGLMStack(nn.Layer):
             block_position_ids = [
                 paddle.concat(
                     (
-                        paddle.zeros(context_length, dtype="int64"),
+                        paddle.zeros([context_length], dtype="int64"),
                         paddle.arange(seq_length - context_length, dtype="int64") + 1,
                     )
                 )
@@ -480,9 +482,7 @@ class ChatGLMStack(nn.Layer):
 
             return custom_forward
 
-        hidden_states = recompute(
-            create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, self.rotary_embeddings, cache
-        )
+        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, cache)
         return hidden_states
 
     def forward(
@@ -511,15 +511,16 @@ class ChatGLMStack(nn.Layer):
             if self.config.pre_seq_len is not None:
                 past_key_values = self.get_prompt(batch_size=input_ids.shape[0], dtype=inputs_embeds.dtype)
             else:
-                past_key_values = tuple([None] * len(self.config.num_layers))
+                past_key_values = tuple([None] * len(self.layers))
 
             if attention_mask is None:
                 attention_mask = self.get_masks(input_ids)
 
             if position_ids is None:
-                MASK, gMASK = 150000, 150001
-                mask_token = MASK if MASK in input_ids else gMASK
-                use_gmask = False if MASK in input_ids else gMASK
+                # MASK, gMASK = self.mask_token_id, self.gmask_token_is
+                MASK = self.mask_token_is
+                mask_token = MASK  # gMASK if gMASK in input_ids else MASK
+                use_gmask = False  # True if gMASK in input_ids else False
 
                 mask_positions = [seq.tolist().index(mask_token) for seq in input_ids]
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
@@ -531,7 +532,7 @@ class ChatGLMStack(nn.Layer):
 
         hidden_states = inputs_embeds  # .transpose([0, 1, 2])
 
-        cache = [] if use_cache else None
+        current_key_values = [] if use_cache else None
         if attention_mask is None:
             attention_mask = paddle.zeros([1, 1]).astype("bool")
 
@@ -539,19 +540,28 @@ class ChatGLMStack(nn.Layer):
             cache_i = past_key_values[i]
 
             if self.enable_recompute:
-                hidden_states = self.recompute_training(
-                    layer, hidden_states, attention_mask, position_ids, cache=cache_i
+                hidden_states, cache = self.recompute_training(
+                    layer,
+                    hidden_states=hidden_states,
+                    ltor_mask=attention_mask,
+                    position_ids=position_ids,
+                    use_cache=use_cache,
+                    cache=cache_i,
                 )
             else:
-                hidden_states = layer(
-                    hidden_states, attention_mask, position_ids, self.rotary_embeddings, cache=cache_i
+                hidden_states, cache = layer(
+                    hidden_states=hidden_states,
+                    ltor_mask=attention_mask,
+                    position_ids=position_ids,
+                    use_cache=use_cache,
+                    cache=cache_i,
                 )
 
             if use_cache:
-                cache.append(hidden_states.detach())
+                current_key_values.append(cache.detach())
 
         output = self.final_layernorm(hidden_states)
-        return (output, cache)
+        return (output, current_key_values)
 
 
 class ChatGLMPretrainedModel(PretrainedModel):
@@ -757,7 +767,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
     def prepare_inputs_for_generation(self, input_ids, position_ids, attention_mask, past_key_values, cache, **kwargs):
         batch_size, seq_length = input_ids.shape
-        MASK, gMASK = 150000, 150001
+        MASK, gMASK = self.mask_token_id, self.gmask_token_id
         mask_token = MASK if MASK in input_ids else gMASK
         use_gmask = False if MASK in input_ids else gMASK
         seqs = input_ids.tolist()
