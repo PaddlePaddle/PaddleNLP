@@ -27,7 +27,7 @@ from ...utils import (
 
 
 @dataclass
-class JointPipelineOutput(BaseOutput):
+class ImageTextPipelineOutput(BaseOutput):
     """
     Output class for UniDiffuser pipelines.
     Args:
@@ -51,11 +51,13 @@ except OptionalDependencyNotAvailable:
         UniDiffuserImageToTextPipeline,
         UniDiffuserImageVariationPipeline,
         UniDiffuserJointGenerationPipeline,
+        UniDiffuserPipeline,
         UniDiffuserTextGenerationPipeline,
         UniDiffuserTextToImagePipeline,
         UniDiffuserTextVariationPipeline,
     )
 else:
+    from .pipeline_unidiffuser import UniDiffuserPipeline
     from .pipeline_unidiffuser_i import UniDiffuserImageGenerationPipeline
     from .pipeline_unidiffuser_i2t import UniDiffuserImageToTextPipeline
     from .pipeline_unidiffuser_i2t2i import UniDiffuserImageVariationPipeline

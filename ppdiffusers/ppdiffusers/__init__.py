@@ -166,6 +166,7 @@ else:
         UniDiffuserImageToTextPipeline,
         UniDiffuserImageVariationPipeline,
         UniDiffuserJointGenerationPipeline,
+        UniDiffuserPipeline,
         UniDiffuserTextGenerationPipeline,
         UniDiffuserTextToImagePipeline,
         UniDiffuserTextVariationPipeline,

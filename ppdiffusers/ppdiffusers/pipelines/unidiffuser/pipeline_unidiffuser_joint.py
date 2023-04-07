@@ -22,7 +22,7 @@ from ...models import AutoencoderKL, CaptionDecoder, UViTModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
-from . import JointPipelineOutput
+from . import ImageTextPipelineOutput
 from .dpm_solver_pp import DPM_Solver, NoiseScheduleVP
 from .unidiffuser_common import (
     combine_joint,
@@ -234,4 +234,4 @@ class UniDiffuserJointGenerationPipeline(DiffusionPipeline):
         if not return_dict:
             return (image, text)
 
-        return JointPipelineOutput(images=image, texts=text)
+        return ImageTextPipelineOutput(images=image, texts=text)

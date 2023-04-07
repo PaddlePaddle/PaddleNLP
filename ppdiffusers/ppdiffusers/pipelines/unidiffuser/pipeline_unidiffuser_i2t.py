@@ -75,15 +75,14 @@ class UniDiffuserImageToTextPipeline(DiffusionPipeline):
     def i2t_nnet(self, x, timesteps, z, clip_img):
         sample_scale = 7
         data_type = 1
-
         t_img = paddle.zeros([timesteps.shape[0]], dtype=paddle.int32)
 
         z_out, clip_img_out, text_out = self.unet(
-            z,
-            clip_img,
-            text=x,
-            t_img=t_img,
-            t_text=timesteps,
+            z,  # [1, 4, 64, 64]
+            clip_img,  # [1, 1, 512]
+            text=x,  # [1, 77, 64]
+            t_img=t_img,  # [1]
+            t_text=timesteps,  # [1]
             data_type=paddle.zeros_like(t_img, dtype=paddle.int32) + data_type,
         )
 
@@ -159,7 +158,7 @@ class UniDiffuserImageToTextPipeline(DiffusionPipeline):
         bs_embed, seq_len, _ = image_embeddings.shape
         image_embeddings = image_embeddings.tile([1, num_images_per_prompt, 1])
         image_embeddings = image_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
-        return image_embeddings
+        return image_embeddings  # [1,1,512] # -19.63137245
 
     def _encode_image_contexts(self, image, num_images_per_prompt):
         img_contexts = []

@@ -89,7 +89,6 @@ class NoiseScheduleVP:
 
         Moreover, as lambda(t) is an invertible function, we also support its inverse function:
 
-            t = self.inverse_lambda(lambda_t)
 
         ===============================================================
 
@@ -389,27 +388,8 @@ class DPM_Solver:
         Returns:
             A pytorch tensor of the time steps, with the shape (N + 1,).
         """
-        if skip_type == "logSNR":
-            lambda_T = self.noise_schedule.marginal_lambda(paddle.to_tensor(t_T))
-            lambda_0 = self.noise_schedule.marginal_lambda(paddle.to_tensor(t_0))
-            logSNR_steps = paddle.linspace(lambda_T.cpu().item(), lambda_0.cpu().item(), N + 1)
-            return self.noise_schedule.inverse_lambda(logSNR_steps)
-        elif skip_type == "t2":
-            t_order = 2
-            t = paddle.linspace(t_T ** (1.0 / t_order), t_0 ** (1.0 / t_order), N + 1).pow(t_order)
-            return t
-        elif skip_type == "time_uniform":
+        if skip_type == "time_uniform":
             return paddle.linspace(t_T, t_0, N + 1)
-        elif skip_type == "time_quadratic":
-            t = paddle.linspace(t_0, t_T, 10000000)
-            quadratic_t = paddle.sqrt(t)
-            quadratic_steps = paddle.linspace(quadratic_t[0], quadratic_t[-1], N + 1)
-            return paddle.flip(
-                paddle.concat(
-                    [t[paddle.searchsorted(quadratic_t, quadratic_steps)[:-1]], t_T * paddle.ones((1,))], axis=0
-                ),
-                axis=[0],
-            )
         else:
             raise ValueError(
                 "Unsupported skip_type {}, need to be 'logSNR' or 'time_uniform' or 'time_quadratic'".format(skip_type)
@@ -602,90 +582,6 @@ class DPM_Solver:
         else:
             return x_t
 
-    def dpm_multistep_second_update(self, x, noise_prev_list, t_prev_list, t, solver_type="dpm_solver"):
-        ns = self.noise_schedule
-        dims = len(x.shape) - 1
-        noise_prev_1, noise_prev_0 = noise_prev_list
-        t_prev_1, t_prev_0 = t_prev_list
-        lambda_prev_1, lambda_prev_0, lambda_t = (
-            ns.marginal_lambda(t_prev_1),
-            ns.marginal_lambda(t_prev_0),
-            ns.marginal_lambda(t),
-        )
-        log_alpha_prev_0, log_alpha_t = ns.marginal_log_mean_coeff(t_prev_0), ns.marginal_log_mean_coeff(t)
-        sigma_prev_0, sigma_t = ns.marginal_std(t_prev_0), ns.marginal_std(t)
-        alpha_t = paddle.exp(log_alpha_t)
-
-        h_0 = lambda_prev_0 - lambda_prev_1
-        h = lambda_t - lambda_prev_0
-        r0 = h_0 / h
-        D1_0 = (1.0 / r0)[(...,) + (None,) * dims] * (noise_prev_0 - noise_prev_1)
-        if self.predict_x0:
-            if solver_type == "taylor":
-                x_t = (
-                    (sigma_t / sigma_prev_0)[(...,) + (None,) * dims] * x
-                    - (alpha_t * (paddle.exp(-h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                    + (alpha_t * ((paddle.exp(-h) - 1.0) / h + 1.0))[(...,) + (None,) * dims] * D1_0
-                )
-            elif solver_type == "dpm_solver":
-                x_t = (
-                    (sigma_t / sigma_prev_0)[(...,) + (None,) * dims] * x
-                    - (alpha_t * (paddle.exp(-h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                    - 0.5 * (alpha_t * (paddle.exp(-h) - 1.0))[(...,) + (None,) * dims] * D1_0
-                )
-        elif solver_type == "taylor":
-            x_t = (
-                paddle.exp(log_alpha_t - log_alpha_prev_0)[(...,) + (None,) * dims] * x
-                - (sigma_t * (paddle.exp(h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                - (sigma_t * ((paddle.exp(h) - 1.0) / h - 1.0))[(...,) + (None,) * dims] * D1_0
-            )
-        elif solver_type == "dpm_solver":
-            x_t = (
-                paddle.exp(log_alpha_t - log_alpha_prev_0)[(...,) + (None,) * dims] * x
-                - (sigma_t * (paddle.exp(h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                - 0.5 * (sigma_t * (paddle.exp(h) - 1.0))[(...,) + (None,) * dims] * D1_0
-            )
-        return x_t
-
-    def dpm_multistep_third_update(self, x, noise_prev_list, t_prev_list, t, solver_type="dpm_solver"):
-        ns = self.noise_schedule
-        dims = len(x.shape) - 1
-        noise_prev_2, noise_prev_1, noise_prev_0 = noise_prev_list
-        t_prev_2, t_prev_1, t_prev_0 = t_prev_list
-        lambda_prev_2, lambda_prev_1, lambda_prev_0, lambda_t = (
-            ns.marginal_lambda(t_prev_2),
-            ns.marginal_lambda(t_prev_1),
-            ns.marginal_lambda(t_prev_0),
-            ns.marginal_lambda(t),
-        )
-        log_alpha_prev_0, log_alpha_t = ns.marginal_log_mean_coeff(t_prev_0), ns.marginal_log_mean_coeff(t)
-        sigma_prev_0, sigma_t = ns.marginal_std(t_prev_0), ns.marginal_std(t)
-        alpha_t = paddle.exp(log_alpha_t)
-
-        h_1 = lambda_prev_1 - lambda_prev_2
-        h_0 = lambda_prev_0 - lambda_prev_1
-        h = lambda_t - lambda_prev_0
-        r0, r1 = h_0 / h, h_1 / h
-        D1_0 = (1.0 / r0)[(...,) + (None,) * dims] * (noise_prev_0 - noise_prev_1)
-        D1_1 = (1.0 / r1)[(...,) + (None,) * dims] * (noise_prev_1 - noise_prev_2)
-        D1 = D1_0 + (r0 / (r0 + r1))[(...,) + (None,) * dims] * (D1_0 - D1_1)
-        D2 = (1.0 / (r0 + r1))[(...,) + (None,) * dims] * (D1_0 - D1_1)
-        if self.predict_x0:
-            x_t = (
-                (sigma_t / sigma_prev_0)[(...,) + (None,) * dims] * x
-                - (alpha_t * (paddle.exp(-h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                + (alpha_t * ((paddle.exp(-h) - 1.0) / h + 1.0))[(...,) + (None,) * dims] * D1
-                - (alpha_t * ((paddle.exp(-h) - 1.0 + h) / h**2 - 0.5))[(...,) + (None,) * dims] * D2
-            )
-        else:
-            x_t = (
-                paddle.exp(log_alpha_t - log_alpha_prev_0)[(...,) + (None,) * dims] * x
-                - (sigma_t * (paddle.exp(h) - 1.0))[(...,) + (None,) * dims] * noise_prev_0
-                - (sigma_t * ((paddle.exp(h) - 1.0) / h - 1.0))[(...,) + (None,) * dims] * D1
-                - (sigma_t * ((paddle.exp(h) - 1.0 - h) / h**2 - 0.5))[(...,) + (None,) * dims] * D2
-            )
-        return x_t
-
     def dpm_solver_third_update(
         self,
         x,
@@ -853,91 +749,6 @@ class DPM_Solver:
         else:
             raise ValueError("Solver order must be 1 or 2 or 3, got {}".format(order))
 
-    def dpm_multistep_update(self, x, noise_prev_list, t_prev_list, t, order, solver_type="taylor"):
-        """
-        A single step for DPM-Solver of the given order `order`.
-
-        Args:
-            x: A pytorch tensor. The initial value at time `s`.
-            s: A pytorch tensor. The starting time, with the shape (x.shape[0],).
-            t: A pytorch tensor. The ending time, with the shape (x.shape[0],).
-            order: A `int`. The order of DPM-Solver. We only support order == 1 or 2 or 3.
-        Returns:
-            x_t: A pytorch tensor. The approximated solution at time `t`.
-        """
-        if order == 1:
-            return self.dpm_solver_first_update(x, t_prev_list[-1], t, noise_s=noise_prev_list[-1])
-        elif order == 2:
-            return self.dpm_multistep_second_update(x, noise_prev_list, t_prev_list, t, solver_type=solver_type)
-        elif order == 3:
-            return self.dpm_multistep_third_update(x, noise_prev_list, t_prev_list, t, solver_type=solver_type)
-        else:
-            raise ValueError("Solver order must be 1 or 2 or 3, got {}".format(order))
-
-    def dpm_solver_adaptive(
-        self, x, order, t_T, t_0, h_init=0.05, atol=0.0078, rtol=0.05, theta=0.9, t_err=1e-5, solver_type="dpm_solver"
-    ):
-        """
-        The adaptive step size solver based on DPM-Solver.
-
-        Args:
-            x: A pytorch tensor. The initial value at time `t_T`.
-            order: A `int`. The (higher) order of the solver. We only support order == 2 or 3.
-            t_T: A `float`. The starting time of the sampling (default is T).
-            t_0: A `float`. The ending time of the sampling (default is epsilon).
-            h_init: A `float`. The initial step size (for logSNR).
-            atol: A `float`. The absolute tolerance of the solver. For image data, the default setting is 0.0078, followed [1].
-            rtol: A `float`. The relative tolerance of the solver. The default setting is 0.05.
-            theta: A `float`. The safety hyperparameter for adapting the step size. The default setting is 0.9, followed [1].
-            t_err: A `float`. The tolerance for the time. We solve the diffusion ODE until the absolute error between the
-                current time and `t_0` is less than `t_err`. The default setting is 1e-5.
-        Returns:
-            x_0: A pytorch tensor. The approximated solution at time `t_0`.
-
-        [1] A. Jolicoeur-Martineau, K. Li, R. Piché-Taillefer, T. Kachman, and I. Mitliagkas, "Gotta go fast when generating data with score-based models," arXiv preprint arXiv:2105.14080, 2021.
-        """
-        ns = self.noise_schedule
-        s = t_T * paddle.ones((x.shape[0],))
-        lambda_s = ns.marginal_lambda(s)
-        lambda_0 = ns.marginal_lambda(t_0 * paddle.ones_like(s))
-        h = h_init * paddle.ones_like(s)
-        x_prev = x
-        nfe = 0
-        if order == 2:
-            r1 = 0.5
-            lower_update = lambda x, s, t: self.dpm_solver_first_update(x, s, t, return_noise=True)
-            higher_update = lambda x, s, t, **kwargs: self.dpm_solver_second_update(
-                x, s, t, r1=r1, solver_type=solver_type, **kwargs
-            )
-        elif order == 3:
-            r1, r2 = 1.0 / 3.0, 2.0 / 3.0
-            lower_update = lambda x, s, t: self.dpm_solver_second_update(
-                x, s, t, r1=r1, return_noise=True, solver_type=solver_type
-            )
-            higher_update = lambda x, s, t, **kwargs: self.dpm_solver_third_update(
-                x, s, t, r1=r1, r2=r2, solver_type=solver_type, **kwargs
-            )
-        else:
-            raise ValueError("For adaptive step size solver, order must be 2 or 3, got {}".format(order))
-        while paddle.abs((s - t_0)).mean() > t_err:
-            t = ns.inverse_lambda(lambda_s + h)
-            x_lower, lower_noise_kwargs = lower_update(x, s, t)
-            x_higher = higher_update(x, s, t, **lower_noise_kwargs)
-            delta = paddle.maximum(
-                paddle.ones_like(x) * atol, rtol * paddle.maximum(paddle.abs(x_lower), paddle.abs(x_prev))
-            )
-            norm_fn = lambda v: paddle.sqrt(paddle.square(v.reshape((v.shape[0], -1))).mean(axis=-1, keepdim=True))
-            E = norm_fn((x_higher - x_lower) / delta).max()
-            if paddle.all(E <= 1.0):
-                x = x_higher
-                s = t
-                x_prev = x_lower
-                lambda_s = ns.marginal_lambda(s)
-            h = paddle.minimum(theta * h * paddle.pow(E, -1.0 / order), lambda_0 - lambda_s)
-            nfe += order
-        print("adaptive solver nfe", nfe)
-        return x
-
     def sample(
         self,
         x,
@@ -1012,38 +823,8 @@ class DPM_Solver:
         """
         t_0 = eps
         t_T = self.noise_schedule.T if T is None else T
-        if method == "adaptive":
-            with paddle.no_grad():
-                x = self.dpm_solver_adaptive(
-                    x, order=order, t_T=t_T, t_0=t_0, atol=atol, rtol=rtol, solver_type=solver_type
-                )
-        elif method == "multistep":
-            assert steps >= order
-            timesteps = self.get_time_steps(skip_type=skip_type, t_T=t_T, t_0=t_0, N=steps)
-            assert timesteps.shape[0] - 1 == steps
-            with paddle.no_grad():
-                vec_t = timesteps[0].expand([x.shape[0]])
-                noise_prev_list = [self.model_fn(x, vec_t)]
-                t_prev_list = [vec_t]
-                for init_order in range(1, order):
-                    vec_t = timesteps[init_order].expand([x.shape[0]])
-                    x = self.dpm_multistep_update(
-                        x, noise_prev_list, t_prev_list, vec_t, init_order, solver_type=solver_type
-                    )
-                    noise_prev_list.append(self.model_fn(x, vec_t))
-                    t_prev_list.append(vec_t)
-                for step in range(order, steps + 1):
-                    vec_t = timesteps[step].expand([x.shape[0]])
-                    x = self.dpm_multistep_update(
-                        x, noise_prev_list, t_prev_list, vec_t, order, solver_type=solver_type
-                    )
-                    for i in range(order - 1):
-                        t_prev_list[i] = t_prev_list[i + 1]
-                        noise_prev_list[i] = noise_prev_list[i + 1]
-                    t_prev_list[-1] = vec_t
-                    if step < steps:
-                        noise_prev_list[-1] = self.model_fn(x, vec_t)
-        elif method == "fast":
+
+        if method == "fast":
             orders, _ = self.get_time_steps_for_dpm_solver_fast(
                 skip_type=skip_type, t_T=t_T, t_0=t_0, steps=steps, order=order
             )
@@ -1078,18 +859,6 @@ class DPM_Solver:
                     )
                     x = self.dpm_solver_update(x, vec_s, vec_t, order, solver_type=solver_type, r1=r1, r2=r2)
                     i += order
-        elif method == "singlestep":
-            N_steps = steps // order
-            orders = [order] * N_steps
-            timesteps = self.get_time_steps(skip_type=skip_type, t_T=t_T, t_0=t_0, N=N_steps)
-            assert len(timesteps) - 1 == N_steps
-            with paddle.no_grad():
-                for i, order in enumerate(orders):
-                    vec_s, vec_t = (
-                        paddle.ones((x.shape[0],)) * timesteps[i],
-                        paddle.ones((x.shape[0],)) * timesteps[i + 1],
-                    )
-                    x = self.dpm_solver_update(x, vec_s, vec_t, order, solver_type=solver_type)
         if denoise:
             x = self.denoise_fn(x, paddle.ones((x.shape[0],)) * t_0)
         return x
