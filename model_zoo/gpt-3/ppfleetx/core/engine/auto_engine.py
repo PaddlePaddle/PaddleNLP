@@ -59,6 +59,8 @@ class AutoEngine(BasicEngine):
         self._module = module
 
         # lr_scheduler and optimizer
+        if configs.Optimizer.lr.get("name") == "CosineAnnealingWithWarmupDecay":
+            configs.Optimizer.lr["global_batch_size"] = configs.Global.global_batch_size
         lr = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
         optimizer = build_optimizer(configs.Optimizer, model, lr) if mode == "train" else None
 

@@ -295,12 +295,14 @@ class MultiHeadAttention(nn.Layer):
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        out, weights = flash_attention(q, k, v, self.dropout, causal=True, return_softmax=self.need_weights)
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
             perm = [1, 0, 2]
             out = tensor.transpose(x=out, perm=perm)
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
@@ -340,7 +342,7 @@ class MultiHeadAttention(nn.Layer):
         # else out shape is [b, s, h]
         out = tensor.reshape(x=out, shape=[0, 0, -1])
 
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
         r"""
@@ -365,9 +367,12 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self.core_attn
 
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            out, weights = recompute(attn_func, q, k, v, attn_mask)
+            out = recompute(attn_func, q, k, v, attn_mask)
         else:
-            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
+            out = attn_func(q, k, v, attn_mask=attn_mask)
+
+        if self.need_weights:
+            out, weights = out
 
         # project to output
         # if sequence_parallel is true, out shape are [s/n, b, h],

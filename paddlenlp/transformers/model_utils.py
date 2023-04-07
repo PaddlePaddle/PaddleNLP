@@ -22,7 +22,7 @@ import re
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 import numpy as np
 import paddle
@@ -77,6 +77,128 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
+    """
+    Prune a linear layer to keep only entries in index.
+    Used to remove heads.
+    Args:
+        layer (`paddle.nn.Linear`): The layer to prune.
+        index (`paddle.Tensor`): The indices to keep in the layer.
+        dim (`int`, *optional*, defaults to 0): The dimension on which to keep the indices.
+    Returns:
+        `paddle.nn.Linear`: The pruned layer as a new layer with `stop_gradient=False`.
+    """
+    index = index.to(layer.weight)
+    W = layer.weight.index_select(dim, index).clone().detach()
+    if layer.bias is not None:
+        if dim == 1:
+            b = layer.bias.clone().detach()
+        else:
+            b = layer.bias[index].clone().detach()
+    new_size = list(layer.weight.shape)
+    new_size[dim] = len(index)
+    new_layer = nn.Linear(new_size[1], new_size[0], bias_attr=layer.bias is not None)
+    new_layer.weight.stop_gradient = True
+    new_layer.weight.copy_(W)
+    new_layer.weight.stop_gradient = False
+    if layer.bias is not None:
+        new_layer.bias.stop_gradient = True
+        new_layer.bias.copy_(b)
+        new_layer.bias.stop_gradient = False
+    return new_layer
+
+
+def find_pruneable_heads_and_indices(
+    heads: List[int], n_heads: int, head_size: int, already_pruned_heads: Set[int]
+) -> Tuple[Set[int], paddle.Tensor]:
+    """
+    Finds the heads and their indices taking `already_pruned_heads` into account.
+    Args:
+        heads (`List[int]`): List of the indices of heads to prune.
+        n_heads (`int`): The number of heads in the model.
+        head_size (`int`): The size of each head.
+        already_pruned_heads (`Set[int]`): A set of already pruned heads.
+    Returns:
+        `Tuple[Set[int], paddle.Tensor]`: A tuple with the remaining heads and their corresponding indices.
+    """
+    mask = paddle.ones([n_heads, head_size])
+    heads = set(heads) - already_pruned_heads  # Convert to set and remove already pruned heads
+    for head in heads:
+        # Compute how many pruned heads are before the head and move the index accordingly
+        head = head - sum(1 if h < head else 0 for h in already_pruned_heads)
+        mask[head] = 0
+    mask = mask.reshape([-1]).eq(1)
+    index: paddle.Tensor = paddle.arange(len(mask))[mask].cast("int64")
+    return heads, index
+
+
+def apply_chunking_to_forward(
+    forward_fn: Callable[..., paddle.Tensor], chunk_size: int, chunk_dim: int, *input_tensors
+) -> paddle.Tensor:
+    """
+    This function chunks the `input_tensors` into smaller input tensor parts of size `chunk_size` over the dimension
+    `chunk_dim`. It then applies a layer `forward_fn` to each chunk independently to save memory.
+    If the `forward_fn` is independent across the `chunk_dim` this function will yield the same result as directly
+    applying `forward_fn` to `input_tensors`.
+    Args:
+        forward_fn (`Callable[..., paddle.Tensor]`):
+            The forward function of the model.
+        chunk_size (`int`):
+            The chunk size of a chunked tensor: `num_chunks = len(input_tensors[0]) / chunk_size`.
+        chunk_dim (`int`):
+            The dimension over which the `input_tensors` should be chunked.
+        input_tensors (`Tuple[paddle.Tensor]`):
+            The input tensors of `forward_fn` which will be chunked
+    Returns:
+        `paddle.Tensor`: A tensor with the same shape as the `forward_fn` would have given if applied`.
+    Examples:
+    ```python
+    # rename the usual forward() fn to forward_chunk()
+    def forward_chunk(self, hidden_states):
+        hidden_states = self.decoder(hidden_states)
+        return hidden_states
+    # implement a chunked forward function
+    def forward(self, hidden_states):
+        return apply_chunking_to_forward(self.forward_chunk, self.chunk_size_lm_head, self.seq_len_dim, hidden_states)
+    ```"""
+
+    assert len(input_tensors) > 0, f"{input_tensors} has to be a tuple/list of tensors"
+
+    # inspect.signature exist since python 3.5 and is a python method -> no problem with backward compatibility
+    num_args_in_forward_chunk_fn = len(inspect.signature(forward_fn).parameters)
+    if num_args_in_forward_chunk_fn != len(input_tensors):
+        raise ValueError(
+            f"forward_chunk_fn expects {num_args_in_forward_chunk_fn} arguments, but only {len(input_tensors)} input "
+            "tensors are given"
+        )
+
+    if chunk_size > 0:
+        tensor_shape = input_tensors[0].shape[chunk_dim]
+        for input_tensor in input_tensors:
+            if input_tensor.shape[chunk_dim] != tensor_shape:
+                raise ValueError(
+                    f"All input tenors have to be of the same shape: {tensor_shape}, "
+                    f"found shape {input_tensor.shape[chunk_dim]}"
+                )
+
+        if input_tensors[0].shape[chunk_dim] % chunk_size != 0:
+            raise ValueError(
+                f"The dimension to be chunked {input_tensors[0].shape[chunk_dim]} has to be a multiple of the chunk "
+                f"size {chunk_size}"
+            )
+
+        num_chunks = input_tensors[0].shape[chunk_dim] // chunk_size
+
+        # chunk input tensor into tuples
+        input_tensors_chunks = tuple(input_tensor.chunk(num_chunks, axis=chunk_dim) for input_tensor in input_tensors)
+        # apply forward fn to every tuple
+        output_chunks = tuple(forward_fn(*input_tensors_chunk) for input_tensors_chunk in zip(*input_tensors_chunks))
+        # concatenate output at same dimension
+        return paddle.concat(output_chunks, axis=chunk_dim)
+
+    return forward_fn(*input_tensors)
 
 
 def unwrap_model(model, *args, **kwargs):
@@ -156,7 +278,10 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def _find_weight_file_path(
-    cache_dir: str, model_class: Type[PretrainedModel], resource_uri: Optional[str] = None
+    cache_dir: str,
+    model_class: Type[PretrainedModel],
+    config: PretrainedConfig = None,
+    resource_uri: Optional[str] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
@@ -178,7 +303,15 @@ def _find_weight_file_path(
     if os.path.isfile(weight_file_path):
         return weight_file_path
 
-    # 3. find the target weight file if there is only one weight file
+    # 3. find the target weight file name for splited tensor parallel
+    if config and config.tensor_parallel_degree > 1:
+        tensor_parallel_weight_file_path = os.path.join(
+            cache_dir, _add_variant(resource_weight_file_name, f"tp{config.tensor_parallel_rank:0>2d}")
+        )
+        if os.path.isfile(tensor_parallel_weight_file_path):
+            return tensor_parallel_weight_file_path
+
+    # 4. find the target weight file if there is only one weight file
     weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
     if len(weight_file_names) == 1:
         logger.warning(
@@ -264,7 +397,6 @@ def register_base_model(cls):
 
 class BackboneMixin:
     def forward_with_filtered_kwargs(self, *args, **kwargs):
-
         signature = dict(inspect.signature(self.forward).parameters)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
@@ -360,7 +492,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         config = kwargs["config"]
         if not isinstance(config, PretrainedConfig):
-            raise TypeError("config parameter should be the instance of PretraiendConfig")
+            raise TypeError("config parameter should be the instance of PretrainedConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
         self.model_config_file = CONFIG_NAME
@@ -374,32 +506,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if not self.constructed_from_pretrained_config():
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
-
-    def __getattr__(self, name):
-        """
-        called when the attribute name is missed in the model
-
-        Args:
-            name: the name of attribute
-
-        Returns: the value of attribute
-
-        """
-        try:
-            return super(PretrainedModel, self).__getattr__(name)
-        except AttributeError:
-            result = getattr(self.config, name)
-            if getattr(self, "deprecated_warnings", None) is None:
-                self.deprecated_warnings = {}
-
-            if not self.deprecated_warnings.get(name, False):
-                logger.warning(
-                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-                    f"Instead, do `model.config.{name}`"
-                )
-                self.deprecated_warnings[name] = True
-
-            return result
 
     @property
     def base_model(self):
@@ -458,6 +564,30 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             Optional[Embedding]: the otuput embedding of model
         """
         return None
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        tie_word_embeddings = (
+            self.tie_word_embeddings
+            if hasattr(self, "tie_word_embeddings")
+            else self.config.get("tie_word_embeddings", False)
+        )
+
+        if tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            input_embeddings = self.get_input_embeddings()
+            if output_embeddings is not None and input_embeddings is not None:
+                if input_embeddings.weight.shape == output_embeddings.weight.shape:
+                    output_embeddings.weight = input_embeddings.weight
+                else:
+                    raise ValueError(
+                        "when tie input/output embeddings, the shape of output embeddings: {}"
+                        "should be equal to shape of input embeddings: {}".format(
+                            input_embeddings.weight.shape, output_embeddings.weight.shape
+                        )
+                    )
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
@@ -822,7 +952,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with io.open(model_config_file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
-    def save_pretrained(self, save_dir: str):
+    def save_pretrained(self, save_dir: str, *args, **kwargs):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -846,7 +976,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
         if self.constructed_from_pretrained_config():
-            return self.save_pretrained_v2(save_dir)
+            return self.save_pretrained_v2(save_dir, *args, **kwargs)
 
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
@@ -1023,6 +1153,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         cache_dir: str | None = None,
         subfolder: str | None = None,
+        config: PretrainedConfig = None,
         support_conversion: bool = False,
     ) -> str:
         """resolve model target file path from `` and `cache_dir`
@@ -1091,7 +1222,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
                 if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
@@ -1110,7 +1240,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
 
         # 4. download from community or hf-hub
         else:
@@ -1124,18 +1254,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if url_file_exists(community_model_file_path):
                 return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
-            # 5. Final ERROR
-            logger.warning(
-                f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-                f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-            )
+        # 5. Final ERROR
+        logger.warning(
+            f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
+            f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
+        )
 
-            if ENABLE_TORCH_CHECKPOINT:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
-            else:
-                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+        if ENABLE_TORCH_CHECKPOINT:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+        else:
+            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
 
-            raise FileNotFoundError(msg)
+        raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(
@@ -1367,7 +1497,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
         init_contexts = []
         if low_cpu_mem_usage:
@@ -1404,6 +1534,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
+            config=config,
             support_conversion=support_conversion,
         )
 
@@ -1423,9 +1554,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
         else:
             # 4. loading the state dict
-            if config.tensor_parallel_degree > 1:
-                if model_weight_file.endswith("model_state.pdparams"):
-                    model_state_dict = cls.convert_tensor_parallel(model_weight_file, config, cache_dir)
+            if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):
+                model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
             else:
                 model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
@@ -1433,11 +1563,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
-
-        if config.tensor_parallel_degree > 1:
-            model.resource_files_names["model_state"] = _add_variant(
-                model.resource_files_names["model_state"], f"tp{config.tensor_parallel_rank:0>2d}"
-            )
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
@@ -1493,7 +1618,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model, model_state_dict
 
-    def save_pretrained_v2(self, save_dir: str):
+    def save_pretrained_v2(self, save_dir: str, *args, **kwargs):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -1519,22 +1644,41 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
+        merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+
         # 1. retrieve the model related config
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         model_to_save = unwrap_model(self)
+
+        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
+
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        # Attach architecture to the config
-        model_to_save.config.architectures = [model_to_save.__class__.__name__]
+        state_dict_to_save = None
+        config_to_save = model_to_save.config
+        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
+            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+            config_to_save.tensor_parallel_degree = 1
+            if config_to_save.tensor_parallel_rank != 0:
+                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                return
+        else:
+            if config_to_save.tensor_parallel_degree > 1:
+                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
 
-        model_to_save.config.save_pretrained(save_dir)
+            state_dict_to_save = self.state_dict()
+
+        # Attach architecture to the config
+        config_to_save.architectures = [model_to_save.__class__.__name__]
+        config_to_save.save_pretrained(save_dir)
 
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, self.resource_files_names["model_state"])
-            paddle.save(self.state_dict(), file_name)
+            file_name = os.path.join(save_dir, WEIGHTS_NAME)
+            paddle.save(state_dict_to_save, file_name)
+            del model_to_save
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")

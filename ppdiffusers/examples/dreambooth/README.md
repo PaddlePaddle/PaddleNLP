@@ -12,7 +12,7 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-pip install -U ppdiffusers visualdl
+pip install -U ppdiffusers visualdl -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
 
 ### 1.2 Sks Dog 训练教程
@@ -75,6 +75,7 @@ python -u train_dreambooth.py \
 > * `--random_flip`: 是否对图片进行随机水平反转，默认值为`False`。
 > * `--gradient_checkpointing`: 是否开启`gradient_checkpointing`功能，在一定程度上能够更显显存，但是会减慢训练速度。
 > * `--output_dir`: 模型训练完所保存的路径，默认设置为`dreambooth-model`文件夹，建议用户每训练一个模型可以修改一下输出路径，防止先前已有的模型被覆盖了。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
 > 基本无需修改的参数
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
@@ -117,8 +118,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_dreambooth.py \
 当训练完成后，模型将自动保存到`output_dir`目录，在上述例子中，我们的模型最终保存到了`dream_outputs`文件夹。我们可以使用`StableDiffusionPipeline`快速加载该模型。
 
 ```
-├── run_multi.sh # 4卡训练命令
-├── run_single.sh # 单卡训练命令
 ├── train_dreambooth.py # 训练脚本
 ├── dream_outputs  # 我们指定的输出文件路径
     ├── vae # vae权重文件夹

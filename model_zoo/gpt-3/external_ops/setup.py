@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import multiprocessing
+import os
 
 
 def get_gencode_flags():
@@ -29,10 +30,16 @@ def run(func):
     p.join()
 
 
+def change_pwd():
+    path = os.path.dirname(__file__)
+    os.chdir(path)
+
+
 def setup_fast_ln():
     from paddle.utils.cpp_extension import CUDAExtension, setup
 
     gencode_flags = get_gencode_flags()
+    change_pwd()
     setup(
         name="fast_ln",
         ext_modules=CUDAExtension(
@@ -66,6 +73,7 @@ def setup_fused_ln():
     from paddle.utils.cpp_extension import CUDAExtension, setup
 
     gencode_flags = get_gencode_flags()
+    change_pwd()
     setup(
         name="fused_ln",
         ext_modules=CUDAExtension(

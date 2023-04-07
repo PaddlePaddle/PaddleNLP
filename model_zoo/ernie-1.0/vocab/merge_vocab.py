@@ -14,10 +14,11 @@
 
 import pickle
 import re
+
 from paddlenlp.transformers import BasicTokenizer
 from paddlenlp.transformers.tokenizer_utils import (
-    _is_punctuation,
     _is_control,
+    _is_punctuation,
     _is_whitespace,
     is_chinese_char,
     tokenize_special_chars,
@@ -39,7 +40,7 @@ def chinese_char():
 # 日文 或 谚文字母
 def jk_vocab(c):
     c = ord(c)
-    return (c >= 0x3040 and c <= 0x33FF) or (c >= 0x1100 and c <= 0x11FF)  #  谚文字母
+    return (c >= 0x3040 and c <= 0x33FF) or (c >= 0x1100 and c <= 0x11FF)  # 谚文字母
 
 
 # 特殊 TOKEN

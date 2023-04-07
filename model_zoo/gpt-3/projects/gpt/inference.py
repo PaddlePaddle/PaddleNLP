@@ -26,8 +26,9 @@ import ppfleetx_ops
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../")))
 
+import paddle.distributed.fleet as fleet
 from ppfleetx.core.engine.inference_engine import InferenceEngine
-from ppfleetx.data import build_dataloader, tokenizers
+from ppfleetx.data import tokenizers
 
 
 def parse_args():

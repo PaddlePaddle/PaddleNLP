@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+
+import paddle
+
 from .batch_sampler import *
 from .env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from .import_utils import install_package, uninstall_package
 from .serialization import load_torch
+
+
+@contextlib.contextmanager
+def device_guard(device="cpu", dev_id=0):
+    origin_device = paddle.device.get_device()
+    if device == "cpu":
+        paddle.set_device(device)
+    elif device in ["gpu", "xpu", "npu"]:
+        paddle.set_device("{}:{}".format(device, dev_id))
+    try:
+        yield
+    finally:
+        paddle.set_device(origin_device)

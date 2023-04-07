@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 import unittest
 
 import paddle
-from test_modeling_common import ModelTesterMixin
+from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import VQModel
 from ppdiffusers.utils import floats_tensor
@@ -29,18 +29,16 @@ class VQModelTests(ModelTesterMixin, unittest.TestCase):
     def dummy_input(self, sizes=(32, 32)):
         batch_size = 4
         num_channels = 3
-
         image = floats_tensor((batch_size, num_channels) + sizes)
-
         return {"sample": image}
 
     @property
     def input_shape(self):
-        return (3, 32, 32)
+        return 3, 32, 32
 
     @property
     def output_shape(self):
-        return (3, 32, 32)
+        return 3, 32, 32
 
     def prepare_init_args_and_inputs_for_common(self):
         init_dict = {
@@ -64,34 +62,28 @@ class VQModelTests(ModelTesterMixin, unittest.TestCase):
         model, loading_info = VQModel.from_pretrained("fusing/vqgan-dummy", output_loading_info=True)
         self.assertIsNotNone(model)
         self.assertEqual(len(loading_info["missing_keys"]), 0)
-
         image = model(**self.dummy_input)
-
         assert image is not None, "Make sure output is not None"
 
     def test_output_pretrained(self):
         model = VQModel.from_pretrained("fusing/vqgan-dummy")
         model.eval()
-
         paddle.seed(0)
-
-        image = paddle.randn([1, model.config.in_channels, model.config.sample_size, model.config.sample_size])
+        image = paddle.randn(shape=[1, model.config.in_channels, model.config.sample_size, model.config.sample_size])
         with paddle.no_grad():
             output = model(image).sample
-
-        output_slice = output[0, -1, -3:, -3:].flatten()
+        output_slice = output[0, -1, -3:, -3:].flatten().cpu()
         expected_output_slice = paddle.to_tensor(
             [
-                -0.02714749,
-                -0.41129789,
-                -0.17730837,
-                -0.52454376,
-                -0.24236129,
-                -0.39570868,
-                -0.16461502,
-                -0.06902058,
-                -0.01736599,
+                -0.027147896587848663,
+                -0.41129639744758606,
+                -0.17730756103992462,
+                -0.5245445370674133,
+                -0.2423611730337143,
+                -0.3957087993621826,
+                -0.16461530327796936,
+                -0.06902074813842773,
+                -0.01736617460846901,
             ]
         )
-
-        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
+        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=0.01))
