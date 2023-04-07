@@ -592,10 +592,9 @@ if is_paddle_available() and is_paddlenlp_available():
     # patch BertModel forward
     from paddlenlp.transformers import BertModel
 
-    raw_forward = BertModel.forward
+    BertModel.raw_forward = BertModel.forward
 
-    @patch_to(BertModel)
-    def forward(
+    def forward_new(
         self,
         input_ids: paddle.Tensor,
         token_type_ids: Optional[paddle.Tensor] = None,
@@ -609,18 +608,19 @@ if is_paddle_available() and is_paddlenlp_available():
     ):
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
-        return raw_forward(
-            self,
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            past_key_values,
-            use_cache,
-            output_hidden_states,
-            output_attentions,
-            return_dict,
+        return self.raw_forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
         )
+
+    BertModel.forward = forward_new
 
     TRANSFORMERS_SAFE_WEIGHTS_NAME = "model.safetensors"
     TRANSFORMERS_WEIGHTS_NAME = "pytorch_model.bin"
