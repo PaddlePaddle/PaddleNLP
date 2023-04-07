@@ -58,6 +58,14 @@ def copy_func(f):
     return fn
 
 
+class _clsmethod:
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, _, f_cls):
+        return MethodType(self.f, f_cls)
+
+
 # copied from https://github.com/fastai/fastcore/blob/c9b4c088d3706569c076e7c197c724730be190ab/fastcore/basics.py#L938-L954
 def patch_to(cls, as_prop=False, cls_method=False):
     "Decorator: add `f` to `cls`"
@@ -73,7 +81,8 @@ def patch_to(cls, as_prop=False, cls_method=False):
                 setattr(nf, o, getattr(f, o))
             nf.__qualname__ = f"{c_.__name__}.{nm}"
             if cls_method:
-                setattr(c_, nm, MethodType(nf, c_))
+                # fix https://github.com/fastai/fastcore/issues/510
+                setattr(c_, nm, _clsmethod(nf))
             else:
                 setattr(c_, nm, property(nf) if as_prop else nf)
         # Avoid clobbering existing functions
@@ -86,35 +95,33 @@ if is_paddle_available():
     import paddle
     import paddle.nn as nn
 
-    paddle.long = paddle.int64
-    paddle.int = paddle.int32
-    paddle.double = paddle.float64
-    paddle.half = paddle.float16
-    paddle.from_numpy = paddle.to_tensor
-    paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
-    paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
-    paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
-    paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
-    paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
-    paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
-    paddle.Tensor.bfloat16 = lambda x: paddle.cast(x, paddle.bfloat16)
-    paddle.Tensor.clamp = paddle.clip
-    paddle.clamp = paddle.clip
+    # paddle.long = paddle.int64
+    # paddle.int = paddle.int32
+    # paddle.double = paddle.float64
+    # paddle.half = paddle.float16
+    # paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
+    # paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
+    # paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
+    # paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
+    # paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
+    # paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
+    # paddle.Tensor.clamp = paddle.clip
+    # paddle.clamp = paddle.clip
 
     def view_pt(x, *shape: builtins.int, name=None):
         return paddle.reshape(x, shape=shape, name=name)
 
     paddle.view = view_pt
     paddle.Tensor.view = view_pt
-    setattr(paddle.Tensor, "data", property(lambda x: x))
-    paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
+
+    if not hasattr(paddle.Tensor, "data_ptr"):
+        paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
 
     def permute_pt(x, *perm: builtins.int, name=None):
         return paddle.transpose(x, perm=perm, name=name)
 
     paddle.permute = permute_pt
     paddle.Tensor.permute = permute_pt
-    paddle.cat = paddle.concat
     paddle.Tensor.softmax = nn.functional.softmax
 
     # patch repeat_interleave
@@ -170,13 +177,6 @@ if is_paddle_available():
 
     paddle.gather_nd = gather_nd
     paddle.Tensor.gather_nd = gather_nd
-
-    def size_pt(self, i=None):
-        if i is None:
-            return self.shape
-        return self.shape[i]
-
-    paddle.Tensor.size = size_pt
     paddle.Tensor.contiguous = lambda x: x
 
     # must return self!
