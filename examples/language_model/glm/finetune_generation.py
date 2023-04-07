@@ -124,23 +124,6 @@ def main():
         model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    # model.generate = partial(
-    #    generate,
-    #    self=model,
-    #    out_seq_length=data_args.src_length + data_args.tgt_length,
-    #    tgt_length=data_args.tgt_length,
-    #    min_tgt_length=data_args.min_tgt_length,
-    #    num_beams=data_args.num_beams,
-    #    length_penalty=data_args.length_penalty,
-    #    no_repeat_ngram_size=data_args.no_repeat_ngram_size,
-    #    end_token_id=tokenizer.eop_token_id,
-    #    pad_token_id=tokenizer.pad_token_id,
-    #    mask_token_id=tokenizer.gmask_token_id,
-    #    no_block_position=data_args.no_block_position,
-    #    select_topk=data_args.select_topk,
-    #    top_k=data_args.top_k,
-    #    top_p=data_args.top_p,
-    # )
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])

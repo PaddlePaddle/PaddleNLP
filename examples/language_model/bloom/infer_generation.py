@@ -21,16 +21,13 @@ import numpy as np
 
 from paddlenlp.transformers import AutoTokenizer
 
-# from utils import left_padding
-
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
-    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
+    parser.add_argument("--model_prefix", type=str, default="bloom", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -134,8 +131,14 @@ class Predictor(object):
         return fd.Runtime(option)
 
     def preprocess(self, input_text):
-        inputs = self.tokenizer(input_text)
-        inputs = left_padding(inputs, self.tokenizer.pad_token_id)
+        inputs = self.tokenizer(
+            input_text,
+            return_tensors="np",
+            padding=True,
+            max_length="max_length",
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
         input_ids_name = self.runtime.get_input_info(0).name
         input_map = {
             input_ids_name: np.array(inputs["input_ids"], dtype="int64"),

@@ -195,7 +195,7 @@ class SentenceBackTranslate:
         num_beams (int): The number of beams in the "beam_search"
             strategy. Default to 4.
         use_faster: (bool): Whether to use faster entry of model
-            for FasterGeneration. Default to True.
+            for FasterGeneration. Default to False.
         decode_strategy (str, optional): The decoding strategy in generation.
             Currently, there are three decoding strategies supported:
             "greedy_search", "sampling" and "beam_search". Default to
@@ -209,7 +209,7 @@ class SentenceBackTranslate:
         max_length=128,
         batch_size=1,
         num_beams=4,
-        use_faster=True,
+        use_faster=False,
         decode_strategy="beam_search",
         from_model_name=None,
         to_model_name=None,

@@ -252,6 +252,7 @@ class GAUAlphaModelTest(ModelTesterMixin, unittest.TestCase):
     return_dict: bool = False
     use_labels: bool = False
     use_test_inputs_embeds: bool = False
+    test_tie_weights = True
 
     all_model_classes = (
         GAUAlphaModel,
