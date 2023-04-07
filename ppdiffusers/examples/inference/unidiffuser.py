@@ -28,13 +28,13 @@ from ppdiffusers.utils import load_image
 
 generator = paddle.Generator().manual_seed(0)
 
-# mode = "t2i"
-mode = "i2t"
-# mode = "t2i2t"
-# mode = "i2t2i"
+mode = "t2i"
+# mode = "i2t"
 # mode = "joint"
 # mode = "i"
 # mode = "t"
+# mode = "t2i2t"
+# mode = "i2t2i"
 
 pipe = UniDiffuserPipeline(
     image_encoder=CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32"),

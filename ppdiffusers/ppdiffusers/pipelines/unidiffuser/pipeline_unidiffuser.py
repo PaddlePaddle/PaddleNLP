@@ -47,15 +47,13 @@ def preprocess(image):
         return image
     elif isinstance(image, PIL.Image.Image):
         image = [image]
+    else:
+        raise ValueError
 
     if isinstance(image[0], PIL.Image.Image):
-        w, h = image[0].size
-        w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
-        image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
-        image = np.concatenate(image, axis=0)
-        image = np.array(image).astype(np.float32) / 255.0
-        image = image.transpose(0, 3, 1, 2)
-        image = 2.0 * image - 1.0
+        image = np.array(image[0])
+        image = (image / 127.5 - 1.0).astype(np.float32)
+        image = einops.rearrange(image, "h w c -> 1 c h w")
         image = paddle.to_tensor(image)
     elif isinstance(image[0], paddle.Tensor):
         image = paddle.concat(image, axis=0)
@@ -300,10 +298,13 @@ class UniDiffuserPipeline(DiffusionPipeline):
             )
 
         if isinstance(generator, list):
-            image_latents = [self.vae.encode(image[i : i + 1]).latent_dist.mode() for i in range(batch_size)]
+            image_latents = [
+                self.vae.encode(image[i : i + 1]).latent_dist.sample() * self.vae.scaling_factor
+                for i in range(batch_size)
+            ]
             image_latents = paddle.concat(image_latents, axis=0)
         else:
-            image_latents = self.vae.encode(image).latent_dist.mode()
+            image_latents = self.vae.encode(image).latent_dist.sample() * self.vae.scaling_factor
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] == 0:
             # expand image_latents for batch_size
@@ -322,10 +323,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
             )
         else:
             image_latents = paddle.concat([image_latents], axis=0)
-
-        if do_classifier_free_guidance:
-            uncond_image_latents = paddle.zeros_like(image_latents)
-            image_latents = paddle.concat([image_latents, image_latents, uncond_image_latents], axis=0)
 
         return image_latents
 
@@ -679,7 +676,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 50,
-        guidance_scale: float = 7.5,
+        guidance_scale: float = 7.0,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         num_prompts_per_image: Optional[int] = 1,
@@ -741,7 +738,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
             # 4.1. Encode images, if available
             # Encode image using VAE
             image_vae = preprocess(image)  # [1, 3, 512, 512]
-            height, width = np.array(image).shape[:2]
+            height, width = image_vae.shape[2:]
             image_vae_latents = self.encode_image_vae_latents(
                 image_vae,
                 batch_size,
