@@ -1115,6 +1115,7 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
         self.lm_head = RobertaLMHead(config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -1231,8 +1232,7 @@ class RobertaLMHead(nn.Layer):
         self.bias = paddle.create_parameter(
             shape=tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor)
         )
-        self.decoder = nn.Linear(config.hidden_size, config.vocab_size)
-        self.decoder.bias = self.bias
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -1240,7 +1240,7 @@ class RobertaLMHead(nn.Layer):
         x = self.layer_norm(x)
 
         # project back to size of vocabulary with bias
-        x = self.decoder(x)
+        x = paddle.matmul(x, self.decoder.weight, transpose_y=True) + self.bias
 
         return x
 
@@ -1260,6 +1260,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
         self.apply(self.init_weights)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
