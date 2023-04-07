@@ -819,8 +819,8 @@ class BloomModel(BloomPreTrainedModel):
         # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
         if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
-                self.vocab_size,
-                self.hidden_size,
+                config.vocab_size,
+                config.hidden_size,
                 weight_attr=paddle.ParamAttr(
                     initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
                 ),
