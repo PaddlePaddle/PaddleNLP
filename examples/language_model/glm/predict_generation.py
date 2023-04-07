@@ -21,10 +21,13 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", required=True, help="The directory of model.")
+    parser.add_argument(
+        "--model_name_or_path", default="THUDM/glm-large-chinese", required=True, help="The directory of model."
+    )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
+
     return parser.parse_args()
 
 
@@ -39,10 +42,10 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
         self.batch_size = args.batch_size
         self.args = args
-        self.model = AutoModelForConditionalGeneration.from_pretrained(args.model_path)
+        self.model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
         self.model.eval()
 
     def preprocess(self, input_text):
