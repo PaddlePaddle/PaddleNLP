@@ -425,6 +425,9 @@ class LukeModel(LukePretrainedModel):
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
+    Args:
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
     """
 
     def __init__(self, config: LukeConfig):
@@ -766,9 +769,9 @@ class LukeForEntityClassification(LukePretrainedModel):
 
         self.luke = LukeModel(config)
 
-        self.num_classes = config.num_classes
+        self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(self.config.hidden_size, config.num_classes)
+        self.classifier = nn.Linear(self.config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -805,7 +808,7 @@ class LukeForEntityClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -814,7 +817,7 @@ class LukeForEntityClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntityClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntityClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntityClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7)]
@@ -857,9 +860,9 @@ class LukeForEntityPairClassification(LukePretrainedModel):
 
         self.luke = LukeModel(config)
 
-        self.num_classes = config.num_classes
+        self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(self.config.hidden_size * 2, config.num_classes, bias_attr=False)
+        self.classifier = nn.Linear(self.config.hidden_size * 2, config.num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
     def forward(
@@ -896,7 +899,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity pair classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -905,7 +908,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntityPairClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntityPairClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntityPairClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7), (17, 28)]
@@ -947,9 +950,9 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
 
         self.luke = LukeModel(config)
 
-        self.num_classes = config.num_classes
+        self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(self.config.hidden_size * 3, config.num_classes)
+        self.classifier = nn.Linear(self.config.hidden_size * 3, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -992,7 +995,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity span classification logits.
-            Shape as `[batch_size, num_entities, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_entities, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -1001,7 +1004,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntitySpanClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntitySpanClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntitySpanClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7)]

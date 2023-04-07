@@ -59,7 +59,7 @@ class LukeModelTester:
         pad_token_id=1,
         cls_token_id=2,
         entity_pad_token_id=0,
-        num_classes=2,
+        num_labels=2,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -83,7 +83,7 @@ class LukeModelTester:
         self.entity_vocab_size = entity_vocab_size
         self.entity_emb_size = entity_emb_size
         self.entity_pad_token_id = entity_pad_token_id
-        self.num_classes = num_classes
+        self.num_labels = num_labels
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -130,7 +130,7 @@ class LukeModelTester:
             pad_token_id=self.pad_token_id,
             entity_emb_size=self.entity_emb_size,
             entity_pad_token_id=self.entity_pad_token_id,
-            num_classes=self.num_classes,
+            num_labels=self.num_labels,
         )
 
     def prepare_config_and_inputs_for_common(self):
@@ -244,7 +244,7 @@ class LukeModelTester:
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
         )
-        self.parent.assertEqual(result.shape, [self.batch_size, self.num_classes])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.num_labels])
 
     def create_and_check_entity_span_classification_model(
         self,
@@ -268,7 +268,7 @@ class LukeModelTester:
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
         )
-        self.parent.assertEqual(result.shape, [self.batch_size, 2, self.num_classes])
+        self.parent.assertEqual(result.shape, [self.batch_size, 2, self.num_labels])
 
     def create_and_check_entity_pair_classification_model(
         self,
@@ -290,7 +290,7 @@ class LukeModelTester:
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
         )
-        self.parent.assertEqual(result.shape, [self.batch_size, self.num_classes])
+        self.parent.assertEqual(result.shape, [self.batch_size, self.num_labels])
 
 
 class LukeModelTest(ModelTesterMixin, unittest.TestCase):
