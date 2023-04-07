@@ -744,12 +744,12 @@ class ErnieLMPredictionHead(nn.Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.bias = self.create_parameter(
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder.bias = self.create_parameter(
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
         # link bias
-        self.decoder.bias = self.bias
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -759,10 +759,7 @@ class ErnieLMPredictionHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        print(hidden_states)
-        print(paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True))
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
-        print(self.bias)
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
