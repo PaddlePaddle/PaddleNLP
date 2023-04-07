@@ -13,10 +13,16 @@
 # limitations under the License.
 
 import argparse
+import os
+import sys
 import time
 
 import numpy as np
 import paddle.distributed.fleet as fleet
+
+__dir__ = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath(os.path.join(__dir__, "../", "../")))
+
 from ppfleetx.core.engine.inference_engine import InferenceEngine
 
 
