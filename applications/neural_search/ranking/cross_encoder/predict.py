@@ -18,18 +18,16 @@ from functools import partial
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from tqdm import tqdm
-from paddlenlp.transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
+from data import convert_example, create_dataloader, read_text_pair
 
-from data import convert_example, read_text_pair, create_dataloader
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default="checkpoints/model_900/model_state.pdparams", help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--test_set", type=str, required=True, help="The full path of test_set.")
 parser.add_argument("--topk", type=int, default=10, help="The Topk texts.")

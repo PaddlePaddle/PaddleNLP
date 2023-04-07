@@ -12,30 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import json
+import logging
 import os
 import sys
 import time
-import logging
-import json
-import collections
 from functools import partial
 from pathlib import Path
-import argparse
 
 import paddle
-from paddle.io import DataLoader
-from paddlenlp.data import Pad, Dict
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics.squad import squad_evaluate
-
-from squad import RCInterpret
-from squad import compute_prediction
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-
 from roberta.modeling import RobertaForQuestionAnswering
+from squad import RCInterpret, compute_prediction
+
+from paddlenlp.data import Dict, Pad
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("../../..")
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import (  # noqa: E402
+    convert_tokenizer_res_to_old_version,
+)
 
 sys.path.remove("../../..")
 
@@ -148,7 +147,6 @@ def evaluate(model, data_loader, args):
 
     all_start_logits = []
     all_end_logits = []
-    all_cls_logits = []
     tic_eval = time.time()
 
     for batch in data_loader:

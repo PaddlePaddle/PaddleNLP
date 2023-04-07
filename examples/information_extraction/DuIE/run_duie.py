@@ -13,48 +13,63 @@
 # limitations under the License.
 
 import argparse
+import json
 import os
 import random
-import time
-import math
-import json
-from functools import partial
-import codecs
-import zipfile
-import re
-from tqdm import tqdm
 import sys
+import time
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from data_loader import DataCollator, DuIEDataset
 from paddle.io import DataLoader
+from tqdm import tqdm
+from utils import decoding, get_precision_recall_f1, write_prediction_results
 
-from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification, LinearDecayWithWarmup
+from paddlenlp.transformers import (
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 
-from data_loader import DuIEDataset, DataCollator
-from utils import decoding, find_entity, get_precision_recall_f1, write_prediction_results
-
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--do_train", action='store_true', default=False, help="do train")
-parser.add_argument("--do_predict", action='store_true', default=False, help="do predict")
+parser.add_argument("--do_train", action="store_true", default=False, help="do train")
+parser.add_argument("--do_predict", action="store_true", default=False, help="do predict")
 parser.add_argument("--init_checkpoint", default=None, type=str, required=False, help="Path to initialize params from")
 parser.add_argument("--data_path", default="./data", type=str, required=False, help="Path to data.")
-parser.add_argument("--predict_data_file", default="./data/test_data.json", type=str, required=False, help="Path to data.")
-parser.add_argument("--output_dir", default="./checkpoints", type=str, required=False, help="The output directory where the model predictions and checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int,help="The maximum total input sequence length after tokenization. Sequences longer "
-    "than this will be truncated, sequences shorter will be padded.", )
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
+parser.add_argument(
+    "--predict_data_file", default="./data/test_data.json", type=str, required=False, help="Path to data."
+)
+parser.add_argument(
+    "--output_dir",
+    default="./checkpoints",
+    type=str,
+    required=False,
+    help="The output directory where the model predictions and checkpoints will be written.",
+)
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
+)
+parser.add_argument(
+    "--batch_size",
+    default=8,
+    type=int,
+    help="Batch size per GPU/CPU for training.",
+)
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_ratio", default=0, type=float, help="Linear warmup over warmup_ratio * total_steps.")
 parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu."
+)
 args = parser.parse_args()
-# yapf: enable
 
 
 class BCELossForDuIE(nn.Layer):

@@ -95,9 +95,11 @@ class TransformerDecoder(Layer):
                 cache=cache[i] if cache is not None else cache,
                 output_attentions=output_attentions,
             )
+
             # outputs = hidden_states if both use_cache and output_attentions are False
             # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
             output = outputs[0] if (use_cache or output_attentions) else outputs
+
             if output_attentions:
                 all_self_attentions = all_self_attentions + (outputs[1],)
             if use_cache:
@@ -460,6 +462,9 @@ class OPTLMHead(Layer):
         )
 
     def forward(self, hidden_states):
+        if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
+            hidden_states = hidden_states["last_hidden_state"]
+
         logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
@@ -485,7 +490,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
@@ -620,8 +625,11 @@ class OPTForCausalLM(OPTPretrainedModel):
         self._fast_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
         return self._fast_entry
 
-    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, inputs_embeds=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
+        if cache is not None:
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         if attention_mask is not None:
@@ -629,27 +637,29 @@ class OPTForCausalLM(OPTPretrainedModel):
                 attention_mask = attention_mask[:, -1, -1, :]
             if "int" in paddle.common_ops_import.convert_dtype(attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        if inputs_embeds is not None and cache is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids}
+
         if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
                 position_ids += 2
-        return {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache,
-        }
+
+        model_inputs.update(
+            {
+                "cache": cache,
+                "use_cache": use_cache,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+            }
+        )
+        return model_inputs
 
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)

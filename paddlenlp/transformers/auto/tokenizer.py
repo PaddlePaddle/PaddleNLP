@@ -21,7 +21,10 @@ from collections import OrderedDict
 from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url_with_filelock,
+)
 from paddlenlp.utils.import_utils import import_module, is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
 
@@ -54,6 +57,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieTokenizer", "ernie"),
         ("FNetTokenizer", "fnet"),
         ("FunnelTokenizer", "funnel"),
+        ("LlamaTokenizer", "llama"),
         ("LayoutXLMTokenizer", "layoutxlm"),
         ("LayoutLMv2Tokenizer", "layoutlmv2"),
         ("LayoutLMTokenizer", "layoutlm"),
@@ -95,6 +99,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMBertTokenizer", "glm"),
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
+        ("BloomTokenizer", "bloom"),
     ]
 )
 
@@ -341,7 +346,7 @@ class AutoTokenizer:
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
+                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

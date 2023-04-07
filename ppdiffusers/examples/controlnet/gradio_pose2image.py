@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,12 +22,14 @@ from annotator.openpose import OpenposePaddleDetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
-from ppdiffusers import StableDiffusionControlNetPipeline
+from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
 apply_openpose = OpenposePaddleDetector()
 
-
-pipe = StableDiffusionControlNetPipeline.from_pretrained("takuma104/control_sd15_openpose", safety_checker=None)
+controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-openpose")
+pipe = StableDiffusionControlNetPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
+)
 
 
 def process(

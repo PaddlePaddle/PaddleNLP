@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from args import parse_args
-
 import paddle
 import paddle.nn as nn
-from paddlenlp.metrics import Perplexity
-
-from seq2seq_attn import Seq2SeqAttnModel, CrossEntropyCriterion
+from args import parse_args
 from data import create_train_loader
+from seq2seq_attn import CrossEntropyCriterion, Seq2SeqAttnModel
+
+from paddlenlp.metrics import Perplexity
 
 
 def do_train(args):
-    device = paddle.set_device(args.device)
+    paddle.set_device(args.device)
 
     # Define dataloader
     train_loader, eval_loader, src_vocab_size, tgt_vocab_size, eos_id = create_train_loader(args)

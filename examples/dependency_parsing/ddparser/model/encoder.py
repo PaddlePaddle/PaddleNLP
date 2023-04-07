@@ -14,9 +14,8 @@
 
 import paddle
 import paddle.nn as nn
-
-from utils import mask_fill, index_sample, pad_sequence_paddle
-from model.dropouts import SharedDropout, IndependentDropout
+from model.dropouts import IndependentDropout, SharedDropout
+from utils import index_sample, pad_sequence_paddle
 
 
 class ErnieEncoder(nn.Layer):

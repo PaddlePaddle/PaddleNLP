@@ -28,29 +28,41 @@
 #### （1）模型微调：
 ```shell
 # 运行训练
-python train_chn.py \
+python -m paddle.distributed.launch --gpus 0,1 python train_chn.py \
 --data_path './data/ChnSentiCorp' \
 --device 'gpu' \
---epochs 10 \
+--num_train_epochs 10 \
 --max_seq_length 512 \
---batch_size 8 \
+--per_device_train_batch_size 8 \
+--per_device_eval_batch_size 8 \
 --learning_rate 2e-5 \
+--adam_beta2 0.98 \
 --weight_decay 0.0001 \
---warmup_proportion 0.1 \
+--warmup_ratio 0.1 \
+--logging_steps 10 \
+--save_steps 100 \
 --seed 2333 \
---save_dir 'outputs/chn' | tee outputs/train_chn.log
+--do_train \
+--do_eval \
+--output_dir 'outputs/chn' | tee outputs/train_chn.log
 ```
 其中参数释义如下：
 - `data_path` 表示微调数据路径
 - `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
-- `epochs` 表示训练轮数。
+- `num_train_epochs` 表示训练轮数。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示每次迭代**每张卡**上的训练样本数目。
+- `per_device_eval_batch_size` 表示每次迭代**每张卡**上的验证样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `adam_beta2` 表示优化器中使用的beta2的系数。
 - `weight_decay` 表示优化器中使用的weight_decay的系数。
-- `warmup_steps` 表示动态学习率热启动的step数。
+- `warmup_ratio` 表示动态学习率热启动的比例。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示验证并保存模型间隔。
 - `seed` 指定随机种子。
-- `save_dir` 表示模型保存路径。
+- `do_train` 表示是否进行训练。
+- `do_eval` 表示是否进行验证。
+- `output_dir` 表示模型保存路径。
 
 #### (2) 评估
 
@@ -61,29 +73,41 @@ python train_chn.py \
 #### （1）训练
 
 ```bash
-python train_xnli.py \
+python -m paddle.distributed.launch --gpus 0,1 python train_xnli.py \
 --data_path './data/XNLI' \
 --device 'gpu' \
---epochs 5 \
---max_seq_len 256 \
---batch_size 16 \
+--num_train_epochs 5 \
+--max_seq_length 256 \
+--per_device_train_batch_size 16 \
+--per_device_eval_batch_size 16 \
 --learning_rate 1.3e-5 \
+--adam_beta2 0.98 \
 --weight_decay 0.001 \
---warmup_proportion 0.1 \
+--warmup_ratio 0.1 \
+--logging_steps 10 \
+--save_steps 100 \
 --seed 2333 \
---save_dir outputs/xnli | tee outputs/train_xnli.log
+--do_train \
+--do_eval \
+--output_dir "outputs/xnli" | tee outputs/train_xnli.log
 ```
 其中参数释义如下：
 - `data_path` 表示微调数据路径
 - `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
-- `epochs` 表示训练轮数。
+- `num_train_epochs` 表示训练轮数。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示每次迭代**每张卡**上的训练样本数目。
+- `per_device_eval_batch_size` 表示每次迭代**每张卡**上的验证样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `adam_beta2` 表示优化器中使用的beta2的系数。
 - `weight_decay` 表示优化器中使用的weight_decay的系数。
-- `warmup_steps` 表示动态学习率热启动的step数。
+- `warmup_ratio` 表示动态学习率热启动的比例。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示验证并保存模型间隔。
 - `seed` 指定随机种子。
-- `save_dir` 表示模型保存路径。
+- `do_train` 表示是否进行训练。
+- `do_eval` 表示是否进行验证。
+- `output_dir` 表示模型保存路径。
 
 #### （2）评估
 
@@ -95,42 +119,49 @@ test数据集 acc最好结果为81.657,达到论文精度要求。
 
 ```shell
 # 开始训练
-python train_cmrc2018.py \
-    --data_dir "data/cmrc2018" \
+python -m paddle.distributed.launch --gpus 0,1 python train_cmrc2018.py \
+    --data_dir "./data/cmrc2018" \
     --model_name_or_path ChineseBERT-large \
     --max_seq_length 512 \
-    --train_batch_size 8 \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 16 \
     --gradient_accumulation_steps 8 \
-    --eval_batch_size 16 \
     --learning_rate 4e-5 \
     --max_grad_norm 1.0 \
+    --adam_beta2 0.98 \
     --num_train_epochs 3 \
     --logging_steps 2 \
     --save_steps 20 \
-    --warmup_radio 0.1 \
+    --warmup_ratio 0.1 \
     --weight_decay 0.01 \
-    --output_dir outputs/cmrc2018 \
     --seed 1111 \
-    --num_workers 0 \
-    --use_amp
+    --do_train \
+    --do_eval \
+    --dataloader_num_workers 0 \
+    --fp16 True \
+    --output_dir "outputs/cmrc2018"
 ```
 其中参数释义如下：
 - `data_path` 表示微调数据路径。
 - `model_name_or_path` 模型名称或者路径，支持ChineseBERT-base、ChineseBERT-large两种种规格。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `train_batch_size` 表示训练过程中每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示训练过程中每次迭代**每张卡**上的样本数目。
+- `per_device_eval_batch_size` 表示验证过程中每次迭代**每张卡**上的样本数目。
 - `gradient_accumulation_steps` 梯度累加步数。
-- `eval_batch_size` 表示验证过程中每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `max_grad_norm` 梯度裁剪。
+- `adam_beta2` 表示优化器中使用的beta2的系数。
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。
-- `warmup_radio` 表示动态学习率热启动的比例。
+- `save_steps` 表示验证并保存模型间隔。
+- `warmup_ratio` 表示动态学习率热启动的比例。
 - `weight_decay` 表示优化器中使用的weight_decay的系数。
-- `output_dir` 表示模型保存路径。
 - `seed` 指定随机种子。
-- `num_workers` 表示同时工作进程。
-- `use_amp` 表示是否使用混合精度。
+- `do_train` 表示是否进行训练。
+- `do_eval` 表示是否进行验证。
+- `dataloader_num_workers` 表示同时工作进程。
+- `fp16` 表示是否使用混合精度fp16。
+- `output_dir` 表示模型保存路径。
 
 训练过程中模型会在dev数据集进行评估，其中最好的结果如下所示：
 

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import time
@@ -23,15 +22,18 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader
-from paddlenlp.datasets import load_dataset
-
 from paddle.metric import Accuracy
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
@@ -260,8 +262,6 @@ def do_train(args):
     ): fn(samples)
 
     train_batch_sampler = paddle.io.BatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-
-    feed_list_name = []
 
     # Define the input data and create the train/dev data_loader
     with paddle.static.program_guard(main_program, startup_program):

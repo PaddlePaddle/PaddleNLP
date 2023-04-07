@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ re_attention = re.compile(
 
 
 def parse_prompt_attention(text):
-    """
+    r"""
     Parses a string with attention tokens and returns a list of pairs: text and its associated weight.
     Accepted tokens are:
       (abc) - increases attention to abc by a multiplier of 1.1
@@ -187,6 +187,7 @@ def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str], max_len
     """
     tokens = []
     weights = []
+    truncated = False
     for text in prompt:
         texts_and_weights = parse_prompt_attention(text)
         text_token = []
@@ -201,15 +202,19 @@ def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str], max_len
 
             # stop if the text is too long (longer than truncation limit)
             if len(text_token) > max_length:
+                truncated = True
                 break
 
         # truncate
         if len(text_token) > max_length:
+            truncated = True
             text_token = text_token[:max_length]
             text_weight = text_weight[:max_length]
 
         tokens.append(text_token)
         weights.append(text_weight)
+    if truncated:
+        logger.warning("Prompt was truncated. Try to shorten the prompt or increase max_embeddings_multiples")
     return tokens, weights
 
 
@@ -228,9 +233,9 @@ def pad_tokens_and_weights(tokens, weights, max_length, bos, eos, pad, no_boseos
             if len(weights[i]) == 0:
                 w = [1.0] * weights_length
             else:
-                for j in range((len(weights[i]) - 1) // chunk_length + 1):
+                for j in range(max_embeddings_multiples):
                     w.append(1.0)  # weight for starting token in this chunk
-                    w += weights[i][j * chunk_length : min(len(weights[i]), (j + 1) * chunk_length)]
+                    w += weights[i][j * (chunk_length - 2) : min(len(weights[i]), (j + 1) * (chunk_length - 2))]
                     w.append(1.0)  # weight for ending token in this chunk
                 w += [1.0] * (weights_length - len(w))
             weights[i] = w[:]
@@ -361,7 +366,7 @@ def get_weighted_text_embeddings(
         no_boseos_middle=no_boseos_middle,
         chunk_length=pipe.tokenizer.model_max_length,
     )
-    prompt_tokens = paddle.to_tensor(prompt_tokens)
+    prompt_tokens = paddle.to_tensor(prompt_tokens, dtype=paddle.int64)
     if uncond_prompt is not None:
         uncond_tokens, uncond_weights = pad_tokens_and_weights(
             uncond_tokens,
@@ -373,37 +378,39 @@ def get_weighted_text_embeddings(
             no_boseos_middle=no_boseos_middle,
             chunk_length=pipe.tokenizer.model_max_length,
         )
-        uncond_tokens = paddle.to_tensor(uncond_tokens)
+        uncond_tokens = paddle.to_tensor(uncond_tokens, dtype=paddle.int64)
 
     # get the embeddings
     text_embeddings = get_unweighted_text_embeddings(
-        pipe, prompt_tokens, pipe.tokenizer.model_max_length, no_boseos_middle=no_boseos_middle
+        pipe,
+        prompt_tokens,
+        pipe.tokenizer.model_max_length,
+        no_boseos_middle=no_boseos_middle,
     )
-    prompt_weights = paddle.to_tensor(prompt_weights, dtype=text_embeddings.dtype)
+    prompt_weights = paddle.to_tensor(prompt_weights, dtype=paddle.float32).cast(text_embeddings.dtype)
     if uncond_prompt is not None:
         uncond_embeddings = get_unweighted_text_embeddings(
-            pipe, uncond_tokens, pipe.tokenizer.model_max_length, no_boseos_middle=no_boseos_middle
+            pipe,
+            uncond_tokens,
+            pipe.tokenizer.model_max_length,
+            no_boseos_middle=no_boseos_middle,
         )
-        uncond_weights = paddle.to_tensor(uncond_weights, dtype=uncond_embeddings.dtype)
+        uncond_weights = paddle.to_tensor(uncond_weights, dtype=paddle.float32).cast(uncond_embeddings.dtype)
 
     # assign weights to the prompts and normalize in the sense of mean
     # TODO: should we normalize by chunk or in a whole (current implementation)?
     if (not skip_parsing) and (not skip_weighting):
         previous_mean = text_embeddings.mean(axis=[-2, -1])
         text_embeddings *= prompt_weights.unsqueeze(-1)
-        text_embeddings *= previous_mean / text_embeddings.mean(axis=[-2, -1])
+        text_embeddings *= previous_mean / text_embeddings.mean(axis=[-2, -1], keepdim=True)
         if uncond_prompt is not None:
             previous_mean = uncond_embeddings.mean(axis=[-2, -1])
             uncond_embeddings *= uncond_weights.unsqueeze(-1)
-            uncond_embeddings *= previous_mean / uncond_embeddings.mean(axis=[-2, -1])
+            uncond_embeddings *= previous_mean / uncond_embeddings.mean(axis=[-2, -1], keepdim=True)
 
-    # For classifier free guidance, we need to do two forward passes.
-    # Here we concatenate the unconditional and text embeddings into a single batch
-    # to avoid doing two forward passes
     if uncond_prompt is not None:
-        text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
-
-    return text_embeddings
+        return text_embeddings, uncond_embeddings
+    return text_embeddings, None
 
 
 def preprocess_image(image):
@@ -416,11 +423,11 @@ def preprocess_image(image):
     return 2.0 * image - 1.0
 
 
-def preprocess_mask(mask):
+def preprocess_mask(mask, scale_factor=8):
     mask = mask.convert("L")
     w, h = mask.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    mask = mask.resize((w // 8, h // 8), resample=PIL_INTERPOLATION["nearest"])
+    mask = mask.resize((w // scale_factor, h // scale_factor), resample=PIL_INTERPOLATION["nearest"])
     mask = np.array(mask).astype(np.float32) / 255.0
     mask = np.tile(mask, (4, 1, 1))
     mask = mask[None].transpose(0, 1, 2, 3)  # what does this step do?
@@ -515,7 +522,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             )
         if safety_checker is not None and feature_extractor is None:
             raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
+                f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
         is_unet_version_less_0_9_0 = hasattr(unet.config, "_ppdiffusers_version") and version.parse(
@@ -538,6 +545,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             new_config = dict(unet.config)
             new_config["sample_size"] = 64
             unet._internal_dict = FrozenDict(new_config)
+
         self.register_modules(
             vae=vae,
             text_encoder=text_encoder,
@@ -548,6 +556,12 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             feature_extractor=feature_extractor,
         )
         self.register_to_config(requires_safety_checker=requires_safety_checker)
+
+        self.__init__additional__()
+
+    def __init__additional__(self):
+        if not hasattr(self, "vae_scale_factor"):
+            setattr(self, "vae_scale_factor", 2 ** (len(self.vae.config.block_out_channels) - 1))
 
     def __call__(self, *args, **kwargs):
         return self.text2image(*args, **kwargs)
@@ -565,18 +579,41 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         skip_weighting,
         do_classifier_free_guidance,
         num_images_per_prompt,
+        **kwargs,
     ):
-        if do_classifier_free_guidance and negative_prompt is None:
-            negative_prompt = ""
-        text_embeddings = get_weighted_text_embeddings(
-            self, prompt, negative_prompt, max_embeddings_multiples, no_boseos_middle, skip_parsing, skip_weighting
-        )
+        batch_size = len(prompt) if isinstance(prompt, list) else 1
 
+        if negative_prompt is None:
+            negative_prompt = [""] * batch_size
+        elif isinstance(negative_prompt, str):
+            negative_prompt = [negative_prompt] * batch_size
+        if batch_size != len(negative_prompt):
+            raise ValueError(
+                f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
+                f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
+                " the batch size of `prompt`."
+            )
+
+        text_embeddings, uncond_embeddings = get_weighted_text_embeddings(
+            pipe=self,
+            prompt=prompt,
+            uncond_prompt=negative_prompt if do_classifier_free_guidance else None,
+            max_embeddings_multiples=max_embeddings_multiples,
+            no_boseos_middle=no_boseos_middle,
+            skip_parsing=skip_parsing,
+            skip_weighting=skip_weighting,
+            **kwargs,
+        )
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
         text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
-        if not do_classifier_free_guidance and text_embeddings.shape[0] > 1:
-            text_embeddings = text_embeddings[:1]
+
+        if do_classifier_free_guidance:
+            seq_len = uncond_embeddings.shape[1]
+            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
+
         return text_embeddings
 
     def run_safety_checker(self, image, dtype):
@@ -718,7 +755,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         # new add
-        max_embeddings_multiples: Optional[int] = 1,
+        max_embeddings_multiples: Optional[int] = 3,
         no_boseos_middle: Optional[bool] = False,
         skip_parsing: Optional[bool] = False,
         skip_weighting: Optional[bool] = False,

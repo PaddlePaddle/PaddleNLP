@@ -17,7 +17,7 @@
 
 ## 1. 零样本文本分类应用
 
-本项目提供基于通用文本分类 UTC（Universial Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
+本项目提供基于通用文本分类 UTC（Universal Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
 
 <div align="center">
     <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/211755652-dac155ca-649e-470c-ac8b-06156b444b58.png">
@@ -220,7 +220,33 @@ python run_eval.py \
 
 ### 2.6 模型部署
 
-在UTC的服务化能力中我们提供基于PaddleNLP SimpleServing 来搭建服务化能力，通过几行代码即可搭建服务化部署能力
+目前 UTC 模型提供基于多种部署方式，包括基于 FastDeploy 的本地 Python 部署以及 PaddleNLP SimpleServing 的服务化部署。
+
+#### Python 部署
+
+以下示例展示如何基于 FastDeploy 库完成 UTC 模型完成通用文本分类任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型。模型目录为 `application/zero_shot_text_classification/checkpoint/model_best`（用户可按实际情况设置）。
+
+```bash
+# CPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device cpu
+# GPU 推理
+python deploy/python/infer.py --model_dir ./checkpoint/model_best --device gpu
+```
+
+运行完成后返回的结果如下：
+
+```bash
+[2023-03-02 06:32:47,528] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load './checkpoint/model_best'.
+[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
+[2023-03-02 06:33:18,120] [    INFO] - Assigning ['[O-MASK]'] to the additional_special_tokens key of the tokenizer
+[{'predictions': [{'label': '这是一条好评', 'score': 0.9073}], 'text_a': '房间干净明亮，非常不错'}]
+```
+
+更多细节请参考[UTC Python 部署方法](./deploy/python/README.md)
+
+#### 服务化部署
+
+在 UTC 的服务化能力中我们提供基于PaddleNLP SimpleServing 来搭建服务化能力，通过几行代码即可搭建服务化部署能力。
 
 ```
 # Save at server.py

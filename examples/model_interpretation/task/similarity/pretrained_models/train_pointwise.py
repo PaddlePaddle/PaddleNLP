@@ -12,28 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
+import sys
 import time
+from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
+from data import convert_pointwise_example as convert_example
+from data import create_dataloader
 
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-
-from data import create_dataloader
-from data import convert_pointwise_example as convert_example
-import sys
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("..")
 sys.path.append("../../..")
-from roberta.modeling import RobertaForSequenceClassification
+from roberta.modeling import RobertaForSequenceClassification  # noqa: E402
 
 sys.path.remove("../../..")
 sys.path.remove("..")

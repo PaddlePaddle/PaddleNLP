@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import os
+import sys
 
 import numpy as np
-import paddle
 import torch
 import torch.nn as nn
 from reprod_log import ReprodLogger
@@ -24,7 +23,7 @@ CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
 CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
-from models.pt_bert import BertConfig, BertForSequenceClassification
+from models.pt_bert import BertConfig, BertForSequenceClassification  # noqa: E402
 
 if __name__ == "__main__":
 
