@@ -21,6 +21,8 @@ import numpy as np
 import paddle
 import yaml
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+
 from .det_keypoint_unite_utils import argsparser
 from .infer import (  # noqa F401
     Detector,
@@ -311,6 +313,15 @@ trt_calib_mode = False
 cpu_threads = 4
 enable_mkldnn = False
 det_threshold = 0.4
+
+if not os.path.exists(det_model_dir):
+    detmodel_url = (
+        "https://bj.bcebos.com/v1/paddledet/models/keypoint/tinypose_enhance/picodet_s_320_lcnet_pedestrian.zip"
+    )
+    get_path_from_url_with_filelock(detmodel_url, root_dir="annotator/ppdet_hrnet/models/")
+if not os.path.exists(keypoint_model_dir):
+    kptmodel_url = "https://bj.bcebos.com/v1/paddledet/models/pipeline/dark_hrnet_w32_256x192.zip"
+    get_path_from_url_with_filelock(kptmodel_url, root_dir="annotator/ppdet_hrnet/models/")
 
 
 class PPDetPose(object):
