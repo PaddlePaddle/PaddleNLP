@@ -368,6 +368,7 @@ def add_resize(img, sf=4):
 
     return img
 
+
 def add_Gaussian_noise(img, noise_level1=2, noise_level2=25):
     noise_level = random.randint(noise_level1, noise_level2)
     rnum = np.random.rand()
