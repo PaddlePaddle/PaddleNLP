@@ -456,7 +456,6 @@ class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
         expected_slice = paddle.to_tensor(
             [[[-0.0664, -1.3266, -0.3922], [-0.2440, -1.3631, -1.0745], [-0.0986, -0.7947, -0.1932]]]
         )
-        print(output[:, 1:4, 1:4])
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
