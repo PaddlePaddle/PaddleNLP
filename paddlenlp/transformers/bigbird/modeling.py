@@ -547,16 +547,16 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
     Args:
         bigbird (:class:`BigBirdModel`):
             An instance of :class:`BigBirdModel`.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `None`.
     """
 
     def __init__(self, config: BigBirdConfig):
         super(BigBirdForSequenceClassification, self).__init__(config)
-        self.num_classes = config.num_classes
+        self.num_labels = config.num_labels
         self.config = config
         self.bigbird = BigBirdModel(config)
-        self.linear = nn.Linear(config.hidden_size, self.num_classes)
+        self.linear = nn.Linear(config.hidden_size, self.num_labels)
         self.dropout = nn.Dropout(config.hidden_dropout_prob, mode="upscale_in_train")
         self.apply(self.init_weights)
 
@@ -603,7 +603,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `output`, a tensor of the input text classification logits.
-            Its data type should be float32 and it has a shape of [batch_size, num_classes].
+            Its data type should be float32 and it has a shape of [batch_size, num_labels].
 
         Examples:
             .. code-block::
@@ -1247,7 +1247,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
     Args:
         bigbird (:class:`BigBirdModel`):
             An instance of BigBirdModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of BIGBIRD.
@@ -1257,12 +1257,10 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
 
     def __init__(self, config: BigBirdConfig):
         super(BigBirdForTokenClassification, self).__init__(config)
-        self.num_classes = config.num_classes
-        self.bigbird = BigBirdModel(config)  # allow bigbird to be config
-        self.dropout = nn.Dropout(
-            self.dropout if self.dropout is not None else self.bigbird.config["hidden_dropout_prob"]
-        )
-        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], self.num_classes)
+        self.num_labels = config.num_labels
+        self.bigbird = BigBirdModel(config)
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], self.num_labels)
         self.apply(self.init_weights)
 
     def forward(
