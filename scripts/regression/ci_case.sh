@@ -227,7 +227,7 @@ time (python -m paddle.distributed.launch run_pretrain.py \
     --do_train true \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
-time (python -m paddle.distributed.launch get_ft_model.py \
+time (python -u get_ft_model.py \
     --model_dir pretrain_model/ \>${log_path}/electra_get_ft_model) >>${log_path}/electra_get_ft_model 2>&1
 print_info $? electra_get_ft_model
 time (python -m paddle.distributed.launch run_glue.py \
