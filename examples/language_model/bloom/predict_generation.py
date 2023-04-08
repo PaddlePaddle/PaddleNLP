@@ -65,17 +65,7 @@ class Predictor(object):
 
     def infer(self, inputs):
         if self.model.config.dtype == "float32" or self.model.config.dtype is None:
-            result = self.model.generate(
-                **inputs,
-                max_length=self.args.max_length,
-                bos_token_id=self.tokenizer.bos_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
-                decode_strategy="sampling",
-                top_k=1,
-            )
-        else:
-            with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
+            with paddle.no_grad():
                 result = self.model.generate(
                     **inputs,
                     max_length=self.args.max_length,
@@ -85,6 +75,18 @@ class Predictor(object):
                     decode_strategy="sampling",
                     top_k=1,
                 )
+        else:
+            with paddle.no_grad():
+                with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
+                    result = self.model.generate(
+                        **inputs,
+                        max_length=self.args.max_length,
+                        bos_token_id=self.tokenizer.bos_token_id,
+                        eos_token_id=self.tokenizer.eos_token_id,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        decode_strategy="sampling",
+                        top_k=1,
+                    )
         result = result[0]
         return result
 
