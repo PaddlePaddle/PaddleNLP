@@ -87,7 +87,7 @@ def convert_example(
         target = example["question"]
 
     # Add the eos token for the source and target
-    source = "答案：" + title + tokenizer.eos_token + "上下文：" + source + "。" + tokenizer.eos_token + "在已知答案的前提下，问题："
+    source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
     target = target[: max_target_length - 1]
     target = target + tokenizer.eos_token
 
@@ -100,14 +100,13 @@ def convert_example(
 
     source_tokenized = tokenizer(
         source,
-        max_length=(max_source_length + max_target_length - target_input_ids_len),
+        max_length=(max_source_length + max_target_length - target_input_ids_len - 1),
         padding="max_length",
         truncation=True,
     )
 
-    input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
+    input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
     labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
-
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -226,6 +225,10 @@ def main():
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
+
+    if training_args.do_eval:
+        eval_result = trainer.evaluate()
+        trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":
