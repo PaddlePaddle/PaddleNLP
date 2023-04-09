@@ -109,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--doccano_file",
         type=str,
-        default="doccano_ext.json",
+        default="doccano_ext.jsonl",
         help="Saving path in doccano format.",
     )
     parser.add_argument(
