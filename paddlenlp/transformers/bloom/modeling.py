@@ -1123,7 +1123,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.criterion = BloomPretrainingCriterion(
             pad_token_id=config.pad_token_id,
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=config.tensor_parallel_output,
+            tensor_parallel_output=True,
         )
 
         # Initialize weights and apply final processing
@@ -1199,7 +1199,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
             are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         transformer_outputs = self.bloom(
             input_ids,
             past_key_values=cache,
@@ -1213,9 +1212,11 @@ class BloomForCausalLM(BloomPreTrainedModel):
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-
         # TODO(wj-Mcat): to enable lm_head
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
+        parallel_output = True
+        if hidden_states.stop_gradient:
+            parallel_output = False
+        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
         # lm_logits = self.lm_head(hidden_states)
 
         loss = None
