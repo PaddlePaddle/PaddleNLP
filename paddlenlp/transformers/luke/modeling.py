@@ -21,6 +21,11 @@ import paddle.nn as nn
 from ...transformers.roberta.modeling import RobertaEmbeddings
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
+from .configuration import (
+    LUKE_PRETRAINED_INIT_CONFIGURATION,
+    LUKE_PRETRAINED_RESOURCE_FILES_MAP,
+    LukeConfig,
+)
 
 __all__ = [
     "LukeModel",
@@ -67,43 +72,11 @@ class LukePretrainedModel(PretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "luke-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "pad_token_id": 1,
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 1,
-            "vocab_size": 50267,
-        },
-        "luke-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "pad_token_id": 1,
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 1,
-            "vocab_size": 50267,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "luke-base": "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-base/model_state.pdparams",
-            "luke-large": "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-large/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = LUKE_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LUKE_PRETRAINED_RESOURCE_FILES_MAP
+
     base_model_prefix = "luke"
+    config_class = LukeConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -113,9 +86,7 @@ class LukePretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.luke.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -124,11 +95,11 @@ class LukePretrainedModel(PretrainedModel):
 
 
 class LukeSelfOutput(nn.Layer):
-    def __init__(self, hidden_size, hidden_dropout_prob):
+    def __init__(self, config: LukeConfig):
         super(LukeSelfOutput, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -138,10 +109,10 @@ class LukeSelfOutput(nn.Layer):
 
 
 class LukeIntermediate(nn.Layer):
-    def __init__(self, hidden_size, hidden_act, intermediate_size):
+    def __init__(self, config: LukeConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, intermediate_size)
-        self.intermediate_act_fn = get_activation(hidden_act)
+        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.intermediate_act_fn = get_activation(config.hidden_act)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -150,11 +121,11 @@ class LukeIntermediate(nn.Layer):
 
 
 class LukeOutput(nn.Layer):
-    def __init__(self, intermediate_size, hidden_size, hidden_dropout_prob):
+    def __init__(self, config: LukeConfig):
         super(LukeOutput, self).__init__()
-        self.dense = nn.Linear(intermediate_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -168,23 +139,8 @@ class LukeEmbeddings(RobertaEmbeddings):
     Same as BertEmbeddings with a tiny tweak for positional embeddings indexing.
     """
 
-    def __init__(
-        self,
-        vocab_size=50267,
-        hidden_size=768,
-        max_position_embeddings=514,
-        type_vocab_size=1,
-        pad_token_id=0,
-        hidden_dropout_prob=0.1,
-    ):
-        super(LukeEmbeddings, self).__init__(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            pad_token_id=pad_token_id,
-        )
+    def __init__(self, config: LukeConfig):
+        super(LukeEmbeddings, self).__init__(config)
 
     def forward(
         self,
@@ -198,9 +154,9 @@ class LukeEmbeddings(RobertaEmbeddings):
 
 
 class LukePooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: LukeConfig):
         super(LukePooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -213,27 +169,19 @@ class LukePooler(nn.Layer):
 
 
 class EntityEmbeddings(nn.Layer):
-    def __init__(
-        self,
-        entity_vocab_size=500000,
-        entity_emb_size=256,
-        hidden_size=768,
-        max_position_embeddings=514,
-        type_vocab_size=1,
-        hidden_dropout_prob=0.1,
-    ):
+    def __init__(self, config: LukeConfig):
         super(EntityEmbeddings, self).__init__()
-        self.entity_emb_size = entity_emb_size
-        self.hidden_size = hidden_size
-        self.entity_embeddings = nn.Embedding(entity_vocab_size, entity_emb_size, padding_idx=0)
-        if entity_emb_size != hidden_size:
-            self.entity_embedding_dense = nn.Linear(entity_emb_size, hidden_size, bias_attr=False)
+        self.entity_emb_size = config.entity_emb_size
+        self.hidden_size = config.hidden_size
+        self.entity_embeddings = nn.Embedding(config.entity_vocab_size, config.entity_emb_size, padding_idx=0)
+        if config.entity_emb_size != config.hidden_size:
+            self.entity_embedding_dense = nn.Linear(config.entity_emb_size, config.hidden_size, bias_attr=False)
 
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, entity_ids, position_ids, token_type_ids=None):
         if token_type_ids is None:
@@ -259,21 +207,21 @@ class EntityEmbeddings(nn.Layer):
 
 
 class LukeSelfAttention(nn.Layer):
-    def __init__(self, num_attention_heads, hidden_size, attention_probs_dropout_prob):
+    def __init__(self, config: LukeConfig):
         super(LukeSelfAttention, self).__init__()
-        self.num_attention_heads = num_attention_heads
-        self.attention_head_size = int(hidden_size / num_attention_heads)
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(hidden_size, self.all_head_size)
-        self.key = nn.Linear(hidden_size, self.all_head_size)
-        self.value = nn.Linear(hidden_size, self.all_head_size)
+        self.query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.w2e_query = nn.Linear(hidden_size, self.all_head_size)
-        self.e2w_query = nn.Linear(hidden_size, self.all_head_size)
-        self.e2e_query = nn.Linear(hidden_size, self.all_head_size)
+        self.w2e_query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.e2w_query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.e2e_query = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
         new_x_shape = x.shape[:-1] + [self.num_attention_heads, self.attention_head_size]
@@ -357,20 +305,10 @@ class LukeSelfAttention(nn.Layer):
 
 
 class LukeAttention(nn.Layer):
-    def __init__(
-        self,
-        num_attention_heads,
-        hidden_size,
-        attention_probs_dropout_prob,
-        hidden_dropout_prob,
-    ):
+    def __init__(self, config: LukeConfig):
         super().__init__()
-        self.self = LukeSelfAttention(
-            num_attention_heads=num_attention_heads,
-            hidden_size=hidden_size,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-        )
-        self.output = LukeSelfOutput(hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob)
+        self.self = LukeSelfAttention(config)
+        self.output = LukeSelfOutput(config)
 
     def forward(
         self,
@@ -402,29 +340,12 @@ class LukeAttention(nn.Layer):
 
 
 class LukeLayer(nn.Layer):
-    def __init__(
-        self,
-        num_attention_heads,
-        hidden_size,
-        hidden_act,
-        intermediate_size,
-        attention_probs_dropout_prob,
-        hidden_dropout_prob,
-    ):
+    def __init__(self, config: LukeConfig):
         super(LukeLayer, self).__init__()
         self.seq_len_dim = 1
-        self.attention = LukeAttention(
-            num_attention_heads=num_attention_heads,
-            hidden_size=hidden_size,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            hidden_dropout_prob=hidden_dropout_prob,
-        )
-        self.intermediate = LukeIntermediate(
-            intermediate_size=intermediate_size, hidden_act=hidden_act, hidden_size=hidden_size
-        )
-        self.output = LukeOutput(
-            intermediate_size=intermediate_size, hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob
-        )
+        self.attention = LukeAttention(config)
+        self.intermediate = LukeIntermediate(config)
+        self.output = LukeOutput(config)
 
     def forward(
         self,
@@ -465,30 +386,9 @@ class LukeLayer(nn.Layer):
 
 
 class LukeEncoder(nn.Layer):
-    def __init__(
-        self,
-        num_attention_heads,
-        hidden_size,
-        hidden_act,
-        intermediate_size,
-        num_hidden_layers,
-        attention_probs_dropout_prob,
-        hidden_dropout_prob,
-    ):
+    def __init__(self, config: LukeConfig):
         super(LukeEncoder, self).__init__()
-        self.layer = nn.LayerList(
-            [
-                LukeLayer(
-                    num_attention_heads=num_attention_heads,
-                    hidden_size=hidden_size,
-                    hidden_act=hidden_act,
-                    intermediate_size=intermediate_size,
-                    attention_probs_dropout_prob=attention_probs_dropout_prob,
-                    hidden_dropout_prob=hidden_dropout_prob,
-                )
-                for _ in range(num_hidden_layers)
-            ]
-        )
+        self.layer = nn.LayerList([LukeLayer(config) for _ in range(config.num_hidden_layers)])
 
     def forward(
         self,
@@ -526,109 +426,26 @@ class LukeModel(LukePretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `LukeModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when
-            calling `LukeModel`. Defaults to 50267.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `514`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `1`.
-        entity_vocab_size (int, optional):
-            Vocabulary size of `entity_ids` in `LukeModel`. Also is the vocab size of token entity embedding matrix.
-            Defines the number of different entity that can be represented by the `entity_ids` passed when
-            calling `LukeModel`. Defaults to 500000.
-        entity_emb_size (int, optional):
-            Dimensionality of the entity embedding layer Defaults to `256`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `1`.
-        entity_pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
     """
 
-    def __init__(
-        self,
-        vocab_size=50267,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=514,
-        type_vocab_size=1,
-        entity_vocab_size=500000,
-        entity_emb_size=256,
-        initializer_range=0.02,
-        pad_token_id=1,
-        entity_pad_token_id=0,
-    ):
-        super(LukeModel, self).__init__()
-        self.initializer_range = initializer_range
-        self.pad_token_id = pad_token_id
-        self.entity_pad_token_id = entity_pad_token_id
-        self.encoder = LukeEncoder(
-            hidden_act=hidden_act,
-            num_hidden_layers=num_hidden_layers,
-            hidden_size=hidden_size,
-            intermediate_size=intermediate_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            num_attention_heads=num_attention_heads,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-        )
-        self.embeddings = LukeEmbeddings(
-            pad_token_id=pad_token_id,
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-        )
-        self.entity_embeddings = EntityEmbeddings(
-            entity_vocab_size=entity_vocab_size,
-            entity_emb_size=entity_emb_size,
-            hidden_size=hidden_size,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-        )
-        self.pooler = LukePooler(hidden_size=hidden_size)
+    def __init__(self, config: LukeConfig):
+        super(LukeModel, self).__init__(config)
+        self.initializer_range = config.initializer_range
+        self.pad_token_id = config.pad_token_id
+        self.entity_pad_token_id = config.entity_pad_token_id
+        self.encoder = LukeEncoder(config)
+        self.embeddings = LukeEmbeddings(config)
+        self.entity_embeddings = EntityEmbeddings(config)
+        self.pooler = LukePooler(config)
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
     def forward(
         self,
@@ -785,17 +602,21 @@ class LukeModel(LukePretrainedModel):
 class LukeLMHead(nn.Layer):
     """Luke Head for masked language modeling."""
 
-    def __init__(self, vocab_size, hidden_size, hidden_act, embedding_weights=None):
+    def __init__(self, config: LukeConfig, embedding_weights=None):
         super(LukeLMHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.activation = get_activation(hidden_act)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=layer_norm_eps)
+        self.activation = get_activation(config.hidden_act)
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype, is_bias=False)
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
+            )
             if embedding_weights is None
             else embedding_weights
         )
-        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.decoder_bias = self.create_parameter(
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
 
     def forward(self, features, **kwargs):
         hidden_state = self.dense(features)
@@ -806,11 +627,11 @@ class LukeLMHead(nn.Layer):
 
 
 class EntityPredictionHeadTransform(nn.Layer):
-    def __init__(self, hidden_act, hidden_size, entity_emb_size):
+    def __init__(self, config: LukeConfig):
         super(EntityPredictionHeadTransform, self).__init__()
-        self.dense = nn.Linear(hidden_size, entity_emb_size)
-        self.transform_act_fn = get_activation(hidden_act)
-        self.layer_norm = nn.LayerNorm(entity_emb_size, epsilon=layer_norm_eps)
+        self.dense = nn.Linear(config.hidden_size, config.entity_emb_size)
+        self.transform_act_fn = get_activation(config.hidden_act)
+        self.layer_norm = nn.LayerNorm(config.entity_emb_size, epsilon=layer_norm_eps)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -820,12 +641,10 @@ class EntityPredictionHeadTransform(nn.Layer):
 
 
 class EntityPredictionHead(nn.Layer):
-    def __init__(self, hidden_size, entity_vocab_size, entity_emb_size, hidden_act):
+    def __init__(self, config: LukeConfig):
         super(EntityPredictionHead, self).__init__()
-        self.transform = EntityPredictionHeadTransform(
-            hidden_size=hidden_size, hidden_act=hidden_act, entity_emb_size=entity_emb_size
-        )
-        self.decoder = nn.Linear(entity_emb_size, entity_vocab_size)
+        self.transform = EntityPredictionHeadTransform(config)
+        self.decoder = nn.Linear(config.entity_emb_size, config.entity_vocab_size)
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
@@ -838,29 +657,22 @@ class LukeForMaskedLM(LukePretrainedModel):
     Luke Model with a `masked language modeling` head on top.
 
     Args:
-        luke (:class:`LukeModel`):
-            An instance of :class:`LukeModel`.
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
 
     """
 
-    def __init__(self, luke):
-        super(LukeForMaskedLM, self).__init__()
-        self.luke = luke
-        self.vocab_size = self.luke.config["vocab_size"]
-        self.entity_vocab_size = self.luke.config["entity_vocab_size"]
+    def __init__(self, config: LukeConfig):
+        super(LukeForMaskedLM, self).__init__(config)
+        self.luke = LukeModel(config)
+        self.vocab_size = self.config.vocab_size
+        self.entity_vocab_size = self.config.entity_vocab_size
 
         self.lm_head = LukeLMHead(
-            vocab_size=self.luke.config["vocab_size"],
-            hidden_size=self.luke.config["hidden_size"],
-            hidden_act=self.luke.config["hidden_act"],
+            config,
             embedding_weights=self.luke.embeddings.word_embeddings.weight,
         )
-        self.entity_predictions = EntityPredictionHead(
-            hidden_size=self.luke.config["hidden_size"],
-            hidden_act=self.luke.config["hidden_act"],
-            entity_vocab_size=self.luke.config["entity_vocab_size"],
-            entity_emb_size=self.luke.config["entity_emb_size"],
-        )
+        self.entity_predictions = EntityPredictionHead(config)
 
         self.apply(self.init_weights)
 
@@ -948,20 +760,18 @@ class LukeForEntityClassification(LukePretrainedModel):
     token) for entity classification tasks, such as Open Entity.
 
     Args:
-        luke (:class:`LukeModel`):
-            An instance of LukeModel.
-        num_classes (int):
-            The number of classes.
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
     """
 
-    def __init__(self, luke, num_classes):
-        super(LukeForEntityClassification, self).__init__()
+    def __init__(self, config: LukeConfig):
+        super(LukeForEntityClassification, self).__init__(config)
 
-        self.luke = luke
+        self.luke = LukeModel(config)
 
-        self.num_classes = num_classes
-        self.dropout = nn.Dropout(self.luke.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.luke.config["hidden_size"], num_classes)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -998,7 +808,7 @@ class LukeForEntityClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -1007,7 +817,7 @@ class LukeForEntityClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntityClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntityClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntityClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7)]
@@ -1040,21 +850,19 @@ class LukeForEntityPairClassification(LukePretrainedModel):
     tokens) for entity pair classification tasks, such as TACRED.
 
     Args:
-        luke (:class:`LukeModel`):
-            An instance of LukeModel.
-        num_classes (int):
-            The number of classes.
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
 
     """
 
-    def __init__(self, luke, num_classes):
-        super(LukeForEntityPairClassification, self).__init__()
+    def __init__(self, config: LukeConfig):
+        super(LukeForEntityPairClassification, self).__init__(config)
 
-        self.luke = luke
+        self.luke = LukeModel(config)
 
-        self.num_classes = num_classes
-        self.dropout = nn.Dropout(self.luke.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.luke.config["hidden_size"] * 2, num_classes, bias_attr=False)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.config.hidden_size * 2, config.num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
     def forward(
@@ -1091,7 +899,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity pair classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -1100,7 +908,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntityPairClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntityPairClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntityPairClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7), (17, 28)]
@@ -1133,21 +941,18 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
     such as named entity recognition.
 
     Args:
-        luke (:class:`LukeModel`):
-            An instance of LukeModel.
-        num_classes (int):
-            The number of classes.
-
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
     """
 
-    def __init__(self, luke, num_classes):
-        super(LukeForEntitySpanClassification, self).__init__()
+    def __init__(self, config: LukeConfig):
+        super(LukeForEntitySpanClassification, self).__init__(config)
 
-        self.luke = luke
+        self.luke = LukeModel(config)
 
-        self.num_classes = num_classes
-        self.dropout = nn.Dropout(self.luke.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.luke.config["hidden_size"] * 3, num_classes)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.config.hidden_size * 3, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -1190,7 +995,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the entity span classification logits.
-            Shape as `[batch_size, num_entities, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_entities, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -1199,7 +1004,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
                 from paddlenlp.transformers import LukeForEntitySpanClassification, LukeTokenizer
 
                 tokenizer = LukeTokenizer.from_pretrained('luke-base')
-                model = LukeForEntitySpanClassification.from_pretrained('luke-base', num_classes=2)
+                model = LukeForEntitySpanClassification.from_pretrained('luke-base', num_labels=2)
 
                 text = "Beyoncé lives in Los Angeles."
                 entity_spans = [(0, 7)]
@@ -1238,14 +1043,14 @@ class LukeForQuestionAnswering(LukePretrainedModel):
     """
     LukeBert Model with question answering tasks.
     Args:
-        luke (:class:`LukeModel`):
-            An instance of :class:`LukeModel`.
+        config (:class:`LukeConfig`):
+            An instance of LukeConfig.
     """
 
-    def __init__(self, luke):
-        super(LukeForQuestionAnswering, self).__init__()
-        self.luke = luke
-        self.qa_outputs = nn.Linear(self.luke.config["hidden_size"], 2)
+    def __init__(self, config: LukeConfig):
+        super(LukeForQuestionAnswering, self).__init__(config)
+        self.luke = LukeModel(config)
+        self.qa_outputs = nn.Linear(self.config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(

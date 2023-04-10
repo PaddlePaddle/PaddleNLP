@@ -14,13 +14,18 @@
 # limitations under the License.
 
 import math
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.nn import Embedding
+from paddle import Tensor
+from paddle.nn import Embedding, MultiHeadAttention
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import ModelOutput
+from .configuration import PEGASUS_PRETRAINED_INIT_CONFIGURATION, PegasusConfig
 
 __all__ = [
     "PegasusModel",
@@ -29,6 +34,17 @@ __all__ = [
     "PegasusDecoder",
     "PegasusForConditionalGeneration",
 ]
+
+PEGASUS_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+    "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1",
+    "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA",
+    "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA",
+]
+
+Cache = MultiHeadAttention.Cache
+StaticCache = MultiHeadAttention.StaticCache
 
 
 def shift_tokens_right(input_ids, pad_token_id, decoder_start_token_id):
@@ -57,9 +73,11 @@ class PegasusPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {}
+    model_config_file = CONFIG_NAME
+    pretrained_init_configuration = PEGASUS_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = {}
     base_model_prefix = "pegasus"
+    config_class = PegasusConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -70,7 +88,7 @@ class PegasusPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.pegasus.config["init_std"],
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -106,7 +124,7 @@ class PegasusSinusoidalPositionalEmbedding(Embedding):
         return out
 
     @paddle.no_grad()
-    def forward(self, input_ids_shape, past_key_values_length=0):
+    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0) -> Tensor:
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
@@ -119,50 +137,36 @@ class PegasusEncoder(PegasusPretrainedModel):
     The Transformer Encoder of PegasusModel. The arguments of PegasusEncoder can see :class:`PegasusModel`.
     """
 
-    def __init__(
-        self,
-        embed_tokens,
-        vocab_size,
-        pad_token_id=1,
-        d_model=768,
-        num_encoder_layers=6,
-        encoder_attention_heads=12,
-        encoder_ffn_dim=3072,
-        dropout=0.1,
-        activation_function="relu",
-        attention_dropout=0.1,
-        activation_dropout=0.1,
-        max_position_embeddings=1024,
-        scale_embedding=True,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
+    def __init__(self, config: PegasusConfig, embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.embed_scale = math.sqrt(config.d_model) if config.scale_embedding else 1.0
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
-        self.encoder_embed_positions = PegasusSinusoidalPositionalEmbedding(max_position_embeddings, d_model)
+        self.encoder_embed_positions = PegasusSinusoidalPositionalEmbedding(
+            config.max_position_embeddings, config.d_model
+        )
 
-        self.encoder_dropout = nn.Dropout(dropout)
-        self.encoder_layernorm = nn.LayerNorm(d_model)
+        self.encoder_dropout = nn.Dropout(config.dropout)
+        self.encoder_layernorm = nn.LayerNorm(config.d_model)
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=encoder_attention_heads,
-            dim_feedforward=encoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
+            d_model=config.d_model,
+            nhead=config.encoder_attention_heads,
+            dim_feedforward=config.encoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
             normalize_before=True,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None, **kwargs):
+    def forward(self, input_ids: Optional[Tensor] = None, attention_mask: Optional[Tensor] = None, **kwargs):
         """
         The PegasusEncoder forward method, overrides the `__call__()` special method.
 
@@ -204,57 +208,43 @@ class PegasusDecoder(PegasusPretrainedModel):
     The Transformer Decoder of PegasusModel. The arguments of PegasusDecoder can see :class:`PegasusModel`.
     """
 
-    def __init__(
-        self,
-        embed_tokens,
-        vocab_size,
-        pad_token_id=1,
-        d_model=768,
-        num_decoder_layers=6,
-        decoder_attention_heads=12,
-        decoder_ffn_dim=3072,
-        dropout=0.1,
-        activation_function="relu",
-        attention_dropout=0.1,
-        activation_dropout=0.1,
-        max_position_embeddings=1024,
-        scale_embedding=True,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
+    def __init__(self, config: PegasusConfig, embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.embed_scale = math.sqrt(config.d_model) if config.scale_embedding else 1.0
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
-        self.decoder_embed_positions = PegasusSinusoidalPositionalEmbedding(max_position_embeddings, d_model)
-        self.decoder_dropout = nn.Dropout(dropout)
-        self.decoder_layernorm = nn.LayerNorm(d_model)
+        self.decoder_embed_positions = PegasusSinusoidalPositionalEmbedding(
+            config.max_position_embeddings, config.d_model
+        )
+        self.decoder_dropout = nn.Dropout(config.dropout)
+        self.decoder_layernorm = nn.LayerNorm(config.d_model)
 
         decoder_layer = nn.TransformerDecoderLayer(
-            d_model=d_model,
-            nhead=decoder_attention_heads,
-            dim_feedforward=decoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
+            d_model=config.d_model,
+            nhead=config.decoder_attention_heads,
+            dim_feedforward=config.decoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
             normalize_before=True,
         )
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers)
+        self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers)
         self.apply(self.init_weights)
 
     def forward(
         self,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        memory_mask=None,
-        cache=None,
-        x=None,
-        mix_ratio=0,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
+        memory_mask: Optional[Tensor] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        x: Optional[Tensor] = None,
+        mix_ratio: Optional[float] = 0,
     ):
         """
         The PegasusDecoder forward method, overrides the `__call__()` special method.
@@ -285,14 +275,11 @@ class PegasusDecoder(PegasusPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
-        decoder_length = paddle.shape(decoder_input_ids)[-1]
-        casual_mask = paddle.tensor.triu(
-            (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
-        )
-        if decoder_attention_mask is not None:
-            decoder_attention_mask = decoder_attention_mask + casual_mask
-        else:
-            decoder_attention_mask = casual_mask
+        if decoder_attention_mask is None:
+            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_attention_mask = paddle.tensor.triu(
+                (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
+            )
 
         if x is None:
             decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
@@ -337,132 +324,18 @@ class PegasusModel(PegasusPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `PegasusModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `PegasusModel`.
-        bos_token (int, optional):
-            The beginning of sequence token that was used during pretraining. Can be
-            used a sequence classifier token.
-            Defaults to `0`.
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-        eos_token (int, optional):
-            A special token representing the end of a sequence that was used during pretraining.
-            Defaults to `1`.
-        forced_eos_token_id (int, optional):
-            The id of the token to force as the last generated token when max_length is reached.
-            Usually set to eos_token_id. Defaults to `1`.
-        decoder_start_token_id (int, optional):
-            If an encoder-decoder model starts decoding with a different token than bos, the id of that token.
-            Defaults to `0`.
-        d_model (int, optional):
-            Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `1024`.
-        num_encoder_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `16`.
-        num_decoder_layers (int, optional):
-            Number of hidden layers in the Transformer decoder. Defaults to `16`.
-        encoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `16`.
-        decoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer decoder.
-            Defaults to `16`.
-        encoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `encoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `encoder_ffn_dim` is larger than `d_model`.
-            Defaults to `4096`.
-        decoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `decoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `decoder_ffn_dim` is larger than `d_model`.
-            Defaults to `4096`.
-        dropout (float, optional):
-            The dropout probability used in all fully connected layers (pre-process and post-process of MHA and FFN sub-layer)
-            in the encoders and decoders. Defaults to `0.1`.
-        activation_function (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"relu"`.
-        attention_dropout (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers and decoder layers to drop some attention target.
-            Defaults to `0.1`.
-        activation_dropout (float, optional):
-            The dropout probability used after FFN activation in all encoder layers and decoder layers.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `1024`.
-        scale_embedding (bool, optional):
-            Scale embeddings by diving by sqrt(d_model). Defaults to `True`.
-        init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Default to `0.02`.
-
+        config (:class:`PegasusConfig`):
+            An instance of PegasusConfig used to construct PegasusModel.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        bos_token_id=0,
-        pad_token_id=0,
-        eos_token_id=1,
-        forced_eos_token_id=1,
-        decoder_start_token_id=0,
-        d_model=1024,
-        num_encoder_layers=16,
-        num_decoder_layers=16,
-        encoder_attention_heads=16,
-        decoder_attention_heads=16,
-        encoder_ffn_dim=4096,
-        decoder_ffn_dim=4096,
-        dropout=0.1,
-        activation_function="relu",
-        attention_dropout=0.1,
-        activation_dropout=0.1,
-        max_position_embeddings=1024,
-        scale_embedding=True,
-        init_std=0.02,
-    ):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = PegasusEncoder(
-            self.shared,
-            vocab_size,
-            pad_token_id,
-            d_model,
-            num_encoder_layers,
-            encoder_attention_heads,
-            encoder_ffn_dim,
-            dropout,
-            activation_function,
-            attention_dropout,
-            activation_dropout,
-            max_position_embeddings,
-            scale_embedding,
-            init_std,
-        )
-
-        self.decoder = PegasusDecoder(
-            self.shared,
-            vocab_size,
-            pad_token_id,
-            d_model,
-            num_decoder_layers,
-            decoder_attention_heads,
-            decoder_ffn_dim,
-            dropout,
-            activation_function,
-            attention_dropout,
-            activation_dropout,
-            max_position_embeddings,
-            scale_embedding,
-            init_std,
-        )
+    def __init__(self, config: PegasusConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.decoder_start_token_id = config.decoder_start_token_id
+        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        self.encoder = PegasusEncoder(config, self.shared)
+        self.decoder = PegasusDecoder(config, self.shared)
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -479,13 +352,13 @@ class PegasusModel(PegasusPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=False,
-        cache=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
     ):
         r"""
         The PegasusModel forward method, overrides the `__call__()` special method.
@@ -540,8 +413,8 @@ class PegasusModel(PegasusPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import PegasusModel, PegasusTokenizer
 
-                tokenizer = PegasusTokenizer.from_pretrained('bart-base')
-                model = PegasusModel.from_pretrained('bart-base')
+                tokenizer = PegasusTokenizer.from_pretrained(pegasus_path)
+                model = PegasusModel.from_pretrained(pegasus_path)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -576,8 +449,20 @@ class PegasusModel(PegasusPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
+
+        memory_mask = attention_mask
+        if attention_mask is not None:
+            if attention_mask.ndim == 4:
+                memory_mask = attention_mask[:, :, -1:, :]
+            elif attention_mask.ndim == 3:
+                memory_mask = attention_mask[:, -1:, :].unsqueeze([1])
+            elif attention_mask.ndim == 2:
+                memory_mask = attention_mask.unsqueeze([1, 2])
+            else:
+                raise ValueError("Invalid attention mask shape. ")
+
         decoder_output, new_cache = self.decoder(
-            decoder_input_ids, decoder_attention_mask, encoder_output, attention_mask, cache
+            decoder_input_ids, decoder_attention_mask, encoder_output, memory_mask, cache
         )
         return decoder_output, new_cache, encoder_output, attention_mask
 
@@ -587,19 +472,22 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     Pegasus Model with a `language modeling` head on top.
 
     Args:
-        Pegasus (:class:`PegasusModel`):
-            An instance of PegasusModel.
+        config (:class:`PegasusConfig`):
+            An instance of PegasusConfig used to construct PegasusForConditionalGeneration.
     """
 
-    def __init__(self, pegasus):
-        super().__init__()
-        self.pegasus = pegasus
+    def __init__(self, config: PegasusConfig):
+        super().__init__(config)
+        self.pegasus = PegasusModel(config)
         self.lm_head_weight = self.create_parameter(
-            shape=[self.pegasus.config["vocab_size"], self.pegasus.config["d_model"]],
+            shape=[config.vocab_size, config.d_model],
             dtype=self.pegasus.shared.weight.dtype,
             is_bias=False,
         )
-        self.register_buffer("final_logits_bias", paddle.zeros((1, self.pegasus.config["vocab_size"])))
+        if hasattr(self, "final_logits_bias") and "final_logits_bias" not in self._buffers:
+            self.final_logits_bias = paddle.zeros((1, config.vocab_size))
+        else:
+            self.register_buffer("final_logits_bias", paddle.zeros((1, config.vocab_size)))
         self.use_SSTIA = False
         self.mix_ratio = 0
 
@@ -636,14 +524,14 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=False,
-        cache=None,
-        labels=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        labels: Optional[Tensor] = None,
     ):
         r"""
         The PegasusForConditionalGeneration forward method, overrides the __call__() special method.
@@ -682,8 +570,8 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import PegasusForConditionalGeneration, PegasusTokenizer
 
-                tokenizer = PegasusTokenizer.from_pretrained('bart-base')
-                model = PegasusForConditionalGeneration.from_pretrained('bart-base')
+                tokenizer = PegasusTokenizer.from_pretrained(pegasus_path)
+                model = PegasusForConditionalGeneration.from_pretrained(pegasus_path)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -778,11 +666,5 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)

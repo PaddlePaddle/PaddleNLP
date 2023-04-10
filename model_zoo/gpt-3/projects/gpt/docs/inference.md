@@ -10,8 +10,8 @@
 以`GPT-3(345M)`模型为例，通过如下方式下载PaddleFleetX发布的训练好的权重。若你已下载或使用训练过程中的权重，可跳过此步。
 
 ```bash
-wget https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_auto_345M.tar.gz
-tar -zxvf GPT_auto_345M.tar.gz
+wget https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
+tar -zxvf GPT_345M_FP16.tar.gz
 ```
 
 通过如下方式进行推理模型导出

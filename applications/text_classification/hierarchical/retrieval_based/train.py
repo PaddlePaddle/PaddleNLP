@@ -15,29 +15,24 @@ import argparse
 import os
 import random
 import time
+from functools import partial
+
 import numpy as np
 import paddle
-from functools import partial
-from collections import Counter
-
 import paddle.nn as nn
-from paddlenlp.utils.log import logger
-from paddlenlp.data import Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from base_model import SemanticIndexBase
-from model import SemanticIndexBatchNeg
 from data import (
-    read_text_pair,
+    build_index,
     convert_example,
     create_dataloader,
     gen_id2corpus,
     gen_text_file,
-    convert_corpus_example,
+    read_text_pair,
 )
-from data import convert_label_example
-from data import build_index
+from model import SemanticIndexBatchNeg
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import MapDataset, load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 
 # yapf: disable
 parser = argparse.ArgumentParser()

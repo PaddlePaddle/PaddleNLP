@@ -166,17 +166,6 @@ class ElectraPretrainedModel(PretrainedModel):
         """
         # Initialize weights
         self.apply(self._init_weights)
-        # Tie weights if needed
-        self.tie_weights()
-
-    def tie_weights(self):
-        """
-        Tie the weights between the input embeddings and the output embeddings.
-        """
-        if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings"):
-            output_embeddings = self.get_output_embeddings()
-            if output_embeddings is not None:
-                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
 
     def _init_weights(self, layer):
         """Initialize the weights"""
@@ -195,29 +184,6 @@ class ElectraPretrainedModel(PretrainedModel):
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
-    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        """Tie or clone layer weights"""
-        if output_embeddings.weight.shape == input_embeddings.weight.shape:
-            output_embeddings.weight = input_embeddings.weight
-        elif output_embeddings.weight.shape == input_embeddings.weight.t().shape:
-            output_embeddings.weight.set_value(input_embeddings.weight.t())
-        else:
-            raise ValueError(
-                "when tie input/output embeddings, the shape of output embeddings: {}"
-                "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".format(
-                    output_embeddings.weight.shape, input_embeddings.weight.shape, input_embeddings.weight.t().shape
-                )
-            )
-        if getattr(output_embeddings, "bias", None) is not None:
-            if output_embeddings.weight.shape[-1] != output_embeddings.bias.shape[0]:
-                raise ValueError(
-                    "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
-                    "please check output_embeddings configuration".format(
-                        output_embeddings.weight.shape[-1], output_embeddings.bias.shape[0]
-                    )
-                )
-
 
 @register_base_model
 class ElectraModel(ElectraPretrainedModel):
@@ -232,44 +198,8 @@ class ElectraModel(ElectraPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `ElectraModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ElectraModel`.
-        embedding_size (int, optional):
-            Dimensionality of the embedding layer.
-        hidden_size (int, optional):
-            Dimensionality of the encoder layer and pooler layer.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`ElectraPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
     """
 
     def __init__(self, config: ElectraConfig):
@@ -434,8 +364,8 @@ class ElectraDiscriminator(ElectraPretrainedModel):
     The Electra Discriminator can detect the tokens that are replaced by the Electra Generator.
 
     Args:
-         electra (:class:`ElectraModel`):
-             An instance of :class:`ElectraModel`.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
 
     """
 
@@ -505,8 +435,8 @@ class ElectraGenerator(ElectraPretrainedModel):
     a masked language model.
 
     Args:
-         electra (:class:`ElectraModel`):
-             An instance of :class:`ElectraModel`.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
     """
 
     def __init__(self, config: ElectraConfig):
@@ -624,14 +554,8 @@ class ElectraClassificationHead(nn.Layer):
     Perform sentence-level classification tasks.
 
     Args:
-        hidden_size (int):
-            Dimensionality of the embedding layer.
-        hidden_dropout_prob (float):
-            The dropout probability for all fully connected layers.
-        num_classes (int):
-            The number of classes.
-        activation (str):
-            The activation function name between layers.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
 
     """
 
@@ -639,7 +563,7 @@ class ElectraClassificationHead(nn.Layer):
         super(ElectraClassificationHead, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.out_proj = nn.Linear(config.hidden_size, config.num_classes)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
         self.act = get_activation(config.hidden_act)
 
     def forward(self, features, **kwargs):
@@ -653,7 +577,7 @@ class ElectraClassificationHead(nn.Layer):
 
         Returns:
             Tensor: Returns a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
         """
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
@@ -672,8 +596,8 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
         - sequence-level Contrastive Sequence Prediction (CSP) task.
 
     Args:
-         electra (:class:`ElectraModel`):
-             An instance of :class:`ElectraModel`.
+         config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ErnieHealthDiscriminator
 
     """
 
@@ -744,24 +668,13 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        electra (:class:`ElectraModel`):
-            An instance of ElectraModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Electra.
-            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
-            instance `electra`. Defaults to None.
-        activation (str, optional):
-            The activation function name for classifier.
-            Defaults to "gelu".
-        layer_norm_eps (float, optional):
-            The epsilon to initialize nn.LayerNorm layers.
-            Defaults to 1e-12.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ElectraForSequenceClassification
     """
 
     def __init__(self, config: ElectraConfig):
         super(ElectraForSequenceClassification, self).__init__(config)
+        self.num_labels = config.num_labels
         self.electra = ElectraModel(config)
         self.classifier = ElectraClassificationHead(config)
         self.init_weights()
@@ -802,7 +715,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -837,12 +750,12 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -865,23 +778,17 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        electra (:class:`ElectraModel`):
-            An instance of ElectraModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Electra.
-            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
-            instance `electra`. Defaults to None.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ElectraForTokenClassification
     """
 
     def __init__(self, config: ElectraConfig):
         super(ElectraForTokenClassification, self).__init__(config)
         self.electra = ElectraModel(config)
-
-        dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
-        self.dropout = nn.Dropout(dropout_p)
-
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
+        )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.init_weights()
 
@@ -925,7 +832,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -961,7 +868,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape([-1, self.num_classes]), labels.reshape([-1]))
+            loss = loss_fct(logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
 
         if not return_dict:
             output = (logits,) + sequence_output[1:]
@@ -980,10 +887,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     Electra Model for pretraining tasks.
 
     Args:
-        generator (:class:`ElectraGenerator`):
-            An instance of :class:`ElectraGenerator`.
-        discriminator (:class:`ElectraDiscriminator`):
-            An instance of :class:`ElectraDiscriminator`.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ElectraForTotalPretraining
 
     """
 
@@ -993,6 +898,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
         self.init_weights()
+        # Tie weights if needed
+        self.tie_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:
@@ -1154,10 +1061,8 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
     ERNIE-Health Model for pretraining task.
 
     Args:
-        generator (:class:`ElectraGenerator`):
-            An instance of :class:`ElectraGenerator`.
-        discriminator (:class:`ErnieHealthDiscriminator):
-            An instance of :class:`ErnieHealthDiscriminator`.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ElectraForMultipleChoice
     """
 
     def __init__(self, config: ElectraConfig):
@@ -1269,14 +1174,8 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        electra (:class:`ElectraModel`):
-            An instance of ElectraModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Electra.
-            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
-            instance `electra`. Defaults to None.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig to construct ElectraForMultipleChoice
     """
 
     def __init__(self, config: ElectraConfig):
@@ -1434,13 +1333,8 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
     """
 
     Args:
-        vocab_size(int):
-            Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `ElectraModel`.
-        gen_weight(float):
-            The weight of the Electra Generator.
-        disc_weight(float):
-            The weight of the Electra Discriminator.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
 
     """
 
@@ -1520,13 +1414,8 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
     """
 
     Args:
-        vocab_size(int):
-            Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `ElectraModel`.
-        gen_weight(float):
-            The weight of the Electra Generator.
-        disc_weight(float):
-            The weight of the Electra Discriminator.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig
 
     """
 
@@ -1662,8 +1551,8 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        electra (:class:`ElectraModel`):
-            An instance of ElectraModel.
+        config (:class:`ElectraConfig`):
+            An instance of ElectraConfig used to construct ElectraForQuestionAnswering.
 
     """
 

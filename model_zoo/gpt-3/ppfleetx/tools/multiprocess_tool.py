@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import math
 import multiprocessing
 import os
 import time
@@ -23,14 +22,14 @@ from multiprocessing import Process
 """
 Multi-process batch processing tool
 
-This tool provides a multi-process batch processing method. 
+This tool provides a multi-process batch processing method.
 For example, multi-process batch download data, multi-process preprocessing data, etc.
 
-The tool relies on executable shell commands or scripts. Its essence is to use Python's 
-multi-process library to create multiple processes, and call executable commands or 
+The tool relies on executable shell commands or scripts. Its essence is to use Python's
+multi-process library to create multiple processes, and call executable commands or
 scripts through the os.system API.
 
-Executable commands or scripts are passed in via a txt text file, organized by line. 
+Executable commands or scripts are passed in via a txt text file, organized by line.
 For example, the following example is download, unzip and delete example.
 
 batch_cmd.txt

@@ -19,7 +19,7 @@ import json
 import os
 from collections import OrderedDict
 
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ...utils.import_utils import import_module
 from ...utils.log import logger
 from ..utils import resolve_cache_dir
@@ -33,6 +33,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
         ("ChineseCLIPProcessor", "chineseclip"),
         ("CLIPProcessor", "clip"),
         ("ErnieViLProcessor", "ernie_vil"),
+        ("CLIPSegProcessor", "clipseg"),
     ]
 )
 
@@ -40,7 +41,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.procesing")
+        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
@@ -79,7 +80,7 @@ class AutoProcessor:
 
         if init_class:
             class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.procesing")
+            import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
             processor_class = getattr(import_class, init_class)
             return processor_class
         # If no `init_class`, we use pattern recognition to recognize the processor class.
@@ -159,7 +160,7 @@ class AutoProcessor:
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
             )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
+                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

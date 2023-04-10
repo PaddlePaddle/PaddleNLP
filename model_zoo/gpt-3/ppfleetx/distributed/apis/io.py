@@ -13,12 +13,9 @@
 # limitations under the License.
 
 import os
-import random
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddle.distributed import fleet
 from paddle.incubate.distributed.utils.io import save_for_auto_inference
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
@@ -80,12 +77,9 @@ def load(ckpt_dir, model, optimizer=None, mode="train", load_recovery=None):
     if nranks > 1:
         hcg = env.get_hcg()
 
-        dp_rank = hcg.get_data_parallel_rank()
         mp_rank = hcg.get_model_parallel_rank()
         pp_rank = hcg.get_stage_id()
         sharding_rank = hcg.get_sharding_parallel_rank()
-    else:
-        dp_rank = 0
 
     load_recovery = {} if load_recovery is None else load_recovery
 

@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import copy
-import os
 import random
-import sys
 
 import numpy as np
 import paddle
-from ppfleetx.data import dataset, sampler, utils
+from ppfleetx.data import dataset as fleetx_dataset
+from ppfleetx.data import sampler, utils
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
 
@@ -55,7 +54,7 @@ def build_dataset(config, mode):
     config_dataset = config[mode].dataset
     config_dataset = copy.deepcopy(config_dataset)
     dataset_name = config_dataset.pop("name")
-    dataset = eval("dataset.{}".format(dataset_name))(**config_dataset)
+    dataset = eval("fleetx_dataset.{}".format(dataset_name))(**config_dataset)
 
     logger.debug("build dataset({}) success...".format(dataset))
 

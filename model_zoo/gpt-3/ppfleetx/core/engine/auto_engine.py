@@ -12,27 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
-import sys
-import time
 
-import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.fluid.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
-from paddle.optimizer.lr import LRScheduler
 from ppfleetx.core.engine import BasicEngine
 from ppfleetx.core.module import BasicModule
-from ppfleetx.data import utils
-from ppfleetx.optims import build_lr_scheduler, build_optimizer
+try:
+    from ppfleetx.optims import build_lr_scheduler, build_optimizer
+except Exception:
+    pass
 from ppfleetx.utils.log import logger
 from ppfleetx.utils.version import version_check
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 class AutoEngine(BasicEngine):
@@ -66,6 +59,8 @@ class AutoEngine(BasicEngine):
         self._module = module
 
         # lr_scheduler and optimizer
+        if configs.Optimizer.lr.get("name") == "CosineAnnealingWithWarmupDecay":
+            configs.Optimizer.lr["global_batch_size"] = configs.Global.global_batch_size
         lr = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
         optimizer = build_optimizer(configs.Optimizer, model, lr) if mode == "train" else None
 

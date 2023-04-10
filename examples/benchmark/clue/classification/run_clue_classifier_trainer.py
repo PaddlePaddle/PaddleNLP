@@ -13,27 +13,26 @@
 # limitations under the License.
 
 import os
-import sys
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Optional
-from dataclasses import dataclass, field
 
-import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 from paddle.metric import Accuracy
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
-    TrainingArguments,
     Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
 )
-from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.transformers import (
-    AutoTokenizer,
     AutoModelForSequenceClassification,
+    AutoTokenizer,
+    export_model,
 )
 from paddlenlp.utils.log import logger
 
@@ -190,7 +189,7 @@ def main():
     )
 
     data_args.label_list = getattr(raw_datasets["train"], "label_list", None)
-    num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
+    num_classes = 1 if raw_datasets["train"].label_list is None else len(raw_datasets["train"].label_list)
 
     # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -218,7 +217,6 @@ def main():
         preds = paddle.to_tensor(preds)
         label = paddle.to_tensor(p.label_ids)
 
-        probs = F.softmax(preds, axis=1)
         metric = Accuracy()
         metric.reset()
         result = metric.compute(preds, label)
@@ -277,9 +275,7 @@ def main():
         ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir, "export")
-        paddlenlp.transformers.export_model(
-            model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir
-        )
+        export_model(model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

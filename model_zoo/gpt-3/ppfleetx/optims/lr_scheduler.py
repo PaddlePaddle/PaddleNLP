@@ -13,10 +13,7 @@
 # limitations under the License.
 
 import math
-import warnings
 
-import numpy
-from paddle import Tensor
 from paddle.optimizer import lr
 from paddle.optimizer.lr import LRScheduler
 
@@ -34,6 +31,7 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
         self.warmup_step = warmup_rate * decay_steps
         self.max_lr = max_lr
         self.min_lr = min_lr
+        self.increment = int(kwargs.get("global_batch_size", 0))
         super(CosineAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch, verbose)
 
     def get_lr(self):
@@ -51,7 +49,7 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
 
     def step(self, epoch=None):
         if epoch is None:
-            self.last_epoch += 0
+            self.last_epoch += self.increment
             self.last_lr = self.get_lr()
         else:
             self.last_epoch += epoch
@@ -69,7 +67,7 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
 class LinearDecayWithWarmup(LRScheduler):
     def __init__(self, learning_rate, step_each_epoch, epochs, warmup=0, verbose=False, last_epoch=-1, **kwargs):
         if kwargs.get("total_steps", -1) > 0:
-            self.T_max = total_steps
+            self.T_max = kwargs.get("total_steps")
         else:
             self.T_max = epochs * step_each_epoch
 
@@ -109,7 +107,7 @@ class CosineDecay(lr.LRScheduler):
         progress = min(1.0, max(0.0, progress))
 
         if self.warmups:
-            lr = lr * min(1.0, self.last_epoch / self.warmups)
+            lr = self.base_lr * min(1.0, self.last_epoch / self.warmups)
         else:
             lr = 0.5 * self.base_lr * (1.0 + math.cos(math.pi * progress))
 

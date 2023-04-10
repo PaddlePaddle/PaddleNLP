@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from milvus import MetricType, IndexType
+from milvus import IndexType, MetricType
 
 MILVUS_HOST = "10.21.226.173"
 MILVUS_PORT = 8530

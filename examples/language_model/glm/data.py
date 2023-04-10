@@ -33,9 +33,9 @@ def custom_convert_example(example, tokenizer, data_args, is_test=True):
         target = example["target"]
     elif "question" in example.keys():
         target = example["question"]
-    example["text_a"] = "答案：" + title + "," + "上下文：" + source
+    example["text_a"] = "答案：" + title + "，" + "上下文：" + source
     example["text_b"] = "在已知答案的前提下，问题：" + target
-    inputs = tokenizer.encode(" " + example["text_a"], max_length=data_args.src_length - 1, truncation=True)
+    inputs = tokenizer.encode(example["text_a"], max_length=data_args.src_length - 1, truncation=True)
     inputs["input_ids"] = inputs["input_ids"][:-1] + [tokenizer.gmask_token_id] + inputs["input_ids"][-1:]
     pad_length = data_args.src_length - len(inputs["input_ids"])
     inputs["input_ids"] = np.array([inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
@@ -45,8 +45,9 @@ def custom_convert_example(example, tokenizer, data_args, is_test=True):
         inputs,
         max_gen_length=data_args.tgt_length,
         targets=" " + example["text_b"] if not is_test else None,
-        padding=True,
+        padding="max_length",
     )
+
     for input_name in inputs.keys():
         inputs[input_name] = inputs[input_name].squeeze(0)
     if is_test:
@@ -114,7 +115,6 @@ def cnn_dm_convert_example(example, tokenizer, data_args, is_test=True):
     )
     for input_name in inputs.keys():
         inputs[input_name] = inputs[input_name].squeeze(0)
-    inputs["attention_mask"] = sep
     if is_test:
         inputs["position_ids"] = inputs["position_ids"][:, : inputs["input_ids"].shape[-1]]
         labels = tokenizer.encode(" " + example["highlights"], add_special_tokens=False)["input_ids"]

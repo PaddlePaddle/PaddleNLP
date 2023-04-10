@@ -189,17 +189,17 @@ class VerbalizerTest(unittest.TestCase):
         [
             (
                 "__internal_testing__/tiny-random-ernie",
-                ["cls", "predictions", "decoder_weight"],
+                ["cls", "predictions", "decoder"],
                 ErnieLMPredictionHead,
-                ["decoder_weight", "decoder_bias"],
+                ["decoder_bias", "decoder.weight"],
                 ["transform.weight", "transform.bias", "layer_norm.weight", "layer_norm.bias"],
             ),
             (
                 "albert-chinese-tiny",
                 ["predictions", "decoder"],
                 AlbertMLMHead,
-                ["decoder.weight"],
-                ["bias", "layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
+                ["bias", "decoder.weight"],
+                ["layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
             ),
         ]
     )
@@ -207,14 +207,12 @@ class VerbalizerTest(unittest.TestCase):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForMaskedLM.from_pretrained(model_name)
         verb = SoftVerbalizer(self.default_label_words, tokenizer, model)
-
         self.assertEqual(verb.head_name, head_name)
         self.assertTrue(isinstance(verb.head, head_class))
         self.assertTrue(isinstance(getattr(model, head_name[0]), MaskedLMIdentity))
         module = getattr(verb.head, verb.head_name[-1])
         module = module.weight if isinstance(module, paddle.nn.Linear) else module
         self.assertTrue(len(self.default_label_words) in module.shape)
-
         self.assertEqual([x[0] for x in verb.head_parameters()], head_params)
         self.assertEqual([x[0] for x in verb.non_head_parameters()], non_head_params)
 

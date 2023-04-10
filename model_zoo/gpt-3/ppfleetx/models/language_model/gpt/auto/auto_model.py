@@ -23,7 +23,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -555,7 +554,7 @@ class GPTModelAuto(nn.Layer):
 
         embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
-        if self.training == False:
+        if self.training is False:
             # TODO, use registered buffer
             causal_mask = paddle.tensor.triu(
                 paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
@@ -1044,8 +1043,6 @@ class GPTForGenerationAuto(nn.Layer):
         repetition_penalty = self.repetition_penalty
         num_beams = self.num_beams
         num_beam_groups = self.num_beam_groups
-        length_penalty = self.length_penalty
-        early_stopping = self.early_stopping
         bos_token_id = self.bos_token_id
         eos_token_id = self.eos_token_id
         pad_token_id = self.pad_token_id
