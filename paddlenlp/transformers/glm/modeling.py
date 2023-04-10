@@ -170,7 +170,14 @@ class GLMAttention(nn.Layer):
         # [bs,  num_head, seq_len, seq_len(+cache_len)]
         attention_scores = paddle.multiply(attention_scores, ltor_mask)
         if self.attention_scale > 1.0:
-            max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+            # Fixme for max op not support fp16 https://github.com/PaddlePaddle/Paddle/issues/52601
+            if attention_scores.dtype != paddle.float32:
+                old_type = attention_scores.dtype
+                max_attention_scores = attention_scores.astype("float32").max(axis=-1, keepdim=True)[0]
+                max_attention_scores = max_attention_scores.astype(old_type)
+            else:
+                max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+
             attention_scores -= max_attention_scores
             attention_scores *= self.attention_scale
 
