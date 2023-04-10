@@ -683,9 +683,9 @@ class LoRAModel(nn.Layer):
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().numpy()[0]
+                freeze_numel += float(weight.numel())
             else:
-                trainable_numel += weight.numel().numpy()[0]
+                trainable_numel += float(weight.numel())
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
