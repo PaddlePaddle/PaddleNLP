@@ -46,16 +46,16 @@ class BloomTrainer(Trainer):
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
 
         model.eval()
-
-        tokens = model.generate(
-            input_ids=inputs["input_ids"],
-            max_length=self.data_args.tgt_length,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy="sampling",
-            top_k=1,
-        )[0]
+        with paddle.no_grad():
+            tokens = model.generate(
+                input_ids=inputs["input_ids"],
+                max_length=self.data_args.tgt_length,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+                decode_strategy="sampling",
+                top_k=1,
+            )[0]
         all_preds = []
         for pred_tokens in tokens:
             all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
