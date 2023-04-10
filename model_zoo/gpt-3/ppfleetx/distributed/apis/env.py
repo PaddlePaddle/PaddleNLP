@@ -65,8 +65,8 @@ def set_seed(seed):
 
     # seed = mp_rank +
     #        pp_rank * (mp_size) +
-    #        dp_rank * (mp_size + pp_size) +
-    #        sharding_rank * (mp_size + pp_size + dp_size)
+    #        dp_rank * (mp_size * pp_size) +
+    #        sharding_rank * (mp_size * pp_size * dp_size)
     # seed offset is order to avoid conflicts with the parameter initialization seed
 
     seed_offset = seed + 1024 + paddle.distributed.get_world_size()
