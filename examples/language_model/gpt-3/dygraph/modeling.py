@@ -227,7 +227,7 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
-        softmax_mask_fuse_upper_triangle = strtobool(os.getenv("softmax_mask_fuse_upper_triangle", True))
+        softmax_mask_fuse_upper_triangle = strtobool(os.getenv("softmax_mask_fuse_upper_triangle", "True"))
         if softmax_mask_fuse_upper_triangle:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
         else:
@@ -789,7 +789,7 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
-        softmax_mask_fuse_upper_triangle = strtobool(os.getenv("softmax_mask_fuse_upper_triangle", True))
+        softmax_mask_fuse_upper_triangle = strtobool(os.getenv("softmax_mask_fuse_upper_triangle", "True"))
 
         if self.enable_fuse_transformer or not softmax_mask_fuse_upper_triangle:
             length = paddle.shape(input_ids)[-1]
