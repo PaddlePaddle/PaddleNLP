@@ -745,11 +745,9 @@ class ErnieLMPredictionHead(nn.Layer):
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
         self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
-        self.decoder.bias = self.create_parameter(
+        self.decoder_bias = self.create_parameter(
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
-        # link bias for loading pretrained weights
-        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
