@@ -380,6 +380,6 @@ for lora_enabled in [True, False]:
 ```
 生成的图片如下所示：
 
-|       lora_disable.png       |       lora_enable.png       |
-|:-------------------:|:-------------------:|
-|<img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%>| <img src=" https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%> |
+| lora_disable.png | lora_enable.png |
+|:----------:|:--------------:|
+|<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
