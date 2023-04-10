@@ -66,6 +66,7 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 
+from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
@@ -467,8 +468,41 @@ def dtype_byte_size(dtype):
     return bit_size // 8
 
 
+_re_layer_prefix = re.compile(r"\.(\d+)\.")
+
+
+def _partion_for_pipeline_mode(keys):
+    # the keys should be sort in networks order
+    # todo handle tie_weight
+    def layer_prefix(key):
+        ret = _re_layer_prefix.search(key)
+        if ret is not None:
+            return key[0 : ret.end()]
+        return ""
+
+    keys = list(keys)
+    start_idx = -1
+    prefix_str = None
+    parttion_map = {}
+    for k in keys:
+        prefix = layer_prefix(k)
+        if prefix != prefix_str:
+            prefix_str = prefix
+            start_idx += 1
+        parttion_map[k] = start_idx
+
+    # if only one parttion, we don't parttion it
+    if start_idx < 1:
+        return {keys[i]: i for i in range(len(keys))}
+
+    return parttion_map
+
+
 def shard_checkpoint(
-    state_dict: Dict[str, paddle.Tensor], max_shard_size: Union[int, str] = "10GB", weights_name: str = WEIGHTS_NAME
+    state_dict: Dict[str, paddle.Tensor],
+    max_shard_size: Union[int, str] = "10GB",
+    weights_name: str = WEIGHTS_NAME,
+    shard_format="naive",
 ):
     """
     Splits a model state dictionary in sub-checkpoints so that the final size of each sub-checkpoint does not exceed a
@@ -493,7 +527,14 @@ def shard_checkpoint(
             (like `"5MB"`).
         weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
             The name of the model save file.
+        shard_format (`str`, *optional*, defaults to `"naive"`):
+            support naive or pipeline.
     """
+    assert shard_format in [
+        "naive",
+        "pipeline",
+    ], f"Invalid shard_format: {shard_format}, it show be `naive` or `pipeline`."
+
     max_shard_size = convert_file_size_to_int(max_shard_size)
 
     sharded_state_dicts = []
@@ -501,20 +542,49 @@ def shard_checkpoint(
     current_block_size = 0
     total_size = 0
 
-    for key, weight in state_dict.items():
-        weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
-        # If this weight is going to tip up over the maximal size, we split.
-        if current_block_size + weight_size > max_shard_size:
-            sharded_state_dicts.append(current_block)
-            current_block = {}
-            current_block_size = 0
+    if shard_format == "naive":
+        for key, weight in state_dict.items():
+            weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
+            # If this weight is going to tip up over the maximal size, we split.
+            if current_block_size + weight_size > max_shard_size:
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    sharded_state_dicts.append(current_block)
+                current_block = {}
+                current_block_size = 0
 
-        current_block[key] = weight
-        current_block_size += weight_size
-        total_size += weight_size
+            current_block[key] = weight
+            current_block_size += weight_size
+            total_size += weight_size
 
-    # Add the last block
-    sharded_state_dicts.append(current_block)
+        # Add the last block
+        sharded_state_dicts.append(current_block)
+
+    if shard_format == "pipeline":
+        parttion_map = _partion_for_pipeline_mode(state_dict.keys())
+        partition_num = max(parttion_map.values())
+
+        for index in range(partition_num + 1):
+            weight_names = [k for k, v in parttion_map.items() if v == index]
+            weight_size = sum(
+                state_dict[key].numel().item() * dtype_byte_size(state_dict[key].dtype) for key in weight_names
+            )
+
+            # try to add new block
+            if current_block_size + weight_size > max_shard_size:
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    sharded_state_dicts.append(current_block)
+                current_block = {}
+                current_block_size = 0
+            for key in weight_names:
+                current_block[key] = state_dict[key]
+            current_block_size += weight_size
+            total_size += weight_size
+
+        # Add the last block
+        sharded_state_dicts.append(current_block)
+        logger.info(f"The average size of partition is around: {total_size//partition_num}")
 
     # If we only have one shard, we return it
     if len(sharded_state_dicts) == 1:
@@ -622,12 +692,23 @@ def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
                 f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
             )
         for key in state_dict.keys():
+            if dtype == "bfloat16":
+                # fix fp32/fp16 cast to bfloat16
+                # so cast numpy to paddle, let paddle handle dtype casting
+                if isinstance(state_dict[key], np.ndarray):
+                    with device_guard("cpu"):
+                        state_dict[key] = paddle.to_tensor(state_dict[key])
+
             if isinstance(state_dict[key], np.ndarray):
-                if dtype == "bfloat16":
-                    assert state_dict[key].dtype == np.uint16, "paddle.bfloat16 save as uint16. fail to convert."
-                    continue
-                state_dict[key] = state_dict[key].astype(dtype=dtype)
-            else:
+                if isinstance(state_dict[key].dtype.type, np.floating):
+                    state_dict[key] = state_dict[key].astype(dtype=dtype)
+                if isinstance(state_dict[key].dtype, np.uint16):
+                    # paddle.bfloat16 save as np.uint16.
+                    # so cast np to numpy, let paddle handle dtype casting
+                    with device_guard("cpu"):
+                        state_dict[key] = paddle.to_tensor(state_dict[key])
+
+            if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                 state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
     else:
         dtype_prefix_len = len("paddle.")
@@ -1518,6 +1599,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_sharded = False
         sharded_metadata = None
 
+        # -1. when it's from HF
+        if from_hf_hub:
+            resolved_archive_file = resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path,
+                cache_dir=cache_dir,
+                support_conversion=support_conversion,
+                subfolder=subfolder,
+            )
+            return resolved_archive_file, sharded_metadata, is_sharded
+
         if pretrained_model_name_or_path is not None:
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
             is_local = os.path.isdir(pretrained_model_name_or_path)
@@ -1583,6 +1674,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         subfolder=subfolder,
                         _raise_exceptions_for_missing_entries=False,
                     )
+                    resolved_archive_file = None
                     if pretrained_model_name_or_path in cls.pretrained_init_configuration:
                         # fetch the weight url from the `pretrained_resource_files_map`
                         resource_file_url = cls.pretrained_resource_files_map["model_state"][
@@ -1902,20 +1994,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             remove_prefix_from_model,
             ignore_mismatched_sizes,
         )
-
-        # start_prefix = prefix + "."
-
-        # `add_prefix_to_model` and `remove_prefix_from_model` are for different situation,
-        # you can check the following matrix, which means:
-        # the value of cell: (add_prefix_to_model, remove_prefix_from_model)
-        # the load/Init-Base is the state-dict which don't contain `prefix`.
-        # the load/Init-DownStream is the state-dict which contain the `prefix`
-        #
-        # |                 | load-Base | load-DownStream |
-        # |-----------------|-----------|-----------------|
-        # | Init-Base       | F,F       | T,F             |
-        # | Init-DonwStream | F,T       | F,F             |
-        #
 
         if state_dict is not None:
             # Whole checkpoint
@@ -2237,6 +2315,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
 
         # 1. retrieve the model related config
 
@@ -2306,7 +2385,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         weights_name = _add_variant(weights_name, variant)
 
         # Save model
-        shards, index = shard_checkpoint(state_dict_to_save, max_shard_size=max_shard_size, weights_name=weights_name)
+        shards, index = shard_checkpoint(
+            state_dict_to_save, max_shard_size=max_shard_size, weights_name=weights_name, shard_format=shard_format
+        )
 
         # Clean the folder from a previous save
         for filename in os.listdir(save_directory):
@@ -2346,7 +2427,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
             # Save the index as well
             with open(save_index_file, "w", encoding="utf-8") as f:
-                content = json.dumps(index, indent=2, sort_keys=True) + "\n"
+                content = json.dumps(index, indent=2) + "\n"
                 f.write(content)
             logger.info(
                 f"The model is bigger than the maximum size per checkpoint ({max_shard_size}) and is going to be "

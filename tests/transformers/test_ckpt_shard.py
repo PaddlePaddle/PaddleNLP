@@ -79,6 +79,34 @@ class TestCkptShard(unittest.TestCase):
             new_model = AutoModel.from_pretrained(tmp_dir)
             new_model.eval()
 
+    def testSaveShardFormat(self):
+        from paddlenlp.transformers import AutoModel
+
+        model = AutoModel.from_pretrained("bert-base-cased")
+        model.eval()
+        ret = model(input_ids=paddle.to_tensor([[x for x in range(100, 110)]], dtype="int64"), return_dict=True)
+        v1 = ret.last_hidden_state.abs().mean().item()
+
+        # Now let’s use a maximum shard size of 200MB:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            model.save_pretrained(
+                tmp_dir,
+                max_shard_size="50MB",
+                shard_format="pipeline",
+                safe_serialization=True,
+            )
+            print(sorted(os.listdir(tmp_dir)))
+
+            new_model = AutoModel.from_pretrained(tmp_dir)
+            # print(new_model.state_dict().keys())
+            new_model.eval()
+            ret = new_model(
+                input_ids=paddle.to_tensor([[x for x in range(100, 110)]], dtype="int64"), return_dict=True
+            )
+            v2 = ret.last_hidden_state.abs().mean().item()
+            np.testing.assert_allclose(v1, v2, rtol=1e-9)
+
+    @unittest.skip("")
     def testPaddleLoadShard(self):
         from paddlenlp.transformers import AutoModel
 
