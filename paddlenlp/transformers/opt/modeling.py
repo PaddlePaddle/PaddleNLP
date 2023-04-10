@@ -838,10 +838,11 @@ class OPTModel(OPTPretrainedModel):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         self.checkpoints = []
+
         past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
 
         if attention_mask is None:
-            attention_mask = paddle.zeros(shape=input_shape)
+            attention_mask = paddle.zeros(input_shape, dtype=paddle.get_default_dtype())
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -867,7 +868,6 @@ class OPTModel(OPTPretrainedModel):
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
-
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1094,7 +1094,6 @@ class OPTForCausalLM(OPTPretrainedModel):
             {
                 "cache": cache,
                 "use_cache": True,
-                # "return_dict": False,
                 "attention_mask": attention_mask,
             }
         )
@@ -1109,10 +1108,9 @@ class OPTForCausalLM(OPTPretrainedModel):
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * -1e9
+            attention_mask = (input_ids != pad_token_id).astype("int64") * -1e4
         else:
             attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
-
         return attention_mask
 
     def __getattr__(self, name):

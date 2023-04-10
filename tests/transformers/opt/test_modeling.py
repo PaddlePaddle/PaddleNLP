@@ -94,12 +94,12 @@ class OPTModelTester:
         input_mask = None
         if self.use_input_mask:
             # contruct input_mask filling with 0 and -1e4
-            input_mask_cond = paddle.randn([self.batch_size, self.seq_length])
-            input_mask = paddle.where(
-                input_mask_cond > input_mask_cond.mean(),
-                paddle.zeros_like(input_mask_cond, dtype="int64"),
-                paddle.full(input_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-            )
+            # left padding: [[-1e4, -1e4, -1e4, 0, 0], [-1e4, -1e4, -1e4, 0, 0], ...]
+            input_mask = []
+            for _ in range(self.batch_size):
+                pad_length = random.randint(0, self.seq_length)
+                input_mask.append([0] * (self.seq_length - pad_length) + [1] * pad_length)
+            input_mask = paddle.to_tensor(input_mask, dtype="int64") * -1e4
 
         sequence_labels = None
         token_labels = None
@@ -200,7 +200,12 @@ class OPTModelTester:
         output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
         if self.parent.return_dict:
             output_from_no_past = output_from_no_past[0]
-        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
+
+        past_key_values_length = paddle.shape(past[0].k)[2]
+        attention_mask = paddle.zeros(shape=[next_tokens.shape[0], 1 + past_key_values_length])
+        output_from_past = model(
+            next_tokens, use_cache=True, attention_mask=attention_mask, cache=past, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -265,12 +270,7 @@ class OPTModelTester:
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
-        next_mask_cond = paddle.randn((self.batch_size, 3))
-        next_mask = paddle.where(
-            next_mask_cond > next_mask_cond.mean(),
-            paddle.zeros_like(next_mask_cond, dtype="int64"),
-            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-        )
+        next_mask = paddle.zeros_like(next_tokens, dtype=paddle.get_default_dtype())
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -359,12 +359,9 @@ class OPTModelTester:
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size, dtype="int64")
-        next_mask_cond = paddle.randn((self.batch_size, 3))
-        next_mask = paddle.where(
-            next_mask_cond > next_mask_cond.mean(),
-            paddle.zeros_like(next_mask_cond, dtype="int64"),
-            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-        )
+
+        # all next mask is zeros
+        next_mask = paddle.zeros_like(next_tokens, dtype=paddle.get_default_dtype())
 
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -619,3 +616,15 @@ class OPTModelIntegrationTest(unittest.TestCase):
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_opt_generation(self):
+        model = OPTModel.from_pretrained("facebook/opt-1.3b")
+        tokenizer = GPTTokenizer.from_pretrained("facebook/opt-1.3b")
+        tokenizer.padding_side = "left"
+        model.eval()
+        sentence = "I love you, but"
+        input_ids = tokenizer(sentence, return_tensors="pd", padding=True).input_ids
+        generated_ids = model.generate(input_ids, decode_strategy="sampling", top_k=1)[0].tolist()
+        decoded_sentence = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+        self.assertEqual(sentence, decoded_sentence)
