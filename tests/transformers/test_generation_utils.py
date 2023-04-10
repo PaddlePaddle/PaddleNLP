@@ -544,7 +544,6 @@ class GenerationTesterMixin:
                 pretrained_model = self.all_generative_model_classes[model_class][0](**config)
                 model = model_class(pretrained_model)
             model.eval()
-
             output_ids_generate = model.generate(
                 decode_strategy="greedy_search",
                 max_length=max_length,

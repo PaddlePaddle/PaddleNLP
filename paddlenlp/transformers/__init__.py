@@ -119,6 +119,7 @@ from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .luke.modeling import *
 from .luke.tokenizer import *
+from .luke.configuration import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .mbart.configuration import *

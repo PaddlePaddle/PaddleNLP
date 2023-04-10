@@ -464,7 +464,7 @@ function gpt_auto_serial() {
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9507 ${loss}
+    check_result $FUNCNAME 10.9276 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -493,7 +493,7 @@ function gpt_auto_dp2mp2() {
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9695 ${loss}
+    check_result $FUNCNAME 10.9293 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -522,7 +522,7 @@ function gpt_auto_mp2pp2() {
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9507 ${loss}
+    check_result $FUNCNAME 10.9276 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -553,7 +553,7 @@ function gpt_auto_dp2pp2() {
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9730 ${loss}
+    check_result $FUNCNAME 10.9275 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -584,7 +584,7 @@ function gpt_auto_dp2mp2pp2() {
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9730 ${loss}
+    check_result $FUNCNAME 10.9275 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -642,7 +642,7 @@ function gpt_auto_dp2sharding2() {
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9695 ${loss}
+    check_result $FUNCNAME 10.9293 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -671,7 +671,7 @@ function gpt_auto_dp2mp2sharding2() {
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`tail -5 $log_dir/workerlog.0 | grep "lr:" | cut -d " " -f5 `
-    check_result $FUNCNAME 10.9695 ${loss}
+    check_result $FUNCNAME 10.9293 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -702,7 +702,7 @@ function gpt_auto_dp2pp2sharding2() {
     loss1=`tail -5 $log_dir/workerlog.2 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.3 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9730 ${loss}
+    check_result $FUNCNAME 10.9275 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -733,7 +733,7 @@ function gpt_auto_dp2mp2pp2sharding2() {
     loss1=`tail -5 $log_dir/workerlog.4 | grep "lr:" | cut -d " " -f5 `
     loss2=`tail -5 $log_dir/workerlog.6 | grep "lr:" | cut -d " " -f5 `
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9730 ${loss}
+    check_result $FUNCNAME 10.9275 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -942,6 +942,7 @@ function gpt_auto_export() {
 
 function before_hook() {
     # requirements
+    sed -i -e "s/paddlenlp/#paddlenlp/g" requirements.txt
     python -m pip install -r requirements.txt --force-reinstall
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 

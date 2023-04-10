@@ -168,7 +168,7 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.init_noise_sigma = self.sigmas.max()
 
         timesteps = paddle.to_tensor(timesteps)
-        timesteps = paddle.cat([timesteps[:1], timesteps[1:].repeat_interleave(2)])
+        timesteps = paddle.concat([timesteps[:1], timesteps[1:].repeat_interleave(2)])
 
         self.timesteps = timesteps.cast(paddle.float32)
 
