@@ -1405,9 +1405,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray):
+                if isinstance(state_dict[key], np.ndarray) and isinstance(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
-                else:
+                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                     state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:
             dtype_prefix_len = len("paddle.")
@@ -1526,6 +1526,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
 
+        # Fix me for loading dtype paddle.int64 but cast paddle.float32
         # if dtype is None, use config.dtype instead
         if dtype is None and config.dtype is not None:
             dtype = config.dtype
