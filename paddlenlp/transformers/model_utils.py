@@ -507,34 +507,28 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-        if hasattr(self, "init_weights") and inspect.ismethod(self.init_weights):
-            self.apply(self.init_weights)
+        self.init_weights()
 
-    def _init_weights(self, module):
+    def _init_weights(self, layer):
         """
         Initialize the weights. This method should be overridden by derived class.
         """
         pass
 
-    def _initialize_weights(self, module):
+    def _initialize_weights(self, layer):
         """
         Initialize the weights if they are not already initialized.
         """
-        if getattr(module, "_is_initialized", False):
+        if getattr(layer, "_is_initialized", False):
             return
-        self._init_weights(module)
-        module._is_initialized = True
+        self._init_weights(layer)
+        layer._is_initialized = True
 
     def init_weights(self):
         """
         If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
         initialization logic in `_init_weights`.
         """
-        # TODO(wj-Mcat): prune heads
-        # Prune heads if needed
-        if self.constructed_from_pretrained_config() and self.config.pruned_heads:
-            self.prune_heads(self.config.pruned_heads)
-
         if _init_weights:
             # Initialize weights
             self.apply(self._initialize_weights)
@@ -542,45 +536,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # Tie weights should be skipped when not initializing all weights
             # since from_pretrained(...) calls tie weights anyways
             self.tie_weights()
-
-    def prune_heads(self, heads_to_prune: Dict[int, List[int]]):
-        """
-        Prunes heads of the base model.
-
-        Arguments:
-            heads_to_prune (`Dict[int, List[int]]`):
-                Dictionary with keys being selected layer indices (`int`) and associated values being the list of heads
-                to prune in said layer (list of `int`). For instance {1: [0, 2], 2: [2, 3]} will prune heads 0 and 2 on
-                layer 1 and heads 2 and 3 on layer 2.
-        """
-        # TODO(wj-Mcat): implement prune heads
-        pass
-
-    def __getattr__(self, name):
-        """
-        called when the attribute name is missed in the model
-
-        Args:
-            name: the name of attribute
-
-        Returns: the value of attribute
-
-        """
-        try:
-            return super(PretrainedModel, self).__getattr__(name)
-        except AttributeError:
-            result = getattr(self.config, name)
-            if getattr(self, "deprecated_warnings", None) is None:
-                self.deprecated_warnings = {}
-
-            if not self.deprecated_warnings.get(name, False):
-                logger.warning(
-                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-                    f"Instead, do `model.config.{name}`"
-                )
-                self.deprecated_warnings[name] = True
-
-            return result
 
     @property
     def base_model(self):
