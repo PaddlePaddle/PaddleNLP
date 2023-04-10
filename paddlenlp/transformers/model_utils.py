@@ -569,13 +569,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         Tie the weights between the input embeddings and the output embeddings.
         """
-        tie_word_embeddings = (
-            self.tie_word_embeddings
-            if hasattr(self, "tie_word_embeddings")
-            else self.config.get("tie_word_embeddings", False)
-        )
-
-        if tie_word_embeddings:
+        if self.config.tie_word_embeddings:
             output_embeddings = self.get_output_embeddings()
             input_embeddings = self.get_input_embeddings()
             if output_embeddings is not None and input_embeddings is not None:
