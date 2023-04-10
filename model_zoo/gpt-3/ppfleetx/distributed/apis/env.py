@@ -73,8 +73,8 @@ def set_seed(seed):
     global_seed = (
         seed_offset
         + pp_rank * (mp_size)
-        + dp_rank * (mp_size + pp_size)
-        + sharding_rank * (mp_size + pp_size + dp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
     )
 
     seed_offset += paddle.distributed.get_world_size()
@@ -82,8 +82,8 @@ def set_seed(seed):
         seed_offset
         + mp_rank
         + pp_rank * (mp_size)
-        + dp_rank * (mp_size + pp_size)
-        + sharding_rank * (mp_size + pp_size + dp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
     )
 
     tracker = get_rng_state_tracker()
