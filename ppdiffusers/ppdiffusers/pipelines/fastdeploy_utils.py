@@ -46,7 +46,7 @@ if is_paddle_available():
 if is_fastdeploy_available():
     import fastdeploy as fd
 
-    def fdtensor2pdtensor(fdtensor: fd.C.FDTensor):
+    def fdtensor2pdtensor(fdtensor: "fd.C.FDTensor"):
         dltensor = fdtensor.to_dlpack()
         pdtensor = paddle.utils.dlpack.from_dlpack(dltensor)
         return pdtensor
