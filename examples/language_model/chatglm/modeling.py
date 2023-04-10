@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import re
 from functools import partial
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import paddle
 import paddle.nn as nn
@@ -36,6 +36,7 @@ from paddlenlp.utils.log import logger
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
+    "ChatGLMForConditionalGeneration",
 ]
 
 
@@ -144,7 +145,7 @@ class ChatGLMAttention(nn.Layer):
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
             base=10000,
-            dtype=paddle.float16,
+            dtype=self.config.paddle_dtype,
             learnable=False,
         )
         self.scale_mask_softmax = None
@@ -217,7 +218,6 @@ class ChatGLMAttention(nn.Layer):
         cache: Tensor = None,
         layer_id=0,
     ):
-        hidden_states = hidden_states.transpose([1, 0, 2])
         # [s, b, h]
         query_length, batch_size = hidden_states.shape[:2]
         # [s, b, 3h]
@@ -319,12 +319,13 @@ class ChatGLMBlock(nn.Layer):
         use_cache: bool = False,
         cache: Tensor = None,
     ):
-        layernorm_output = self.input_layernorm(hidden_states)
+        hidden_states.numpy().dump(f"align_paddle_{hidden_states.dtype}.npy")
+        attention_input = self.input_layernorm(hidden_states)
         # Layer norm before transformer layer
         # cache = self.input_layernorm(cache) if cache is not None else None
         # Self attention
         attention_output, cache, _ = self.attention(
-            hidden_states=layernorm_output,
+            hidden_states=attention_input,
             ltor_mask=ltor_mask,
             position_ids=position_ids,
             cache=cache,
@@ -333,13 +334,13 @@ class ChatGLMBlock(nn.Layer):
         )
         # Residual connection
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
-        layernorm_input = alpha * layernorm_output + attention_output
+        layernorm_input = alpha * attention_input + attention_output
         # Layernorm after attention
-        layernorm_output = self.post_attention_layernorm(layernorm_input)
+        mlp_input = self.post_attention_layernorm(layernorm_input)
         # MLP
-        mlp_output = self.mlp(layernorm_output)
+        mlp_output = self.mlp(mlp_input)
         # Second residual connection
-        output = layernorm_output * alpha + mlp_output
+        output = mlp_input * alpha + mlp_output
         return output, cache
 
 
@@ -436,42 +437,6 @@ class ChatGLMStack(nn.Layer):
         # past_key_values = [(v[0], v[1]) for v in past_key_values]
         return past_key_values
 
-    def get_masks(self, input_ids):
-        batch_size, seq_length = input_ids.shape
-        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
-        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
-        for i, context_length in enumerate(context_lengths):
-            attention_mask[i, :, :context_length] = 1
-        attention_mask = attention_mask.unsqueeze(1)
-        attention_mask = (attention_mask < 0.5).astype("bool")
-        return attention_mask
-
-    def get_position_ids(self, input_ids, mask_positions, gmask=False):
-        batch_size, seq_length = input_ids.shape
-        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
-        if self.position_encoding_2d:
-            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
-            for i, context_length in enumerate(context_lengths):
-                position_ids[i, context_length:] = mask_positions[i]
-            block_position_ids = [
-                paddle.concat(
-                    (
-                        paddle.zeros([context_length], dtype="int64"),
-                        paddle.arange(seq_length - context_length, dtype="int64") + 1,
-                    )
-                )
-                for context_length in context_lengths
-            ]
-            block_position_ids = paddle.stack(block_position_ids, axis=0)
-            position_ids = paddle.stack((position_ids, block_position_ids), axis=1)
-        else:
-            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
-            if not gmask:
-                for i, context_length in enumerate(context_lengths):
-                    position_ids[context_length:] = mask_positions[i]
-
-        return position_ids
-
     @paddle.jit.not_to_static
     def recompute_training(
         self, layer_module: nn.Layer, hidden_states: Tensor, ltor_mask: Tensor, position_ids: Tensor, cache: Tensor
@@ -506,6 +471,7 @@ class ChatGLMStack(nn.Layer):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
+            inputs_embeds = inputs_embeds.transpose([1, 0, 2])
 
         if past_key_values is None:
             if self.config.pre_seq_len is not None:
@@ -513,24 +479,12 @@ class ChatGLMStack(nn.Layer):
             else:
                 past_key_values = tuple([None] * len(self.layers))
 
-            if attention_mask is None:
-                attention_mask = self.get_masks(input_ids)
-
-            if position_ids is None:
-                # MASK, gMASK = self.mask_token_id, self.gmask_token_is
-                MASK = self.mask_token_is
-                mask_token = MASK  # gMASK if gMASK in input_ids else MASK
-                use_gmask = False  # True if gMASK in input_ids else False
-
-                mask_positions = [seq.tolist().index(mask_token) for seq in input_ids]
-                position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
-
         if self.config.pre_seq_len is not None and attention_mask is not None:
             prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
             prefix_attention_mask = (prefix_attention_mask < 0.5).astype("bool")
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
 
-        hidden_states = inputs_embeds  # .transpose([0, 1, 2])
+        hidden_states = inputs_embeds
 
         current_key_values = [] if use_cache else None
         if attention_mask is None:
@@ -576,13 +530,49 @@ class ChatGLMPretrainedModel(PretrainedModel):
     base_model_prefix = "chatglm"
     config_class = ChatGLMConfig
     model_config_file = CONFIG_NAME
-    # resource_files_names = {"model_state": "model_state.pdparams"}
+    resource_files_names = {"model_state": "model_state.pdparams"}
     # pretrained_init_configuration = ChatGLM_PRETRAINED_INIT_CONFIGURATION
     # pretrained_resource_files_map = ChatGLM_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
         return None
+
+    def get_masks(self, input_ids):
+        batch_size, seq_length = input_ids.shape
+        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
+        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
+        for i, context_length in enumerate(context_lengths):
+            attention_mask[i, :, :context_length] = 1
+        attention_mask = attention_mask.unsqueeze(1)
+        attention_mask = (attention_mask < 0.5).astype("bool")
+        return attention_mask
+
+    def get_position_ids(self, input_ids, mask_positions, gmask=False):
+        batch_size, seq_length = input_ids.shape
+        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
+        if self.position_encoding_2d:
+            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
+            for i, context_length in enumerate(context_lengths):
+                position_ids[i, context_length:] = mask_positions[i]
+            block_position_ids = [
+                paddle.concat(
+                    (
+                        paddle.zeros([context_length], dtype="int64"),
+                        paddle.arange(seq_length - context_length, dtype="int64") + 1,
+                    )
+                )
+                for context_length in context_lengths
+            ]
+            block_position_ids = paddle.stack(block_position_ids, axis=0)
+            position_ids = paddle.stack((position_ids, block_position_ids), axis=1)
+        else:
+            position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
+            if not gmask:
+                for i, context_length in enumerate(context_lengths):
+                    position_ids[context_length:] = mask_positions[i]
+
+        return position_ids
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config):
@@ -632,8 +622,8 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
-        prefix = ""
-        # prefix = "glm."
+        # prefix = ""
+        prefix = "chatglm."
 
         return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
 
@@ -655,9 +645,14 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMModel, self).__init__(config)
         self.config = config
-        self.output_predict = config.output_predict
         self.transformer = ChatGLMStack(config)
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.transformer.word_embeddings
+
+    def set_input_embeddings(self, new_embeddings):
+        self.transformer.word_embeddings = new_embeddings
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output):
         hcg = fleet.get_hybrid_communicate_group()
@@ -719,6 +714,17 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         use_cache: bool = None,
         return_dict: bool = None,
     ):
+        if attention_mask is None:
+            attention_mask = self.get_masks(input_ids)
+
+        if position_ids is None:
+            MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
+            mask_token = gMASK if sum([gMASK in x for x in input_ids]) > 0 else MASK
+            use_gmask = True if sum([gMASK in x for x in input_ids]) > 0 else False
+
+            mask_positions = [seq.tolist().index(mask_token) for seq in input_ids]
+            position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
+
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         logits, hidden_layers = self.transformer(
             input_ids=input_ids,
@@ -728,16 +734,6 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             past_key_values=past_key_values,
             use_cache=use_cache,
         )
-        if self.output_predict:
-            if self.config.tensor_parallel_degree > 1:
-                # FIXME: @ZHUI fix for jit_to_static
-                logits = self.parallel_matmul(
-                    logits, self.transformer.word_embeddings.weight, self.config.tensor_parallel_output
-                )
-            else:
-                logits = F.linear(logits, self.transformer.word_embeddings.weight.T)
-
-            # logits = logits.transpose([1, 0, 2])
 
         if not return_dict:
             return (logits, hidden_layers)
@@ -747,29 +743,22 @@ class ChatGLMModel(ChatGLMPretrainedModel):
 
 class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
     def __init__(self, config: ChatGLMConfig):
-        super().__init__(config)
-
-        self.max_sequence_length = config.max_sequence_length
-
-        self.position_encoding_2d = config.position_encoding_2d
-
-        self.transformer = ChatGLMModel(config)
-
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False, dtype=paddle.float16)
+        super(ChatGLMForConditionalGeneration, self).__init__(config)
 
         self.config = config
+        self.max_sequence_length = config.max_sequence_length
+        self.position_encoding_2d = config.position_encoding_2d
+        self.chatglm = ChatGLMModel(config)
 
-    def get_output_embeddings(self):
-        return self.lm_head
+        self.lm_head = self.chatglm.get_input_embeddings()
 
-    def set_output_embeddings(self, new_embeddings):
-        self.lm_head = new_embeddings
-
-    def prepare_inputs_for_generation(self, input_ids, position_ids, attention_mask, past_key_values, cache, **kwargs):
+    def prepare_inputs_for_generation(
+        self, input_ids, position_ids=None, attention_mask=None, past_key_values=None, cache=None, **kwargs
+    ):
         batch_size, seq_length = input_ids.shape
-        MASK, gMASK = self.mask_token_id, self.gmask_token_id
-        mask_token = MASK if MASK in input_ids else gMASK
-        use_gmask = False if MASK in input_ids else gMASK
+        MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
+        mask_token = gMASK if sum([gMASK in x for x in input_ids]) > 0 else MASK
+        use_gmask = True if sum([gMASK in x for x in input_ids]) > 0 else MASK
         seqs = input_ids.tolist()
         mask_positions = [seq.index(mask_token) for seq in seqs]
 
@@ -809,11 +798,9 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not bool")
                 attention_mask = None
             if attention_mask is None:
-                attention_mask = self.get_masks(input_ids, device=input_ids.device)
+                attention_mask = self.get_masks(input_ids)
             if position_ids is None:
-                position_ids = self.get_position_ids(
-                    input_ids, device=input_ids.device, mask_positions=mask_positions, gmask=use_gmask
-                )
+                position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
 
             return {
                 "input_ids": input_ids,
@@ -822,10 +809,48 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "attention_mask": attention_mask,
             }
 
+    def _update_model_kwargs_for_generation(
+        self,
+        outputs: ModelOutput,
+        model_kwargs: Dict[str, Any],
+        is_encoder_decoder: bool = False,
+        standardize_cache_format: bool = False,
+    ) -> Dict[str, Any]:
+        # update past_key_values
+        model_kwargs["past_key_values"] = outputs["past_key_values"] if hasattr(outputs, "past_key_values") else None
+
+        # update attention mask
+        if "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            if attention_mask is not None and attention_mask.dtype == paddle.bool:
+                attention_mask = paddle.concat(
+                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=paddle.bool)], axis=3
+                )
+                new_attention_mask = attention_mask[:, :, -1:].clone()
+                new_attention_mask[..., -1] = False
+                model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
+
+        # update position ids
+        if "position_ids" in model_kwargs:
+            position_ids = model_kwargs["position_ids"]
+            new_position_id = position_ids[..., -1:].clone()
+            new_position_id[:, 1, :] += 1
+            model_kwargs["position_ids"] = paddle.concat([position_ids, new_position_id], axis=-1)
+
+        return model_kwargs
+
     def forward(
-        self, input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels, use_cache, return_dict
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        labels=None,
+        use_cache=None,
+        return_dict=True,
     ):
-        transformer_outputs = self.transformer(
+        transformer_outputs = self.chatglm(
             input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -835,9 +860,9 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             return_dict=return_dict,
         )
 
-        hidden_states = transformer_outputs[0]
+        hidden_states = transformer_outputs.logits if return_dict else transformer_outputs[0]
 
-        lm_logits = self.lm_head(hidden_states).transpose([1, 0, 2])
+        lm_logits = F.linear(hidden_states, self.lm_head.weight.T).transpose([1, 0, 2])
         loss = None
         if labels is not None:
             shift_logits = lm_logits[..., :-1, :]
@@ -849,13 +874,12 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             if loss is not None:
                 return (loss, lm_logits, transformer_outputs[1:])
             else:
-                return (lm_logits, transformer_outputs[1:])
+                return (lm_logits, transformer_outputs.cache)
 
         return CausalLMOutputWithPast(
             loss=loss,
             logits=lm_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=transformer_outputs.hidden_states,
+            past_key_values=transformer_outputs.cache,
         )
 
     @staticmethod

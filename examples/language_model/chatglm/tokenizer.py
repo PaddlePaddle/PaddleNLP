@@ -19,16 +19,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import sentencepiece as spm
 
-from paddlenlp.transformers.tokenization_utils import PreTrainedTokenizer
-from paddlenlp.transformers.tokenization_utils_base import (
-    BatchEncoding,
-    EncodedInput,
-    PaddingStrategy,
-)
-
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "THUDM/chatglm-6b": 2048,
-}
+from paddlenlp.transformers import BatchEncoding, PaddingStrategy, PretrainedTokenizer
 
 
 class TextTokenizer:
@@ -163,7 +154,7 @@ class SPTokenizer:
             raise ValueError("The key should be str or int.")
 
 
-class ChatGLMTokenizer(PreTrainedTokenizer):
+class ChatGLMTokenizer(PretrainedTokenizer):
     """
     Construct a ChatGLM tokenizer. Based on byte-level Byte-Pair-Encoding.
 
@@ -172,25 +163,43 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
             Path to the vocabulary file.
     """
 
-    vocab_files_names = {"vocab_file": "ice_text.model"}
-    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+    resource_files_names = {"vocab_file": "ice_text.model"}
+    max_model_input_sizes = {"THUDM/chatglm-6b": 2048}
     model_input_names = ["input_ids"]
+    pretrained_resource_files_map = {
+        "model_file": {
+            "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/ice_text.model"
+        }
+    }
 
     def __init__(
         self,
         vocab_file,
         do_lower_case=False,
         remove_space=False,
-        bos_token="sop",
-        eos_token="eos",
-        eop_token="eop",
+        unk_token="<unk>",
+        bos_token="<sop>",
+        eos_token="</s>",
+        eop_token="<eop>",
         mask_token="[MASK]",
         gmask_token="[gMASK]",
         padding_side="left",
         num_image_tokens=20000,
         **kwargs
     ) -> None:
-        super().__init__(do_lower_case=do_lower_case, remove_space=remove_space, padding_side=padding_side, **kwargs)
+        super().__init__(
+            do_lower_case=do_lower_case,
+            remove_space=remove_space,
+            padding_side=padding_side,
+            unk_token=unk_token,
+            bos_token=bos_token,
+            eos_token=eos_token,
+            eop_token=eop_token,
+            mask_token=mask_token,
+            gmask_token=gmask_token,
+            num_image_tokens=num_image_tokens,
+            **kwargs,
+        )
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
@@ -349,7 +358,7 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
 
     def _pad(
         self,
-        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
+        encoded_inputs: Union[Dict, BatchEncoding],
         max_length: Optional[int] = None,
         padding_strategy=PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
@@ -423,3 +432,14 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
         return encoded_inputs
+
+    @staticmethod
+    def prepare_query_for_chat(query: str, history: List[str] = None):
+        if history is None:
+            return query
+        else:
+            prompt = ""
+            for i, (old_query, response) in enumerate(history):
+                prompt += "[Round {}]\n问：{}\n答：{}\n".format(i, old_query, response)
+            prompt += "[Round {}]\n问：{}\n答：".format(len(history), query)
+        return prompt
