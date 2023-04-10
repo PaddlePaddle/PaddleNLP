@@ -838,7 +838,6 @@ class OPTModel(OPTPretrainedModel):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         self.checkpoints = []
-
         past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
         if attention_mask is None:
             attention_mask = paddle.zeros(input_shape, dtype=paddle.get_default_dtype())
