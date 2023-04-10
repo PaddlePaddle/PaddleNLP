@@ -17,7 +17,7 @@ import inspect
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import paddle
 import paddle.nn as nn
@@ -766,9 +766,9 @@ class GenerationMixin(object):
 
     @staticmethod
     def expand_inputs_for_generation(
+        input_ids: Optional[paddle.Tensor] = None,
         expand_size: int = 1,
         is_encoder_decoder: bool = False,
-        input_ids: Optional[paddle.Tensor] = None,
         **model_kwargs,
     ):
         """Expands tensors from [batch_size, ...] to [batch_size * expand_size, ...]"""
