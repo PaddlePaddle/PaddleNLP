@@ -373,20 +373,26 @@ class SoftVerbalizer(Verbalizer):
         self.head_name = attribute_chain
         module_name = attribute_chain[-1]
         module = getattr(self.head, module_name)
+        # modify weight
         module_weight = module.weight
-        module_bias = module.bias
         selected_weight = self._create_init_weight(module_weight)
-        selected_bias = self._create_init_weight(module_bias, is_bias=True)
         setattr(self.head, module_name, nn.Linear(len(self.labels), module.weight.shape[1], bias_attr=False))
         getattr(self.head, module_name).weight.set_value(selected_weight.T)
-        getattr(self.head, module_name).bias = self.head.create_parameter(
-            shape=[len(self.labels)], dtype=selected_bias.dtype, is_bias=True
-        )
-        getattr(self.head, module_name).bias.set_value(selected_bias)
+        # modify bias
         if hasattr(self.head, "decoder_bias"):
-            self.head.decoder_bias = getattr(self.head, module_name).bias
+            module_bias = self.head.decoder_bias
+            selected_bias = self._create_init_weight(module_bias, is_bias=True)
+            self.head.decoder_bias = self.head.create_parameter(
+                shape=[len(self.labels)], dtype=selected_bias.dtype, is_bias=True
+            )
+            self.head.decoder_bias.set_value(selected_bias)
         elif hasattr(self.head, "bias"):
-            self.head.bias = getattr(self.head, module_name).bias
+            module_bias = self.head.bias
+            selected_bias = self._create_init_weight(module_bias, is_bias=True)
+            self.head.bias = self.head.create_parameter(
+                shape=[len(self.labels)], dtype=selected_bias.dtype, is_bias=True
+            )
+            self.head.bias.set_value(selected_bias)
 
     def _create_init_weight(self, weight: Tensor, is_bias: bool = False):
         token_ids = self.token_ids.squeeze(1)
