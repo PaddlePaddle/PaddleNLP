@@ -80,7 +80,7 @@ for i, img in enumerate(images):
 
 例如我们有下面的prompt:
 
-```
+```python
 prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
 ```
 然后，我们可以定义动物、物体和衣服的可能采样值。这些文件可以来自与类别同名的.txt文件。
@@ -101,8 +101,7 @@ sofa
 bench
 ```
 代码示例为：
-```
-
+```python
 from wildcard_stable_diffusion import WildcardStableDiffusionPipeline
 
 pipe = WildcardStableDiffusionPipeline.from_pretrained(
@@ -123,7 +122,7 @@ image.save("wildcard_img.png")
 ### Composable Stable diffusion
 
 以下代码需要9GB的显存。
-```
+```python
 import os
 
 import paddle
@@ -156,7 +155,7 @@ for i, img in enumerate(images):
 
 one-step-unet可以按照下面的方式运行：
 
-```
+```python
 from one_step_unet import UnetSchedulerOneForwardPipeline
 
 pipe = UnetSchedulerOneForwardPipeline.from_pretrained("google/ddpm-cifar10-32")
