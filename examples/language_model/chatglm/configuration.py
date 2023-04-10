@@ -16,6 +16,18 @@
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
+__all__ = [
+    "ChatGLMConfig",
+    "CHATGLM_PRETRAINED_RESOURCE_FILES_MAP",
+]
+
+
+CHATGLM_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/model_state.pdparams"
+    }
+}
+
 
 class ChatGLMConfig(PretrainedConfig):
     r"""
@@ -52,8 +64,8 @@ class ChatGLMConfig(PretrainedConfig):
         Example:
 
     ```python
-    >>> from configuration_chatglm import ChatGLMConfig
-    >>> from modeling_chatglm import ChatGLMModel
+    >>> from configuration import ChatGLMConfig
+    >>> from modeling import ChatGLMModel
 
     >>> # Initializing a ChatGLM-6B THUDM/ChatGLM-6B style configuration
     >>> configuration = ChatGLMConfig()

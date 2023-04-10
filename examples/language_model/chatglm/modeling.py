@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from configuration import ChatGLMConfig
+from configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
@@ -531,8 +531,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
     config_class = ChatGLMConfig
     model_config_file = CONFIG_NAME
     resource_files_names = {"model_state": "model_state.pdparams"}
-    # pretrained_init_configuration = ChatGLM_PRETRAINED_INIT_CONFIGURATION
-    # pretrained_resource_files_map = ChatGLM_PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_resource_files_map = CHATGLM_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
