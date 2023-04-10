@@ -1395,9 +1395,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray):
+                if isinstance(state_dict[key], np.ndarray) and isinstance(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
-                else:
+                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                     state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:
             dtype_prefix_len = len("paddle.")
@@ -1493,16 +1493,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
-
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         model_kwargs = kwargs
@@ -1517,6 +1507,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
+
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+
+        # Fix me for loading dtype paddle.int64 but cast paddle.float32
+        # if dtype is None, use config.dtype instead
+        if dtype is None and config.dtype is not None:
+            dtype = config.dtype
+
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
+
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
