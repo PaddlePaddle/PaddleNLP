@@ -136,6 +136,12 @@ def get_parser():
     parser.add_argument("--epoch", type=int, default=10, help="Number of epochs. ")
 
     parser.add_argument("--generated_inputs", action="store_true", help="Use generated inputs. ")
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=4,
+        help="num_workers of dataloader. When paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0 ",
+    )
 
     # For benchmark.
     parser.add_argument(
