@@ -340,7 +340,8 @@ images[0].save("lpw.png")
 
 ```python
 import paddle
-from ppdiffusers.utils import image_grid, DiffusionPipeline
+from ppdiffusers.utils import image_grid
+from ppdiffusers import DiffusionPipeline
 from webui_stable_diffusion import WebUIStableDiffusionPipeline
 
 pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
