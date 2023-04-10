@@ -121,6 +121,7 @@ class OPTConfig(PretrainedConfig):
         "dropout": "classifier_dropout",
         "num_classes": "num_labels",
         "ffn_dim": "intermediate_size",
+        "activation_function": "hidden_act",
     }
     pretrained_init_configuration = OPT_PRETRAINED_INIT_CONFIGURATION
     model_type = "opt"
