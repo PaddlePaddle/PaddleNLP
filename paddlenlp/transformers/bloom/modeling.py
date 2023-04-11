@@ -460,19 +460,13 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = query_layer.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if self.config.use_pure_fp16:
-            with paddle.amp.auto_cast(False):
-                if input_dtype == paddle.float16:
-                    attention_scores = paddle.cast(attention_scores, paddle.float32)
-                attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-                attention_probs = paddle.cast(
-                    F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype
-                )
-        else:
-            if input_dtype == paddle.float16:
-                attention_scores = paddle.cast(attention_scores, paddle.float32)
+        if input_dtype != paddle.float32:
+            attention_scores = paddle.cast(attention_scores, paddle.float32)
             attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
             attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
+        else:
+            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            attention_probs = F.softmax(attn_weights, axis=-1)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
