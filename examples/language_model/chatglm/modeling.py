@@ -29,7 +29,8 @@ from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast, ModelOutput
-from paddlenlp.utils.converter import StateDictNameMapping
+
+# from paddlenlp.utils.converter import StateDictNameMapping
 from paddlenlp.utils.env import CONFIG_NAME
 from paddlenlp.utils.log import logger
 
@@ -439,7 +440,13 @@ class ChatGLMStack(nn.Layer):
 
     @paddle.jit.not_to_static
     def recompute_training(
-        self, layer_module: nn.Layer, hidden_states: Tensor, ltor_mask: Tensor, position_ids: Tensor, cache: Tensor
+        self,
+        layer_module: nn.Layer,
+        hidden_states: Tensor,
+        ltor_mask: Tensor,
+        position_ids: Tensor,
+        use_cache: bool,
+        cache: Tensor,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -447,7 +454,9 @@ class ChatGLMStack(nn.Layer):
 
             return custom_forward
 
-        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, cache)
+        hidden_states = recompute(
+            create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, use_cache, cache
+        )
         return hidden_states
 
     def forward(
@@ -550,7 +559,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
     def get_position_ids(self, input_ids, mask_positions, gmask=False):
         batch_size, seq_length = input_ids.shape
         context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
-        if self.position_encoding_2d:
+        if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
             for i, context_length in enumerate(context_lengths):
                 position_ids[i, context_length:] = mask_positions[i]
@@ -574,27 +583,16 @@ class ChatGLMPretrainedModel(PretrainedModel):
         return position_ids
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config):
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
-        import numpy as np
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
-        from paddlenlp.transformers.conversion_utils import (
-            naive_merged_qkv_to_tensor_parallel_qkv,
-            split_tensor_parallel_weight,
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
         )
-
-        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
-            if transpose:
-                x = np.transpose(x, [1, 0])
-            if is_old_qkv:
-                assert is_column, "QKV vectors should be column parallel linear."
-                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
-            return split_tensor_parallel_weight(
-                x,
-                tensor_parallel_degree=config.tensor_parallel_degree,
-                tensor_parallel_rank=config.tensor_parallel_rank,
-                is_column=is_column,
-            )
 
         def get_tensor_parallel_split_mappings(num_hidden_layers):
             final_actions = {}
@@ -606,10 +604,11 @@ class ChatGLMPretrainedModel(PretrainedModel):
                 "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True),
                 # Row Linear
                 "transformer.word_embeddings.weight": partial(fn, is_column=False),
-                # 'transformer.layers.0.attention.dense.bias',
+                # "transformer.layers.0.attention.dense.bias": partial(fn, is_column=False),
                 "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
-                # 'transformer.layers.0.mlp.dense_4h_to_h.bias',
+                # "transformer.layers.0.mlp.dense_4h_to_h.bias": partial(fn, is_column=False),
                 "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+                "lm_head.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -619,12 +618,14 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
             return final_actions
 
-        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
         # prefix = ""
-        prefix = "chatglm."
+        # prefix = "chatglm."
 
-        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+        # return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
 
 
 @register_base_model
@@ -672,36 +673,6 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
             return logits
-
-    def get_attention_mask(self, input_ids):
-        context_length = paddle.where(input_ids == self.config.bos_token_id)[0] + 1
-        attention_mask = paddle.tril(paddle.ones([input_ids.shape[0], input_ids.shape[0]]))
-        attention_mask[..., : context_length - 1] = 1
-        attention_mask = attention_mask.unsqueeze(1)
-        attention_mask = (attention_mask < 0.5).bool()
-        return attention_mask
-
-    def get_position_ids(self, input_ids, mask_position, gmask=False):
-        context_length = len(input_ids)
-        if self.position_encoding_2d:
-            seq_length = paddle.where(input_ids == self.config.bos_token_id)[0]
-            position_ids = paddle.arange(context_length, dtype="int64")
-            if not gmask:
-                position_ids[seq_length:] = mask_position
-            block_position_ids = paddle.concat(
-                [
-                    paddle.zeros(seq_length, dtype="int64"),
-                    paddle.arange(context_length - seq_length, dtype="int64") + 1,
-                ]
-            )
-            position_ids = paddle.stack([position_ids, block_position_ids], axis=0)
-        else:
-            position_ids = paddle.arange(context_length)
-            if not gmask:
-                position_ids[seq_length:] = mask_position
-
-        position_ids = position_ids.unsqueeze(0)
-        return position_ids
 
     def forward(
         self,

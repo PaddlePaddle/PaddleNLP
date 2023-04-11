@@ -19,7 +19,8 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import sentencepiece as spm
 
-from paddlenlp.transformers import BatchEncoding, PaddingStrategy, PretrainedTokenizer
+from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
+from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
 
 
 class TextTokenizer:
