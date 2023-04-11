@@ -51,7 +51,7 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -90,7 +90,7 @@ def main():
             )
 
     # Set the dtype for loading model
-    dtype = None
+    dtype = "float32"
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
@@ -112,8 +112,8 @@ def main():
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=2,
-            lora_alpha=4,
+            r=4,
+            lora_alpha=8,
             merge_weights=False,
         )
         model = LoRAModel(model, lora_config)

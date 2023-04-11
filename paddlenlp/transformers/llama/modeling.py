@@ -92,7 +92,7 @@ class RMSNorm(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
-            shape=[self.hidden_size], dtype=config.dtype, default_initializer=nn.initializer.Constant(1.0)
+            shape=[self.hidden_size], dtype="float32", default_initializer=nn.initializer.Constant(1.0)
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -108,7 +108,6 @@ class RMSNorm(nn.Layer):
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
-
             output = self.weight * hidden_states
             output = output.astype(paddle.get_default_dtype())
         return output
@@ -368,7 +367,6 @@ class LlamaDecoderLayer(nn.Layer):
         """
 
         residual = hidden_states
-
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
