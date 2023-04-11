@@ -507,7 +507,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-        self.init_weights()
+        # only execute when it's the base method
+        if self.init_weights is PretrainedModel.init_weights:
+            self.init_weights()
 
     def _init_weights(self, layer):
         """
