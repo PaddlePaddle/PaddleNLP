@@ -19,14 +19,14 @@ from types import MethodType
 import paddle
 import paddle.nn as nn
 
-from .models.modeling_utils import convert_state_dict
-from .pipelines import DiffusionPipeline
+from ..models.modeling_utils import convert_state_dict
+from ..pipelines import DiffusionPipeline
+from ..utils import is_safetensors_available, is_torch_available
+from ..utils.constants import PPDIFFUSERS_CACHE
+from ..utils.download_utils import ppdiffusers_url_download
+from ..utils.initializer_utils import kaiming_uniform_, zeros_
+from ..utils.load_utils import smart_load
 from .ppnlp_patch_utils import patch_to
-from .utils import is_safetensors_available, is_torch_available
-from .utils.constants import PPDIFFUSERS_CACHE
-from .utils.download_utils import ppdiffusers_url_download
-from .utils.initializer_utils import kaiming_uniform_, zeros_
-from .utils.load_utils import smart_load
 
 if is_safetensors_available():
     import safetensors

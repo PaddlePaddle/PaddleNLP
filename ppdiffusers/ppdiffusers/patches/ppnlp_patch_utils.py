@@ -24,7 +24,7 @@ from collections import OrderedDict
 from types import FunctionType, MethodType
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .utils import (
+from ..utils import (
     DIFFUSERS_CACHE,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
@@ -58,6 +58,14 @@ def copy_func(f):
     return fn
 
 
+class _clsmethod:
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, _, f_cls):
+        return MethodType(self.f, f_cls)
+
+
 # copied from https://github.com/fastai/fastcore/blob/c9b4c088d3706569c076e7c197c724730be190ab/fastcore/basics.py#L938-L954
 def patch_to(cls, as_prop=False, cls_method=False):
     "Decorator: add `f` to `cls`"
@@ -73,7 +81,8 @@ def patch_to(cls, as_prop=False, cls_method=False):
                 setattr(nf, o, getattr(f, o))
             nf.__qualname__ = f"{c_.__name__}.{nm}"
             if cls_method:
-                setattr(c_, nm, MethodType(nf, c_))
+                # fix https://github.com/fastai/fastcore/issues/510
+                setattr(c_, nm, _clsmethod(nf))
             else:
                 setattr(c_, nm, property(nf) if as_prop else nf)
         # Avoid clobbering existing functions
@@ -86,35 +95,33 @@ if is_paddle_available():
     import paddle
     import paddle.nn as nn
 
-    paddle.long = paddle.int64
-    paddle.int = paddle.int32
-    paddle.double = paddle.float64
-    paddle.half = paddle.float16
-    paddle.from_numpy = paddle.to_tensor
-    paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
-    paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
-    paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
-    paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
-    paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
-    paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
-    paddle.Tensor.bfloat16 = lambda x: paddle.cast(x, paddle.bfloat16)
-    paddle.Tensor.clamp = paddle.clip
-    paddle.clamp = paddle.clip
+    # paddle.long = paddle.int64
+    # paddle.int = paddle.int32
+    # paddle.double = paddle.float64
+    # paddle.half = paddle.float16
+    # paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
+    # paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
+    # paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
+    # paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
+    # paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
+    # paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
+    # paddle.Tensor.clamp = paddle.clip
+    # paddle.clamp = paddle.clip
 
     def view_pt(x, *shape: builtins.int, name=None):
         return paddle.reshape(x, shape=shape, name=name)
 
     paddle.view = view_pt
     paddle.Tensor.view = view_pt
-    setattr(paddle.Tensor, "data", property(lambda x: x))
-    paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
+
+    if not hasattr(paddle.Tensor, "data_ptr"):
+        paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
 
     def permute_pt(x, *perm: builtins.int, name=None):
         return paddle.transpose(x, perm=perm, name=name)
 
     paddle.permute = permute_pt
     paddle.Tensor.permute = permute_pt
-    paddle.cat = paddle.concat
     paddle.Tensor.softmax = nn.functional.softmax
 
     # patch repeat_interleave
@@ -170,13 +177,6 @@ if is_paddle_available():
 
     paddle.gather_nd = gather_nd
     paddle.Tensor.gather_nd = gather_nd
-
-    def size_pt(self, i=None):
-        if i is None:
-            return self.shape
-        return self.shape[i]
-
-    paddle.Tensor.size = size_pt
     paddle.Tensor.contiguous = lambda x: x
 
     # must return self!
@@ -592,10 +592,9 @@ if is_paddle_available() and is_paddlenlp_available():
     # patch BertModel forward
     from paddlenlp.transformers import BertModel
 
-    raw_forward = BertModel.forward
+    BertModel.raw_forward = BertModel.forward
 
-    @patch_to(BertModel)
-    def forward(
+    def forward_new(
         self,
         input_ids: paddle.Tensor,
         token_type_ids: Optional[paddle.Tensor] = None,
@@ -609,18 +608,19 @@ if is_paddle_available() and is_paddlenlp_available():
     ):
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
-        return raw_forward(
-            self,
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            past_key_values,
-            use_cache,
-            output_hidden_states,
-            output_attentions,
-            return_dict,
+        return self.raw_forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
         )
+
+    BertModel.forward = forward_new
 
     TRANSFORMERS_SAFE_WEIGHTS_NAME = "model.safetensors"
     TRANSFORMERS_WEIGHTS_NAME = "pytorch_model.bin"
@@ -847,10 +847,10 @@ if is_paddle_available() and is_paddlenlp_available():
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
-        from .models.modeling_pytorch_paddle_utils import (
+        from ..models.modeling_pytorch_paddle_utils import (
             convert_paddle_state_dict_to_pytorch,
         )
-        from .models.modeling_utils import convert_state_dict
+        from ..models.modeling_utils import convert_state_dict
 
         if to_diffusers is None:
             to_diffusers = TO_DIFFUSERS
@@ -942,16 +942,16 @@ if is_paddle_available() and is_paddlenlp_available():
     )
 
     # logger.set_level("WARNING")
-    from .models.modeling_pytorch_paddle_utils import (
+    from ..models.modeling_pytorch_paddle_utils import (
         convert_pytorch_state_dict_to_paddle,
     )
-    from .pipelines.alt_diffusion.modeling_roberta_series import (
+    from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
     )
-    from .pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
-    from .pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
-    from .pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-    from .pipelines.stable_diffusion_safe.safety_checker import (
+    from ..pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
+    from ..pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
+    from ..pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+    from ..pipelines.stable_diffusion_safe.safety_checker import (
         SafeStableDiffusionSafetyChecker,
     )
 
