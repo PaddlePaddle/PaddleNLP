@@ -465,7 +465,8 @@ class BloomAttention(nn.Layer):
             attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
             attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
         else:
-            attention_probs = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            attention_probs = F.softmax(attn_weights, axis=-1)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
