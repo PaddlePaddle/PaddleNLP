@@ -13,9 +13,9 @@
 # limitations under the License.
 
 
-# mode = "t2i"
+mode = "t2i"
 # mode = "i2t"
-mode = "joint"
+# mode = "joint"
 # mode = "i"
 # mode = "t"
 # mode = "t2i2t"

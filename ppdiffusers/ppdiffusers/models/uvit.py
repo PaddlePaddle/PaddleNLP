@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
-from typing import Optional
 
 import einops
 import paddle
@@ -21,7 +20,7 @@ import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..utils import BaseOutput
-from .attention import BasicTransformerBlock, DropPath, Mlp
+from .attention import DropPath, Mlp
 from .embeddings import PatchEmbed, get_timestep_embedding
 from .modeling_utils import ModelMixin
 
@@ -126,15 +125,17 @@ class UViTModelOutput(BaseOutput):
 class UViTModel(ModelMixin, ConfigMixin):
     r"""
     UViTModel is a unet-stype ViT model that takes in a noisy sample and a timestep and returns sample shaped output.
-    Note that the different is the
+    Note that the different between the original U-ViT is the post-layer normalization and add a layer normalization
+    after concatenat-ing a long skip connection, which stabilizes the training of U-ViT in UniDiffuser.
 
     """
 
     @register_to_config
     def __init__(
         self,
+        sample_size=1,
         img_size=64,
-        in_chans=4,
+        in_channels=4,
         patch_size=2,
         embed_dim=1536,
         depth=30,
@@ -152,7 +153,8 @@ class UViTModel(ModelMixin, ConfigMixin):
         use_checkpoint=False,
     ):
         super().__init__()
-        self.in_chans = in_chans
+        self.sample_size = sample_size
+        self.in_channels = in_channels
         self.patch_size = patch_size
         self.embed_dim = embed_dim
 
@@ -161,7 +163,7 @@ class UViTModel(ModelMixin, ConfigMixin):
             height=self.img_size[0],
             width=self.img_size[1],
             patch_size=patch_size,
-            in_channels=in_chans,
+            in_channels=in_channels,
             embed_dim=embed_dim,
             add_pos_embed=False,
         )
@@ -228,7 +230,7 @@ class UViTModel(ModelMixin, ConfigMixin):
         )
 
         self.norm = norm_layer(embed_dim)
-        self.patch_dim = patch_size**2 * in_chans
+        self.patch_dim = patch_size**2 * in_channels
         self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias_attr=True)
 
         self.token_embedding = nn.Embedding(2, embed_dim)
@@ -297,7 +299,7 @@ class UViTModel(ModelMixin, ConfigMixin):
         )
 
         img_out = self.decoder_pred(img_out)
-        sample_img = unpatchify(img_out, self.in_chans)
+        sample_img = unpatchify(img_out, self.in_channels)
         sample_clip_img = self.clip_img_out(clip_img_out)
         sample_text = self.text_out(text_out)
 

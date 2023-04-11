@@ -29,7 +29,7 @@ from paddlenlp.transformers import (
 
 from ...models import AutoencoderKL, UViTModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DPMSolverMultistepScheduler
+from ...schedulers import DPMSolverUniDiffuserScheduler
 from ...utils import deprecate, logging, randn_tensor
 from . import ImageTextPipelineOutput
 from .caption_decoder import CaptionDecoder
@@ -69,7 +69,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
     unet: UViTModel
     vae: AutoencoderKL
     caption_decoder: CaptionDecoder
-    scheduler: DPMSolverMultistepScheduler
+    scheduler: DPMSolverUniDiffuserScheduler
 
     def __init__(
         self,
@@ -80,7 +80,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
         unet: UViTModel,
         vae: AutoencoderKL,
         caption_decoder: CaptionDecoder,
-        scheduler: DPMSolverMultistepScheduler,
+        scheduler: DPMSolverUniDiffuserScheduler,
     ):
         super().__init__()
         self.register_modules(
@@ -99,24 +99,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         self.image_encoder_clip_img_dim = 512
         self.text_encoder_seq_len = tokenizer.model_max_length  # 77
         self.text_encoder_text_dim = 64
-
-    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
-    def prepare_extra_step_kwargs(self, generator, eta):
-        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-        # and should be between [0, 1]
-
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-        extra_step_kwargs = {}
-        if accepts_eta:
-            extra_step_kwargs["eta"] = eta
-
-        # check if the scheduler accepts generator
-        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
-        if accepts_generator:
-            extra_step_kwargs["generator"] = generator
-        return extra_step_kwargs
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.check_inputs
     def check_inputs(
@@ -673,7 +655,10 @@ class UniDiffuserPipeline(DiffusionPipeline):
         width = width or self.unet.config.img_size * self.vae_scale_factor
 
         # 1. Check inputs. Raise error if not correct
-        self.check_inputs(prompt, height, width, callback_steps)
+        if mode in ["i2t", "i2t2i"]:
+            self.check_inputs([image], height, width, callback_steps)
+        if mode in ["t2i", "t2i2t"]:
+            self.check_inputs([prompt], height, width, callback_steps)
 
         # 2. Define call parameters
         batch_size = self._infer_batch_size(mode, prompt, prompt_embeds, image, num_samples)
