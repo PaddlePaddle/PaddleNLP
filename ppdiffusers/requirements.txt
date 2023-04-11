@@ -3,3 +3,4 @@ safetensors
 ftfy
 regex
 Pillow
+git+https://github.com/arogozhnikov/einops.git
