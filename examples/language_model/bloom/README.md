@@ -76,7 +76,7 @@ python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_
 
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2,3" predict_generation.py \
-  --model_name_or_path checkpoints/bloom-7b1/checkpoint-20 \
+  --model_name_or_path checkpoints/bloom-560m/checkpoint-20 \
   --save_onepiece_model_path ./save
 ```
 
