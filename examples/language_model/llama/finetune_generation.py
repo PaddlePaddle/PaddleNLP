@@ -21,8 +21,7 @@ from data import DataCollatorForSupervisedDataset, convert_example
 from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
-from paddlenlp.layers.lora import print_trainable_parameters
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -90,15 +89,24 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
     # Load the pretrained language model.
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        # dtype="float16",  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=True,
+        use_pure_fp16=training_args.fp16,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
@@ -108,9 +116,9 @@ def main():
             lora_alpha=4,
             merge_weights=False,
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
-        print_trainable_parameters(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer.pad_token = tokenizer.unk_token
@@ -156,6 +164,9 @@ def main():
         do_generation=True,
         data_collator=collate_fn,
     )
+
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)

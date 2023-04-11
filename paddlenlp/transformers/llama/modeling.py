@@ -34,7 +34,9 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebookresearch/tiny-random-llama",
+    "facebook/tiny-random-llama",
+    "facebook/llama-7b",
+    "facebook/llama-13b",
 ]
 
 __all__ = [
@@ -90,7 +92,7 @@ class RMSNorm(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
-            shape=[self.hidden_size], dtype="float32", default_initializer=nn.initializer.Constant(1.0)
+            shape=[self.hidden_size], dtype=config.dtype, default_initializer=nn.initializer.Constant(1.0)
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -257,7 +259,6 @@ class LlamaAttention(nn.Layer):
         """Input shape: Batch x Time x Channel"""
 
         bsz, q_len, _ = hidden_states.shape
-
         query_states = (
             self.q_proj(hidden_states)
             .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
@@ -307,7 +308,7 @@ class LlamaAttention(nn.Layer):
                 raise ValueError(
                     f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
                 )
-            attn_weights = attn_weights + attention_mask
+            attn_weights = attention_mask + attn_weights
 
         # Upcast attention to fp32
         if self.config.use_pure_fp16:
@@ -469,7 +470,6 @@ class LlamaModel(LlamaPretrainedModel):
 
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
-        self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
 
@@ -480,7 +480,6 @@ class LlamaModel(LlamaPretrainedModel):
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
             )
         else:
-            # self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size, self.padding_idx)
             self.embed_tokens = nn.Embedding(
                 self.vocab_size,
                 self.hidden_size,
