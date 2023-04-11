@@ -41,6 +41,27 @@ __all__ = [
 ]
 
 
+def parallel_matmul(lm_output, logit_weights, parallel_output):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    world_size = hcg.get_model_parallel_world_size()
+
+    if world_size > 1:
+        # _c_identity is backwards is reduce
+        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+
+        if parallel_output:
+            return logits
+
+        # _c_concat has not grad backwards
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        return logits
+
+
 class PrefixEncoder(nn.Layer):
     """
     The prefix encoder for P-Tuning v2.
@@ -608,7 +629,6 @@ class ChatGLMPretrainedModel(PretrainedModel):
                 "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
                 # "transformer.layers.0.mlp.dense_4h_to_h.bias": partial(fn, is_column=False),
                 "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
-                "lm_head.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -621,11 +641,6 @@ class ChatGLMPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
-
-        # prefix = ""
-        # prefix = "chatglm."
-
-        # return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
 
 
 @register_base_model
@@ -654,26 +669,6 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     def set_input_embeddings(self, new_embeddings):
         self.transformer.word_embeddings = new_embeddings
 
-    def parallel_matmul(self, lm_output, logit_weights, parallel_output):
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        world_size = hcg.get_model_parallel_world_size()
-
-        if world_size > 1:
-            # _c_identity is backwards is reduce
-            input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-
-            logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
-
-            if parallel_output:
-                return logits
-
-            # _c_concat has not grad backwards
-            return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
-        else:
-            logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
-            return logits
-
     def forward(
         self,
         input_ids: Tensor = None,
@@ -689,8 +684,9 @@ class ChatGLMModel(ChatGLMPretrainedModel):
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
-            mask_token = gMASK if sum([gMASK in x for x in input_ids]) > 0 else MASK
-            use_gmask = True if sum([gMASK in x for x in input_ids]) > 0 else False
+            all_ids = input_ids.reshape([-1])
+            mask_token = gMASK if gMASK in all_ids else MASK
+            use_gmask = True if gMASK in all_ids else False
 
             mask_positions = [seq.tolist().index(mask_token) for seq in input_ids]
             position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
@@ -727,9 +723,10 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
     ):
         batch_size, seq_length = input_ids.shape
         MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
-        mask_token = gMASK if sum([gMASK in x for x in input_ids]) > 0 else MASK
-        use_gmask = True if sum([gMASK in x for x in input_ids]) > 0 else MASK
-        seqs = input_ids.tolist()
+        all_ids = input_ids.reshape([-1])
+        mask_token = gMASK if gMASK in all_ids else MASK
+        use_gmask = True if gMASK in all_ids else False
+        seqs = input_ids.numpy().tolist()
         mask_positions = [seq.index(mask_token) for seq in seqs]
 
         if cache is not None or past_key_values is not None:
@@ -832,7 +829,11 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
         hidden_states = transformer_outputs.logits if return_dict else transformer_outputs[0]
 
-        lm_logits = F.linear(hidden_states, self.lm_head.weight.T).transpose([1, 0, 2])
+        if self.config.tensor_parallel_degree > 1:
+            lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
+        else:
+            lm_logits = F.linear(hidden_states, self.lm_head.weight.T)
+        lm_logits = lm_logits.transpose([1, 0, 2])
         loss = None
         if labels is not None:
             shift_logits = lm_logits[..., :-1, :]
@@ -862,7 +863,8 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             for layer_past in cache
         )
 
-    def process_response(self, response):
+    @staticmethod
+    def process_response(response):
         response = response.strip()
         response = response.replace("[[训练时间]]", "2023年")
         punkts = [
