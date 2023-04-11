@@ -761,9 +761,9 @@ def _load_state_dict_into_meta_model(
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
                 and dtype == paddle.float16
             ):
-                param = param.to(paddle.float32)
+                param = param.astype(paddle.float32)
             else:
-                param = param.to(dtype)
+                param = param.astype(dtype)
 
         # For compatibility with PyTorch load_state_dict which converts state dict dtype to existing dtype in model
         if dtype is None:
@@ -2044,7 +2044,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
 
                 if low_cpu_mem_usage:
-                    new_error_msgs, offload_index, state_dict_index = _load_state_dict_into_meta_model(
+                    new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
                         loaded_keys,
