@@ -16,12 +16,7 @@
 
 import paddle
 
-from paddlenlp.transformers import (
-    BartForConditionalGeneration,
-    BartTokenizer,
-    PretrainedConfig,
-)
-from paddlenlp.transformers.generation_utils import (
+from paddlenlp.generation.logits_process import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -29,9 +24,13 @@ from paddlenlp.transformers.generation_utils import (
     LogitsProcessorList,
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
-    TopKProcess,
-    TopPProcess,
 )
+from paddlenlp.transformers import (
+    BartForConditionalGeneration,
+    BartTokenizer,
+    PretrainedConfig,
+)
+from paddlenlp.transformers.generation_utils import TopKProcess, TopPProcess
 from tests.testing_utils import slow
 
 
