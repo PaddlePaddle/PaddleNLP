@@ -549,9 +549,7 @@ class GPTPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.gpt.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -819,11 +817,15 @@ class GPTForPretraining(GPTPretrainedModel):
 
     """
 
+    _keys_to_ignore_on_load_missing = [r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
+
     def __init__(self, config: GPTConfig):
         super(GPTForPretraining, self).__init__(config)
         self.gpt = GPTModel(config)
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
 
         self.apply(self.init_weights)
+        self.tie_weights()
 
     def forward(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -873,7 +875,7 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(encoder_outputs, self.gpt.embeddings.word_embeddings.weight, transpose_y=True)
+        logits = paddle.matmul(encoder_outputs, self.decoder.weight, transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
@@ -1004,16 +1006,12 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
 
 class GPTLMHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+    def __init__(self, config: GPTConfig):
         super(GPTLMHead, self).__init__()
-        self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
-            if embedding_weights is None
-            else embedding_weights
-        )
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True)
         return logits
 
 
@@ -1027,14 +1025,18 @@ class GPTLMHeadModel(GPTPretrainedModel):
 
     """
 
+    _keys_to_ignore_on_load_missing = [r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
+
     def __init__(self, config: GPTConfig):
         super(GPTLMHeadModel, self).__init__(config)
         self.gpt = GPTModel(config)
 
-        self.lm_head = GPTLMHead(
-            self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
-        )
+        self.lm_head = GPTLMHead(config)
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,
