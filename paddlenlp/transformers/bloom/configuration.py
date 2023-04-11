@@ -108,7 +108,6 @@ class BloomConfig(PretrainedConfig):
         attention_dropout=0.0,
         attention_softmax_in_fp32=True,
         pretraining_tp=1,  # TP rank used when training with megatron
-        dtype="float16",
         slow_but_exact=False,
         use_recompute=False,
         use_pure_fp16=False,
@@ -133,7 +132,6 @@ class BloomConfig(PretrainedConfig):
 
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
-        self.dtype = dtype
         self.slow_but_exact = slow_but_exact
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16

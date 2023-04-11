@@ -1395,7 +1395,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray) and isinstance(state_dict[key].dtype.type, np.floating):
+                if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
                 if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                     state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
