@@ -134,6 +134,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
 
     def __init__(self, config: PPMiniLMConfig):
         super(PPMiniLMModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
         self.embeddings = PPMiniLMEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(
