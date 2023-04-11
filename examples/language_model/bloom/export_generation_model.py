@@ -17,6 +17,7 @@ import argparse
 import os
 
 import paddle
+from utils import init_parallel_weights
 
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
 
@@ -75,6 +76,12 @@ def main():
 
     config = BloomConfig.from_pretrained(args.model_name_or_path)
     config.use_recompute = False
+
+    init_parallel_weights(args.model_name_or_path, config.tensor_parallel_degree)
+
+    # only export on the single GPU currently
+    config.tensor_parallel_degree = 1
+
     # Load the model and parameter
     model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
