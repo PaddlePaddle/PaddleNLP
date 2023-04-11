@@ -15,7 +15,7 @@
 # flake8: noqa
 
 
-from . import ppnlp_patch_utils, webui_lora_helper
+from . import patches
 from .configuration_utils import ConfigMixin
 from .utils import (
     OptionalDependencyNotAvailable,

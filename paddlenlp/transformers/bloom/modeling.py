@@ -460,19 +460,13 @@ class BloomAttention(nn.Layer):
         # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
         input_dtype = query_layer.dtype
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if self.config.use_pure_fp16:
-            with paddle.amp.auto_cast(False):
-                if input_dtype == paddle.float16:
-                    attention_scores = paddle.cast(attention_scores, paddle.float32)
-                attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
-                attention_probs = paddle.cast(
-                    F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype
-                )
-        else:
-            if input_dtype == paddle.float16:
-                attention_scores = paddle.cast(attention_scores, paddle.float32)
+        if input_dtype != paddle.float32:
+            attention_scores = paddle.cast(attention_scores, paddle.float32)
             attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
             attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
+        else:
+            attn_weights = masked_fill(attention_scores, attention_mask, finfo(attention_scores.dtype).min)
+            attention_probs = F.softmax(attn_weights, axis=-1)
 
         # [batch_size, num_heads, q_length, kv_length]
         attention_probs = self.attention_dropout(attention_probs)
@@ -1123,7 +1117,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.criterion = BloomPretrainingCriterion(
             pad_token_id=config.pad_token_id,
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=config.tensor_parallel_output,
+            tensor_parallel_output=True,
         )
 
         # Initialize weights and apply final processing
@@ -1199,7 +1193,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
             are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         transformer_outputs = self.bloom(
             input_ids,
             past_key_values=cache,
@@ -1213,9 +1206,11 @@ class BloomForCausalLM(BloomPreTrainedModel):
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-
         # TODO(wj-Mcat): to enable lm_head
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
+        parallel_output = True
+        if hidden_states.stop_gradient:
+            parallel_output = False
+        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
         # lm_logits = self.lm_head(hidden_states)
 
         loss = None
