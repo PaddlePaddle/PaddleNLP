@@ -80,7 +80,7 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
         self.attention_head_dim = attention_head_dim
         inner_dim = num_attention_heads * attention_head_dim
         self.in_channels = in_channels
-        self.norm = nn.GroupNorm(num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-06, affine=True)
+        self.norm = nn.GroupNorm(num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-06)
         self.proj_in = nn.Linear(in_features=in_channels, out_features=inner_dim)
         self.transformer_blocks = nn.LayerList(
             sublayers=[
@@ -160,6 +160,3 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
         if not return_dict:
             return (output,)
         return TransformerTemporalModelOutput(sample=output)
-
-
-1

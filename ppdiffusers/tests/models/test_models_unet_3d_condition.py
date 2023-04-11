@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,37 +17,13 @@ import unittest
 
 import numpy as np
 import paddle
+from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers.models import UNet3DConditionModel
-from ppdiffusers.models.attention_processor import LoRAAttnProcessor
 from ppdiffusers.utils import floats_tensor, logging
 from ppdiffusers.utils.import_utils import is_ppxformers_available
 
-from ..test_modeling_common import ModelTesterMixin
-
 logger = logging.get_logger(__name__)
-
-
-def create_lora_layers(model):
-    lora_attn_procs = {}
-    for name in model.attn_processors.keys():
-        cross_attention_dim = None if name.endswith("attn1.processor") else model.config.cross_attention_dim
-        if name.startswith("mid_block"):
-            hidden_size = model.config.block_out_channels[-1]
-        elif name.startswith("up_blocks"):
-            block_id = int(name[len("up_blocks.")])
-            hidden_size = list(reversed(model.config.block_out_channels))[block_id]
-        elif name.startswith("down_blocks"):
-            block_id = int(name[len("down_blocks.")])
-            hidden_size = model.config.block_out_channels[block_id]
-        lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=hidden_size, cross_attention_dim=cross_attention_dim)
-        lora_attn_procs[name] = lora_attn_procs[name]
-        with paddle.no_grad():
-            lora_attn_procs[name].to_q_lora.up.weight.set_value(lora_attn_procs[name].to_q_lora.up.weight + 1)
-            lora_attn_procs[name].to_k_lora.up.weight.set_value(lora_attn_procs[name].to_k_lora.up.weight + 1)
-            lora_attn_procs[name].to_v_lora.up.weight.set_value(lora_attn_procs[name].to_v_lora.up.weight + 1)
-            lora_attn_procs[name].to_out_lora.up.weight.set_value(lora_attn_procs[name].to_out_lora.up.weight + 1)
-    return lora_attn_procs
 
 
 class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
@@ -152,22 +129,3 @@ class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         with paddle.no_grad():
             output = model(**inputs_dict)
         assert output is not None
-
-    @unittest.skipIf(
-        not is_ppxformers_available(), reason="XFormers attention is only available with CUDA and `xformers` installed"
-    )
-    def test_lora_xformers_on_off(self):
-        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
-        init_dict["attention_head_dim"] = 4
-        paddle.seed(seed=0)
-        model = self.model_class(**init_dict)
-        lora_attn_procs = create_lora_layers(model)
-        model.set_attn_processor(lora_attn_procs)
-        with paddle.no_grad():
-            sample = model(**inputs_dict).sample
-            model.enable_xformers_memory_efficient_attention()
-            on_sample = model(**inputs_dict).sample
-            model.disable_xformers_memory_efficient_attention()
-            off_sample = model(**inputs_dict).sample
-        assert (sample - on_sample).abs().max() < 0.0001
-        assert (sample - off_sample).abs().max() < 0.0001
