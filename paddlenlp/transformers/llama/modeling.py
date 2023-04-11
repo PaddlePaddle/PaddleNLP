@@ -440,7 +440,7 @@ class LlamaPretrainedModel(PretrainedModel):
 
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -490,8 +490,6 @@ class LlamaModel(LlamaPretrainedModel):
         self.norm = RMSNorm(config)
 
         self.gradient_checkpointing = False
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -665,9 +663,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_output=config.tensor_parallel_output,
         )
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
