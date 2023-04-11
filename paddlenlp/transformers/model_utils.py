@@ -507,6 +507,38 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
+        # only execute when it's the base method
+        if self.init_weights is PretrainedModel.init_weights:
+            self.init_weights()
+
+    def _init_weights(self, layer):
+        """
+        Initialize the weights. This method should be overridden by derived class.
+        """
+        pass
+
+    def _initialize_weights(self, layer):
+        """
+        Initialize the weights if they are not already initialized.
+        """
+        if getattr(layer, "_is_initialized", False):
+            return
+        self._init_weights(layer)
+        layer._is_initialized = True
+
+    def init_weights(self):
+        """
+        If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
+        initialization logic in `_init_weights`.
+        """
+        if _init_weights:
+            # Initialize weights
+            self.apply(self._initialize_weights)
+
+            # Tie weights should be skipped when not initializing all weights
+            # since from_pretrained(...) calls tie weights anyways
+            self.tie_weights()
+
     @property
     def base_model(self):
         """
@@ -1489,7 +1521,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
-        dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
@@ -1507,6 +1538,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
+
+        dtype = kwargs.pop("dtype", config.dtype)
 
         init_contexts = []
         if low_cpu_mem_usage:
@@ -1526,6 +1559,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
+
+        # PretrainedConfig auto contains dtype field
+        dtype = kwargs.pop("dtype", config.get("dtype", None))
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+            if dtype:
+                init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
