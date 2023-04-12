@@ -69,12 +69,21 @@ def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
         return logits
 
 
-def finfo(dtype):
-    if dtype == "float32":
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
+    if dtype == paddle.float32:
         return np.finfo(np.float32)
-    if dtype == "float16":
+    if dtype == paddle.float16:
         return np.finfo(np.float16)
-    if dtype == "float64":
+    if dtype == paddle.float64:
         return np.finfo(np.float64)
 
 
@@ -84,7 +93,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     """
     batch_size, target_length = input_ids_shape
 
-    mask = paddle.full((target_length, target_length), float(finfo(paddle.get_default_dtype()).min))
+    mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
 
     mask_cond = paddle.arange(mask.shape[-1])
     mask_cond = mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1])
@@ -319,7 +328,7 @@ class LlamaAttention(nn.Layer):
                 f" {attn_weights.shape}"
             )
 
-        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len]).astype(query_states.dtype)
 
         if attention_mask is not None:
             if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
@@ -327,6 +336,9 @@ class LlamaAttention(nn.Layer):
                     f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
                 )
             attn_weights = attention_mask + attn_weights
+            attn_weights = paddle.maximum(
+                attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
+            )
 
         # Upcast attention to fp32
         with paddle.amp.auto_cast(False):
@@ -513,13 +525,13 @@ class LlamaModel(LlamaPretrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length):
+    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
         if input_shape[-1] > 1:
             combined_attention_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length, dtype=attention_mask.dtype
+                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
             )
 
         if attention_mask is not None:
@@ -592,7 +604,9 @@ class LlamaModel(LlamaPretrainedModel):
         # embed positions
         if attention_mask is None:
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        attention_mask = self._prepare_decoder_attention_mask(attention_mask, (batch_size, seq_length), cache_length)
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+        )
         hidden_states = inputs_embeds
 
         # decoder layers
