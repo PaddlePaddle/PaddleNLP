@@ -463,7 +463,9 @@ class AlbertPretrainedModel(PretrainedModel):
             or "AlbertForSequenceClassification" in config.architectures
             or "AlbertForTokenClassification" in config.architectures
         ):
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+            model_mappings.extend(
+                [["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias", "classifier.bias"]]
+            )
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
