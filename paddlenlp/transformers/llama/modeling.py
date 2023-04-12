@@ -415,6 +415,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -650,10 +651,23 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.llama = LlamaModel(config)
 
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.lm_head = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                config.vocab_size,
+                gather_output=True,
+                has_bias=False,
+            )
+        else:
+            self.lm_head = nn.Linear(
+                config.hidden_size,
+                config.vocab_size,
+                bias_attr=False,
+            )
+
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=config.tensor_parallel_output,
+            tensor_parallel_output=False,
         )
 
         # Initialize weights and apply final processing
@@ -738,6 +752,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             shift_labels = labels[..., 1:]
             # Flatten the tokens
             loss = self.criterion(shift_logits, shift_labels)
+            print(loss)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
