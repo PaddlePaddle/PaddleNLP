@@ -726,18 +726,16 @@ class ModelTesterMixin:
 
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         for model_class in self.all_model_classes:
-            if "CausalLM" not in model_class.__name__ and "MaskedLM" not in model_class.__name__:
+            if (
+                "CausalLM" not in model_class.__name__
+                and "MaskedLM" not in model_class.__name__
+                and "Pretraining" not in model_class.__name__
+            ):
                 continue
 
             model = self._make_model_instance(config, model_class)
 
-            tie_word_embeddings = (
-                model.tie_word_embeddings
-                if hasattr(model, "tie_word_embeddings")
-                else model.config.get("tie_word_embeddings", False)
-            )
-
-            if not tie_word_embeddings:
+            if not model.config.tie_word_embeddings:
                 continue
 
             if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
