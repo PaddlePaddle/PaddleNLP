@@ -25,6 +25,7 @@ import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from ppfleetx.utils.log import logger
 
 from ..dygraph.processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -34,6 +35,11 @@ from ..dygraph.processor import (
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
 )
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
 
 
 class MultiHeadAttention(nn.Layer):
@@ -62,6 +68,7 @@ class MultiHeadAttention(nn.Layer):
         recompute_granularity="full",
         mesh=None,
         mesh_idx=None,
+        use_flash_attn=False,
     ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -75,6 +82,7 @@ class MultiHeadAttention(nn.Layer):
         self.recompute_granularity = recompute_granularity
         self.mesh = mesh
         self.mesh_idx = mesh_idx
+        self.use_flash_attn = use_flash_attn if flash_attention else None
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -94,7 +102,6 @@ class MultiHeadAttention(nn.Layer):
 
         mix_layer = self.qkv_proj(query)
         mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
-        mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
         assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
@@ -119,7 +126,6 @@ class MultiHeadAttention(nn.Layer):
 
         q = self.q_proj(query)
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
-        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
 
         if isinstance(cache, self.StaticCache):
             # for encoder-decoder attention in inference and has cached
@@ -129,8 +135,8 @@ class MultiHeadAttention(nn.Layer):
 
         if isinstance(cache, self.Cache):
             # for decoder self-attention in inference
-            k = tensor.concat([cache.k, k], axis=2)
-            v = tensor.concat([cache.v, v], axis=2)
+            k = tensor.concat([cache.k, k], axis=1)
+            v = tensor.concat([cache.v, v], axis=1)
         if use_cache is True:
             cache = self.Cache(k, v)
 
@@ -154,9 +160,7 @@ class MultiHeadAttention(nn.Layer):
         k = self.k_proj(key)
         v = self.v_proj(value)
         k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
-        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
         v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
-        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
         return k, v
 
     def gen_cache(self, key, value=None, type=Cache):
@@ -180,7 +184,19 @@ class MultiHeadAttention(nn.Layer):
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
+    def _flash_attention(self, q, k, v, attn_mask=None):
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        return (out, weights) if self.need_weights else (out, None)
+
     def core_attn(self, q, k, v, attn_mask=None):
+        perm = [0, 2, 1, 3]
+        q = tensor.transpose(x=q, perm=perm)
+        k = tensor.transpose(x=k, perm=perm)
+        v = tensor.transpose(x=v, perm=perm)
+
         # scale dot product attention
         product = paddle.matmul(x=q, y=k, transpose_y=True) * self.head_dim**-0.5
 
@@ -221,10 +237,15 @@ class MultiHeadAttention(nn.Layer):
             else:
                 q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
+        if self.use_flash_attn and attn_mask is None:
+            attn_func = self._flash_attention
+        else:
+            attn_func = self.core_attn
+
         if self.use_recompute and self.recompute_granularity == "core_attn":
             out, weights = auto.recompute(self.core_attn)(q, k, v, attn_mask=attn_mask)
         else:
-            out, weights = self.core_attn(q, k, v, attn_mask=attn_mask)
+            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
 
         auto.shard_tensor(self.out_proj.weight, self.mesh[self.mesh_idx], [self.mesh.mp, None])
 
@@ -334,6 +355,7 @@ class TransformerDecoderLayer(nn.Layer):
         recompute_granularity="full",
         mesh=None,
         mesh_idx=None,
+        use_flash_attn=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -362,6 +384,7 @@ class TransformerDecoderLayer(nn.Layer):
             recompute_granularity=recompute_granularity,
             mesh=mesh,
             mesh_idx=mesh_idx,
+            use_flash_attn=use_flash_attn,
         )
 
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -481,6 +504,7 @@ class GPTModelAuto(nn.Layer):
         use_recompute=False,
         recompute_granularity="full",
         mesh=None,
+        use_flash_attn=False,
     ):
 
         super(GPTModelAuto, self).__init__()
@@ -490,6 +514,13 @@ class GPTModelAuto(nn.Layer):
         self.vocab_size = vocab_size
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+
+        if use_flash_attn:
+            if flash_attention:
+                logger.info("Flash-attention enabled.")
+            else:
+                use_flash_attn = False
+                logger.warning("Flash-attention is not support in this Paddle version.")
 
         if not mesh:
             raise RuntimeError("AutoPrallel modeling need `mesh` to annotate distributed attribute.")
@@ -526,6 +557,7 @@ class GPTModelAuto(nn.Layer):
                     recompute_granularity=recompute_granularity,
                     mesh=self.mesh,
                     mesh_idx=stages[i],
+                    use_flash_attn=use_flash_attn,
                 )
             )
 
