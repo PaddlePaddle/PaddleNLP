@@ -673,21 +673,18 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config, parallel_output=False):
+    def __init__(self, config, embedding_weights=None):
         super(LlamaLMHead, self).__init__()
         self.weight = self.create_parameter(
             shape=[config.hidden_size, config.vocab_size // config.tensor_parallel_degree],
             dtype=paddle.get_default_dtype(),
         )
         self.config = config
-        self.parallel_output = parallel_output
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, parallel_output=False):
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
-            logits = parallel_matmul(
-                hidden_states, self.weight.astype("float32"), parallel_output=self.parallel_output
-            )
+            logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
         return logits
 
 
@@ -699,7 +696,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = LlamaModel(config)
 
         self.lm_head = LlamaLMHead(config)
-
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_output=True,
