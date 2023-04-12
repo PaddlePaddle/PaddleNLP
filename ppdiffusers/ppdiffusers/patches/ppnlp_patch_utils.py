@@ -633,7 +633,7 @@ if is_paddle_available() and is_paddlenlp_available():
     TRANSFORMERS_WEIGHTS_NAME = "pytorch_model.bin"
 
     # patch from_pretrained and save_pretrained
-    def from_pretrained_v3(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
+    def from_pretrained_v3(cls, pretrained_model_name_or_path, *args, from_hf_hub: bool = False, **kwargs):
         cache_dir = (
             kwargs.pop("cache_dir", DIFFUSERS_CACHE) if from_hf_hub else kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         )
@@ -647,6 +647,8 @@ if is_paddle_available() and is_paddlenlp_available():
         use_auth_token = kwargs.pop("use_auth_token", None)
         revision = kwargs.pop("revision", None)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
+        # do not use paddlenlp dtype
+        kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", None)
         variant = kwargs.pop("variant", None)
 
@@ -833,10 +835,18 @@ if is_paddle_available() and is_paddlenlp_available():
     raw_save_pretrained = PretrainedModel.save_pretrained
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, paddle_dtype=None, **kwargs
+    ):
         if cls.constructed_from_pretrained_config() and hasattr(cls, "smart_convert"):
             return from_pretrained_v3(
-                cls, pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
+                cls,
+                pretrained_model_name_or_path,
+                *args,
+                from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
+                paddle_dtype=paddle_dtype,
+                **kwargs,
             )
         return raw_from_pretrained(
             cls, pretrained_model_name_or_path, *args, from_hf_hub=from_hf_hub, subfolder=subfolder, **kwargs
