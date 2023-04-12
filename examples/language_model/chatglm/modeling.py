@@ -759,7 +759,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "input_ids": last_token,
                 "past_key_values": cache,
                 "position_ids": position_ids,
-                "use_cache": True,
+                "use_cache": False,
                 "attention_mask": attention_mask,
             }
         else:
@@ -775,7 +775,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "input_ids": input_ids,
                 "past_key_values": cache,
                 "position_ids": position_ids,
-                "use_cache": True,
+                "use_cache": False,
                 "attention_mask": attention_mask,
             }
 
