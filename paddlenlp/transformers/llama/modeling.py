@@ -438,7 +438,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
-                # "lm_head.weight": partial(fn, is_column=True),
+                "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -676,7 +676,8 @@ class LlamaLMHead(nn.Layer):
     def __init__(self, config):
         super(LlamaLMHead, self).__init__()
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, config.vocab_size], dtype=paddle.get_default_dtype()
+            shape=[config.hidden_size, config.vocab_size // config.tensor_parallel_degree],
+            dtype=paddle.get_default_dtype(),
         )
         self.config = config
 
@@ -684,7 +685,7 @@ class LlamaLMHead(nn.Layer):
         # default_type = hidden_states.dtype
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
-            logits = paddle.matmul(hidden_states, self.weight.astype("float32"))
+            logits = parallel_matmul(hidden_states, self.weight.astype("float32"))
             # logits = logits.astype(default_type)
         return logits
 
