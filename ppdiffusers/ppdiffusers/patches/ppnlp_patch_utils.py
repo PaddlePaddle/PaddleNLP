@@ -669,7 +669,7 @@ if is_paddle_available() and is_paddlenlp_available():
                     config_path = (
                         os.path.join(config_path, subfolder)
                         if os.path.isdir(config_path)
-                        else "/".join(config_path, subfolder)
+                        else "/".join([config_path, subfolder])
                     )
 
             config = cls.config_class.from_pretrained(
