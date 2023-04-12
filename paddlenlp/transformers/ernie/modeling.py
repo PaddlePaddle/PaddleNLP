@@ -745,7 +745,7 @@ class ErnieLMPredictionHead(nn.Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size, bias_attr=False)
         self.decoder_bias = self.create_parameter(
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )

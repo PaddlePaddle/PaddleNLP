@@ -863,7 +863,7 @@ class BertLMPredictionHead(Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size, bias_attr=False)
         self.decoder_bias = self.create_parameter(
             shape=[config.vocab_size], dtype=self.decoder.weight.dtype, is_bias=True
         )

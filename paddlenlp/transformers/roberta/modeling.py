@@ -1232,7 +1232,7 @@ class RobertaLMHead(nn.Layer):
         self.bias = paddle.create_parameter(
             shape=tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor)
         )
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size, bias_attr=False)
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
