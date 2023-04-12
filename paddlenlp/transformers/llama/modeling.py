@@ -673,19 +673,22 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, parallel_output=False):
         super(LlamaLMHead, self).__init__()
         self.weight = self.create_parameter(
             shape=[config.hidden_size, config.vocab_size // config.tensor_parallel_degree],
             dtype=paddle.get_default_dtype(),
         )
         self.config = config
+        self.parallel_output = parallel_output
 
     def forward(self, hidden_states):
         # default_type = hidden_states.dtype
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
-            logits = parallel_matmul(hidden_states, self.weight.astype("float32"))
+            logits = parallel_matmul(
+                hidden_states, self.weight.astype("float32"), parallel_output=self.parallel_output
+            )
             # logits = logits.astype(default_type)
         return logits
 
@@ -714,7 +717,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=False,
+            tensor_parallel_output=True,
         )
 
         # Initialize weights and apply final processing
@@ -790,17 +793,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]
-
-        logits = self.lm_head(hidden_states)
-        # parallel_output = True
-        # if hidden_states.stop_gradient:
-        #     parallel_output = False
-        # with paddle.amp.auto_cast(False):
-        #     logits = parallel_matmul(
-        #         hidden_states.astype("float32"),
-        #         self.lm_head.weight.astype("float32"),
-        #         parallel_output=parallel_output
-        #     )
+        parallel_output = True
+        if hidden_states.stop_gradient:
+            parallel_output = False
+        logits = self.lm_head(hidden_states, parallel_output=parallel_output)
 
         loss = None
         if labels is not None:
