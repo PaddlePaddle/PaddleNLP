@@ -698,7 +698,7 @@ class LlamaLMHead(nn.Layer):
     def forward(self, hidden_states, parallel_output=False):
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
-            logits = parallel_matmul(hidden_states, self.weight, parallel_output=parallel_output)
+            logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
         return logits
 
 
