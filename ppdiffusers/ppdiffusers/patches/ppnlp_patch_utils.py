@@ -127,6 +127,7 @@ if is_paddle_available():
     # patch repeat_interleave
     raw_repeat_interleave = paddle.repeat_interleave
 
+    @paddle.jit.not_to_static
     def repeat_interleave(x, repeats, axis=None, name=None):
         fp16 = False
         if x.dtype == paddle.float16:
@@ -145,6 +146,7 @@ if is_paddle_available():
     # patch max
     raw_max = paddle.max
 
+    @paddle.jit.not_to_static
     def max(x, axis=None, keepdim=False, name=None):
         fp16 = False
         if x.dtype == paddle.float16:
@@ -163,6 +165,7 @@ if is_paddle_available():
     # patch gather_nd support bfloat16
     raw_gather_nd = paddle.gather_nd
 
+    @paddle.jit.not_to_static
     def gather_nd(x, index, name=None):
         bfp16 = False
         if x.dtype == paddle.bfloat16:
@@ -180,7 +183,6 @@ if is_paddle_available():
     paddle.Tensor.contiguous = lambda x: x
 
     # must return self!
-    @patch_to(nn.Layer)
     def eval(self):
         # Layer-level setting
         self.training = False
@@ -188,12 +190,15 @@ if is_paddle_available():
             layer.training = False
         return self
 
-    @patch_to(nn)
+    nn.Layer.eval = eval
+
     def Parameter(data: paddle.Tensor, requires_grad=True):
         tensor = paddle.create_parameter(data.shape, dtype=data.dtype, default_initializer=nn.initializer.Assign(data))
         if not requires_grad:
             tensor.stop_gradient = True
         return tensor
+
+    nn.Parameter = Parameter
 
     @contextlib.contextmanager
     def device_scope(device="cpu"):
@@ -207,7 +212,6 @@ if is_paddle_available():
 
     paddle.device_scope = device_scope
 
-    @patch_to(nn.Layer)
     def get_sublayer(self, target: str):
         if target == "":
             return self
@@ -224,6 +228,8 @@ if is_paddle_available():
             if not isinstance(mod, nn.Layer):
                 raise AttributeError("`" + item + "` is not " "an nn.Layer")
         return mod
+
+    nn.Layer.get_sublayer = get_sublayer
 
     class _WrappedHook:
         def __init__(self, hook: Callable, module: Optional["nn.Layer"] = None):
@@ -265,30 +271,31 @@ if is_paddle_available():
     except ImportError:
         from paddle.fluid.dygraph.layers import HookRemoveHelper
 
-    @patch_to(nn.Layer)
     def register_load_state_dict_pre_hook(self, hook, with_module=False):
         handle = HookRemoveHelper(self.load_state_dict_pre_hooks)
         self.load_state_dict_pre_hooks[handle._hook_id] = _WrappedHook(hook, self if with_module else None)
         return handle
 
+    nn.Layer.register_load_state_dict_pre_hook = register_load_state_dict_pre_hook
+
     raw_set_state_dict = nn.Layer.set_state_dict
 
-    @patch_to(nn.Layer)
     def set_state_dict(self, state_dict, use_structured_name: bool = True):
         for hook in self.load_state_dict_pre_hooks.values():
             hook(state_dict)
         return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
 
+    nn.Layer.set_state_dict = set_state_dict
     nn.Layer.load_dict = nn.Layer.set_state_dict
     nn.Layer.set_dict = nn.Layer.set_state_dict
 
     raw_init = nn.Layer.__init__
 
-    @patch_to(nn.Layer)
     def __init__(self, name_scope=None, dtype="float32"):
         raw_init(self, name_scope=name_scope, dtype=dtype)
         self.load_state_dict_pre_hooks = OrderedDict()
 
+    nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
     # set logger level warning

@@ -944,15 +944,17 @@ class DiffusionPipeline(ConfigMixin):
                     else:
                         # else load from the root directory
                         loaded_sub_model = load_method(cached_folder, **loading_kwargs)
-                except Exception:
+                except Exception as e:
                     # (TODO, junnyu)
                     # if we cant find this file, we will try to download this
                     if not is_local_dir and not from_hf_hub:
                         loaded_sub_model = load_method(
                             pretrained_model_name_or_path + "/" + name, cache_dir=cache_dir, **loading_kwargs
                         )
-                if loaded_sub_model is None:
-                    raise ValueError(f"We cant load '{name}' from {pretrained_model_name_or_path} or {cached_folder}!")
+                    if loaded_sub_model is None:
+                        raise ValueError(
+                            f"We cant load '{name}' from {pretrained_model_name_or_path} or {cached_folder}! \n {e} "
+                        )
             # paddlenlp's model is in training mode not eval mode
             # if isinstance(loaded_sub_model, PretrainedModel):
             # if paddle_dtype is not None and next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:
