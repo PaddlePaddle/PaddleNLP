@@ -666,7 +666,11 @@ if is_paddle_available() and is_paddlenlp_available():
                     kwargs["subfolder"] = subfolder
             else:
                 if subfolder is not None:
-                    config_path = os.path.join(config_path, subfolder)
+                    config_path = (
+                        os.path.join(config_path, subfolder)
+                        if os.path.isdir(config_path)
+                        else "/".join(config_path, subfolder)
+                    )
 
             config = cls.config_class.from_pretrained(
                 config_path,
@@ -678,8 +682,9 @@ if is_paddle_available() and is_paddlenlp_available():
             )
         assert config is not None
 
-        if not os.path.exists(os.path.join(cache_dir, "config.json")):
-            config.save_pretrained(cache_dir)
+        # we will remove in the future.
+        if not from_hf_hub and not os.path.exists(os.path.join(cache_dir, config_path, "config.json")):
+            config.save_pretrained(os.path.join(cache_dir, config_path))
 
         model = cls(config)
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
