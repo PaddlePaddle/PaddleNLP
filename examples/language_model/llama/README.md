@@ -24,10 +24,11 @@ model = LLaMAForCausalLM.from_pretrained("facebook/llama-7b", load_state_as_np=T
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
-    --gpus "4,5,6,7" finetune_generation.py \
+    --gpus "0,1,2,3" finetune_generation.py \
     --model_name_or_path facebook/llama-7b \
     --do_train \
     --do_eval \
+    --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --tensor_parallel_degree 4 \
