@@ -1081,8 +1081,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # update init_config
         self._update_init_config(self.init_config, "vocab_size", new_num_tokens)
 
-        # TODO(westfish@126.com): add tie_weight.
-        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+        # Tie the weights between the input embeddings and the output embeddings if needed.
+        self.tie_weights()
 
         return new_embeddings
 
