@@ -580,17 +580,28 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     output_embeddings.weight = input_embeddings.weight
                 if getattr(output_embeddings, "bias", None) is not None:
-                    output_embeddings.bias.set_value(
-                        nn.functional.pad(
-                            output_embeddings.bias,
-                            (
-                                0,
-                                output_embeddings.weight.shape[0] - output_embeddings.bias.shape[0],
-                            ),
-                            "constant",
-                            0,
+                    # need to pad
+                    if output_embeddings.weight.shape[0] > output_embeddings.bias.shape[0]:
+                        old_bias = output_embeddings.bias
+                        pad_length = old_bias - output_embeddings.bias.shape[0]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
                         )
-                    )
+                        new_bias = paddle.concat([old_bias, paddle.zeros([pad_length])])
+                        output_embeddings.bias.set_value(new_bias)
+                    # need to trim
+                    elif output_embeddings.weight.shape[0] < output_embeddings.bias.shape[0]:
+                        new_bias = output_embeddings.bias[: output_embeddings.weight.shape[0]]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
+                        )
+                        output_embeddings.bias.set_value(new_bias)
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
