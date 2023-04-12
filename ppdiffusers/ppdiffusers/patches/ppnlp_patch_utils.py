@@ -848,8 +848,15 @@ if is_paddle_available() and is_paddlenlp_available():
                 paddle_dtype=paddle_dtype,
                 **kwargs,
             )
+
         return raw_from_pretrained(
-            cls, pretrained_model_name_or_path, *args, from_hf_hub=from_hf_hub, subfolder=subfolder, **kwargs
+            cls,
+            pretrained_model_name_or_path,
+            *args,
+            from_hf_hub=from_hf_hub,
+            subfolder=subfolder,
+            dtype=paddle_dtype,
+            **kwargs,
         )
 
     PretrainedModel.from_pretrained = from_pretrained
