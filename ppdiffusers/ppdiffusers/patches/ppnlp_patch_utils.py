@@ -849,13 +849,14 @@ if is_paddle_available() and is_paddlenlp_available():
                 **kwargs,
             )
 
+        dtype = kwargs.pop("dtype", paddle_dtype)
         return raw_from_pretrained(
             cls,
             pretrained_model_name_or_path,
             *args,
             from_hf_hub=from_hf_hub,
             subfolder=subfolder,
-            dtype=kwargs.pop("dtype", paddle_dtype),
+            dtype=dtype,
             **kwargs,
         )
 
