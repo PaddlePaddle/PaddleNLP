@@ -75,6 +75,7 @@ if is_paddle_available():
     rand = paddle.rand
     randint = paddle.randint
 
+    @paddle.jit.not_to_static
     def randn_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
         if generator is None:
@@ -83,6 +84,7 @@ if is_paddle_available():
             with get_rng_state_tracker().rng_state(generator):
                 return randn(shape, dtype=dtype, name=name)
 
+    @paddle.jit.not_to_static
     def rand_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
         if generator is None:
@@ -91,6 +93,7 @@ if is_paddle_available():
             with get_rng_state_tracker().rng_state(generator):
                 return rand(shape, dtype=dtype, name=name)
 
+    @paddle.jit.not_to_static
     def randint_pt(low=0, high=None, shape=[1], dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
         if generator is None:
@@ -99,6 +102,7 @@ if is_paddle_available():
             with get_rng_state_tracker().rng_state(generator):
                 return randint(low=low, high=high, shape=shape, dtype=dtype, name=name)
 
+    @paddle.jit.not_to_static
     def randn_like_pt(x, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
         if dtype is None:

@@ -69,7 +69,7 @@ pip install -r requirements.txt
 ### pip安装
 
 ```shell
-pip install --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --upgrade ppdiffusers
 ```
 
 ### 手动安装

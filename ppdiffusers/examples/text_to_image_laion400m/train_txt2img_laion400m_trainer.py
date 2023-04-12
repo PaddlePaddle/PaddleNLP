@@ -34,9 +34,13 @@ def main():
     # report to custom_visualdl
     training_args.report_to = ["custom_visualdl"]
     training_args.resolution = data_args.resolution
+
     training_args.image_logging_steps = model_args.image_logging_steps = (
-        math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps
+        (math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps)
+        if model_args.image_logging_steps > 0
+        else -1
     )
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
@@ -67,6 +71,16 @@ def main():
         interpolation="lanczos",
         tokenizer=model.tokenizer,
     )
+
+    if model_args.to_static:
+        input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, model_args.model_max_length], dtype="int64")
+        pixel_values = paddle.static.InputSpec(
+            name="pixel_values", shape=[-1, 3, data_args.resolution, data_args.resolution], dtype="float32"
+        )
+        specs = [input_ids, pixel_values]
+        paddle.jit.ignore_module([os])
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
     trainer = LatentDiffusionTrainer(
         model=model, args=training_args, train_dataset=train_dataset, tokenizer=model.tokenizer

@@ -666,14 +666,14 @@ class BloomPreTrainedModel(PretrainedModel):
 
         return mappings
 
-    def init_weights(self, module):
+    def _init_weights(self, layer):
         """Initialize the weights."""
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.set_value(
-                paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
+        if isinstance(layer, (nn.Linear, nn.Embedding)):
+            layer.weight.set_value(
+                paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=layer.weight.shape)
             )
-            if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
+            if getattr(layer, "bias", None) is not None:
+                layer.weight.set_value(paddle.zeros(shape=layer.weight.shape, dtype=paddle.get_default_dtype()))
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, BloomModel):
@@ -831,9 +831,6 @@ class BloomModel(BloomPreTrainedModel):
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -1077,7 +1074,6 @@ class BloomForPretraining(BloomPreTrainedModel):
         self.criterion = BloomPretrainingCriterion(
             pad_token_id=config.pad_token_id, tensor_parallel_degree=config.tensor_parallel_degree
         )
-        self.apply(self.init_weights)
         self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
@@ -1119,9 +1115,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_output=True,
         )
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1252,9 +1245,6 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
         self.bloom = BloomModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -1373,9 +1363,6 @@ class BloomForTokenClassification(BloomPreTrainedModel):
             classifier_dropout = 0.1
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(
         self,

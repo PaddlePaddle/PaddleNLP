@@ -66,7 +66,7 @@ python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_
     --fp16 \
     --fp16_opt_level O2 \
     --recompute \
-    --tensor_parallel_degree 1
+    --tensor_parallel_degree 4
 ```
 ## 模型动态图预测
 
