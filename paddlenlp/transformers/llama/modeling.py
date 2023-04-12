@@ -21,7 +21,7 @@ from typing import Optional, Tuple
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddle import nn
+from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
@@ -44,6 +44,29 @@ __all__ = [
     "LlamaPretrainedModel",
     "LlamaForCausalLM",
 ]
+
+
+def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+    is_fleet_init = True
+    world_size = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        world_size = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
+    if is_fleet_init and world_size > 1:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+        if parallel_output:
+            return logits
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(x, y, transpose_y=False)
+        return logits
 
 
 def finfo(dtype):
@@ -415,7 +438,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
-                "lm_head.weight": partial(fn, is_column=True),
+                # "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -644,6 +667,23 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
+class LlamaLMHead(nn.Layer):
+    def __init__(self, config):
+        super(LlamaLMHead, self).__init__()
+        self.weight = self.create_parameter(
+            shape=[config.hidden_size, config.vocab_size], dtype=paddle.get_default_dtype(), is_bias=False
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        default_type = hidden_states.dtype
+        with paddle.amp.auto_cast(False):
+            hidden_states = hidden_states.astype("float32")
+            logits = paddle.matmul(hidden_states, self.weight.astype("float32"))
+            logits = logits.astype(default_type)
+        return logits
+
+
 class LlamaForCausalLM(LlamaPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
@@ -651,23 +691,24 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.llama = LlamaModel(config)
 
-        if config.tensor_parallel_degree > 1:
-            self.lm_head = fleet.meta_parallel.ColumnParallelLinear(
-                config.hidden_size,
-                config.vocab_size,
-                gather_output=True,
-                has_bias=False,
-            )
-        else:
-            self.lm_head = nn.Linear(
-                config.hidden_size,
-                config.vocab_size,
-                bias_attr=False,
-            )
+        self.lm_head = LlamaLMHead(config)
+        # if config.tensor_parallel_degree > 1:
+        #     self.lm_head = fleet.meta_parallel.ColumnParallelLinear(
+        #         config.hidden_size,
+        #         config.vocab_size,
+        #         gather_output=True,
+        #         has_bias=False,
+        #     )
+        # else:
+        #     self.lm_head = nn.Linear(
+        #         config.hidden_size,
+        #         config.vocab_size,
+        #         bias_attr=False,
+        #     )
 
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=False,
+            tensor_parallel_output=True,
         )
 
         # Initialize weights and apply final processing
@@ -743,8 +784,12 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]
-        with paddle.amp.auto_cast(False):
-            logits = paddle.cast(self.lm_head(hidden_states), "float32")
+
+        logits = self.lm_head(hidden_states)
+        # parallel_output = True
+        # if hidden_states.stop_gradient:
+        #     parallel_output = False
+        # logits = parallel_matmul(hidden_states, self.lm_head.weight, parallel_output=parallel_output)
 
         loss = None
         if labels is not None:
