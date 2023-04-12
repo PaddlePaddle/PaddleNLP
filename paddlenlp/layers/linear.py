@@ -35,7 +35,7 @@ class Linear(nn.Layer):
         self._weight_attr = weight_attr
         self._bias_attr = bias_attr
         self.weight = self.create_parameter(
-            shape=[out_features, in_features],
+            shape=[out_features, in_features],  # paddle linear has shape [in_features, out_features]
             attr=self._weight_attr,
             dtype=self._dtype,
             is_bias=False,
@@ -55,5 +55,5 @@ class Linear(nn.Layer):
     def extra_repr(self):
         name_str = ", name={}".format(self.name) if self.name else ""
         return "in_features={}, out_features={}, dtype={}{}".format(
-            self.weight.shape[0], self.weight.shape[1], self._dtype, name_str
+            self.weight.shape[1], self.weight.shape[0], self._dtype, name_str
         )
