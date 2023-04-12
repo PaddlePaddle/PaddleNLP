@@ -678,6 +678,9 @@ if is_paddle_available() and is_paddlenlp_available():
             )
         assert config is not None
 
+        if not os.path.exists(os.path.join(cache_dir, "config.json")):
+            config.save_pretrained(cache_dir)
+
         model = cls(config)
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
         # Load model
