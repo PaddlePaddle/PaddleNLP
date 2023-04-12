@@ -714,14 +714,6 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
                 torch_logit.last_hidden_state.shape,
             )
 
-            # todo:
-            # size mismatch for text_projection.weight: copying a param with shape torch.Size([64, 32]) from checkpoint, the shape in current model is torch.Size([32, 32]).
-            # print(paddle_logit.text_embeds.shape, torch_logit.text_embeds.shape)
-            # np.testing.assert_equal(
-            #     paddle_logit.text_embeds.shape,
-            #     torch_logit.text_embeds.shape,
-            # )
-
     @require_package("transformers", "torch")
     def test_clip_vision_with_projection_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -752,14 +744,6 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
                 paddle_logit.last_hidden_state.shape,
                 torch_logit.last_hidden_state.shape,
             )
-
-            # todo:
-            # size mismatch for text_projection.weight: copying a param with shape torch.Size([64, 32]) from checkpoint, the shape in current model is torch.Size([32, 32]).
-            # print(paddle_logit.vision_embeds.shape, torch_logit.vision_embeds.shape)
-            # np.testing.assert_equal(
-            #     paddle_logit.vision_embeds.shape,
-            #     torch_logit.vision_embeds.shape,
-            # )
 
 
 class CLIPModelIntegrationTest(unittest.TestCase):

@@ -382,20 +382,37 @@ class CLIPPretrainedModel(PretrainedModel):
             else:
                 num_vision_layer = config.get(num_layer_key, 0)
 
+        has_text_layer = num_text_layer > 0
+        has_text_projection_layer = has_text_layer and (
+            "CLIPModel" in (config.architectures or [])
+            or "CLIPTextModelWithProjection" in (config.architectures or [])
+            or cls.__name__ in ["CLIPModel", "CLIPTextModelWithProjection"]
+        )
+
+        has_vision_layer = num_vision_layer > 0
+        has_vision_projection_layer = has_vision_layer and (
+            "CLIPModel" in (config.architectures or [])
+            or "CLIPVisionModelWithProjection" in (config.architectures or [])
+            or cls.__name__ in ["CLIPModel", "CLIPVisionModelWithProjection"]
+        )
+
         if model_type == "clip":
             hard_mappings = [["logit_scale", "logit_scale"]]
         else:
             hard_mappings = []
 
         # text model
-        if num_text_layer > 0:
+        if has_text_layer:
             text_model_layer_mappings = [
                 ["text_model.embeddings.token_embedding.weight", "text_model.token_embedding.weight"],
                 ["text_model.embeddings.position_embedding.weight", "text_model.positional_embedding.weight"],
                 ["text_model.final_layer_norm.weight", "text_model.ln_final.weight"],
                 ["text_model.final_layer_norm.bias", "text_model.ln_final.bias"],
-                ["text_projection.weight", "text_projection", "transpose"],
             ]
+
+            if has_text_projection_layer:
+                text_model_layer_mappings.extend([["text_projection.weight", "text_projection", "transpose"]])
+
             hard_mappings.extend(text_model_layer_mappings)
 
             for layer_index in range(num_text_layer):
@@ -477,7 +494,7 @@ class CLIPPretrainedModel(PretrainedModel):
                 hard_mappings.extend(text_model_layer_mappings)
 
         # vision model
-        if num_vision_layer > 0:
+        if has_vision_layer:
             vision_model_layer_mappings = [
                 ["vision_model.embeddings.class_embedding", "vision_model.class_embedding"],
                 ["vision_model.embeddings.patch_embedding.weight", "vision_model.conv1.weight"],
@@ -486,8 +503,11 @@ class CLIPPretrainedModel(PretrainedModel):
                 ["vision_model.pre_layrnorm.bias", "vision_model.ln_pre.bias"],
                 ["vision_model.post_layernorm.weight", "vision_model.ln_post.weight"],
                 ["vision_model.post_layernorm.bias", "vision_model.ln_post.bias"],
-                ["visual_projection.weight", "vision_projection", "transpose"],
             ]
+
+            if has_vision_projection_layer:
+                vision_model_layer_mappings.extend([["visual_projection.weight", "vision_projection", "transpose"]])
+
             hard_mappings.extend(vision_model_layer_mappings)
             for layer_index in range(num_vision_layer):
                 vision_model_layer_mappings = [
