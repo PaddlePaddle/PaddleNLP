@@ -180,7 +180,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # check edge cases with negative and extreme logits
         ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
-
+        ramp_logits = ramp_logits.astype("float32")
         # make ramp_logits more extreme
         ramp_logits[1] = ramp_logits[1] * 100.0
 
@@ -273,7 +273,7 @@ class LogitsProcessorTest(unittest.TestCase):
         current_tokens = paddle.to_tensor([0, 3, 1, 2])
 
         diversity_logits_processor = HammingDiversityLogitsProcessor(
-            diversity_penalty=1.0, num_beams=num_beams, num_beam_groups=num_beam_groups
+            diversity_rate=1.0, num_beams=num_beams, num_beam_groups=num_beam_groups
         )
 
         processed_scores = diversity_logits_processor(None, scores, current_tokens, 1)
@@ -290,7 +290,7 @@ class LogitsProcessorTest(unittest.TestCase):
         batch_size = 4
         bos_token_id = 0
 
-        logits_processor = ForcedBOSTokenLogitsProcessor(bos_token_id=bos_token_id)
+        logits_processor = ForcedBOSTokenLogitsProcessor(forced_bos_token_id=bos_token_id)
 
         # check that all scores are -inf except the bos_token_id score
         input_ids = ids_tensor((batch_size, 1), vocab_size=20)
@@ -311,7 +311,7 @@ class LogitsProcessorTest(unittest.TestCase):
         eos_token_id = 0
         max_length = 5
 
-        logits_processor = ForcedEOSTokenLogitsProcessor(max_length=max_length, eos_token_id=eos_token_id)
+        logits_processor = ForcedEOSTokenLogitsProcessor(max_length=max_length, forced_eos_token_id=eos_token_id)
 
         # check that all scores are -inf except the eos_token_id when max_length-1 is reached
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)

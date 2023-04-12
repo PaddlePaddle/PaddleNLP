@@ -16,6 +16,9 @@ import time
 import warnings
 from abc import ABC
 from copy import deepcopy
+from typing import Optional
+
+import paddle
 
 
 class StoppingCriteria(ABC):
@@ -41,11 +44,11 @@ class MaxTimeCriteria(StoppingCriteria):
             The start of the generation allowed time.
     """
 
-    def __init__(self, max_time: float, initial_timestamp):
+    def __init__(self, max_time: float, initial_timestamp: Optional[float] = None):
         self.max_time = max_time
         self.initial_timestamp = time.time() if initial_timestamp is None else initial_timestamp
 
-    def __call__(self, input_ids, scores, **kwargs) -> bool:
+    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs) -> bool:
         return time.time() - self.initial_timestamp > self.max_time
 
 
@@ -62,12 +65,12 @@ class MaxLengthCriteria(StoppingCriteria):
     def __init__(self, max_length: int):
         self.max_length = max_length
 
-    def __call__(self, input_ids, scores, **kwargs) -> bool:
+    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs) -> bool:
         return input_ids.shape[-1] >= self.max_length
 
 
 class StoppingCriteriaList(list):
-    def __call__(self, input_ids, scores, **kwargs):
+    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs):
         return any(criteria(input_ids, scores) for criteria in self)
 
     @property

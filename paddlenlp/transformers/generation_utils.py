@@ -34,7 +34,7 @@ from .model_outputs import CausalLMOutputWithPast, ModelOutput, Seq2SeqLMOutput
 
 __all__ = ["GenerationMixin"]
 
-from generation.logits_process import (
+from ..generation.logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
@@ -46,7 +46,7 @@ from generation.logits_process import (
     TopKLogitsWarper,
     TopPLogitsWarper,
 )
-from generation.stopping_criteria import (
+from ..generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
@@ -435,16 +435,13 @@ class GenerationMixin(object):
         # may be different from expected. In this case, you need to rewrite the
         # method.
 
-        # update past_key_values
-        if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
-            model_kwargs["past_key_values"] = outputs.past_key_values
-
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -1121,8 +1118,8 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
-        # max_length includes the initial prompted tokens
-        stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
+        # max_length excludes the initial prompted tokens.
+        stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length + cur_len)
 
         # If the first step in the loop, encode all the prefix and obtain (1) past_key_values
         # (2) last_hidden_states (3) logit_for_next_step (4) update model kwargs for the next step

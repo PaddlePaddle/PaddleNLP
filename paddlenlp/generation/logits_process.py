@@ -237,9 +237,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
             num_tokens = scores.shape[1]
-            scores[
-                :, [i for i in range(num_tokens) if i != self.forced_eos_token_id]
-            ] = -1e9  # TODO change back to -inf after paddle.topk is fixed
+            scores[:, [i for i in range(num_tokens) if i != self.forced_eos_token_id]] = -float("inf")
             scores[:, self.forced_eos_token_id] = 0
         return scores
 
@@ -269,7 +267,7 @@ class TemperatureLogitsWarper(LogitsWarper):
 
         self.temperature = temperature
 
-    def __call__(self, scores, logits):
+    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor):
         scores = scores / self.temperature
         return scores
 
@@ -287,7 +285,7 @@ class TopKLogitsWarper(LogitsWarper):
             Minimum number of tokens that cannot be filtered.
     """
 
-    def __init__(self, top_k: int, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
+    def __init__(self, top_k: int, filter_value: float = -float("inf"), min_tokens_to_keep: int = 1):
         if not isinstance(top_k, int) or top_k <= 0:
             raise ValueError(f"`top_k` has to be a strictly positive integer, but is {top_k}")
 
@@ -298,7 +296,12 @@ class TopKLogitsWarper(LogitsWarper):
         top_k = min(self.top_k, probs.shape[-1])  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         topk_probs, _ = paddle.topk(probs, k=top_k)
-        probs = paddle.where(probs < topk_probs[:, -1:], paddle.full_like(probs, self.filter_value), probs)
+
+        # NOTE: probs need to be float32, otherwise, paddle.full_like will do truncation
+        probs = probs.astype("float32")
+        probs = paddle.where(
+            probs < topk_probs[:, -1:], paddle.full_like(probs, self.filter_value, dtype="float32"), probs
+        )
         return probs
 
 
@@ -316,7 +319,7 @@ class TopPLogitsWarper(LogitsWarper):
             Minimum number of tokens that cannot be filtered.
     """
 
-    def __init__(self, top_p: float, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
+    def __init__(self, top_p: float, filter_value: float = -float("inf"), min_tokens_to_keep: int = 1):
         top_p = float(top_p)
         if top_p < 0 or top_p > 1.0:
             raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
@@ -344,5 +347,7 @@ class TopPLogitsWarper(LogitsWarper):
         )
         condition = paddle.cast(condition, "bool").reshape(probs.shape)
 
-        probs = paddle.where(condition, paddle.full_like(probs, self.filter_value), probs)
+        # NOTE: probs need to be float32, otherwise, paddle.full_like will do truncation
+        probs = probs.astype("float32")
+        probs = paddle.where(condition, paddle.full_like(probs, self.filter_value, dtype="float32"), probs)
         return probs
