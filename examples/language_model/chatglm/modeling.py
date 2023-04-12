@@ -111,6 +111,7 @@ class RotaryEmbeddings(nn.Layer):
             seq_len = x.shape[seq_dim]
 
         # x.shape = [b, s, n, h/n/2]
+        # TODO: Remove the condition for converting to static graph.
         # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
         #    self.max_seq_len_cached = None if self.learnable else seq_len
         # [s]
@@ -469,7 +470,13 @@ class ChatGLMStack(nn.Layer):
             return custom_forward
 
         hidden_states = recompute(
-            create_custom_forward(layer_module), hidden_states, ltor_mask, position_ids, use_cache, cache
+            create_custom_forward(layer_module),
+            hidden_states,
+            ltor_mask,
+            position_ids,
+            use_cache,
+            cache,
+            use_reentrant=False,
         )
         return hidden_states
 
