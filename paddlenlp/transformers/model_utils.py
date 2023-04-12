@@ -578,12 +578,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         f"The shape of input embeddings is {input_embeddings.weight.shape} and the shape of output embeddings is {output_embeddings.weight.shape}. "
                         "This is only expected if you are calling the `resize_token_embeddings` method"
                     )
-                    output_embeddings.weight = input_embeddings.weight
+                output_embeddings.weight = input_embeddings.weight
                 if getattr(output_embeddings, "bias", None) is not None:
                     # need to pad
                     if output_embeddings.weight.shape[0] > output_embeddings.bias.shape[0]:
                         old_bias = output_embeddings.bias
-                        pad_length = old_bias - output_embeddings.bias.shape[0]
+                        pad_length = output_embeddings.weight.shape[0] - old_bias.shape[0]
                         output_embeddings.bias = output_embeddings.create_parameter(
                             shape=[output_embeddings.weight.shape[0]],
                             attr=output_embeddings._bias_attr,
