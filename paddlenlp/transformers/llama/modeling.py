@@ -681,11 +681,11 @@ class LlamaLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        default_type = hidden_states.dtype
+        # default_type = hidden_states.dtype
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
             logits = paddle.matmul(hidden_states, self.weight.astype("float32"))
-            logits = logits.astype(default_type)
+            # logits = logits.astype(default_type)
         return logits
 
 
