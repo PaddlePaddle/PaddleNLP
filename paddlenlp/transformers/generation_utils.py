@@ -1709,7 +1709,15 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 def TopKProcess(probs, top_k, min_tokens_to_keep):
     top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
     # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
+
+    # topk do not support bf16 in inference engine
+    if probs.dtype == paddle.bfloat16:
+        topk_probs = paddle.cast(probs, paddle.float16)
+        topk_probs, _ = paddle.topk(topk_probs, top_k)
+        topk_probs = paddle.cast(topk_probs, dtype=paddle.bfloat16)
+    else:
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+
     probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
     return probs
 

@@ -146,13 +146,10 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Set the dtype for loading model
-    dtype = None
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # all of dtype should be in [`float16`, `bfloat16`]
+    dtype = "float16"
+    if training_args.fp16_opt_level == "O2" and training_args.bf16:
+        dtype = "bfloat16"
 
     # Load the pretrained language model.
     model = BloomForCausalLM.from_pretrained(
@@ -238,8 +235,11 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate()
-        trainer.log_metrics("test", eval_result)
+        # the following ops do not support bfloat16
+        black_list = ["multinomial", "bmm", "topk"] if dtype == "bfloat16" else []
+        with paddle.amp.auto_cast(True, custom_black_list=black_list, dtype=dtype):
+            eval_result = trainer.evaluate()
+            trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":
