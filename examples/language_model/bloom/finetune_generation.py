@@ -87,7 +87,7 @@ def convert_example(
         target = example["question"]
 
     # Add the eos token for the source and target
-    source = "答案：" + title + tokenizer.eos_token + "上下文：" + source + "。" + tokenizer.eos_token + "在已知答案的前提下，问题："
+    source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
     target = target[: max_target_length - 1]
     target = target + tokenizer.eos_token
 
@@ -100,14 +100,13 @@ def convert_example(
 
     source_tokenized = tokenizer(
         source,
-        max_length=(max_source_length + max_target_length - target_input_ids_len),
+        max_length=(max_source_length + max_target_length - target_input_ids_len - 1),
         padding="max_length",
         truncation=True,
     )
 
-    input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
+    input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
     labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
-
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -147,12 +146,20 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
     # Load the pretrained language model.
     model = BloomForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
-        # dtype="float16",  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=training_args.recompute,
@@ -220,12 +227,19 @@ def main():
         data_args=data_args,
     )
 
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
+
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
+
+    if training_args.do_eval:
+        eval_result = trainer.evaluate()
+        trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":

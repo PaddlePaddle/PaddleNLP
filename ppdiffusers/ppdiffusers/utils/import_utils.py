@@ -138,6 +138,15 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _paddlenlp_available = False
 
+# (sayakpaul): importlib.util.find_spec("opencv-python") returns None even when it's installed.
+# _opencv_available = importlib.util.find_spec("opencv-python") is not None
+try:
+    _opencv_version = importlib_metadata.version("opencv-python")
+    _opencv_available = True
+    logger.debug(f"Successfully imported cv2 version {_opencv_version}")
+except importlib_metadata.PackageNotFoundError:
+    _opencv_available = False
+
 _scipy_available = importlib.util.find_spec("scipy") is not None
 try:
     _scipy_version = importlib_metadata.version("scipy")
@@ -228,6 +237,10 @@ def is_unidecode_available():
     return _unidecode_available
 
 
+def is_opencv_available():
+    return _opencv_available
+
+
 def is_scipy_available():
     return _scipy_available
 
@@ -300,6 +313,11 @@ PYTORCH_IMPORT_ERROR = """
 installation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.
 """
 
+# docstyle-ignore
+OPENCV_IMPORT_ERROR = """
+{0} requires the OpenCV library but it was not found in your environment. You can install it with pip: `pip
+install opencv-python`
+"""
 
 # docstyle-ignore
 SCIPY_IMPORT_ERROR = """
@@ -351,6 +369,7 @@ BACKENDS_MAPPING = OrderedDict(
         ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
         ("visualdl", (is_visualdl_available, VISUALDL_IMPORT_ERROR)),
         ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
+        ("opencv", (is_opencv_available, OPENCV_IMPORT_ERROR)),
         ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
         ("torch", (is_torch_available, PYTORCH_IMPORT_ERROR)),
         ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),

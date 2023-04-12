@@ -280,6 +280,7 @@ def do_train(args):
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = None
+        paddle.jit.ignore_module([os])
         model = paddle.jit.to_static(model, input_spec=specs)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 

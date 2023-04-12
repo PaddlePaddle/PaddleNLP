@@ -487,6 +487,7 @@ class LoRAConfig:
     Args:
         r (`int`): Lora attention dimension
         target_modules (`Union[List[str],str]`): The names of the modules to apply Lora to.
+        trainable_modules (`List[str]`): The names of the modules to train when applying Lora.
         lora_alpha (`float`): The alpha parameter for Lora scaling.
         lora_dropout (`float`): The dropout probability for Lora layers.
         merge_weights (`bool`):
@@ -498,6 +499,13 @@ class LoRAConfig:
         default=None,
         metadata={
             "help": "List of module names or regex expression of the module names to replace with Lora."
+            "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
+        },
+    )
+    trainable_modules: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "List of module names or regex expression of the module names to train when applying with Lora."
             "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
         },
     )
@@ -683,9 +691,9 @@ class LoRAModel(nn.Layer):
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().numpy()[0]
+                freeze_numel += weight.numel().item()
             else:
-                trainable_numel += weight.numel().numpy()[0]
+                trainable_numel += weight.numel().item()
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
@@ -711,6 +719,12 @@ class LoRAModel(nn.Layer):
                         weight.stop_gradient = False
                     else:
                         weight.stop_gradient = True
+        if self.lora_config.trainable_modules is not None:
+            for name, weight in self.model.state_dict().items():
+                if any(
+                    re.fullmatch(trainable_module, name) for trainable_module in self.lora_config.trainable_modules
+                ):
+                    weight.stop_gradient = False
 
     def get_lora_model(self, model: Union[PretrainedModel, nn.Layer], lora_config: LoRAConfig):
 
