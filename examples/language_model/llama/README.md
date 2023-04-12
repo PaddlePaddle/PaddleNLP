@@ -24,18 +24,24 @@ model = LLaMAForCausalLM.from_pretrained("facebook/llama-7b", load_state_as_np=T
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3,4,5,6,7" finetune_generation.py \
+    --gpus "4,5,6,7" finetune_generation.py \
     --model_name_or_path facebook/llama-7b \
-    --num_train_epochs 3 \
-    --learning_rate 3e-5 \
-    --save_steps 1000 \
-    --recompute \
     --do_train \
-    --output_dir ./checkpoints/ \
-    --per_device_train_batch_size 8 \
+    --do_eval \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --tensor_parallel_degree 4 \
     --overwrite_output_dir \
-    --save_total_limit 1 \
-    --tensor_parallel_degree 8
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --gradient_accumulation_steps 32 \
+    --recompute \
+    --learning_rate 3e-5 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20
 ```
 
 <a name="3"></a>
