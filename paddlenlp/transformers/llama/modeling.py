@@ -539,7 +539,12 @@ class LlamaModel(LlamaPretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(create_custom_forward(layer_module), hidden_states, attention_mask)
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            use_reentrant=False,
+        )
         return hidden_states
 
     def forward(
@@ -671,7 +676,7 @@ class LlamaLMHead(nn.Layer):
     def __init__(self, config):
         super(LlamaLMHead, self).__init__()
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, config.vocab_size], dtype=paddle.get_default_dtype(), is_bias=False
+            shape=[config.hidden_size, config.vocab_size], dtype=paddle.get_default_dtype()
         )
         self.config = config
 
@@ -696,7 +701,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         #     self.lm_head = fleet.meta_parallel.ColumnParallelLinear(
         #         config.hidden_size,
         #         config.vocab_size,
-        #         gather_output=True,
+        #         gather_output=False,
         #         has_bias=False,
         #     )
         # else:
@@ -708,7 +713,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
+            tensor_parallel_output=False,
         )
 
         # Initialize weights and apply final processing
@@ -789,7 +794,12 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         # parallel_output = True
         # if hidden_states.stop_gradient:
         #     parallel_output = False
-        # logits = parallel_matmul(hidden_states, self.lm_head.weight, parallel_output=parallel_output)
+        # with paddle.amp.auto_cast(False):
+        #     logits = parallel_matmul(
+        #         hidden_states.astype("float32"),
+        #         self.lm_head.weight.astype("float32"),
+        #         parallel_output=parallel_output
+        #     )
 
         loss = None
         if labels is not None:
