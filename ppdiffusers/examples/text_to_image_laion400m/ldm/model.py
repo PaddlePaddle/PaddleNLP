@@ -117,7 +117,7 @@ class LatentDiffusionModel(nn.Layer):
         )
         self.register_buffer("alphas_cumprod", self.noise_scheduler.alphas_cumprod)
 
-        if model_args.image_logging_steps:
+        if model_args.image_logging_steps > 0:
             self.eval_scheduler = DDIMScheduler(
                 beta_start=0.00085,
                 beta_end=0.012,
