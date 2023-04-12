@@ -573,13 +573,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             output_embeddings = self.get_output_embeddings()
             input_embeddings = self.get_input_embeddings()
             if output_embeddings is not None and input_embeddings is not None:
-                if input_embeddings.weight.shape == output_embeddings.weight.shape:
+                if input_embeddings.weight.shape != output_embeddings.weight.shape:
+                    logger.warning(
+                        f"The shape of input embeddings is {input_embeddings.weight.shape} and the shape of output embeddings is {output_embeddings.weight.shape}. "
+                        "This is only expected if you are calling the `resize_token_embeddings` method"
+                    )
                     output_embeddings.weight = input_embeddings.weight
-                else:
-                    raise ValueError(
-                        "when tie input/output embeddings, the shape of output embeddings: {}"
-                        "should be equal to shape of input embeddings: {}".format(
-                            input_embeddings.weight.shape, output_embeddings.weight.shape
+                if getattr(output_embeddings, "bias", None) is not None:
+                    output_embeddings.bias.set_value(
+                        nn.functional.pad(
+                            output_embeddings.bias,
+                            (
+                                0,
+                                output_embeddings.weight.shape[0] - output_embeddings.bias.shape[0],
+                            ),
+                            "constant",
+                            0,
                         )
                     )
 

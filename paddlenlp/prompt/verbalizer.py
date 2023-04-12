@@ -24,6 +24,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from paddlenlp.layers import Linear as TransposedLinear
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -356,7 +357,7 @@ class SoftVerbalizer(Verbalizer):
         # Find the nn.Linear layer with in_features = vocab_size
         module_name = None
         for i in model.named_sublayers():
-            if isinstance(i[1], nn.Linear) and i[1].weight.shape[0] == model.config.vocab_size:
+            if isinstance(i[1], TransposedLinear):
                 module_name = i[0]
                 break
         if module_name is None:
@@ -370,29 +371,21 @@ class SoftVerbalizer(Verbalizer):
         self.head = copy.deepcopy(parent_module)
 
         # replace the decoder linear layer with a linear linear with the trimmed vocab size
+        # we create a new decoder linear here instead of `resize_token_embeddings` because we only want to change the output embeddings
+        # this also invalidates any previous tie_weights
         self.head_name = attribute_chain
         module_name = attribute_chain[-1]
         module = getattr(self.head, module_name)
         # modify weight
         module_weight = module.weight
+        module_bias = module.bias
         selected_weight = self._create_init_weight(module_weight)
-        setattr(self.head, module_name, nn.Linear(len(self.labels), module.weight.shape[1], bias_attr=False))
+        selected_bias = self._create_init_weight(module_bias, is_bias=True)
+        setattr(
+            self.head, module_name, TransposedLinear(in_features=module.weight.shape[1], out_features=len(self.labels))
+        )
         getattr(self.head, module_name).weight.set_value(selected_weight.T)
-        # modify bias
-        if hasattr(self.head, "decoder_bias"):
-            module_bias = self.head.decoder_bias
-            selected_bias = self._create_init_weight(module_bias, is_bias=True)
-            self.head.decoder_bias = self.head.create_parameter(
-                shape=[len(self.labels)], dtype=selected_bias.dtype, is_bias=True
-            )
-            self.head.decoder_bias.set_value(selected_bias)
-        elif hasattr(self.head, "bias"):
-            module_bias = self.head.bias
-            selected_bias = self._create_init_weight(module_bias, is_bias=True)
-            self.head.bias = self.head.create_parameter(
-                shape=[len(self.labels)], dtype=selected_bias.dtype, is_bias=True
-            )
-            self.head.bias.set_value(selected_bias)
+        getattr(self.head, module_name).bias.set_value(selected_bias)
 
     def _create_init_weight(self, weight: Tensor, is_bias: bool = False):
         token_ids = self.token_ids.squeeze(1)
