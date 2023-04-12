@@ -15,13 +15,14 @@
 """Modeling classes for ALBERT model."""
 
 import math
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
@@ -356,6 +357,116 @@ class AlbertPretrainedModel(PretrainedModel):
 
     pretrained_init_configuration = ALBERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ALBERT_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_name_mappings(cls, config: AlbertConfig) -> List[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["encoder.embedding_hidden_mapping_in.weight", "encoder.embedding_hidden_mapping_in.weight", "transpose"],
+            ["encoder.embedding_hidden_mapping_in.bias", "encoder.embedding_hidden_mapping_in.bias"],
+            ["pooler.weight", "pooler.weight", "transpose"],
+            ["pooler.bias", "pooler.bias"],
+        ]
+        for group_index in range(config.num_hidden_groups):
+            group_mappings = [
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.LayerNorm.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.layer_norm.weight",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.LayerNorm.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.layer_norm.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
+                ],
+            ]
+            model_mappings.extend(group_mappings)
+
+        # base-model prefix "AlbertModel"
+        if "AlbertModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "albert." + mapping[0]
+                mapping[1] = "transformer." + mapping[1]
+
+        # downstream mappings
+        if "AlbertForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+        if (
+            "AlbertForMultipleChoice" in config.architectures
+            or "AlbertForSequenceClassification" in config.architectures
+            or "AlbertForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     def init_weights(self):
         # Initialize weights
@@ -759,14 +870,7 @@ class AlbertMLMHead(Layer):
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-
-        self.tie_status = config.get("tie_word_embeddings", False)
-        # tie_weights() will tie decoder weight with input embeddings
-        if self.tie_status:
-            self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
-        # use legacy decoder shape in order to load pretrained weights
-        else:
-            self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
+        self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
 
         self.activation = ACT2FN[config.hidden_act]
 
@@ -777,12 +881,7 @@ class AlbertMLMHead(Layer):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-
-        if self.tie_status:
-            hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
-        else:
-            hidden_states = self.decoder(hidden_states)
-
+        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
         prediction_scores = hidden_states
         return prediction_scores
 
