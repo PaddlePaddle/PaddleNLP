@@ -855,7 +855,7 @@ if is_paddle_available() and is_paddlenlp_available():
             *args,
             from_hf_hub=from_hf_hub,
             subfolder=subfolder,
-            dtype=paddle_dtype,
+            dtype=kwargs.pop("dtype", paddle_dtype),
             **kwargs,
         )
 
