@@ -167,7 +167,7 @@ def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, 
     else:
         order = "C"
 
-    return storage.reshape(size, order=order)
+    return storage[storage_offset : storage_offset + np.prod(size)].reshape(size, order=order)
 
 
 def _rebuild_parameter(data, requires_grad, backward_hooks):
