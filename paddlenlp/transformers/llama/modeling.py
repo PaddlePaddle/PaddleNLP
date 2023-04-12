@@ -743,7 +743,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]
-        logits = self.lm_head(hidden_states)
+        with paddle.amp.auto_cast(False):
+            logits = paddle.cast(self.lm_head(hidden_states), "float32")
 
         loss = None
         if labels is not None:
