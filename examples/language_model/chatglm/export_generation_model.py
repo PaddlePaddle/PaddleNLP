@@ -64,11 +64,11 @@ def main():
         1,
         # top_p
         1.0,
-        1.0,
         # repetition_penalty
         1,
         # num_beam_groups
         1,
+        # length_penalty
         0.0,
         # early_stopping
         False,
@@ -78,6 +78,20 @@ def main():
         tokenizer.end_token_id,
         # pad_token_id
         tokenizer.pad_token_id,
+        # decoder_start_token_id
+        None,
+        # forced_bos_token_id
+        None,
+        # forced_eos_token_id
+        None,
+        # no_repeat_ngram_size
+        None,
+        # num_return_sequences
+        1,
+        # diversity_rate
+        0.0,
+        # use_cache
+        False,
     ]
     model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 

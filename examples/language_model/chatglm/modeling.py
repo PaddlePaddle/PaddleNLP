@@ -109,32 +109,33 @@ class RotaryEmbeddings(nn.Layer):
     def forward(self, x, seq_dim=1, seq_len=None):
         if seq_len is None:
             seq_len = x.shape[seq_dim]
+
         # x.shape = [b, s, n, h/n/2]
-        if self.max_seq_len_cached is None or (seq_len > self.max_seq_len_cached):
-            self.max_seq_len_cached = None if self.learnable else seq_len
-            # [s]
-            t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
-            # [s, h/n/2]
-            last_dtype = t.dtype
-            freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
-            if freqs.dtype != last_dtype:
-                freqs = freqs.astype(last_dtype)
-            # [s, h/n]
-            emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.dtype == paddle.float16:
-                emb = emb.astype("float32")
-            # [s, 1, h/n]
-            cos_cached = emb.cos().unsqueeze(1)
-            sin_cached = emb.sin().unsqueeze(1)
+        # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
+        #    self.max_seq_len_cached = None if self.learnable else seq_len
+        # [s]
+        t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
+        # [s, h/n/2]
+        last_dtype = t.dtype  # TODO: Failed for fp16 when converting to static graph.
+        freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
+        if freqs.dtype != last_dtype:
+            freqs = freqs.astype(last_dtype)
+        # [s, h/n]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        if self.dtype == paddle.float16:
+            emb = emb.astype("float32")
+        # [s, 1, h/n]
+        cos_cached = emb.cos().unsqueeze(1)
+        sin_cached = emb.sin().unsqueeze(1)
 
-            if self.dtype == paddle.float16:
-                cos_cached = cos_cached.astype(self.dtype)
-                sin_cached = sin_cached.astype(self.dtype)
+        if self.dtype == paddle.float16:
+            cos_cached = cos_cached.astype(self.dtype)
+            sin_cached = sin_cached.astype(self.dtype)
 
-            if self.learnable:
-                return cos_cached, sin_cached
+        if self.learnable:
+            return cos_cached, sin_cached
 
-            self.cos_cached, self.sin_cached = cos_cached, sin_cached
+        self.cos_cached, self.sin_cached = cos_cached, sin_cached
         return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
 
 
