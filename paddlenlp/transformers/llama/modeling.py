@@ -667,7 +667,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != -100]
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != 0]
             loss = paddle.mean(masked_lm_loss)
         return loss
 
@@ -683,13 +683,11 @@ class LlamaLMHead(nn.Layer):
         self.parallel_output = parallel_output
 
     def forward(self, hidden_states):
-        # default_type = hidden_states.dtype
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
             logits = parallel_matmul(
                 hidden_states, self.weight.astype("float32"), parallel_output=self.parallel_output
             )
-            # logits = logits.astype(default_type)
         return logits
 
 
@@ -701,19 +699,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = LlamaModel(config)
 
         self.lm_head = LlamaLMHead(config)
-        # if config.tensor_parallel_degree > 1:
-        #     self.lm_head = fleet.meta_parallel.ColumnParallelLinear(
-        #         config.hidden_size,
-        #         config.vocab_size,
-        #         gather_output=False,
-        #         has_bias=False,
-        #     )
-        # else:
-        #     self.lm_head = nn.Linear(
-        #         config.hidden_size,
-        #         config.vocab_size,
-        #         bias_attr=False,
-        #     )
 
         self.criterion = LlamaPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
