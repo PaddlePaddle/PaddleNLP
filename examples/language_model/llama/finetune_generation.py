@@ -106,7 +106,6 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=True,
-        use_pure_fp16=training_args.fp16,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced

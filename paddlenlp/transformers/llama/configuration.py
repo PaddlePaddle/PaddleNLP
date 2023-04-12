@@ -39,7 +39,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
-        "use_pure_fp16": False,
     },
     "facebook/llama-7b": {
         "hidden_size": 4096,
@@ -56,7 +55,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
-        "use_pure_fp16": False,
     },
     "facebook/llama-13b": {
         "hidden_size": 5120,
@@ -73,7 +71,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
-        "use_pure_fp16": False,
     },
 }
 
