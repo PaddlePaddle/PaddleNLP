@@ -174,10 +174,10 @@ class MultiHeadAttention(nn.Layer):
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
             k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
+                input=key, shape=[-1, 0, self.num_heads, self.head_dim], dtype=key.dtype, value=0
             )
             v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
+                input=key, shape=[-1, 0, self.num_heads, self.head_dim], dtype=key.dtype, value=0
             )
             return self.Cache(k, v)
         else:
