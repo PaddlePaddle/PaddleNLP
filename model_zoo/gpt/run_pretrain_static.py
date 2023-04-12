@@ -264,7 +264,7 @@ def do_train(args):
 
                     model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
                     model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-                    model_config["topo"] = topo
+                    # model_config["topo"] = topo
 
                     model = GPTForPretraining(GPTConfig(**model_config))
                 else:
@@ -272,13 +272,13 @@ def do_train(args):
                         args.model_name_or_path,
                         hidden_dropout_prob=args.hidden_dropout_prob,
                         attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-                        topo=topo,
+                        # topo=topo,
                     )
 
                 # Create the model for the gpt pretrain
                 preds = model(tokens, position_ids, attention_mask)
 
-                criterion = GPTPretrainingCriterion(topo)
+                criterion = GPTPretrainingCriterion()
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
