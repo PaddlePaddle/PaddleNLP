@@ -360,7 +360,6 @@ class AlbertPretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_name_mappings(cls, config: AlbertConfig) -> List[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
@@ -369,9 +368,16 @@ class AlbertPretrainedModel(PretrainedModel):
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
             ["encoder.embedding_hidden_mapping_in.weight", "encoder.embedding_hidden_mapping_in.weight", "transpose"],
             ["encoder.embedding_hidden_mapping_in.bias", "encoder.embedding_hidden_mapping_in.bias"],
-            ["pooler.weight", "pooler.weight", "transpose"],
-            ["pooler.bias", "pooler.bias"],
         ]
+
+        if config.add_pooling_layer:
+            model_mappings.extend(
+                [
+                    ["pooler.weight", "pooler.weight", "transpose"],
+                    ["pooler.bias", "pooler.bias"],
+                ]
+            )
+
         for group_index in range(config.num_hidden_groups):
             group_mappings = [
                 [
@@ -456,7 +462,7 @@ class AlbertPretrainedModel(PretrainedModel):
         # downstream mappings
         if "AlbertForQuestionAnswering" in config.architectures:
             model_mappings.extend(
-                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+                [["qa_outputs.weight", "qa_outputs.weight", "transpose"], ["qa_outputs.bias", "qa_outputs.bias"]]
             )
         if (
             "AlbertForMultipleChoice" in config.architectures

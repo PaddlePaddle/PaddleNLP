@@ -429,7 +429,7 @@ class AlbertModelCompatibilityTest(unittest.TestCase):
             # ("AlbertForMaskedLM",),   TODO: need to tie weights
             # ("AlbertForPretraining",),   TODO: need to tie weights
             ("AlbertForMultipleChoice",),
-            # ("AlbertForQuestionAnswering",), TODO: transformers NOT add the last pool layer before qa_outputs
+            ("AlbertForQuestionAnswering",),
             ("AlbertForSequenceClassification",),
             ("AlbertForTokenClassification",),
         ]
