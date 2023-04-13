@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import CrossEntropyLoss, MSELoss
 
+from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from .configuration import (
@@ -206,9 +207,7 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.ctrl.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -220,9 +219,7 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.ctrl.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
@@ -480,17 +477,9 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
     def __init__(self, config: CTRLConfig):
         super().__init__(config)
         self.ctrl = CTRLModel(config)
-        if config.tie_word_embeddings:
-            self.lm_head = self.ctrl.w
-            self.lm_head_bias = self.create_parameter(
-                shape=[config.vocab_size],
-                dtype=self.lm_head.weight.dtype,
-                is_bias=True,
-            )
-        else:
-            self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
-
+        self.lm_head = TransposedLinear(config.hidden_size, config.vocab_size)
         self.init_weights()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -597,11 +586,7 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
         )
 
         hidden_states = ctrl_outputs[0]
-
-        if self.ctrl.config["tie_word_embeddings"]:
-            lm_logits = paddle.matmul(hidden_states, self.lm_head.weight, transpose_y=True) + self.lm_head_bias
-        else:
-            lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:

@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
+from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
@@ -759,18 +760,18 @@ class AlbertMLMHead(Layer):
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-        self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
+        self.decoder = TransposedLinear(config.embedding_size, config.vocab_size)
 
         self.activation = ACT2FN[config.hidden_act]
 
         # link bias
-        self.decoder.bias = self.bias
+        self.bias = self.decoder.bias
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
+        hidden_states = self.decoder(hidden_states)
         prediction_scores = hidden_states
         return prediction_scores
 

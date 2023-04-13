@@ -15,6 +15,7 @@
 import base64
 import gzip
 import io
+import json
 import random
 
 import numpy as np
@@ -30,7 +31,9 @@ Image.MAX_IMAGE_PIXELS = 2300000000
 
 def parse_line(line, filename):
     def parse_src(filename):
-        if "laion400m" in filename:
+        if "laion_aes" in filename:
+            return "laion_aes"
+        elif "laion400m" in filename:
             return "laion400m"
         else:
             raise NotImplementedError(f"Unkown data source, {filename}")
@@ -40,6 +43,10 @@ def parse_line(line, filename):
         data_source = parse_src(filename)
         if data_source == "laion400m":
             caption, _, img_b64 = vec[:3]
+        elif data_source == "laion_aes":
+            text_json = json.loads(vec[2])
+            img_b64 = vec[5]
+            caption = text_json.get("caption_en", text_json.get("blip_caption_en", ""))
         else:
             _, captions, _, _, _, img_b64 = vec[:6]
             caption = random.sample(captions.split("|"), 1)[0].replace("\1", "")
@@ -135,7 +142,7 @@ class TextImagePair(IterableDataset):
             for i in file_ids:
                 filename = filenames[i].strip("\n")
                 with gzip.open(filename, "rb") if filename.endswith(".gz") else open(filename, "rb") as f:
-                    retry = 0
+                    # retry = 0
                     while True:
                         line = f.readline()
 
@@ -151,9 +158,9 @@ class TextImagePair(IterableDataset):
                             continue
                         data = parse_line(line, filename)
                         if data is None:
-                            retry += 1
-                            if retry > 100:
-                                break
+                            # retry += 1
+                            # if retry > 100:
+                            #     break
                             continue
                         else:
                             w, h = data["image"].size
