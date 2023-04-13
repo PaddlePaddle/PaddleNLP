@@ -306,6 +306,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             [`~models.unet_2d_condition.UNet3DConditionOutput`] if `return_dict` is True, otherwise a `tuple`. When
             returning a tuple, the first element is the sample tensor.
         """
+        # TODO junnyu, add this to support pure fp16
+        sample = sample.cast(self.dtype)
         default_overall_up_factor = 2**self.num_upsamplers
         forward_upsample_size = False
         upsample_size = None
