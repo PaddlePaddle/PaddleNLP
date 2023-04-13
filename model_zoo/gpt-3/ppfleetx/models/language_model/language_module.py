@@ -14,6 +14,7 @@
 
 import copy
 import logging
+
 import math
 import os
 
@@ -40,7 +41,6 @@ MODEL_CLASSES = {
     "GPT": (GPTTokenizer, "gpt2"),
     "GPT-cn": (GPTChineseTokenizer, "gpt-cpm-large-cn"),
 }
-
 
 def get_model_size(l, h, v, s):
     P = 0

@@ -25,6 +25,7 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+import paddle.incubate.nn.attn_bias as ab
 from paddle.autograd import PyLayer
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.meta_parallel import (
@@ -68,7 +69,6 @@ except:
     memory_efficient_attention = None
 
 from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -309,19 +309,29 @@ class MultiHeadAttention(nn.Layer):
         return out, weights
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
+        perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
+        q_temp = tensor.transpose(x=q, perm=perm)
+        k_temp = tensor.transpose(x=k, perm=perm)
+        product = paddle.matmul(x=q_temp, y=k_temp, transpose_y=True)
+        
         if self.sequence_parallel:
             perm = [1, 0, 2, 3]
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        scale_qk_coeff = self.scale_qk_coeff * self.head_dim**0.5
+            
+        if attn_mask is None:
+            attn_mask = get_triangle_upper_mask(product, attn_mask)
+            attn_mask.stop_gradient = False
+            # attn_mask = ab.LowerTriangularMask()
+            
         out = memory_efficient_attention(
             q, 
             k, 
             v, 
             attn_mask, 
             self.dropout, 
-            1.0 / scale_qk_coeff, 
+            -1.0, 
             self.training
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
@@ -335,11 +345,11 @@ class MultiHeadAttention(nn.Layer):
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
-
+        
         # scale dot product attention
         scale_qk_coeff = self.scale_qk_coeff * self.head_dim**0.5
         product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
-
+        
         if self.scale_qk_coeff != 1.0:
             product = product.scale(self.scale_qk_coeff)
 
@@ -394,13 +404,27 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self._memory_efficient_attention
         else:
             attn_func = self.core_attn
-        
 
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
             attn_outs = recompute(attn_func, q, k, v, attn_mask)
+            # paddle.seed(1024)
+            # weights_1 = F.dropout(q, self.dropout, training=self.training, mode="upscale_in_train")
+            # weights_2 = F.dropout(q, self.dropout, training=self.training, mode="upscale_in_train")
+            
+            attn_outs_mea = recompute(self._memory_efficient_attention, q, k, v, attn_mask)
+            attn_outs_ca = recompute(self.core_attn, q, k, v, attn_mask)
+            diff = attn_outs_mea - attn_outs_ca[0]
+            # diff_drop=weights_1-weights_2
+            # print(f"diff between two dropout: {np.max(np.abs(diff_drop.numpy()))}")
         else:
             attn_outs = attn_func(q, k, v, attn_mask=attn_mask)
-            
+            # attn_outs_mea = self._memory_efficient_attention(q, k, v, attn_mask=attn_mask)
+            # attn_outs_ca = self.core_attn(q, k, v, attn_mask=attn_mask)
+            # diff = attn_outs_mea - attn_outs_ca[0]
+        
+        print(f"diff between mea and attn: {np.max(np.abs(diff.numpy()))}")
+        # assert False
+        
         if self.need_weights:
             assert(not self.use_memory_attn, "the output of memory attn doesn't have weights")
             
@@ -1616,7 +1640,6 @@ def get_triangle_upper_mask(x, mask):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
-
 
 class ConcatSoftmaxInput(PyLayer):
     @staticmethod

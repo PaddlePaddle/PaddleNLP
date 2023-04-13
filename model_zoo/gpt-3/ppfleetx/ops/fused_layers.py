@@ -61,6 +61,7 @@ class FastLayerNorm(OriginLayerNorm):
         check_normalized_shape(self._normalized_shape)
 
     def forward(self, input):
+        print("<<<<<<<<<<<< run into fast ln")
         return fast_ln(input, self.weight, self.bias, self._epsilon)[0]
 
 

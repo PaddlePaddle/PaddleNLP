@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import sys
+from distutils.util import strtobool
 
 import paddle
 import paddle.distributed as dist
@@ -54,6 +55,37 @@ if __name__ == "__main__":
 
     train_data_loader = build_dataloader(cfg.Data, "Train")
     eval_data_loader = build_dataloader(cfg.Data, "Eval")
+
+    load_torch_random_175B_ckpt = os.getenv("load_torch_random_175B_ckpt", False)
+    mp_rank = env.get_hcg().get_model_parallel_rank() if env.get_hcg() is not None else 0
+    pp_rank = env.get_hcg().get_stage_id() if env.get_hcg() is not None else 0
+
+    # hack code for loading part-1
+    load_torch_random_175B_ckpt = False
+    if load_torch_random_175B_ckpt:
+        from load_t2p import trans_model_for_non_pp, trans_model_for_pp
+        import torch
+
+        dir_path = '/root/paddlejob/workspace/env_run/gpt_benchmark/dev_xys/Megatron-LM/random_init_torch_ckpt_175b_188/{}'
+        file_name = 'mp_rank{}_pp_rank{}.bin'.format(mp_rank, pp_rank)
+
+        # Load the checkpoints.
+        model_checkpoint_name = dir_path.format(file_name)
+        optim_checkpoint_name = model_checkpoint_name
+
+        print("model_checkpoint_name :", model_checkpoint_name)
+        torch_state = torch.load(model_checkpoint_name, map_location='cpu')
+
+        # Load model weights.
+        if cfg.Distributed.pp_degree > 1:
+            paddle_state = trans_model_for_pp(torch_state, pp_rank, cfg.Distributed.pp_degree, cfg['Model']['num_layers'], cfg['Model']['max_position_embeddings'], cfg['Model']['hidden_size'])
+        else:
+            paddle_state = trans_model_for_non_pp(torch_state, cfg['Model']['num_layers'])
+
+        missing_keys, unexpected_keys = module.set_state_dict(
+            paddle_state)
+
+        assert len(missing_keys) == 0 and len(unexpected_keys) == 0, "mp_rank : {}.    pp_rank : {}".format(mp_rank, pp_rank)
 
     cfg.Optimizer.lr.update(
         {
