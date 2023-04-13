@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
@@ -863,10 +864,9 @@ class BertLMPredictionHead(Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder.weight.dtype, is_bias=True
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -876,7 +876,7 @@ class BertLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
