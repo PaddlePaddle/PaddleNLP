@@ -21,6 +21,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.fluid.dygraph.base import in_declarative_mode
 
+from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -745,10 +746,9 @@ class ErnieLMPredictionHead(nn.Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
-        self.decoder_bias = self.create_parameter(
-            [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -758,7 +758,8 @@ class ErnieLMPredictionHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
+        # hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 

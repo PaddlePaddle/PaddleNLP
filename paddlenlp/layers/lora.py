@@ -19,7 +19,7 @@ import re
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
 from functools import partial
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import paddle
 import paddle.nn as nn
@@ -594,6 +594,13 @@ class LoRAConfig:
 
 
 class LoRAModel(nn.Layer):
+    restore_layer_map: Dict[nn.Layer, nn.Layer] = {
+        LoRALinear: nn.Linear,
+        LoRAMergedLinear: nn.Linear,
+        ColumnParallelLoRALinear: ColumnParallelLinear,
+        ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+    }
+
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
@@ -629,53 +636,58 @@ class LoRAModel(nn.Layer):
             logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
         return lora_model
 
+    def _merge_trainable_tensor_parallel(self):
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=False,
+            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
+            num_attention_heads=self.model.config.num_attention_heads,
+        )
+        trainable_state_dict = self.get_trainable_state_dict()
+        trainable_name_action_mappings = {}
+        for k in trainable_state_dict:
+            if "lora_B" in k:
+                trainable_name_action_mappings[k] = partial(fn, is_column=False)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+        state_keys_map = ConversionMixin._resolve_prefix_keys(
+            name_action_mappings.keys(), self.model.state_dict().keys()
+        )
+        for k, v in state_keys_map.items():
+            if v in trainable_state_dict:
+                trainable_name_action_mappings[v] = name_action_mappings[k]
+
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        is_dst = paddle.distributed.get_rank(mp_group) == 0
+
+        for key in trainable_state_dict:
+            tensor = trainable_state_dict[key]
+            if key in trainable_name_action_mappings:
+                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                action = trainable_name_action_mappings[key]
+                tensor = action(ret) if is_dst else None
+                trainable_state_dict[key] = tensor
+            else:
+                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+
+        if self.model.config.tensor_parallel_rank != 0:
+            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+            return
+        self.lora_config.tensor_parallel_degree = 1
+        return trainable_state_dict
+
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False):
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
         lora_weight_name = LORA_WEIGHT_FILE_NAME
-        trainable_state_dict = self.get_trainable_state_dict()
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
-            from paddlenlp.transformers.conversion_utils import split_or_merge_func
-
-            fn = split_or_merge_func(
-                is_split=False,
-                tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-                tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-                num_attention_heads=self.model.config.num_attention_heads,
-            )
-            trainable_name_action_mappings = {}
-            for k in trainable_state_dict:
-                if "lora_B" in k:
-                    trainable_name_action_mappings[k] = partial(fn, is_column=False)
-            name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
-            state_keys_map = ConversionMixin._resolve_prefix_keys(
-                name_action_mappings.keys(), self.model.state_dict().keys()
-            )
-            for k, v in state_keys_map.items():
-                if v in trainable_state_dict:
-                    trainable_name_action_mappings[v] = name_action_mappings[k]
-
-            hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-            mp_group = hcg.get_model_parallel_group()
-            is_dst = paddle.distributed.get_rank(mp_group) == 0
-
-            for key in trainable_state_dict:
-                tensor = trainable_state_dict[key]
-                if key in trainable_name_action_mappings:
-                    ret = distributed_gather(tensor, group=mp_group, offload=True)
-                    action = trainable_name_action_mappings[key]
-                    tensor = action(ret) if is_dst else None
-                    trainable_state_dict[key] = tensor
-                else:
-                    trainable_state_dict[key] = tensor.numpy() if is_dst else None
-
-            if self.model.config.tensor_parallel_rank != 0:
-                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                return
-            self.lora_config.tensor_parallel_degree = 1
+            trainable_state_dict = self._merge_trainable_tensor_parallel()
         else:
+            trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
                 lora_weight_name = _add_variant(
                     LORA_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
@@ -744,6 +756,19 @@ class LoRAModel(nn.Layer):
         if module.bias is not None:
             lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)
+
+    def _find_and_restore_module(self, module_name):
+        parent_module = self.model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        module = getattr(parent_module, attribute_chain[-1])
+        original_model_class = self.restore_layer_map[module.__class__]
+        original_module = original_model_class(in_features=module.weight.shape[0], out_features=module.weight.shape[1])
+        original_module.weight = module.weight
+        if module.bias is not None:
+            original_module.bias = module.bias
+        setattr(parent_module, attribute_chain[-1], original_module)
 
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
@@ -836,6 +861,21 @@ class LoRAModel(nn.Layer):
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
         return model
+
+    def restore_original_model(self):
+        # make sure W and lora weights are not merged before we restore the original model
+        if self.lora_config.merge_weights:
+            self.model.train()
+
+        for layer_name, layer in self.model.named_sublayers():
+            if (
+                isinstance(layer, LoRALinear)
+                or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAMergedLinear)
+                or isinstance(layer, ColumnParallelLoRAMergedLinear)
+            ):
+                self._find_and_restore_module(layer_name)
+        return self.model
 
     def __getattr__(self, name: str):
         """Forward missing attributes to the wrapped module."""
