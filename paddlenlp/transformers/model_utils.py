@@ -1543,17 +1543,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if dtype is None:
             dtype = config.dtype
 
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-
-        if dtype:
-            init_contexts.append(dtype_guard(dtype))
-
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
