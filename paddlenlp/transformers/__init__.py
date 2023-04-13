@@ -107,6 +107,9 @@ from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .llama.configuration import *
+from .llama.modeling import *
+from .llama.tokenizer import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
@@ -116,6 +119,7 @@ from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .luke.modeling import *
 from .luke.tokenizer import *
+from .luke.configuration import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .mbart.configuration import *

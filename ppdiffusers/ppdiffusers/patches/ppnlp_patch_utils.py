@@ -24,7 +24,7 @@ from collections import OrderedDict
 from types import FunctionType, MethodType
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .utils import (
+from ..utils import (
     DIFFUSERS_CACHE,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
@@ -58,6 +58,14 @@ def copy_func(f):
     return fn
 
 
+class _clsmethod:
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, _, f_cls):
+        return MethodType(self.f, f_cls)
+
+
 # copied from https://github.com/fastai/fastcore/blob/c9b4c088d3706569c076e7c197c724730be190ab/fastcore/basics.py#L938-L954
 def patch_to(cls, as_prop=False, cls_method=False):
     "Decorator: add `f` to `cls`"
@@ -73,7 +81,8 @@ def patch_to(cls, as_prop=False, cls_method=False):
                 setattr(nf, o, getattr(f, o))
             nf.__qualname__ = f"{c_.__name__}.{nm}"
             if cls_method:
-                setattr(c_, nm, MethodType(nf, c_))
+                # fix https://github.com/fastai/fastcore/issues/510
+                setattr(c_, nm, _clsmethod(nf))
             else:
                 setattr(c_, nm, property(nf) if as_prop else nf)
         # Avoid clobbering existing functions
@@ -86,40 +95,39 @@ if is_paddle_available():
     import paddle
     import paddle.nn as nn
 
-    paddle.long = paddle.int64
-    paddle.int = paddle.int32
-    paddle.double = paddle.float64
-    paddle.half = paddle.float16
-    paddle.from_numpy = paddle.to_tensor
-    paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
-    paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
-    paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
-    paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
-    paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
-    paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
-    paddle.Tensor.bfloat16 = lambda x: paddle.cast(x, paddle.bfloat16)
-    paddle.Tensor.clamp = paddle.clip
-    paddle.clamp = paddle.clip
+    # paddle.long = paddle.int64
+    # paddle.int = paddle.int32
+    # paddle.double = paddle.float64
+    # paddle.half = paddle.float16
+    # paddle.Tensor.half = lambda x: paddle.cast(x, paddle.float16)
+    # paddle.Tensor.float = lambda x: paddle.cast(x, paddle.float32)
+    # paddle.Tensor.double = lambda x: paddle.cast(x, paddle.float64)
+    # paddle.Tensor.int = lambda x: paddle.cast(x, paddle.int32)
+    # paddle.Tensor.long = lambda x: paddle.cast(x, paddle.int64)
+    # paddle.Tensor.bool = lambda x: paddle.cast(x, paddle.bool)
+    # paddle.Tensor.clamp = paddle.clip
+    # paddle.clamp = paddle.clip
 
     def view_pt(x, *shape: builtins.int, name=None):
         return paddle.reshape(x, shape=shape, name=name)
 
     paddle.view = view_pt
     paddle.Tensor.view = view_pt
-    setattr(paddle.Tensor, "data", property(lambda x: x))
-    paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
+
+    if not hasattr(paddle.Tensor, "data_ptr"):
+        paddle.Tensor.data_ptr = lambda x: x.value().get_tensor()._ptr()
 
     def permute_pt(x, *perm: builtins.int, name=None):
         return paddle.transpose(x, perm=perm, name=name)
 
     paddle.permute = permute_pt
     paddle.Tensor.permute = permute_pt
-    paddle.cat = paddle.concat
     paddle.Tensor.softmax = nn.functional.softmax
 
     # patch repeat_interleave
     raw_repeat_interleave = paddle.repeat_interleave
 
+    @paddle.jit.not_to_static
     def repeat_interleave(x, repeats, axis=None, name=None):
         fp16 = False
         if x.dtype == paddle.float16:
@@ -138,6 +146,7 @@ if is_paddle_available():
     # patch max
     raw_max = paddle.max
 
+    @paddle.jit.not_to_static
     def max(x, axis=None, keepdim=False, name=None):
         fp16 = False
         if x.dtype == paddle.float16:
@@ -156,6 +165,7 @@ if is_paddle_available():
     # patch gather_nd support bfloat16
     raw_gather_nd = paddle.gather_nd
 
+    @paddle.jit.not_to_static
     def gather_nd(x, index, name=None):
         bfp16 = False
         if x.dtype == paddle.bfloat16:
@@ -170,17 +180,9 @@ if is_paddle_available():
 
     paddle.gather_nd = gather_nd
     paddle.Tensor.gather_nd = gather_nd
-
-    def size_pt(self, i=None):
-        if i is None:
-            return self.shape
-        return self.shape[i]
-
-    paddle.Tensor.size = size_pt
     paddle.Tensor.contiguous = lambda x: x
 
     # must return self!
-    @patch_to(nn.Layer)
     def eval(self):
         # Layer-level setting
         self.training = False
@@ -188,12 +190,15 @@ if is_paddle_available():
             layer.training = False
         return self
 
-    @patch_to(nn)
+    nn.Layer.eval = eval
+
     def Parameter(data: paddle.Tensor, requires_grad=True):
         tensor = paddle.create_parameter(data.shape, dtype=data.dtype, default_initializer=nn.initializer.Assign(data))
         if not requires_grad:
             tensor.stop_gradient = True
         return tensor
+
+    nn.Parameter = Parameter
 
     @contextlib.contextmanager
     def device_scope(device="cpu"):
@@ -207,7 +212,6 @@ if is_paddle_available():
 
     paddle.device_scope = device_scope
 
-    @patch_to(nn.Layer)
     def get_sublayer(self, target: str):
         if target == "":
             return self
@@ -224,6 +228,8 @@ if is_paddle_available():
             if not isinstance(mod, nn.Layer):
                 raise AttributeError("`" + item + "` is not " "an nn.Layer")
         return mod
+
+    nn.Layer.get_sublayer = get_sublayer
 
     class _WrappedHook:
         def __init__(self, hook: Callable, module: Optional["nn.Layer"] = None):
@@ -265,30 +271,31 @@ if is_paddle_available():
     except ImportError:
         from paddle.fluid.dygraph.layers import HookRemoveHelper
 
-    @patch_to(nn.Layer)
     def register_load_state_dict_pre_hook(self, hook, with_module=False):
         handle = HookRemoveHelper(self.load_state_dict_pre_hooks)
         self.load_state_dict_pre_hooks[handle._hook_id] = _WrappedHook(hook, self if with_module else None)
         return handle
 
+    nn.Layer.register_load_state_dict_pre_hook = register_load_state_dict_pre_hook
+
     raw_set_state_dict = nn.Layer.set_state_dict
 
-    @patch_to(nn.Layer)
     def set_state_dict(self, state_dict, use_structured_name: bool = True):
         for hook in self.load_state_dict_pre_hooks.values():
             hook(state_dict)
         return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
 
+    nn.Layer.set_state_dict = set_state_dict
     nn.Layer.load_dict = nn.Layer.set_state_dict
     nn.Layer.set_dict = nn.Layer.set_state_dict
 
     raw_init = nn.Layer.__init__
 
-    @patch_to(nn.Layer)
     def __init__(self, name_scope=None, dtype="float32"):
         raw_init(self, name_scope=name_scope, dtype=dtype)
         self.load_state_dict_pre_hooks = OrderedDict()
 
+    nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
     # set logger level warning
@@ -592,10 +599,9 @@ if is_paddle_available() and is_paddlenlp_available():
     # patch BertModel forward
     from paddlenlp.transformers import BertModel
 
-    raw_forward = BertModel.forward
+    BertModel.raw_forward = BertModel.forward
 
-    @patch_to(BertModel)
-    def forward(
+    def forward_new(
         self,
         input_ids: paddle.Tensor,
         token_type_ids: Optional[paddle.Tensor] = None,
@@ -609,24 +615,25 @@ if is_paddle_available() and is_paddlenlp_available():
     ):
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
-        return raw_forward(
-            self,
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            past_key_values,
-            use_cache,
-            output_hidden_states,
-            output_attentions,
-            return_dict,
+        return self.raw_forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
         )
+
+    BertModel.forward = forward_new
 
     TRANSFORMERS_SAFE_WEIGHTS_NAME = "model.safetensors"
     TRANSFORMERS_WEIGHTS_NAME = "pytorch_model.bin"
 
     # patch from_pretrained and save_pretrained
-    def from_pretrained_v3(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
+    def from_pretrained_v3(cls, pretrained_model_name_or_path, *args, from_hf_hub: bool = False, **kwargs):
         cache_dir = (
             kwargs.pop("cache_dir", DIFFUSERS_CACHE) if from_hf_hub else kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         )
@@ -640,6 +647,8 @@ if is_paddle_available() and is_paddlenlp_available():
         use_auth_token = kwargs.pop("use_auth_token", None)
         revision = kwargs.pop("revision", None)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
+        # do not use paddlenlp dtype
+        kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", None)
         variant = kwargs.pop("variant", None)
 
@@ -659,7 +668,11 @@ if is_paddle_available() and is_paddlenlp_available():
                     kwargs["subfolder"] = subfolder
             else:
                 if subfolder is not None:
-                    config_path = os.path.join(config_path, subfolder)
+                    config_path = (
+                        os.path.join(config_path, subfolder)
+                        if os.path.isdir(config_path)
+                        else "/".join([config_path, subfolder])
+                    )
 
             config = cls.config_class.from_pretrained(
                 config_path,
@@ -670,6 +683,10 @@ if is_paddle_available() and is_paddlenlp_available():
                 **kwargs,
             )
         assert config is not None
+
+        # we will remove in the future.
+        if not from_hf_hub and not os.path.exists(os.path.join(cache_dir, config_path, "config.json")):
+            config.save_pretrained(os.path.join(cache_dir, config_path))
 
         model = cls(config)
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
@@ -818,13 +835,29 @@ if is_paddle_available() and is_paddlenlp_available():
     raw_save_pretrained = PretrainedModel.save_pretrained
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, paddle_dtype=None, **kwargs
+    ):
         if cls.constructed_from_pretrained_config() and hasattr(cls, "smart_convert"):
             return from_pretrained_v3(
-                cls, pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
+                cls,
+                pretrained_model_name_or_path,
+                *args,
+                from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
+                paddle_dtype=paddle_dtype,
+                **kwargs,
             )
+
+        dtype = kwargs.pop("dtype", paddle_dtype)
         return raw_from_pretrained(
-            cls, pretrained_model_name_or_path, *args, from_hf_hub=from_hf_hub, subfolder=subfolder, **kwargs
+            cls,
+            pretrained_model_name_or_path,
+            *args,
+            from_hf_hub=from_hf_hub,
+            subfolder=subfolder,
+            dtype=dtype,
+            **kwargs,
         )
 
     PretrainedModel.from_pretrained = from_pretrained
@@ -847,10 +880,10 @@ if is_paddle_available() and is_paddlenlp_available():
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
-        from .models.modeling_pytorch_paddle_utils import (
+        from ..models.modeling_pytorch_paddle_utils import (
             convert_paddle_state_dict_to_pytorch,
         )
-        from .models.modeling_utils import convert_state_dict
+        from ..models.modeling_utils import convert_state_dict
 
         if to_diffusers is None:
             to_diffusers = TO_DIFFUSERS
@@ -942,16 +975,16 @@ if is_paddle_available() and is_paddlenlp_available():
     )
 
     # logger.set_level("WARNING")
-    from .models.modeling_pytorch_paddle_utils import (
+    from ..models.modeling_pytorch_paddle_utils import (
         convert_pytorch_state_dict_to_paddle,
     )
-    from .pipelines.alt_diffusion.modeling_roberta_series import (
+    from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
     )
-    from .pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
-    from .pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
-    from .pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-    from .pipelines.stable_diffusion_safe.safety_checker import (
+    from ..pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
+    from ..pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
+    from ..pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+    from ..pipelines.stable_diffusion_safe.safety_checker import (
         SafeStableDiffusionSafetyChecker,
     )
 

@@ -22,8 +22,6 @@ import numpy as np
 import paddle
 import torch
 
-# from paddlenlp.utils import load_torch
-
 """
 Convert weights to paddle, will output `model_state.pdparams`:
 

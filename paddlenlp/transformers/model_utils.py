@@ -396,7 +396,6 @@ def register_base_model(cls):
 
 class BackboneMixin:
     def forward_with_filtered_kwargs(self, *args, **kwargs):
-
         signature = dict(inspect.signature(self.forward).parameters)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
@@ -507,31 +506,37 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-    def __getattr__(self, name):
+        # only execute when it's the base method
+        if self.init_weights is PretrainedModel.init_weights:
+            self.init_weights()
+
+    def _init_weights(self, layer):
         """
-        called when the attribute name is missed in the model
-
-        Args:
-            name: the name of attribute
-
-        Returns: the value of attribute
-
+        Initialize the weights. This method should be overridden by derived class.
         """
-        try:
-            return super(PretrainedModel, self).__getattr__(name)
-        except AttributeError:
-            result = getattr(self.config, name)
-            if getattr(self, "deprecated_warnings", None) is None:
-                self.deprecated_warnings = {}
+        pass
 
-            if not self.deprecated_warnings.get(name, False):
-                logger.warning(
-                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-                    f"Instead, do `model.config.{name}`"
-                )
-                self.deprecated_warnings[name] = True
+    def _initialize_weights(self, layer):
+        """
+        Initialize the weights if they are not already initialized.
+        """
+        if getattr(layer, "_is_initialized", False):
+            return
+        self._init_weights(layer)
+        layer._is_initialized = True
 
-            return result
+    def init_weights(self):
+        """
+        If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
+        initialization logic in `_init_weights`.
+        """
+        if _init_weights:
+            # Initialize weights
+            self.apply(self._initialize_weights)
+
+            # Tie weights should be skipped when not initializing all weights
+            # since from_pretrained(...) calls tie weights anyways
+            self.tie_weights()
 
     @property
     def base_model(self):
@@ -590,6 +595,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             Optional[Embedding]: the otuput embedding of model
         """
         return None
+
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        if self.config.tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            input_embeddings = self.get_input_embeddings()
+            if output_embeddings is not None and input_embeddings is not None:
+                if input_embeddings.weight.shape == output_embeddings.weight.shape:
+                    output_embeddings.weight = input_embeddings.weight
+                else:
+                    raise ValueError(
+                        "when tie input/output embeddings, the shape of output embeddings: {}"
+                        "should be equal to shape of input embeddings: {}".format(
+                            input_embeddings.weight.shape, output_embeddings.weight.shape
+                        )
+                    )
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
@@ -862,7 +885,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
                 if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
@@ -1042,9 +1064,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if dtype not in ["float32", "float16"]:
                 raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray):
+                if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
-                else:
+                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                     state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:
             dtype_prefix_len = len("paddle.")
@@ -1136,19 +1158,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
-        dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1164,8 +1175,39 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
+
+        dtype = kwargs.pop("dtype", config.dtype)
+
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+
+        # Fix me for loading dtype paddle.int64 but cast paddle.float32
+        # if dtype is None, use config.dtype instead
+        if dtype is None and config.dtype is not None:
+            dtype = config.dtype
+
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
+
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
+
+        # PretrainedConfig auto contains dtype field
+        dtype = kwargs.pop("dtype", config.get("dtype", None))
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+            if dtype:
+                init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT

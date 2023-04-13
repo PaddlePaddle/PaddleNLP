@@ -259,12 +259,10 @@ class AlbertLayerGroup(Layer):
     def forward(
         self, hidden_states, attention_mask=None, head_mask=None, output_attentions=False, output_hidden_states=False
     ):
-
         layer_attentions = () if output_attentions else None
         all_hidden_states = (hidden_states,) if output_hidden_states else None
 
         for layer_index, albert_layer in enumerate(self.albert_layers):
-
             layer_output = albert_layer(
                 hidden_states,
                 attention_mask,
@@ -761,7 +759,8 @@ class AlbertMLMHead(Layer):
             [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
         )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-        self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
+        self.decoder = nn.Linear(config.vocab_size, config.embedding_size)
+
         self.activation = ACT2FN[config.hidden_act]
 
         # link bias
@@ -771,8 +770,7 @@ class AlbertMLMHead(Layer):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = self.decoder(hidden_states)
-
+        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
         prediction_scores = hidden_states
         return prediction_scores
 
@@ -806,6 +804,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         self.predictions = AlbertMLMHead(config)
         self.config = config
         self.init_weights()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.predictions.decoder
