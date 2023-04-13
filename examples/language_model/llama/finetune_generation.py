@@ -21,8 +21,7 @@ from data import DataCollatorForSupervisedDataset, convert_example
 from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
-from paddlenlp.layers.lora import print_trainable_parameters
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -52,7 +51,7 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -90,12 +89,20 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    # Set the dtype for loading model
+    dtype = "float32"
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
     # Load the pretrained language model.
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        # dtype="float16",  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=True,
@@ -104,13 +111,13 @@ def main():
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=2,
-            lora_alpha=4,
+            r=4,
+            lora_alpha=8,
             merge_weights=False,
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
-        print_trainable_parameters(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer.pad_token = tokenizer.unk_token
@@ -157,9 +164,12 @@ def main():
         data_collator=collate_fn,
     )
 
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
+
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()

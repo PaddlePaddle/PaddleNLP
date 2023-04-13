@@ -145,7 +145,7 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         train_loader = DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
-            num_workers=4,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
+            num_workers=args.num_workers,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
         )
 
         self.num_batch = len(train_loader)
