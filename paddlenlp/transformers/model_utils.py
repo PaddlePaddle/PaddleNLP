@@ -1523,6 +1523,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        dtype = kwargs.pop("dtype", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1539,29 +1540,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 **kwargs,
             )
 
-        dtype = kwargs.pop("dtype", config.dtype)
-
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-
-        # Fix me for loading dtype paddle.int64 but cast paddle.float32
-        # if dtype is None, use config.dtype instead
-        if dtype is None and config.dtype is not None:
+        if dtype is None:
             dtype = config.dtype
-
-        if dtype:
-            init_contexts.append(dtype_guard(dtype))
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
-        # PretrainedConfig auto contains dtype field
-        dtype = kwargs.pop("dtype", config.get("dtype", None))
         init_contexts = []
         if low_cpu_mem_usage:
             load_state_as_np = True
@@ -1569,8 +1553,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
+
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
