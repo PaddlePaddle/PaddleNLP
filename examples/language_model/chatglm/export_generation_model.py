@@ -66,6 +66,8 @@ def main():
         1.0,
         # repetition_penalty
         1,
+        # num_beams
+        1,
         # num_beam_groups
         1,
         # length_penalty
@@ -91,7 +93,7 @@ def main():
         # diversity_rate
         0.0,
         # use_cache
-        False,
+        True,
     ]
     model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 

@@ -37,9 +37,7 @@ def convert_example(example, tokenizer, data_args, is_test=True):
     # dataset for evaluation
     if is_test:
         inputs = {
-            "input_ids": tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length")[
-                "input_ids"
-            ],
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
             "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
                 "input_ids"
             ],
@@ -47,7 +45,7 @@ def convert_example(example, tokenizer, data_args, is_test=True):
     # dataset for training
     else:
         src_ids = tokenizer.encode(prompt, add_special_tokens=False).input_ids
-        tgt_ids = tokenizer.encode(prompt, add_special_tokens=False).input_ids
+        tgt_ids = tokenizer.encode(response, add_special_tokens=False).input_ids
 
         if len(src_ids) > data_args.src_length - 1:
             src_ids = src_ids[: data_args.src_length - 1]

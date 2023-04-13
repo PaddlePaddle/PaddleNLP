@@ -22,7 +22,7 @@ from modeling import ChatGLMForConditionalGeneration
 from tokenizer import ChatGLMTokenizer
 from utils import ChatGLMTrainer
 
-from paddlenlp.data import DefaultDataCollator
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
@@ -95,7 +95,9 @@ def main():
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     test_ds = dev_ds.map(trans_func)
 
-    collate_fn = DefaultDataCollator()
+    collate_fn = DataCollatorWithPadding(
+        tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding="max_length"
+    )
 
     def compute_metrics(eval_preds):
         rouge1 = Rouge1()
