@@ -28,7 +28,10 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast, ModelOutput
+from paddlenlp.transformers.model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithPast,
+)
 from paddlenlp.utils.env import CONFIG_NAME
 from paddlenlp.utils.log import logger
 
@@ -91,10 +94,11 @@ class PrefixEncoder(nn.Layer):
 
 
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000, dtype=paddle.float16, learnable=False):
+    def __init__(self, hidden_size, base=10000.0, learnable=False):
         super().__init__()
+        self.dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(dtype)
+        inv_freq = inv_freq.astype(self.dtype)
         self.learnable = learnable
         if learnable:
             self.inv_freq = nn.Parameter(inv_freq)
@@ -104,7 +108,6 @@ class RotaryEmbeddings(nn.Layer):
             self.max_seq_len_cached = None
             self.cos_cached = None
             self.sin_cached = None
-        self.dtype = dtype
 
     def forward(self, x, seq_dim=1, seq_len=None):
         if seq_len is None:
@@ -115,12 +118,11 @@ class RotaryEmbeddings(nn.Layer):
         # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
         #    self.max_seq_len_cached = None if self.learnable else seq_len
         # [s]
-        t = paddle.arange(seq_len).astype(self.inv_freq.dtype)
+        t = paddle.arange(seq_len)
         # [s, h/n/2]
-        last_dtype = t.dtype  # TODO: Failed for fp16 when converting to static graph.
+        # TODO: Failed for fp16 when converting to static graph.
         freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
-        if freqs.dtype != last_dtype:
-            freqs = freqs.astype(last_dtype)
+        freqs = freqs.astype(self.dtype)
         # [s, h/n]
         emb = paddle.concat([freqs, freqs], axis=-1)
         if self.dtype == paddle.bfloat16:
@@ -159,13 +161,11 @@ class ChatGLMAttention(nn.Layer):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
-        embed_dtype = config.dtype if config.dtype is not None else paddle.get_default_dtype()
         self.rotary_embeddings = RotaryEmbeddings(
             self.hidden_size // (self.num_attention_heads * 2)
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
-            base=10000,
-            dtype=embed_dtype,
+            base=10000.0,
             learnable=False,
         )
         self.scale_mask_softmax = False
@@ -210,9 +210,8 @@ class ChatGLMAttention(nn.Layer):
             # [s, 1, h/n]
             cos, sin = self.rotary_embeddings(q1, seq_len=position_ids.max() + 1)
             # [s, b]
-            position_ids, block_position_ids = position_ids[:, 0, :].transpose([1, 0]), position_ids[
-                :, 1, :
-            ].transpose([1, 0])
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
 
             # [s, b, n, h/n]
             q1, k1 = self._apply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
@@ -231,7 +230,7 @@ class ChatGLMAttention(nn.Layer):
     def forward(
         self,
         hidden_states: Tensor,
-        ltor_mask: Tensor,
+        attention_mask: Tensor,
         position_ids: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
@@ -265,7 +264,10 @@ class ChatGLMAttention(nn.Layer):
         attention_scale_coeff = float(layer_id) + 1.0
         if self.attention_scale:
             # [s, b, n, h/n]
+            dtype = q_layer.dtype
+            q_layer = q_layer.astype("float32")
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+            q_layer = q_layer.astype(dtype)
 
         # [b, n, s, s]
         output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
@@ -281,17 +283,20 @@ class ChatGLMAttention(nn.Layer):
 
         if self.scale_mask_softmax:
             self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, ltor_mask)
+            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
         else:
-            if not (ltor_mask == 0).all():
-                ltor_mask = ltor_mask.astype(attention_scores.dtype)
-                attention_scores = paddle.multiply(attention_scores, 1.0 - ltor_mask)
-                attention_scores = attention_scores + (-10000.0) * ltor_mask
-            attention_scores = attention_scores.astype("float32") * attention_scale_coeff
-
+            if not (attention_mask == 0).all():
+                # attention_mask = attention_mask.astype(attention_scores.dtype)
+                # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
+                # attention_scores = attention_scores + (-10000.0) * attention_mask
+                attention_scores = paddle.where(
+                    attention_mask > 0, paddle.full_like(attention_mask, -10000.0), attention_scores
+                )
+            attention_scores = attention_scores.astype("float32")
+            attention_scores = attention_scores * attention_scale_coeff
             attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = attention_probs.astype(self.config.dtype)
-        v_layer = v_layer.astype(self.config.dtype)
+            attention_probs = attention_probs.astype(self.config.dtype)
+            v_layer = v_layer.astype(self.config.dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
@@ -327,14 +332,13 @@ class ChatGLMBlock(nn.Layer):
         self.layer_id = layer_id
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = ChatGLMAttention(config)
-
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.mlp = ChatGLMMLP(config)
 
     def forward(
         self,
         hidden_states: Tensor,
-        ltor_mask: Tensor,
+        attention_mask: Tensor,
         position_ids: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
@@ -344,7 +348,7 @@ class ChatGLMBlock(nn.Layer):
         # Self attention
         attention_output, cache, _ = self.attention(
             hidden_states=attention_input,
-            ltor_mask=ltor_mask,
+            attention_mask=attention_mask,
             position_ids=position_ids,
             cache=cache,
             use_cache=use_cache,
@@ -460,7 +464,7 @@ class ChatGLMStack(nn.Layer):
         self,
         layer_module: nn.Layer,
         hidden_states: Tensor,
-        ltor_mask: Tensor,
+        attention_mask: Tensor,
         position_ids: Tensor,
         use_cache: bool,
         cache: Tensor,
@@ -474,7 +478,7 @@ class ChatGLMStack(nn.Layer):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
-            ltor_mask,
+            attention_mask,
             position_ids,
             use_cache,
             cache,
@@ -488,7 +492,7 @@ class ChatGLMStack(nn.Layer):
         position_ids: Tensor,
         attention_mask: Tensor,
         inputs_embeds: Tensor = None,
-        past_key_values: Optional[Tensor] = None,
+        cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
 
@@ -505,11 +509,11 @@ class ChatGLMStack(nn.Layer):
             inputs_embeds = self.word_embeddings(input_ids)
             inputs_embeds = inputs_embeds.transpose([1, 0, 2])
 
-        if past_key_values is None:
+        if cache is None:
             if self.config.pre_seq_len is not None:
-                past_key_values = self.get_prompt(batch_size=input_ids.shape[0], dtype=inputs_embeds.dtype)
+                cache = self.get_prompt(batch_size=input_ids.shape[0], dtype=inputs_embeds.dtype)
             else:
-                past_key_values = tuple([None] * len(self.layers))
+                cache = tuple([None] * len(self.layers))
 
         if self.config.pre_seq_len is not None and attention_mask is not None:
             prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
@@ -518,36 +522,36 @@ class ChatGLMStack(nn.Layer):
 
         hidden_states = inputs_embeds
 
-        current_key_values = [] if use_cache else None
+        current_caches = [] if use_cache else None
         if attention_mask is None:
             attention_mask = paddle.zeros([1, 1]).astype("int64")
 
         for i, layer in enumerate(self.layers):
-            cache_i = past_key_values[i]
+            cache_i = cache[i]
 
             if self.enable_recompute:
-                hidden_states, cache = self.recompute_training(
+                hidden_states, new_cache = self.recompute_training(
                     layer,
                     hidden_states=hidden_states,
-                    ltor_mask=attention_mask,
+                    attention_mask=attention_mask,
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
                 )
             else:
-                hidden_states, cache = layer(
+                hidden_states, new_cache = layer(
                     hidden_states=hidden_states,
-                    ltor_mask=attention_mask,
+                    attention_mask=attention_mask,
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
                 )
 
             if use_cache:
-                current_key_values.append(cache)
+                current_caches.append(new_cache)
 
         output = self.final_layernorm(hidden_states)
-        return (output, current_key_values)
+        return (output, current_caches)
 
 
 class ChatGLMPretrainedModel(PretrainedModel):
@@ -678,7 +682,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         input_ids: Tensor = None,
         position_ids: Tensor = None,
         attention_mask: Tensor = None,
-        past_key_values=None,
+        cache=None,
         inputs_embeds: Tensor = None,
         use_cache: bool = None,
         return_dict: bool = None,
@@ -698,19 +702,19 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        logits, hidden_layers = self.transformer(
+        logits, new_caches = self.transformer(
             input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
-            past_key_values=past_key_values,
+            cache=cache,
             use_cache=use_cache,
         )
 
         if not return_dict:
-            return (logits, hidden_layers)
+            return (logits, new_caches)
 
-        return ModelOutput(logits=logits, cache=hidden_layers)
+        return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
 
 class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
@@ -761,7 +765,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 cache = past_key_values
             return {
                 "input_ids": last_token,
-                "past_key_values": cache[-1],
+                "cache": cache[-1],
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
@@ -777,7 +781,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
             return {
                 "input_ids": input_ids,
-                "past_key_values": cache,
+                "cache": cache,
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
@@ -785,12 +789,12 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
     def update_model_kwargs_for_generation(
         self,
-        outputs: ModelOutput,
+        outputs,
         model_kwargs: Dict[str, Any],
         is_encoder_decoder: bool = False,
         standardize_cache_format: bool = False,
     ) -> Dict[str, Any]:
-        # update past_key_values
+        # update cache
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else outputs["past_key_values"]
 
         # update attention mask
@@ -818,7 +822,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         input_ids,
         position_ids=None,
         attention_mask=None,
-        past_key_values=None,
+        cache=None,
         inputs_embeds=None,
         labels=None,
         use_cache=None,
@@ -828,13 +832,13 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            past_key_values=past_key_values,
+            cache=cache,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             return_dict=return_dict,
         )
 
-        hidden_states = transformer_outputs.logits if return_dict else transformer_outputs[0]
+        hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
         if self.config.tensor_parallel_degree > 1:
             lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
@@ -848,6 +852,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             shift_logits = shift_logits.astype("float32")
             shift_labels = labels[..., 1:].reshape([-1])
             loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+            loss = loss.astype(lm_logits.dtype)
 
         if not return_dict:
             if loss is not None:
@@ -858,7 +863,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         return CausalLMOutputWithPast(
             loss=loss,
             logits=lm_logits,
-            past_key_values=transformer_outputs.cache,
+            past_key_values=transformer_outputs.past_key_values,
         )
 
     @staticmethod
