@@ -20,13 +20,13 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 import paddle
-from paddle import Tensor
+from paddle import Tensor, tensor
 from paddle.distributed.fleet.utils import recompute
+from paddle.incubate.nn.memory_efficient_attention import memory_efficient_attention
 from paddle.nn import MultiHeadAttention
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .utils import adapt_stale_fwd_patch
-
 
 def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
     """re-construct the outputs with one method which contains the simple logic
@@ -71,6 +71,29 @@ def layer_init_wrapper(func):
     return _impl
 
 
+def mea(self, query, key=None, value=None, attn_mask=None, cache=None):
+    query = self.q_proj(query)
+    query = tensor.reshape(x=query, shape=[0, 0, self.num_heads, self.head_dim])
+    #print ("run to mea >>>>>>>>>>>>>>>>>>>>")
+    if isinstance(cache, self.StaticCache):
+        # for encoder-decoder attention in inference and has cached
+        key, value = cache.k, cache.v
+        key = tensor.transpose(x=key, perm=[0, 2, 1, 3])
+        value = tensor.transpose(x=value, perm=[0, 2, 1, 3])
+    else:
+        key = self.k_proj(key)
+        value = self.v_proj(value)
+        key = tensor.reshape(x=key, shape=[0, 0, self.num_heads, self.head_dim])
+        value = tensor.reshape(x=value, shape=[0, 0, self.num_heads, self.head_dim])
+    out = memory_efficient_attention(query, key, value, attn_mask, -1.0, self.training)
+    out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+    out = self.out_proj(out)
+    outs = [out]
+    if cache is not None:
+        outs.append(cache)
+    return out if len(outs) == 1 else tuple(outs)
+
+
 def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_attentions=False):
     self.self_attn.need_weights = output_attentions
     src_mask = _convert_attention_mask(src_mask, src.dtype)
@@ -78,8 +101,12 @@ def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_
     residual = src
     if self.normalize_before:
         src = self.norm1(src)
+    
+    if self.self_attn.forward == mea:
+        attn_outputs = mea(self.self_attn, src, src, src, src_mask, cache)
+    else : 
+        attn_outputs = self.self_attn(src, src, src, src_mask, cache)
 
-    attn_outputs = self.self_attn(src, src, src, src_mask, cache)
     if isinstance(attn_outputs, tuple):
         src = attn_outputs[0]
         outputs = attn_outputs[1:]
@@ -120,8 +147,11 @@ def _transformer_decoder_layer_fwd(
     if self.normalize_before:
         tgt = self.norm1(tgt)
 
-    self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask, cache[0] if cache else None)
-    # self_attn_outputs = (tgt, attn_weights, incremental_cache) or only tgt
+    if isinstance(self.self_attn.forward, mea):
+        self_attn_outputs = mea(self.self_attn, tgt, tgt, tgt, tgt_mask, cache[0] if cache else None)
+    else : 
+        self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask, cache[0] if cache else None)
+
     if isinstance(self_attn_outputs, type(tgt)):
         tgt = self_attn_outputs
     else:
@@ -144,8 +174,11 @@ def _transformer_decoder_layer_fwd(
 
         if self.normalize_before:
             tgt = self.norm2(tgt)
+        if self.cross_attn.forward == mea:
+            cross_attn_outputs = mea(self.cross_attn, tgt, memory, memory, memory_mask, cache[1] if cache else None)
+        else :
+            cross_attn_outputs = self.self_attn(tgt, memory, memory, memory_mask, cache[1] if cache else None)
 
-        cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask, cache[1] if cache else None)
         if isinstance(cross_attn_outputs, type(tgt)):
             tgt = cross_attn_outputs
         else:
@@ -351,6 +384,8 @@ def _transformer_encoder_fwd(
         attentions=all_attentions,
     )
 
+def _emplace_memory_efficient_attention(self):
+    self.emplace_memory_efficient_attention = True
 
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd

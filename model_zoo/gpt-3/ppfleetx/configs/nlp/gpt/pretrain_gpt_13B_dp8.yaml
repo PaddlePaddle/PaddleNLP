@@ -18,9 +18,9 @@ Engine:
 
 Model:
   vocab_size: 50432
-  hidden_size: 5120
+  hidden_size: 12288
   num_layers: 40
-  num_attention_heads: 40
+  num_attention_heads: 96
   ffn_hidden_size: 
   hidden_dropout_prob: 0.1
   attention_probs_dropout_prob: 0.1

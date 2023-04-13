@@ -25,6 +25,7 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+import paddle.incubate.nn.attn_bias as ab
 from paddle.autograd import PyLayer
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.meta_parallel import (
@@ -64,7 +65,15 @@ try:
 except:
     FusedDropoutAdd = None
 FusedDropoutAdd = None
+    
+try:
+    from paddle.incubate.nn.memory_efficient_attention import (
+    memory_efficient_attention,
+)
+except:
+    memory_efficient_attention = None
 
+from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -124,6 +133,7 @@ class MultiHeadAttention(nn.Layer):
         sequence_parallel=False,
         do_recompute=True,
         use_flash_attn=False,
+        use_memory_attn=False,
     ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -139,6 +149,7 @@ class MultiHeadAttention(nn.Layer):
         self.do_recompute = do_recompute
         self.sequence_parallel = sequence_parallel
         self.use_flash_attn = use_flash_attn if flash_attention else None
+        self.use_memory_attn = use_memory_attn if memory_efficient_attention else None
 
         if sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -302,18 +313,50 @@ class MultiHeadAttention(nn.Layer):
         if self.sequence_parallel:
             perm = [1, 0, 2]
             out = tensor.transpose(x=out, perm=perm)
-        return (out, weights) if self.need_weights else out
+        return out, weights
+    
+    def _memory_efficient_attention(self, q, k, v, attn_mask=None):
+        perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
+        q_temp = tensor.transpose(x=q, perm=perm)
+        k_temp = tensor.transpose(x=k, perm=perm)
+        product = paddle.matmul(x=q_temp, y=k_temp, transpose_y=True)
+        
+        if self.sequence_parallel:
+            perm = [1, 0, 2, 3]
+            q = tensor.transpose(x=q, perm=perm)
+            k = tensor.transpose(x=k, perm=perm)
+            v = tensor.transpose(x=v, perm=perm)
+            
+        if attn_mask is None:
+            attn_mask = get_triangle_upper_mask(product, attn_mask)
+            attn_mask.stop_gradient = False
+            # attn_mask = ab.LowerTriangularMask()
+            
+        out = memory_efficient_attention(
+            q, 
+            k, 
+            v, 
+            attn_mask, 
+            self.dropout, 
+            -1.0, 
+            self.training
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        if self.sequence_parallel:
+            perm = [1, 0, 2]
+            out = tensor.transpose(x=out, perm=perm)
+        return out
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
-
+        
         # scale dot product attention
         scale_qk_coeff = self.scale_qk_coeff * self.head_dim**0.5
         product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
-
+        
         if self.scale_qk_coeff != 1.0:
             product = product.scale(self.scale_qk_coeff)
 
@@ -356,23 +399,47 @@ class MultiHeadAttention(nn.Layer):
         # no matter sequence_parallel is true or false,
         # after reshape, q, k, v shape should be [b, num_heads/n, s, head_dim]
         # compute q ,k ,v
+                
         if self.fuse_attn_qkv:
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
-
+        
         if self.use_flash_attn and attn_mask is None:
             attn_func = self._flash_attention
+        if self.use_memory_attn and not self.need_weights:
+            attn_func = self._memory_efficient_attention
         else:
             attn_func = self.core_attn
 
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            out = recompute(attn_func, q, k, v, attn_mask)
+            attn_outs = recompute(attn_func, q, k, v, attn_mask)
+            # paddle.seed(1024)
+            # weights_1 = F.dropout(q, self.dropout, training=self.training, mode="upscale_in_train")
+            # weights_2 = F.dropout(q, self.dropout, training=self.training, mode="upscale_in_train")
+            
+            attn_outs_mea = recompute(self._memory_efficient_attention, q, k, v, attn_mask)
+            attn_outs_ca = recompute(self.core_attn, q, k, v, attn_mask)
+            diff = attn_outs_mea - attn_outs_ca[0]
+            # diff_drop=weights_1-weights_2
+            # print(f"diff between two dropout: {np.max(np.abs(diff_drop.numpy()))}")
         else:
-            out = attn_func(q, k, v, attn_mask=attn_mask)
-
+            attn_outs = attn_func(q, k, v, attn_mask=attn_mask)
+            # attn_outs_mea = self._memory_efficient_attention(q, k, v, attn_mask=attn_mask)
+            # attn_outs_ca = self.core_attn(q, k, v, attn_mask=attn_mask)
+            # diff = attn_outs_mea - attn_outs_ca[0]
+        
+        print(f"diff between mea and attn: {np.max(np.abs(diff.numpy()))}")
+        # assert False
+        
         if self.need_weights:
-            out, weights = out
+            assert(not self.use_memory_attn, "the output of memory attn doesn't have weights")
+            
+        if self.use_memory_attn:
+            out = attn_outs
+        else:
+            out = attn_outs[0]
+            weights = attn_outs[1]
 
         # project to output
         # if sequence_parallel is true, out shape are [s/n, b, h],
@@ -381,6 +448,7 @@ class MultiHeadAttention(nn.Layer):
 
         outs = [out]
         if self.need_weights:
+            assert(self.use_memory_attn, "the output of memory attn doesn't have weights")
             outs.append(weights)
         if use_cache:
             outs.append(cache)
@@ -502,6 +570,7 @@ class TransformerDecoderLayer(nn.Layer):
         do_recompute=True,
         skip_quant_tensors=[],
         use_flash_attn=False,
+        use_memory_attn=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -543,6 +612,7 @@ class TransformerDecoderLayer(nn.Layer):
             sequence_parallel=sequence_parallel,
             do_recompute=do_recompute,
             use_flash_attn=use_flash_attn,
+            use_memory_attn=use_memory_attn,
         )
 
         self.linear1 = ColumnParallelLinear(
@@ -719,6 +789,7 @@ class GPTModelHybrid(nn.Layer):
         skip_tensor_map={},
         freeze_embedding=False,
         use_flash_attn=False,
+        use_memory_attn=False,
         fused_softmax_with_triangular=False,
     ):
 
@@ -738,6 +809,13 @@ class GPTModelHybrid(nn.Layer):
                 use_flash_attn = False
                 logger.warning("Flash-attention is not support in this Paddle version.")
 
+        if use_memory_attn:
+            if memory_efficient_attention:
+                logger.info("Memory-attntion enabled.")
+            else:
+                use_memory_attn = False
+                logger.warning("Memory-attntion is not support in this Paddle version.")
+                
         hcg = env.get_hcg()
         mp_size = hcg.get_model_parallel_world_size()
         if mp_size <= 1:
@@ -786,6 +864,7 @@ class GPTModelHybrid(nn.Layer):
                     do_recompute=i not in no_recompute_layers,
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
+                    use_memory_attn=use_memory_attn,
                 )
             )
 
@@ -1022,6 +1101,7 @@ class GPTForPretrainingPipe(PipelineLayer):
         no_recompute_layers=None,
         pp_recompute_interval=1,
         use_flash_attn=False,
+        use_memory_attn=False,
         fused_softmax_with_triangular=False,
     ):
 
@@ -1041,6 +1121,13 @@ class GPTForPretrainingPipe(PipelineLayer):
                 use_flash_attn = False
                 logger.warning("Flash-attention is not support in this Paddle version.")
 
+        if use_memory_attn:
+            if memory_efficient_attention:
+                logger.info("Memory-efficient-attention enabled.")
+            else:
+                use_memory_attn = False
+                logger.warning("Memory-efficient-attention is not support in this Paddle version.")
+                
         hcg = env.get_hcg()
         mp_size = hcg.get_model_parallel_world_size()
         if mp_size <= 1:
@@ -1091,6 +1178,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                     sequence_parallel=sequence_parallel,
                     do_recompute=i not in no_recompute_layers,
                     use_flash_attn=use_flash_attn,
+                    use_memory_attn=use_memory_attn,
                 )
             )
 
@@ -1569,7 +1657,6 @@ def get_triangle_upper_mask(x, mask):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
-
 
 class ConcatSoftmaxInput(PyLayer):
     @staticmethod

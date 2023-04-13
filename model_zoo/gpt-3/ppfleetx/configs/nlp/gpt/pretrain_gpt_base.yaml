@@ -1,6 +1,6 @@
 Global:
   device: gpu
-  seed: 1024
+  seed: 1234
 
   global_batch_size: 
   local_batch_size: 1
@@ -8,7 +8,7 @@ Global:
 
 
 Engine:
-  max_steps: 500000
+  max_steps: 10000
   num_train_epochs: 1
   accumulate_steps:
   logging_freq: 1
@@ -16,14 +16,14 @@ Engine:
   eval_iters: 10
   test_iters:
   mix_precision:
-    enable: True
+    enable: False
     dtype: "float16"
     level: "O2"
     scale_loss: 32768.0
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
   save_load:
-    save_steps: 1000
+    save_steps: 1000000
     save_epoch: 1
     output_dir: ./output
     ckpt_dir:
@@ -38,6 +38,7 @@ Model:
   scale_qk_by_layer_num: True
   sequence_parallel: False
   use_flash_attn: False
+  use_memory_attn: True
   fused_softmax_with_triangular: True
 
 

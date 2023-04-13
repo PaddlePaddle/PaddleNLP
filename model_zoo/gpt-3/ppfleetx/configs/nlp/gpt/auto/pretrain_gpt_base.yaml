@@ -8,7 +8,7 @@ Global:
 
 
 Engine:
-  max_steps: 500000
+  max_steps: 10000
   num_train_epochs: 1
   eval_freq: 1
   eval_iters: 10
@@ -30,7 +30,7 @@ Model:
   module: "GPTModuleAuto"
   name: "GPT"
   fuse_attn_qkv: False
-
+  use_memory_attn: True
 
 Data:
   Train:
