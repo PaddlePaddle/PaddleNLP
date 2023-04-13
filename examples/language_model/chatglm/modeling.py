@@ -164,7 +164,7 @@ class ChatGLMAttention(nn.Layer):
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
             base=10000,
-            dtype=self.config.paddle_dtype,
+            dtype=self.config.dtype,
             learnable=False,
         )
         self.scale_mask_softmax = None
@@ -289,8 +289,8 @@ class ChatGLMAttention(nn.Layer):
             attention_scores = attention_scores.astype("float32") * attention_scale_coeff
 
             attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = attention_probs.astype(self.config.paddle_dtype)
-        v_layer = v_layer.astype(self.config.paddle_dtype)
+        attention_probs = attention_probs.astype(self.config.dtype)
+        v_layer = v_layer.astype(self.config.dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]

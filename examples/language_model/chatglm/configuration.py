@@ -102,10 +102,11 @@ class ChatGLMConfig(PretrainedConfig):
         recompute=False,
         attention_scale=True,
         activation="gelu",
-        paddle_dtype="float16",
+        dtype="float16",
         num_image_tokens=0,
         **kwargs
     ):
+        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
         self.num_hidden_layers = num_hidden_layers
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -127,6 +128,5 @@ class ChatGLMConfig(PretrainedConfig):
         self.recompute = recompute
         self.attention_scale = attention_scale
         self.activation = activation
-        self.paddle_dtype = paddle_dtype
+        self.dtype = dtype
         self.num_image_tokens = num_image_tokens
-        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
