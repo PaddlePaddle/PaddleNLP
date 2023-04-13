@@ -18,7 +18,7 @@ import os
 import re
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import paddle
 import paddle.nn as nn
@@ -590,6 +590,13 @@ class LoRAConfig:
 
 
 class LoRAModel(nn.Layer):
+    restore_layer_map: Dict[nn.Layer, nn.Layer] = {
+        LoRALinear: nn.Linear,
+        LoRAMergedLinear: nn.Linear,
+        ColumnParallelLoRALinear: ColumnParallelLinear,
+        ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+    }
+
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
@@ -678,6 +685,19 @@ class LoRAModel(nn.Layer):
         if module.bias is not None:
             lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)
+
+    def _find_and_restore_module(self, module_name):
+        parent_module = self.model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        module = getattr(parent_module, attribute_chain[-1])
+        original_model_class = self.restore_layer_map[module.__class__]
+        original_module = original_model_class(in_features=module.weight.shape[0], out_features=module.weight.shape[1])
+        original_module.weight = module.weight
+        if module.bias is not None:
+            original_module.bias = module.bias
+        setattr(parent_module, attribute_chain[-1], original_module)
 
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
@@ -770,6 +790,21 @@ class LoRAModel(nn.Layer):
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
         return model
+
+    def restore_original_model(self):
+        # make sure W and lora weights are not merged before we restore the original model
+        if self.lora_config.merge_weights:
+            self.model.train()
+
+        for layer_name, layer in self.model.named_sublayers():
+            if (
+                isinstance(layer, LoRALinear)
+                or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAMergedLinear)
+                or isinstance(layer, ColumnParallelLoRAMergedLinear)
+            ):
+                self._find_and_restore_module(layer_name)
+        return self.model
 
     def __getattr__(self, name: str):
         """Forward missing attributes to the wrapped module."""
