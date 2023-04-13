@@ -73,6 +73,7 @@ class Predictor(object):
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
             load_state_as_np=True,
+            dtype=config.paddle_dtype,
         )
 
         self.model.eval()

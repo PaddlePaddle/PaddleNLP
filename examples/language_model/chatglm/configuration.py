@@ -102,7 +102,6 @@ class ChatGLMConfig(PretrainedConfig):
         recompute=False,
         attention_scale=True,
         activation="gelu",
-        dtype="float16",
         num_image_tokens=0,
         **kwargs
     ):
@@ -128,5 +127,4 @@ class ChatGLMConfig(PretrainedConfig):
         self.recompute = recompute
         self.attention_scale = attention_scale
         self.activation = activation
-        self.dtype = dtype
         self.num_image_tokens = num_image_tokens

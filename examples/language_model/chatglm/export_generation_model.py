@@ -44,8 +44,12 @@ def parse_args():
 def main():
     args = parse_args()
 
+    paddle.set_default_dtype("float32")
+
     tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
-    model = ChatGLMForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
+    model = ChatGLMForConditionalGeneration.from_pretrained(
+        args.model_name_or_path, load_state_as_np=True, dtype="float32"
+    )
 
     model.eval()
     input_spec = [
@@ -53,7 +57,7 @@ def main():
         paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attention_mask
         paddle.static.InputSpec(shape=[None, None, None], dtype="int64"),  # position_ids
         # max_length
-        20,
+        128,
         # min_length
         0,
         # decode_strategy

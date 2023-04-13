@@ -159,15 +159,16 @@ class ChatGLMAttention(nn.Layer):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
+        embed_dtype = config.dtype if config.dtype is not None else paddle.get_default_dtype()
         self.rotary_embeddings = RotaryEmbeddings(
             self.hidden_size // (self.num_attention_heads * 2)
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
             base=10000,
-            dtype=self.config.dtype,
+            dtype=embed_dtype,
             learnable=False,
         )
-        self.scale_mask_softmax = None
+        self.scale_mask_softmax = False
 
         self.attention_scale = config.attention_scale
 
@@ -790,7 +791,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         standardize_cache_format: bool = False,
     ) -> Dict[str, Any]:
         # update past_key_values
-        model_kwargs["past_key_values"] = outputs["past_key_values"] if hasattr(outputs, "past_key_values") else None
+        model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else outputs["past_key_values"]
 
         # update attention mask
         if "attention_mask" in model_kwargs:
@@ -844,6 +845,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         if labels is not None:
             shift_logits = lm_logits[..., :-1, :]
             shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
+            shift_logits = shift_logits.astype("float32")
             shift_labels = labels[..., 1:].reshape([-1])
             loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
 

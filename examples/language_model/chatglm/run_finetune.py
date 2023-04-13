@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
+from configuration import ChatGLMConfig
 from data import convert_example, read_local_dataset
 from modeling import ChatGLMForConditionalGeneration
 from tokenizer import ChatGLMTokenizer
@@ -72,10 +73,12 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    dtype = None
+    config = ChatGLMConfig.from_pretrained(model_args.model_name_or_path)
+    dtype = config.dtype
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
+    paddle.set_default_dtype(dtype)
 
     # Load the pretrained language model.
     model = ChatGLMForConditionalGeneration.from_pretrained(
