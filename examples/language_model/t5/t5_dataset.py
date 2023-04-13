@@ -19,13 +19,7 @@ import copy
 
 import numpy as np
 import paddle
-from link_to_dataset_utils import create_masked_lm_predictions, get_samples_mapping
-
-# from megatron import get_tokenizer
-# from megatron.data.dataset_utils import (
-#     create_masked_lm_predictions,
-#     get_samples_mapping
-# )
+from dataset_utils import create_masked_lm_predictions, get_samples_mapping
 
 
 class T5Dataset(paddle.io.Dataset):
@@ -72,16 +66,12 @@ class T5Dataset(paddle.io.Dataset):
             self.binary_head,
             self.share_folder,
         )
-        # print("Line70 t5dataset", self.samples_mapping)
         # Vocab stuff.
-        # print(dir(tokenizer.sp_model))
-        # print(tokenizer.get_vocab())
         self.vocab_id_list = list(tokenizer.get_vocab().values())
         self.vocab_id_to_token_dict = copy.deepcopy(
             {tokenizer.convert_tokens_to_ids(key): key for key, _ in tokenizer.get_vocab().items()}
         )
         self.vocab_token_to_id_dict = copy.deepcopy(tokenizer.get_vocab())
-        # self.vocab_id_to_token_dict = tokenizer.inv_vocab
 
         # T5 is chinese char level model, sometime is need
         # add ## chinse char to encode and decode.
@@ -97,7 +87,6 @@ class T5Dataset(paddle.io.Dataset):
         self.bos_id = tokenizer.bos_token_id
         self.eos_id = tokenizer.eos_token_id
 
-        # print(self.cls_id, self.sep_id, self.mask_id, self.pad_id, self.bos_id, self.eos_id)
         self.sentinel_tokens = tokenizer.additional_special_tokens_ids
         assert len(self.sentinel_tokens) > 0, "Provide the argument --vocab-extra-ids 100 to the script"
 
