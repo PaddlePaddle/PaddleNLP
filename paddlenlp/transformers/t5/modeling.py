@@ -690,7 +690,7 @@ class T5PretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_name_mappings(cls, config: T5Config) -> list[StateDictNameMapping]:
-        # from torch to paddle
+        # from pytorch to paddle
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["shared.weight", "shared.weight"],
@@ -795,15 +795,6 @@ class T5PretrainedModel(PretrainedModel):
                     )
 
             model_mappings.extend(layer_mappings)
-
-        if config.tensor_parallel_degree > 1:
-            tp_split_mappings = cls._get_tensor_parallel_mappings(config)
-            for mapping in model_mappings:
-                if mapping[1] in tp_split_mappings:
-                    if len(mapping) == 3:
-                        mapping[2] = tp_split_mappings[mapping[1]]
-                    else:
-                        mapping.append(tp_split_mappings[mapping[1]])
 
         if cls.__name__ != "T5Model":
             for mapping in model_mappings:
