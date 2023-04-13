@@ -1539,7 +1539,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 **kwargs,
             )
 
-        dtype = kwargs.pop("dtype", config.dtype)
+        dtype = model_kwargs.pop("dtype", config.dtype)
 
         init_contexts = []
         if low_cpu_mem_usage:
@@ -1561,7 +1561,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.save_pretrained(cache_dir)
 
         # PretrainedConfig auto contains dtype field
-        dtype = kwargs.pop("dtype", config.get("dtype", None))
+        dtype = model_kwargs.pop("dtype", config.get("dtype", None))
         init_contexts = []
         if low_cpu_mem_usage:
             load_state_as_np = True
