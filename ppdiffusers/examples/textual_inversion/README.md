@@ -12,7 +12,7 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-pip install -U ppdiffusers visualdl -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install -U ppdiffusers visualdl
 ```
 
 ### 1.2 Cat toy 训练 object 的例子

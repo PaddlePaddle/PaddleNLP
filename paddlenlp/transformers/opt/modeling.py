@@ -735,7 +735,7 @@ class OPTPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -782,8 +782,6 @@ class OPTModel(OPTPretrainedModel):
         for i in range(config.num_hidden_layers):
             decoder_layers.append(TransformerDecoderLayer(config))
         self.decoder = TransformerDecoder(config, decoder_layers)
-
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length):

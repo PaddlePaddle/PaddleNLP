@@ -191,7 +191,6 @@ python convert_diffusers_stable_diffusion_to_ppdiffusers.py --pretrained_model_n
 import torch
 from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
 pipe = DiffusersStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-pipe = pipe.to("cuda")
 seed = 1024
 generator = torch.Generator("cuda").manual_seed(seed)
 prompt = "a photo of an astronaut riding a horse on mars"
@@ -222,7 +221,6 @@ from io import BytesIO
 from diffusers import StableDiffusionImg2ImgPipeline as DiffusersStableDiffusionImg2ImgPipeline
 
 pipe = DiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-pipe = pipe.to("cuda")
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
@@ -284,7 +282,6 @@ image = download_image(img_url).resize((512, 512))
 mask_image = download_image(mask_url).resize((512, 512))
 scheduler = DiffusersEulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
 pipe = DiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
-pipe.to("cuda")
 
 prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
 seed = 1024

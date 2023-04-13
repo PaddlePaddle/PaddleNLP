@@ -64,6 +64,7 @@ class ModelArgument:
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
@@ -92,12 +93,12 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # dtype = None
-    # if training_args.fp16_opt_level == "O2":
-    #     if training_args.fp16:
-    #         dtype = "float16"
-    #     if training_args.bf16:
-    #         dtype = "bfloat16"
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
 
     # Load the pretrained language model.
     model = AutoModelForConditionalGeneration.from_pretrained(
@@ -105,8 +106,7 @@ def main():
         output_predict=True,
         parallel_output=True,
         load_state_as_np=True,
-        # low_cpu_mem_usage=True, # todo enable low_cpu_mem_usage=True
-        # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
@@ -162,6 +162,8 @@ def main():
         do_generation=True,
         data_collator=collate_fn,
     )
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)

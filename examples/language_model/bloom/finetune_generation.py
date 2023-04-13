@@ -146,12 +146,20 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
     # Load the pretrained language model.
     model = BloomForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
-        # dtype="float16",  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=training_args.recompute,
@@ -218,6 +226,9 @@ def main():
         data_collator=collate_fn,
         data_args=data_args,
     )
+
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)

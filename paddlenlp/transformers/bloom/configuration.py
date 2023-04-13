@@ -39,8 +39,21 @@ def _construct_resource_file_url(model_names: list[str], file_name: str) -> dict
 
 
 BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "bigscience/bloom",
     "bigscience/bloom-560m",
+    "bigscience/bloom-1b1",
+    "bigscience/bloom-1b3",
+    "bigscience/bloom-1b7",
+    "bigscience/bloom-3b",
+    "bigscience/bloom-7b1",
+    "bigscience/bloomz",
+    "bigscience/bloomz-mt",
     "bigscience/bloomz-560m",
+    "bigscience/bloomz-1b1",
+    "bigscience/bloomz-1b3",
+    "bigscience/bloomz-1b7",
+    "bigscience/bloomz-3b",
+    "bigscience/bloomz-7b1",
 ]
 
 BLOOM_PRETRAINED_INIT_CONFIGURATION = _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "config.json")
@@ -108,7 +121,6 @@ class BloomConfig(PretrainedConfig):
         attention_dropout=0.0,
         attention_softmax_in_fp32=True,
         pretraining_tp=1,  # TP rank used when training with megatron
-        dtype="float16",
         slow_but_exact=False,
         use_recompute=False,
         use_pure_fp16=False,
@@ -133,7 +145,6 @@ class BloomConfig(PretrainedConfig):
 
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
-        self.dtype = dtype
         self.slow_but_exact = slow_but_exact
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
