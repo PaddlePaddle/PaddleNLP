@@ -604,15 +604,37 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             output_embeddings = self.get_output_embeddings()
             input_embeddings = self.get_input_embeddings()
             if output_embeddings is not None and input_embeddings is not None:
-                if input_embeddings.weight.shape == output_embeddings.weight.shape:
-                    output_embeddings.weight = input_embeddings.weight
-                else:
-                    raise ValueError(
-                        "when tie input/output embeddings, the shape of output embeddings: {}"
-                        "should be equal to shape of input embeddings: {}".format(
-                            input_embeddings.weight.shape, output_embeddings.weight.shape
-                        )
+                if input_embeddings.weight.shape != output_embeddings.weight.shape:
+                    logger.warning(
+                        f"The shape of input embeddings is {input_embeddings.weight.shape} and the shape of output embeddings is {output_embeddings.weight.shape}. "
+                        "This is only expected if you are calling the `resize_token_embeddings` method"
                     )
+                output_embeddings.weight = input_embeddings.weight
+                if getattr(output_embeddings, "bias", None) is not None:
+                    # need to pad
+                    if output_embeddings.weight.shape[0] > output_embeddings.bias.shape[0]:
+                        old_bias = output_embeddings.bias
+                        pad_length = output_embeddings.weight.shape[0] - old_bias.shape[0]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
+                        )
+                        new_bias = paddle.concat(
+                            [old_bias, paddle.zeros([pad_length], dtype=output_embeddings.bias.dtype)]
+                        )
+                        output_embeddings.bias.set_value(new_bias)
+                    # need to trim
+                    elif output_embeddings.weight.shape[0] < output_embeddings.bias.shape[0]:
+                        new_bias = output_embeddings.bias[: output_embeddings.weight.shape[0]]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
+                        )
+                        output_embeddings.bias.set_value(new_bias)
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
@@ -741,8 +763,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # update init_config
         self._update_init_config(self.init_config, "vocab_size", new_num_tokens)
 
-        # TODO(westfish@126.com): add tie_weight.
-        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+        # Tie the weights between the input embeddings and the output embeddings if needed.
+        self.tie_weights()
 
         return new_embeddings
 
