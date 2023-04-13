@@ -693,9 +693,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 class LlamaLMHead(nn.Layer):
     def __init__(self, config):
         super(LlamaLMHead, self).__init__()
-        shard_size = config.tensor_parallel_degree if config.tensor_parallel_degree > 1 else 1
+        shard_num = config.tensor_parallel_degree if config.tensor_parallel_degree > 1 else 1
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, config.vocab_size // shard_size],
+            shape=[config.hidden_size, config.vocab_size // shard_num],
             dtype=paddle.get_default_dtype(),
         )
         self.config = config
