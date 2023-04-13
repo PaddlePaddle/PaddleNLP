@@ -133,4 +133,4 @@ with block:
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name="0.0.0.0", server_port=8225)
+block.launch(server_name="0.0.0.0", server_port=8232)
