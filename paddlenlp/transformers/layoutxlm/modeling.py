@@ -921,7 +921,7 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
                     ),
                 )
 
-            outputs = (loss,) + outputs
+            outputs = (loss,) + (outputs,)
 
         return outputs
 

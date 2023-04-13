@@ -16,9 +16,12 @@ import unittest
 
 import paddle
 from paddle import Tensor
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     LayoutXLMConfig,
+    LayoutXLMForQuestionAnswering,
+    LayoutXLMForSequenceClassification,
     LayoutXLMForTokenClassification,
     LayoutXLMModel,
     LayoutXLMPretrainedModel,
@@ -54,9 +57,9 @@ class LayoutXLMModelTester:
         initializer_range=0.02,
         pad_token_id=0,
         type_sequence_label_size=2,
-        num_labels=3,
+        num_labels=2,
         num_choices=4,
-        num_classes=3,
+        num_classes=2,
         scope=None,
     ):
         self.parent = parent
@@ -100,6 +103,8 @@ class LayoutXLMModelTester:
 
         bbox = paddle.expand(paddle.to_tensor([0, 0, 0, 0]), [self.batch_size, self.seq_length, 4])
         image = paddle.zeros([self.batch_size, 3, 224, 224])
+        start_positions = ids_tensor([self.batch_size], self.type_sequence_label_size)
+        end_positions = ids_tensor([self.batch_size], self.type_sequence_label_size)
 
         sequence_labels = None
         token_labels = None
@@ -109,7 +114,18 @@ class LayoutXLMModelTester:
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_classes)
 
         config = self.get_config()
-        return config, input_ids, position_ids, attention_mask, bbox, image, sequence_labels, token_labels
+        return (
+            config,
+            input_ids,
+            position_ids,
+            attention_mask,
+            bbox,
+            image,
+            sequence_labels,
+            token_labels,
+            start_positions,
+            end_positions,
+        )
 
     def get_config(self):
         return LayoutXLMConfig(
@@ -131,7 +147,7 @@ class LayoutXLMModelTester:
         )
 
     def prepare_config_and_inputs_for_common(self):
-        config, input_ids, position_ids, attention_mask, bbox, image, _, _ = self.prepare_config_and_inputs()
+        config, input_ids, position_ids, attention_mask, bbox, image, _, _, _, _ = self.prepare_config_and_inputs()
         inputs_dict = {
             "input_ids": input_ids,
             "position_ids": position_ids,
@@ -151,6 +167,8 @@ class LayoutXLMModelTester:
         image: Tensor,
         sequence_labels: Tensor,
         token_labels: Tensor,
+        start_positions: Tensor,
+        end_positions: Tensor,
     ):
         model = LayoutXLMModel(config)
         model.eval()
@@ -170,6 +188,8 @@ class LayoutXLMModelTester:
         image: Tensor,
         sequence_labels: Tensor,
         token_labels: Tensor,
+        start_positions: Tensor,
+        end_positions: Tensor,
     ):
         model = LayoutXLMForTokenClassification(config)
         model.eval()
@@ -189,22 +209,91 @@ class LayoutXLMModelTester:
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
+    def create_and_check_for_sequence_classification(
+        self,
+        config: LayoutXLMConfig,
+        input_ids: Tensor,
+        position_ids: Tensor,
+        attention_mask: Tensor,
+        bbox: Tensor,
+        image: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        start_positions: Tensor,
+        end_positions: Tensor,
+    ):
+        model = LayoutXLMForSequenceClassification(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            bbox=bbox,
+            image=image,
+            labels=sequence_labels,
+        )
 
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
+
+    def create_and_check_for_question_answering(
+        self,
+        config: LayoutXLMConfig,
+        input_ids: Tensor,
+        position_ids: Tensor,
+        attention_mask: Tensor,
+        bbox: Tensor,
+        image: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        start_positions: Tensor,
+        end_positions: Tensor,
+    ):
+        model = LayoutXLMForQuestionAnswering(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            bbox=bbox,
+            image=image,
+            start_positions=start_positions,
+            end_positions=end_positions,
+        )
+        if len(result) > 3:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
+            self.parent.assertEqual(result[2].shape, [self.batch_size, self.seq_length])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
+
+
+@parameterized_class(
+    ("use_labels"),
+    [
+        [False],
+        [True],
+    ],
+)
 class LayoutXLMModelModelTest(ModelTesterMixin, unittest.TestCase):
 
-    use_labels = False
+    use_labels = True
     return_dict = False
     use_test_model_name_list = False
 
     all_model_classes = (
         LayoutXLMModel,
         LayoutXLMForTokenClassification,
+        LayoutXLMForSequenceClassification,
     )
 
     def setUp(self):
         self.model_tester = LayoutXLMModelTester(self)
-
-        # set attribute in setUp to overwrite the static attribute
         self.test_resize_embeddings = False
 
     def test_model(self):
@@ -214,6 +303,14 @@ class LayoutXLMModelModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
+
+    def test_for_sequence_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
+
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_question_answering(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):

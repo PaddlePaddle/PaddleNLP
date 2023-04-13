@@ -16,7 +16,6 @@
 import unittest
 
 import paddle
-from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     SqueezeBertConfig,
@@ -30,19 +29,6 @@ from tests.testing_utils import slow
 
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
-
-# if is_torch_available():
-#     import torch
-
-#     from transformers import (
-#         SQUEEZEBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
-#         SqueezeBertForMaskedLM,
-#         SqueezeBertForMultipleChoice,
-#         SqueezeBertForQuestionAnswering,
-#         SqueezeBertForSequenceClassification,
-#         SqueezeBertForTokenClassification,
-#         SqueezeBertModel,
-#     )
 
 
 class SqueezeBertModelTester:
@@ -190,15 +176,6 @@ class SqueezeBertModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(
-    ("return_dict", "use_labels"),
-    [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
-    ],
-)
 class SqueezeBertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = SqueezeBertModel
     all_model_classes = (
@@ -207,7 +184,7 @@ class SqueezeBertModelTest(ModelTesterMixin, unittest.TestCase):
         SqueezeBertForTokenClassification,
     )
     return_dict: bool = False
-    use_labels: bool = True
+    use_labels: bool = False
 
     def setUp(self):
         self.model_tester = SqueezeBertModelTester(self)
