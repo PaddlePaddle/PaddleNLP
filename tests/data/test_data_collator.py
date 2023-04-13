@@ -21,6 +21,7 @@ import numpy as np
 import paddle
 
 from paddlenlp.data import (
+    DataCollatorForClosedDomainIE,
     DataCollatorForLanguageModeling,
     DataCollatorForTokenClassification,
     DataCollatorForWholeWordMask,
@@ -269,6 +270,37 @@ class DataCollatorIntegrationTest(unittest.TestCase):
 
         self.assertEqual(batch["input_ids"].shape, [2, 10])
         self.assertEqual(batch["labels"].shape, [2, 10])
+
+    def test_data_collator_for_closed_domain_ie(self):
+        features = [
+            {
+                "input_ids": list(range(5)),
+                "offset_mapping": [(0, 1), (2, 3), (3, 4), (4, 5), (5, 6)],
+                "text": "测试",
+                "doc_id": i,
+                "text_offset": 0,
+                "labels": {"entity_labels": [[0, 0, 1], [1, 1, 2]], "relation_labels": [[0, 1, 0, 1, 2]]},
+            }
+            for i in range(2)
+        ]
+
+        label_maps = {"entity_label2id": {"实体零": 0, "实体一": 1}, "relation_label2id": {"关系零": 0}}
+
+        tokenizer = BertTokenizer(self.vocab_file)
+        data_collator = DataCollatorForClosedDomainIE(tokenizer, label_maps=label_maps)
+        batch = data_collator(features)
+
+        self.assertEqual(batch["input_ids"].shape, [2, 5])
+        self.assertEqual(
+            batch["offset_mapping"],
+            [[(0, 1), (2, 3), (3, 4), (4, 5), (5, 6)], [(0, 1), (2, 3), (3, 4), (4, 5), (5, 6)]],
+        )
+        self.assertEqual(batch["text"], ["测试", "测试"])
+        self.assertEqual(batch["doc_id"], [0, 1])
+        self.assertEqual(batch["text_offset"], [0, 0])
+        self.assertEqual(batch["labels"][0].shape, [2, 2, 2, 2])
+        self.assertEqual(batch["labels"][1].shape, [2, 1, 1, 2])
+        self.assertEqual(batch["labels"][2].shape, [2, 1, 1, 2])
 
     def test_nsp(self):
         tokenizer = BertTokenizer(self.vocab_file)

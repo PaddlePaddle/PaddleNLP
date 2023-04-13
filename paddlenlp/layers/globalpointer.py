@@ -32,39 +32,34 @@ class RotaryPositionEmbedding(nn.Layer):
             self.cos[offset : offset + seqlen, :],
         )
         x1, x2 = x[..., 0::2], x[..., 1::2]
-        # 奇偶交错
         return paddle.stack([x1 * cos - x2 * sin, x1 * sin + x2 * cos], axis=-1).flatten(-2, -1)
 
 
 class GlobalPointer(nn.Layer):
-    def __init__(self, hidden_size, heads, head_size=64, RoPE=True, tril_mask=True, max_length=512):
+    def __init__(self, hidden_size, num_labels, pointer_inter_size=64, RoPE=True, tril_mask=True, max_length=512):
         super().__init__()
-        self.heads = heads
-        self.head_size = head_size
+        self.num_labels = num_labels
+        self.pointer_inter_size = pointer_inter_size
         self.RoPE = RoPE
         self.tril_mask = tril_mask
-        self.dense1 = nn.Linear(hidden_size, head_size * 2)
-        self.dense2 = nn.Linear(head_size * 2, heads * 2)
+        self.dense1 = nn.Linear(hidden_size, pointer_inter_size * 2)
+        self.dense2 = nn.Linear(pointer_inter_size * 2, num_labels * 2)
         if RoPE:
-            self.rotary = RotaryPositionEmbedding(head_size, max_length)
+            self.rotary = RotaryPositionEmbedding(pointer_inter_size, max_length)
 
     def forward(self, inputs, attention_mask=None):
         inputs = self.dense1(inputs)
         qw, kw = inputs[..., ::2], inputs[..., 1::2]
-        # RoPE编码
         if self.RoPE:
             qw, kw = self.rotary(qw), self.rotary(kw)
 
-        # 计算内积
-        logits = paddle.einsum("bmd,bnd->bmn", qw, kw) / self.head_size**0.5
+        logits = paddle.einsum("bmd,bnd->bmn", qw, kw) / self.pointer_inter_size**0.5
         bias = paddle.transpose(self.dense2(inputs), [0, 2, 1]) / 2
         logits = logits[:, None] + bias[:, ::2, None] + bias[:, 1::2, :, None]
 
-        # 排除padding
         attn_mask = 1 - attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
         logits = logits - attn_mask * 1e12
 
-        # # 排除下三角
         if self.tril_mask:
             mask = paddle.tril(paddle.ones_like(logits), diagonal=-1)
 
@@ -74,12 +69,12 @@ class GlobalPointer(nn.Layer):
 
 
 class GlobalPointerForEntityExtraction(nn.Layer):
-    def __init__(self, encoder, label_maps, head_size=64):
+    def __init__(self, encoder, label_maps, pointer_inter_size=64):
         super().__init__()
         self.encoder = encoder
         hidden_size = encoder.config["hidden_size"]
         gpcls = GlobalPointer
-        self.entity_output = gpcls(hidden_size, len(label_maps["entity2id"]), head_size=head_size)
+        self.entity_output = gpcls(hidden_size, len(label_maps["entity2id"]), pointer_inter_size=pointer_inter_size)
 
     def forward(self, input_ids, attention_mask):
         # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
@@ -92,7 +87,7 @@ class GlobalPointerForEntityExtraction(nn.Layer):
 
 
 class GPLinkerForRelationExtraction(nn.Layer):
-    def __init__(self, encoder, label_maps, head_size=64):
+    def __init__(self, encoder, label_maps, pointer_inter_size=64):
         super().__init__()
         self.encoder = encoder
         hidden_size = encoder.config["hidden_size"]
@@ -103,9 +98,13 @@ class GPLinkerForRelationExtraction(nn.Layer):
             num_rels = len(label_maps["sentiment2id"])
         gpcls = GlobalPointer
 
-        self.entity_output = gpcls(hidden_size, num_ents, head_size=head_size)
-        self.head_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
-        self.tail_output = gpcls(hidden_size, num_rels, head_size=head_size, RoPE=False, tril_mask=False)
+        self.entity_output = gpcls(hidden_size, num_ents, pointer_inter_size=pointer_inter_size)
+        self.head_output = gpcls(
+            hidden_size, num_rels, pointer_inter_size=pointer_inter_size, RoPE=False, tril_mask=False
+        )
+        self.tail_output = gpcls(
+            hidden_size, num_rels, pointer_inter_size=pointer_inter_size, RoPE=False, tril_mask=False
+        )
 
     def forward(self, input_ids, attention_mask):
         # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
@@ -118,28 +117,3 @@ class GPLinkerForRelationExtraction(nn.Layer):
         tail_output = self.tail_output(last_hidden_state, attention_mask)
         spo_output = [entity_output, head_output, tail_output]
         return spo_output
-
-
-class GPLinkerForEventExtraction(nn.Layer):
-    def __init__(self, encoder, label_maps, head_size=64):
-        super().__init__()
-        self.encoder = encoder
-        hidden_size = encoder.config["hidden_size"]
-        num_labels = len(label_maps["label2id"])
-        gpcls = GlobalPointer
-
-        self.argu_output = gpcls(hidden_size, num_labels, head_size=head_size)
-        self.head_output = gpcls(hidden_size, 1, head_size=head_size, RoPE=False)
-        self.tail_output = gpcls(hidden_size, 1, head_size=head_size, RoPE=False)
-
-    def forward(self, input_ids, attention_mask):
-        # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
-        context_outputs = self.encoder(input_ids, attention_mask=attention_mask)
-        # last_hidden_state: (batch_size, seq_len, hidden_size)
-        last_hidden_state = context_outputs[0]
-
-        argu_output = self.argu_output(last_hidden_state, attention_mask)
-        head_output = self.head_output(last_hidden_state, attention_mask)
-        tail_output = self.tail_output(last_hidden_state, attention_mask)
-        aht_output = (argu_output, head_output, tail_output)
-        return aht_output

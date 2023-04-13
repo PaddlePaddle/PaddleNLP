@@ -14,8 +14,8 @@
 
 from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
 from .globalpointer import (
+    GlobalPointer,
     GlobalPointerForEntityExtraction,
-    GPLinkerForEventExtraction,
     GPLinkerForRelationExtraction,
 )
 from .lora import *

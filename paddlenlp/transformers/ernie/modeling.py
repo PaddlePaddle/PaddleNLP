@@ -21,6 +21,8 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.fluid.dygraph.base import in_declarative_mode
 
+from ...layers import GlobalPointer
+from ...losses import SparseMultiLabelCrossEntropy
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -50,6 +52,7 @@ __all__ = [
     "ErnieForMultipleChoice",
     "UIE",
     "UTC",
+    "ErnieForClosedDomainIE",
 ]
 
 
@@ -1369,3 +1372,49 @@ class UTC(ErniePretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class ErnieForClosedDomainIE(ErniePretrainedModel):
+    r"""
+    Ernie Model with GlobalPointer on top of the output layer,
+    designed for closed domain information extraction tasks.
+
+    Args:
+        config (:class:`ErnieConfig`):
+            An instance of ErnieConfig used to construct ErnieForClosedDomainIE.
+    """
+
+    def __init__(self, config: ErnieConfig):
+        super(ErnieForClosedDomainIE, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        num_ents = len(config.entity_id2label)
+        num_rels = len(config.relation_id2label)
+        self.entity_output = GlobalPointer(config.hidden_size, num_ents, pointer_inter_size=config.pointer_inter_size)
+        self.with_rel = True if config.relation_id2label else False
+        if self.with_rel:
+            self.head_output = GlobalPointer(
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
+            )
+            self.tail_output = GlobalPointer(
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
+            )
+
+    def forward(self, input_ids, attention_mask, labels=None):
+        sequence_output, _ = self.ernie(input_ids, attention_mask=attention_mask)
+
+        entity_output = self.entity_output(sequence_output, attention_mask)
+        loss = None
+        if not self.with_rel:
+            logits = [entity_output]
+        else:
+            head_output = self.head_output(sequence_output, attention_mask)
+            tail_output = self.tail_output(sequence_output, attention_mask)
+            logits = [entity_output, head_output, tail_output]
+
+        if labels is not None:
+            loss_fct = SparseMultiLabelCrossEntropy()
+            loss = sum([loss_fct(o, l) for o, l in zip(logits, labels)]) / len(logits)
+
+        output = (logits,)
+        # TODO: Add return_dict support
+        return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)

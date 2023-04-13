@@ -24,6 +24,8 @@ from paddle.nn import Layer
 
 from paddlenlp.utils.log import logger
 
+from ...layers import GlobalPointer
+from ...losses import SparseMultiLabelCrossEntropy
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from .configuration import (
@@ -41,6 +43,7 @@ __all__ = [
     "ErnieLayoutForPretraining",
     "ErnieLayoutForQuestionAnswering",
     "UIEX",
+    "ErnieLayoutForClosedDomainIE",
 ]
 
 
@@ -1182,3 +1185,51 @@ class UIEX(ErnieLayoutPretrainedModel):
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
         return start_prob, end_prob
+
+
+class ErnieLayoutForClosedDomainIE(ErnieLayoutPretrainedModel):
+    r"""
+    ErnieLayout Model with GlobalPointer on top of the output layer,
+    designed for closed domain information extraction tasks.
+
+    Args:
+        config (:class:`ErnieLayoutConfig`):
+            An instance of ErnieLayoutConfig used to construct ErnieLayoutForClosedDomainIE.
+    """
+
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForClosedDomainIE, self).__init__(config)
+        self.ernie_layout = ErnieLayoutModel(config)
+        num_ents = len(config.entity_id2label)
+        num_rels = len(config.relation_id2label)
+        self.entity_output = GlobalPointer(config.hidden_size, num_ents, pointer_inter_size=config.pointer_inter_size)
+        self.with_rel = True if config.relation_id2label else False
+        if self.with_rel:
+            self.head_output = GlobalPointer(
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
+            )
+            self.tail_output = GlobalPointer(
+                config.hidden_size, num_rels, pointer_inter_size=config.pointer_inter_size, RoPE=False, tril_mask=False
+            )
+
+    def forward(self, input_ids, attention_mask, bbox, image, labels=None):
+        sequence_output, _ = self.ernie_layout(input_ids, attention_mask=attention_mask, bbox=bbox, image=image)
+        seq_length = paddle.shape(input_ids)[1]
+        sequence_output = sequence_output[:, :seq_length]
+
+        entity_output = self.entity_output(sequence_output, attention_mask)
+        loss = None
+        if not self.with_rel:
+            logits = [entity_output]
+        else:
+            head_output = self.head_output(sequence_output, attention_mask)
+            tail_output = self.tail_output(sequence_output, attention_mask)
+            logits = [entity_output, head_output, tail_output]
+
+        if labels is not None:
+            loss_fct = SparseMultiLabelCrossEntropy()
+            loss = sum([loss_fct(o, l) for o, l in zip(logits, labels)]) / len(logits)
+
+        output = (logits,)
+        # TODO: Add return_dict support
+        return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)

@@ -275,6 +275,7 @@ class DataConverter(object):
         self.anno_type = anno_type
         self.label_studio_file = label_studio_file
         self.ignore_list = ["属性值", "object"]
+        self.doc_parser = DocParser(layout_analysis=self.layout_analysis, ocr_lang=self.ocr_lang)
 
     def process_text_tag(self, line, task_type="ext"):
         items = {}
@@ -375,15 +376,14 @@ class DataConverter(object):
             )
             return None
         logger.info("Parsing image file %s ..." % (img_file))
-        doc_parser = DocParser(layout_analysis=self.layout_analysis, ocr_lang=self.ocr_lang)
 
-        parsed_doc = doc_parser.parse({"doc": img_path})
+        parsed_doc = self.doc_parser.parse({"doc": img_path})
         img_w, img_h = parsed_doc["img_w"], parsed_doc["img_h"]
 
         text = ""
         bbox = []
         for segment in parsed_doc["layout"]:
-            box = doc_parser._normalize_box(segment[0], [img_w, img_h], [1000, 1000])
+            box = self.doc_parser._normalize_box(segment[0], [img_w, img_h], [1000, 1000])
             text += segment[1]
             bbox.extend([box] * len(segment[1]))
         assert len(text) == len(bbox), "len of text is not equal to len of bbox"
@@ -432,6 +432,104 @@ class DataConverter(object):
         else:
             items["label"] = line["annotations"][0]["result"][0]["value"]["choices"]
         return items
+
+    def label_studio_to_closed_domain(self, raw_examples, label_maps):
+        """Convert label-studio to closed-domain format"""
+        examples = []
+        logger.info("Converting label-studio annotation data to closed-domain format...")
+        with tqdm(total=len(raw_examples)):
+            for line in raw_examples:
+                if self.anno_type == "text":
+                    item = self.process_text_tag(line)
+                else:
+                    item = self.process_image_tag(line)
+
+                id2ent = {}
+                entity_list = []
+                spo_list = []
+                for anno_ent_item in item["entities"]:
+                    ent_label = anno_ent_item["label"]
+                    ent_type = "object" if ent_label not in label_maps["entity_label2id"].keys() else ent_label
+
+                    ent = {
+                        "text": item["text"][anno_ent_item["start_offset"] : anno_ent_item["end_offset"]],
+                        "type": ent_type,
+                        "start_index": anno_ent_item["start_offset"],
+                    }
+                    id2ent[anno_ent_item["id"]] = ent
+                    entity_list.append(ent)
+                for anno_rel_item in item["relations"]:
+                    _subject = id2ent[anno_rel_item["from_id"]]
+                    _object = id2ent[anno_rel_item["to_id"]]
+                    rel = {
+                        "subject": _subject["text"],
+                        "predicate": anno_rel_item["type"],
+                        "object": _object["text"],
+                        "subject_start_index": _subject["start_index"],
+                        "object_start_index": _object["start_index"],
+                    }
+                    spo_list.append(rel)
+                item["entity_list"] = entity_list
+                item["spo_list"] = spo_list
+                examples.append(item)
+        return examples
+
+    def uie_to_closed_domain(self, docs, infer_results, label_maps=None):
+        """Convert UIE predicted result to distill format"""
+
+        def _update_pred(pred):
+            ent_result, spo_result = [], []
+            for k in pred["relations"].keys():
+                for o in pred["relations"][k]:
+                    rel = {
+                        "subject": pred["text"],
+                        "predicate": k,
+                        "object": o["text"],
+                        "subject_start_index": pred["start"],
+                        "object_start_index": o["start"],
+                    }
+                    spo_result.append(rel)
+
+                    ent_type = "object" if "relations" not in o.keys() else k
+                    ent = {"text": o["text"], "type": ent_type, "start_index": o["start"]}
+                    ent_result.append(ent)
+
+                    if "relations" in o.keys():
+                        _ent, _spo = _update_pred(o)
+                        ent_result += _ent
+                        spo_result += _spo
+            return ent_result, spo_result
+
+        examples = []
+        for doc, pred in zip(docs, infer_results):
+            if self.anno_type == "text":
+                item = {"text": doc}
+            else:
+                parsed_doc = self.doc_parser.parse({"doc": doc})
+                text = ""
+                bbox = []
+                img_w, img_h = parsed_doc["img_w"], parsed_doc["img_h"]
+                for segment in parsed_doc["layout"]:
+                    box = self.doc_parser._normalize_box(segment[0], [img_w, img_h], [1000, 1000])
+                    text += segment[1]
+                    bbox.extend([box] * len(segment[1]))
+                item = {"text": text, "bbox": bbox, "image": parsed_doc["image"]}
+
+            entity_list = []
+            spo_list = []
+            for key in pred.keys():
+                for s in pred[key]:
+                    ent = {"text": s["text"], "type": key, "start_index": s["start"]}
+                    entity_list.append(ent)
+                    if "relations" in s.keys():
+                        ent_result, spo_result = _update_pred(s)
+                    entity_list += ent_result
+                    spo_list += spo_result
+
+            item["entity_list"] = entity_list
+            item["spo_list"] = spo_list
+            examples.append(item)
+        return examples
 
     def convert_cls_examples(self, raw_examples):
         """
@@ -834,3 +932,85 @@ class DataConverter(object):
             rest_example.append(negative_result)
 
         return added_example, rest_example
+
+    @classmethod
+    def _build_tree(cls, schema, name="root"):
+        """
+        Build the schema tree.
+        """
+        schema_tree = SchemaTree(name)
+        for s in schema:
+            if isinstance(s, str):
+                schema_tree.add_child(SchemaTree(s))
+            elif isinstance(s, dict):
+                for k, v in s.items():
+                    if isinstance(v, str):
+                        child = [v]
+                    elif isinstance(v, list):
+                        child = v
+                    else:
+                        raise TypeError(
+                            "Invalid schema, value for each key:value pairs should be list or string"
+                            "but {} received".format(type(v))
+                        )
+                    schema_tree.add_child(cls._build_tree(child, name=k))
+            else:
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
+        return schema_tree
+
+    def schema2label_maps(self, schema=None):
+        if schema and isinstance(schema, dict):
+            schema = [schema]
+
+        label_maps = {}
+
+        entity_label2id = {}
+        relation_label2id = {}
+
+        schema_tree = self._build_tree(schema)
+        schema_list = schema_tree.children[:]
+
+        while len(schema_list) > 0:
+            node = schema_list.pop(0)
+
+            if not node.parent_relations:
+                entity_label2id[node.name] = len(entity_label2id)
+                parent_relations = node.name
+            elif node.name not in entity_label2id.keys() and len(node.children) != 0:
+                entity_label2id[node.name] = len(entity_label2id)
+
+            for child in node.children:
+                child.parent_relations = parent_relations
+                if child.name not in relation_label2id.keys():
+                    relation_label2id[child.name] = len(relation_label2id)
+                schema_list.append(child)
+
+        if relation_label2id:
+            entity_label2id["object"] = len(entity_label2id)
+        label_maps["entity_label2id"] = entity_label2id
+        label_maps["relation_label2id"] = relation_label2id
+        label_maps["schema"] = schema
+        return label_maps
+
+
+class SchemaTree(object):
+    """
+    Implementataion of SchemaTree
+    """
+
+    def __init__(self, name="root", children=None):
+        self.name = name
+        self.children = []
+        self.prefix = None
+        self.parent_relations = None
+        self.parent = None
+        if children is not None:
+            for child in children:
+                self.add_child(child)
+
+    def __repr__(self):
+        return self.name
+
+    def add_child(self, node):
+        assert isinstance(node, SchemaTree), "The children of a node should be an instacne of SchemaTree."
+        self.children.append(node)

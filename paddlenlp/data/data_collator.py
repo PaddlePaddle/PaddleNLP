@@ -17,7 +17,7 @@ import copy
 import random
 import warnings
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
 
 import numpy as np
@@ -39,6 +39,7 @@ __all__ = [
     "DataCollatorForSeq2Seq",
     "DataCollatorForLanguageModeling",
     "DataCollatorForWholeWordMask",
+    "DataCollatorForClosedDomainIE",
 ]
 
 InputDataClass = NewType("InputDataClass", Any)
@@ -850,3 +851,71 @@ class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
 
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
         return inputs, labels
+
+
+@dataclass
+class DataCollatorForClosedDomainIE:
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    label_maps: Optional[dict] = None
+    multi_modal: bool = False
+    text_feature_names: List[str] = field(default_factory=lambda: ["offset_mapping", "text", "doc_id", "text_offset"])
+    doc_feature_names: List[str] = field(
+        default_factory=lambda: ["bbox", "image", "offset_mapping", "text", "doc_id", "text_offset"]
+    )
+
+    def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
+        labels = [feature["labels"] for feature in features] if "labels" in features[0].keys() else None
+        features_to_pad = [
+            {k: v for k, v in f.items() if k not in ["labels"] + self.doc_feature_names} for f in features
+        ]
+
+        batch = self.tokenizer.pad(
+            features_to_pad,
+            padding=self.padding,
+            return_tensors="pd",
+        )
+
+        if self.multi_modal:
+            bbox_list = [feature["bbox"] for feature in features]
+            padded_bbox_list = []
+            max_length = batch["input_ids"].shape[1]
+            for bbox in bbox_list:
+                padded_bbox_list.append(bbox + [[0, 0, 0, 0] for _ in range(max_length - len(bbox))])
+            for ignore_key in self.doc_feature_names:
+                if ignore_key == "bbox":
+                    batch[ignore_key] = paddle.to_tensor(padded_bbox_list)
+                elif ignore_key == "image":
+                    batch[ignore_key] = paddle.to_tensor([feature[ignore_key] for feature in features])
+                else:
+                    batch[ignore_key] = [feature[ignore_key] for feature in features]
+        else:
+            for ignore_key in self.text_feature_names:
+                batch[ignore_key] = [feature[ignore_key] for feature in features]
+
+        if labels is None:
+            return batch
+
+        bs = len(batch["input_ids"])
+        # Ensure the dimension is greater or equal to 1
+        max_ent_num = max(max([len(lb["entity_labels"]) for lb in labels]), 1)
+        num_ents = len(self.label_maps["entity_label2id"])
+        batch_entity_labels = paddle.zeros(shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
+        for i, lb in enumerate(labels):
+            for eidx, (l, eh, et) in enumerate(lb["entity_labels"]):
+                batch_entity_labels[i, l, eidx, :] = paddle.to_tensor([eh, et])
+
+        if not self.label_maps["relation_label2id"]:
+            batch["labels"] = [batch_entity_labels]
+        else:
+            max_spo_num = max(max([len(lb["relation_labels"]) for lb in labels]), 1)
+            num_rels = len(self.label_maps["relation_label2id"])
+            batch_head_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+            batch_tail_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+
+            for i, lb in enumerate(labels):
+                for spidx, (sh, st, p, oh, ot) in enumerate(lb["relation_labels"]):
+                    batch_head_labels[i, p, spidx, :] = paddle.to_tensor([sh, oh])
+                    batch_tail_labels[i, p, spidx, :] = paddle.to_tensor([st, ot])
+            batch["labels"] = [batch_entity_labels, batch_head_labels, batch_tail_labels]
+        return batch
