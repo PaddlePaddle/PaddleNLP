@@ -1553,8 +1553,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
+
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
