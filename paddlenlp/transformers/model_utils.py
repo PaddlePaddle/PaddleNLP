@@ -590,7 +590,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             dtype=output_embeddings._dtype,
                             is_bias=True,
                         )
-                        new_bias = paddle.concat([old_bias, paddle.zeros([pad_length], dtype=output_embeddings.bias)])
+                        new_bias = paddle.concat(
+                            [old_bias, paddle.zeros([pad_length], dtype=output_embeddings.bias.dtype)]
+                        )
                         output_embeddings.bias.set_value(new_bias)
                     # need to trim
                     elif output_embeddings.weight.shape[0] < output_embeddings.bias.shape[0]:
