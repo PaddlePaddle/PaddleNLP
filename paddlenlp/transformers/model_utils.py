@@ -1540,7 +1540,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 **kwargs,
             )
 
-        dtype = config.dtype if dtype is None else dtype
+        if dtype is None:
+            dtype = config.dtype
 
         init_contexts = []
         if low_cpu_mem_usage:
