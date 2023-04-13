@@ -55,7 +55,7 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     def __init__(self, config: ArtistConfig):
         super().__init__(config)
-        self.lm_head = GPTLMHead(config.hidden_size, config.vocab_size)
+        self.lm_head = GPTLMHead(config)
         self.apply(self.init_weights)
 
     @staticmethod
