@@ -248,7 +248,7 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids)
 
-        if cache is not None:
+        if use_cache and cache is not None:
             cache_k, cache_v = cache[0], cache[1]
             # [s + c, b, n, h/n]
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
@@ -740,7 +740,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             if attention_mask is not None and attention_mask.dtype == paddle.bool:
                 attention_mask = attention_mask[:, :, -1:]
             else:
-                attention_mask = None
+                attention_mask = self.get_masks(input_ids)[:, :, -1:]
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
             else:
@@ -755,7 +755,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                             for mask_position, context_length in zip(mask_positions, context_lengths)
                         ],
                         dtype="int64",
-                    ).unsqueeze(-1)
+                    )
                 else:
                     position_ids = paddle.to_tensor(
                         [mask_position for mask_position in mask_positions], dtype="int64"
@@ -765,9 +765,9 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 cache = past_key_values
             return {
                 "input_ids": last_token,
-                "past_key_values": cache,
+                "past_key_values": cache[-1],
                 "position_ids": position_ids,
-                "use_cache": False,
+                "use_cache": True,
                 "attention_mask": attention_mask,
             }
         else:
@@ -783,7 +783,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "input_ids": input_ids,
                 "past_key_values": cache,
                 "position_ids": position_ids,
-                "use_cache": False,
+                "use_cache": True,
                 "attention_mask": attention_mask,
             }
 
@@ -826,7 +826,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         inputs_embeds=None,
         labels=None,
         use_cache=None,
-        return_dict=True,
+        return_dict=False,
     ):
         transformer_outputs = self.chatglm(
             input_ids=input_ids,
@@ -856,7 +856,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             if loss is not None:
                 return (loss, lm_logits, transformer_outputs[1:])
             else:
-                return (lm_logits, transformer_outputs.cache)
+                return (lm_logits, transformer_outputs[1:])
 
         return CausalLMOutputWithPast(
             loss=loss,

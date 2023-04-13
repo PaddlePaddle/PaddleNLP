@@ -210,7 +210,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         self.eos_token = eos_token
         self.end_token = end_token
         self.mask_token = mask_token
-        self.gMASK_token = gmask_token
+        self.gmask_token = gmask_token
 
         self.sp_tokenizer = SPTokenizer(vocab_file, num_image_tokens=num_image_tokens)
 
@@ -340,7 +340,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
             `List[int]`: List of [input IDs](../glossary#input-ids) with the appropriate special tokens.
         """
         mask_ids = self.sp_tokenizer[self.mask_token]
-        gmask_ids = self.sp_tokenizer[self.gMASK_token]
+        gmask_ids = self.sp_tokenizer[self.gmask_token]
         eos_id = self.sp_tokenizer[self.eos_token]
         if mask_ids not in token_ids_0 and gmask_ids not in token_ids_0:
             token_ids_0 += [gmask_ids]
