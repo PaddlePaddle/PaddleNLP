@@ -888,9 +888,9 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
             f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(self.layoutxlm.config.num_hidden_layers)
         }
         if self.training:
-            outputs = logits, hidden_states
+            outputs = (logits, hidden_states)
         else:
-            outputs = logits
+            outputs = (logits,)
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -921,7 +921,7 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
                     ),
                 )
 
-            outputs = (loss,) + (outputs,)
+            outputs = (loss,) + outputs
 
         return outputs
 

@@ -207,7 +207,7 @@ class LayoutXLMConfig(PretrainedConfig):
         type_vocab_size=1,
         vocab_size=250002,
         with_pool="tanh",
-        use_visual_backbone=True,
+        use_visual_backbone=False,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
