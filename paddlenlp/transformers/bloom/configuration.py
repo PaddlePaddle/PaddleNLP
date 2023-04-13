@@ -39,8 +39,21 @@ def _construct_resource_file_url(model_names: list[str], file_name: str) -> dict
 
 
 BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "bigscience/bloom",
     "bigscience/bloom-560m",
+    "bigscience/bloom-1b1",
+    "bigscience/bloom-1b3",
+    "bigscience/bloom-1b7",
+    "bigscience/bloom-3b",
+    "bigscience/bloom-7b1",
+    "bigscience/bloomz",
+    "bigscience/bloomz-mt",
     "bigscience/bloomz-560m",
+    "bigscience/bloomz-1b1",
+    "bigscience/bloomz-1b3",
+    "bigscience/bloomz-1b7",
+    "bigscience/bloomz-3b",
+    "bigscience/bloomz-7b1",
 ]
 
 BLOOM_PRETRAINED_INIT_CONFIGURATION = _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "config.json")

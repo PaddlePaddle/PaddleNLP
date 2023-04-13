@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -1228,11 +1229,9 @@ class RobertaLMHead(nn.Layer):
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
-        tensor = paddle.zeros((config.vocab_size,))
-        self.bias = paddle.create_parameter(
-            shape=tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor)
-        )
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.bias = self.decoder.bias
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -1240,7 +1239,7 @@ class RobertaLMHead(nn.Layer):
         x = self.layer_norm(x)
 
         # project back to size of vocabulary with bias
-        x = paddle.matmul(x, self.decoder.weight, transpose_y=True) + self.bias
+        x = self.decoder(x)
 
         return x
 
