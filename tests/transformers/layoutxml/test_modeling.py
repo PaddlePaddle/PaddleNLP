@@ -287,9 +287,10 @@ class LayoutXLMModelModelTest(ModelTesterMixin, unittest.TestCase):
     use_test_model_name_list = False
 
     all_model_classes = (
-        LayoutXLMModel,
-        LayoutXLMForTokenClassification,
+        LayoutXLMForQuestionAnswering,
         LayoutXLMForSequenceClassification,
+        LayoutXLMForTokenClassification,
+        LayoutXLMModel,
     )
 
     def setUp(self):
