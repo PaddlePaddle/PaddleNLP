@@ -49,6 +49,7 @@ class ModelArguments:
     enable_xformers_memory_efficient_attention: bool = field(
         default=False, metadata={"help": "enable_xformers_memory_efficient_attention."}
     )
+    to_static: Optional[bool] = field(default=False, metadata={"help": "Whether or not to_static"})
 
 
 @dataclass

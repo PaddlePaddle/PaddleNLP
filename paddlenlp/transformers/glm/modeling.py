@@ -571,7 +571,7 @@ class GLMPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
@@ -642,7 +642,6 @@ class GLMModel(GLMPretrainedModel):
             )
 
         self.transformer = GLMStack(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -713,7 +712,6 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -769,7 +767,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def _reorder_cache(self, cache, beam_index):
         # Speedy decoding is disabled and no reorder is needed if decoder cache is not given.
