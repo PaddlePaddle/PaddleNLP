@@ -14,23 +14,32 @@
 # limitations under the License.
 
 
+import unittest
+
 import paddle
 
 from paddlenlp.generation.logits_process import (
-    BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
     LogitsProcessorList,
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
+    TopKLogitsWarper,
+    TopPLogitsWarper,
+)
+from paddlenlp.generation.stopping_criteria import (
+    MaxLengthCriteria,
+    StoppingCriteriaList,
 )
 from paddlenlp.transformers import (
     BartForConditionalGeneration,
     BartTokenizer,
     PretrainedConfig,
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
 )
-from paddlenlp.transformers.generation_utils import TopKProcess, TopPProcess
+from paddlenlp.transformers.generation_utils import BeamSearchScorer
 from tests.testing_utils import slow
 
 
@@ -38,13 +47,18 @@ def top_k_top_p_filtering(
     logits,
     top_k=0,
     top_p=1.0,
+    filter_value=-float("inf"),
     min_tokens_to_keep=1,
 ):
     if top_k > 0:
-        logits = TopKProcess(logits, top_k, min_tokens_to_keep)
+        logits = TopKLogitsWarper(top_k=top_k, filter_value=filter_value, min_tokens_to_keep=min_tokens_to_keep)(
+            None, logits
+        )
 
     if 0 <= top_p <= 1.0:
-        logits = TopPProcess(logits, top_p, min_tokens_to_keep)
+        logits = TopPLogitsWarper(top_p=top_p, filter_value=filter_value, min_tokens_to_keep=min_tokens_to_keep)(
+            None, logits
+        )
 
     return logits
 
@@ -409,6 +423,82 @@ class GenerationTesterMixin:
             )
         return output_generate, output_group_beam_search
 
+    def _contrastive_generate(
+        self,
+        model,
+        input_ids,
+        attention_mask,
+        max_length,
+    ):
+        contrastive_search_kwargs = {
+            "penalty_alpha": 0.6,
+            "top_k": 5,
+        }
+
+        if model.config.is_encoder_decoder:
+            max_length = 4
+        logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
+            input_ids.shape[-1],
+            eos_token_id=model.config.eos_token_id,
+            forced_bos_token_id=model.config.forced_bos_token_id,
+            forced_eos_token_id=model.config.forced_eos_token_id,
+            max_length=max_length,
+        )
+
+        kwargs = {}
+        model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
+        output_generate = model.generate(
+            input_ids,
+            do_sample=False,
+            num_beams=1,
+            max_length=max_length,
+            **logits_process_kwargs,
+            **model_kwargs,
+            **contrastive_search_kwargs,
+        )
+
+        if model.config.is_encoder_decoder:
+            encoder_outputs, input_ids, attention_mask = self._get_encoder_outputs(
+                model,
+                input_ids,
+                attention_mask,
+            )
+            kwargs["encoder_outputs"] = encoder_outputs
+
+        with paddle.no_grad():
+            model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
+            stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])
+            output_contrastive = model.contrastive_search(
+                input_ids,
+                stopping_criteria=stopping_criteria,
+                logits_processor=logits_processor,
+                **kwargs,
+                **model_kwargs,
+                **contrastive_search_kwargs,
+            )
+        return output_contrastive, output_generate
+
+    def test_contrastive_generate(self):
+
+        # check `generate()` and `contrastive_search()` are equal
+        for model_class in self.all_generative_model_classes.keys():
+
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            paddle.seed(124)
+            # NOTE: contrastive search only works with cache on at the moment.
+            if not hasattr(config, "use_cache"):
+                return
+            config.use_cache = True
+            config.is_decoder = True
+
+            # test old generation output for backwards compatibility
+            model = self._make_model_instance(config, model_class)
+            model = model.eval()
+            output_contrastive, output_generate = self._contrastive_generate(
+                model=model, input_ids=input_ids, attention_mask=attention_mask, max_length=max_length
+            )
+            self.assertListEqual(output_contrastive.tolist(), output_generate.tolist())
+
     def test_greedy_generate(self):
         # check `generate()` and `greedy_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
@@ -630,7 +720,7 @@ class GenerationTesterMixin:
         self.assertTrue(flag)
 
 
-class UtilsFunctionsTest:
+class UtilsFunctionsTest(unittest.TestCase):
 
     # tests whether the top_k_top_p function behaves as expected
     def test_top_k_top_p_filtering(self):
@@ -724,14 +814,14 @@ class UtilsFunctionsTest:
         )
 
         output = top_k_top_p_filtering(logits, top_k=10, top_p=0.6, min_tokens_to_keep=4)
-        non_inf_output = output[output >= -10000]
-        non_inf_idx = (output >= -10000).nonzero()
+        non_inf_output = output[output != -float("inf")]
+        non_inf_idx = (output != -float("inf")).nonzero()
 
         self.assertTrue(paddle.allclose(non_inf_expected_output, non_inf_output, atol=1e-12))
-        self.assertTrue(paddle.all(paddle.eq(non_inf_expected_idx, non_inf_idx)))
+        self.assertTrue(paddle.all(paddle.equal(non_inf_expected_idx, non_inf_idx)))
 
 
-class GenerationIntegrationTests:
+class GenerationIntegrationTests(unittest.TestCase):
     @slow
     def test_diverse_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood.
@@ -801,6 +891,31 @@ class GenerationIntegrationTests:
             eos_token_id=bart_model.bart.config["eos_token_id"],
             logits_processors=None,
             **model_kwargs,
+        )
+
+    def test_max_length_backward_compat_contrastive(self):
+
+        paddle.seed(2)
+
+        # Initialize the model and tokenizer
+        model_name_or_path = "unified_transformer-12L-cn-luge"
+        model = UnifiedTransformerLMHeadModel.from_pretrained(model_name_or_path)
+        tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name_or_path)
+
+        # Prepare the model inputs.
+        history = "早上好，今天空气质量不错。"
+        inputs = tokenizer.dialogue_encode(
+            history, task_type="chitchat", add_start_token_as_response=True, return_tensors=True
+        )
+
+        ids, scores = model.generate(
+            input_ids=inputs["input_ids"],
+            token_type_ids=inputs["token_type_ids"],
+            position_ids=inputs["position_ids"],
+            attention_mask=inputs["attention_mask"],
+            decode_strategy="contrastive_search",
+            top_k=5,
+            penalty_alpha=0.86,
         )
 
     def test_max_length_backward_compat_sample(self):
@@ -1008,4 +1123,4 @@ class GenerationIntegrationTests:
 
         diff = (batched_out - out).abs()
 
-        self.assertTrue(diff.numpy() < 1e-6)
+        self.assertTrue((diff.numpy() < 1e-6).any())

@@ -25,10 +25,6 @@ from paddlenlp.generation.stopping_criteria import (
     validate_stopping_criteria,
 )
 
-"""
-这跟test_modeling_utils.py 中的ids_tensor重名了，所以单独放在这里了
-"""
-
 
 def ids_tensor(shape, vocab_size, rng=None, name=None):
     #  Creates a random int32 tensor of the shape within the vocab size

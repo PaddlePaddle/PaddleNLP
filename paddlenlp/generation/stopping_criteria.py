@@ -27,7 +27,7 @@ class StoppingCriteria(ABC):
     generation.
     """
 
-    def __call__(self, input_ids, logits, **kwargs):
+    def __call__(self, input_ids: paddle.Tensor, logits: paddle.Tensor, **kwargs):
         raise NotImplementedError(f"{self.__class__} is an abstract class. " "StoppingCriteria needs to be subclassed")
 
 
@@ -48,14 +48,14 @@ class MaxTimeCriteria(StoppingCriteria):
         self.max_time = max_time
         self.initial_timestamp = time.time() if initial_timestamp is None else initial_timestamp
 
-    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs) -> bool:
+    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor, **kwargs) -> bool:
         return time.time() - self.initial_timestamp > self.max_time
 
 
 class MaxLengthCriteria(StoppingCriteria):
     """
     This class can be used to stop generation whenever the full generated number of tokens exceeds `max_length`. Keep
-    in mind for decoder-only type of transformers, this will include the initial prompted tokens.
+    in mind for decoder-only type of transformers, [this will include the initial prompted tokens].
 
     Args:
         max_length (`int`):
@@ -65,12 +65,12 @@ class MaxLengthCriteria(StoppingCriteria):
     def __init__(self, max_length: int):
         self.max_length = max_length
 
-    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs) -> bool:
+    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor, **kwargs) -> bool:
         return input_ids.shape[-1] >= self.max_length
 
 
 class StoppingCriteriaList(list):
-    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor, **kwargs):
+    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor, **kwargs):
         return any(criteria(input_ids, scores) for criteria in self)
 
     @property

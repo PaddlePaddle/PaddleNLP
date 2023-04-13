@@ -18,10 +18,6 @@ import unittest
 import paddle
 from paddle import nn
 
-"""
-这跟test_modeling_utils.py 中的ids_tensor重名了，所以单独放在这里了
-"""
-
 
 def ids_tensor(shape, vocab_size, rng=None, name=None):
     #  Creates a random int32 tensor of the shape within the vocab size
@@ -137,7 +133,7 @@ class LogitsProcessorTest(unittest.TestCase):
         # create ramp distribution
         ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1))
         ramp_logits[1:, : vocab_size // 2] = ramp_logits[1:, : vocab_size // 2] + vocab_size
-
+        ramp_logits = ramp_logits.astype("float32")
         top_k_warp = TopKLogitsWarper(3)
 
         scores = top_k_warp(input_ids, ramp_logits)
@@ -151,12 +147,12 @@ class LogitsProcessorTest(unittest.TestCase):
 
         logits = self._get_uniform_logits(batch_size=batch_size, length=length)
         top_k_warp_safety_check = TopKLogitsWarper(top_k=1, filter_value=0.0, min_tokens_to_keep=3)
-
         scores = top_k_warp_safety_check(input_ids, logits)
         # uniform dist is not changed
         self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [0, 0])
 
         ramp_logits = paddle.arange(length).unsqueeze(0).tile((batch_size, 1))
+        ramp_logits = ramp_logits.astype("float32")
         scores = top_k_warp_safety_check(input_ids, ramp_logits)
 
         # min_tokens overwrites k: 3 tokens are kept => 2 tokens are nullified

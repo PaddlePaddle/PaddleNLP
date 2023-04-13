@@ -46,10 +46,7 @@ from ..generation.logits_process import (
     TopKLogitsWarper,
     TopPLogitsWarper,
 )
-from ..generation.stopping_criteria import (
-    StoppingCriteriaList,
-    validate_stopping_criteria,
-)
+from ..generation.stopping_criteria import MaxLengthCriteria, StoppingCriteriaList
 
 
 class BeamHypotheses:
@@ -320,8 +317,8 @@ class GenerationMixin(object):
             seq_len = paddle.full((input_ids.shape[0], 1), input_ids.shape[1], dtype="int64")
         return seq_len
 
+    @staticmethod
     def get_logits_processor(
-        self,
         min_length=None,
         max_length=None,
         eos_token_id=None,
@@ -368,37 +365,46 @@ class GenerationMixin(object):
         else:
             return processors
 
-    # @staticmethod
-    # def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
+    @staticmethod
+    def get_logits_warper(
+        temperature=None,
+        top_k=None,
+        top_p=None,
+        num_beams=1,
+    ):
+        # instantiate warpers list
+        warpers = LogitsProcessorList()
+        if temperature is not None and temperature != 1.0:
+            warpers.append(TemperatureLogitsWarper(temperature))
 
-    #     index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        min_tokens_to_keep = 2 if num_beams > 1 else 1
+        if top_k is not None and top_k != 0:
+            warpers.append(TopKLogitsWarper(top_k=top_k, min_tokens_to_keep=min_tokens_to_keep))
+        if top_p is not None and top_p < 1.0:
+            warpers.append(TopPLogitsWarper(top_p=top_p, min_tokens_to_keep=min_tokens_to_keep))
+        # TODO
+        # Add more pre_processing for distribution during generation
 
-    #     input_ids = paddle.gather(input_ids, index)
+        return warpers
 
-    #     if attention_mask is not None:
-    #         model_kwargs["attention_mask"] = paddle.gather(attention_mask, index)
+    @staticmethod
+    def get_stopping_criteria(max_length: Optional[int], stopping_criteria: Optional[StoppingCriteriaList]):
+        criteria = StoppingCriteriaList()
+        if max_length is not None:
+            criteria.append(MaxLengthCriteria(max_length=max_length))
 
-    #     if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
-    #         token_type_ids = model_kwargs["token_type_ids"]
-    #         model_kwargs["token_type_ids"] = paddle.gather(token_type_ids, index)
+        if stopping_criteria is not None:
+            custom_criteria = StoppingCriteriaList()
+            custom_criteria_type = [type(cr) for cr in stopping_criteria]
 
-    #     if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
-    #         position_ids = model_kwargs["position_ids"]
-    #         model_kwargs["position_ids"] = paddle.gather(position_ids, index)
+            for criterium in criteria:
+                if type(criterium) not in custom_criteria_type:
+                    custom_criteria.append(criterium)
+            custom_criteria.extend(stopping_criteria)
 
-    #     if "seq_len" in model_kwargs and model_kwargs["seq_len"] is not None:
-    #         seq_len = model_kwargs["seq_len"]
-    #         model_kwargs["seq_len"] = paddle.gather(seq_len, index)
-
-    #     if "encoder_output" in model_kwargs and model_kwargs["encoder_output"] is not None:
-    #         encoder_output = model_kwargs["encoder_output"]
-    #         model_kwargs["encoder_output"] = paddle.gather(encoder_output, index)
-
-    #     if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
-    #         role_ids = model_kwargs["role_ids"]
-    #         model_kwargs["role_ids"] = paddle.gather(role_ids, index)
-
-    #     return input_ids, model_kwargs
+            return custom_criteria
+        else:
+            return criteria
 
     @staticmethod
     def expand_inputs_for_generation(
@@ -434,6 +440,26 @@ class GenerationMixin(object):
         # and they contain pad value, the result vectors updated by this method
         # may be different from expected. In this case, you need to rewrite the
         # method.
+
+        # 拴Q了
+        # def _convert_to_standard_cache(
+        #     past_key_value, batch_size
+        # ):
+        #     """
+        #     Standardizes the format of the cache so as to match most implementations, i.e. to tuple(tuple([batch_size,
+        #     num_heads, ...]))
+        #     """
+        #     batch_size_times_num_heads, head_dim, seq_length = past_key_value[0][0].shape
+        #     num_heads = batch_size_times_num_heads // batch_size
+        #     # key: [batch_size * num_heads, head_dim, seq_length] -> [batch_size, num_heads, head_dim, seq_length]
+        #     # value: [batch_size * num_heads, seq_length, head_dim] -> [batch_size, num_heads, seq_length, head_dim]
+        #     return tuple(
+        #         (
+        #             layer_past[0].reshape([batch_size, num_heads, head_dim, seq_length]),
+        #             layer_past[1].reshape([batch_size, num_heads, seq_length, head_dim]),
+        #         )
+        #         for layer_past in past_key_value
+        #     )
 
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
@@ -888,6 +914,7 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
 
+        # max_len includes prefix length
         if is_tracing:
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
@@ -898,6 +925,7 @@ class GenerationMixin(object):
             min_len = input_len + min_length
             max_len = input_len + max_length
 
+        # prepare distribution pre_processing samplers
         logits_processors = self.get_logits_processor(
             min_length=min_len if min_length > 0 else None,
             max_length=max_len,
@@ -912,12 +940,26 @@ class GenerationMixin(object):
             logits_processors=model_kwargs["logits_processors"]
             if "logits_processors" in model_kwargs
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
-            else None,
+            else LogitsProcessorList(),
         )
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
 
+        # prepare stopping criteria
+        stopping_criteria = self.get_stopping_criteria(
+            max_length=max_len,
+            stopping_criteria=model_kwargs["stopping_criteria"]
+            if "stopping_criteria" in model_kwargs
+            and isinstance(model_kwargs["stopping_criteria"], StoppingCriteriaList)
+            else StoppingCriteriaList(),
+        )
+        if "stopping_criteria" in model_kwargs:
+            model_kwargs.pop("stopping_criteria")
+
+        # go into different generation modes
         if decode_strategy == "greedy_search":
+
+            logits_warper = self.get_logits_warper(temperature=temperature)
             if num_return_sequences > 1:
                 raise ValueError(
                     "`num_return_sequences` has to be 1, but is {} "
@@ -925,24 +967,31 @@ class GenerationMixin(object):
                 )
 
             return self.greedy_search(
-                input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
+                input_ids,
+                logits_processors,
+                logits_warper,
+                stopping_criteria,
+                pad_token_id,
+                eos_token_id,
+                **model_kwargs,
             )
+
         elif decode_strategy == "contrastive_search":
             if num_return_sequences > 1:
                 raise ValueError(
                     f"num_return_sequences has to be 1, but is {num_return_sequences} when doing"
                     " contrastive search."
                 )
+            logits_warper = self.get_logits_warper(temperature=temperature)
             return self.contrastive_search(
                 input_ids,
+                top_k,
+                penalty_alpha,
                 logits_processors,
-                max_len,
+                logits_warper,
+                stopping_criteria,
                 pad_token_id,
                 eos_token_id,
-                penalty_alpha,
-                top_k,
-                top_p,
-                temperature,
                 **model_kwargs,
             )
 
@@ -952,28 +1001,27 @@ class GenerationMixin(object):
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
 
+            # top_k and top_p can combine to use
+            logits_warper = self.get_logits_warper(temperature=temperature, top_k=top_k, top_p=top_p)
+
             if is_tracing:
                 return self.sample_d2s(
                     input_ids,
                     logits_processors,
-                    max_len,
+                    logits_warper,
+                    stopping_criteria,
                     pad_token_id,
                     eos_token_id,
-                    top_k,
-                    top_p,
-                    temperature,
                     **model_kwargs,
                 )
             else:
                 return self.sample(
                     input_ids,
                     logits_processors,
-                    max_len,
+                    logits_warper,
+                    stopping_criteria,
                     pad_token_id,
                     eos_token_id,
-                    top_k,
-                    top_p,
-                    temperature,
                     **model_kwargs,
                 )
 
@@ -1041,14 +1089,25 @@ class GenerationMixin(object):
                     **model_kwargs,
                 )
 
-    def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
+    def greedy_search(
+        self,
+        input_ids: paddle.Tensor,
+        logits_processors: Optional[LogitsProcessorList] = None,
+        logits_warper: Optional[LogitsProcessorList] = None,
+        stopping_criteria: Optional[StoppingCriteriaList] = None,
+        pad_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
+        **model_kwargs
+    ):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        while cur_len < max_length:
+        while True:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -1067,11 +1126,19 @@ class GenerationMixin(object):
             # pre-process distribution
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
             next_tokens_scores = logits_processors(input_ids, next_token_logits)
+
+            # record score before warper
+            origin_probs = F.softmax(next_tokens_scores)
+            origin_probs = paddle.log(origin_probs)
+
+            next_tokens_scores = logits_warper(input_ids, next_tokens_scores)
+
             # greedy
             probs = F.softmax(next_tokens_scores)
             probs = paddle.log(probs)
+
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+            next_scores = paddle.index_sample(origin_probs.astype("float32"), next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1085,7 +1152,7 @@ class GenerationMixin(object):
                 unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or stopping_criteria(input_ids, scores):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
@@ -1096,20 +1163,20 @@ class GenerationMixin(object):
 
     def contrastive_search(
         self,
-        input_ids,
-        logits_processors,
-        max_length,
-        pad_token_id,
-        eos_token_id,
+        input_ids: paddle.Tensor,
+        top_k: Optional[int] = 1,
         penalty_alpha: Optional[float] = 0,
-        top_k=None,
-        temperature=None,
+        logits_processors: Optional[LogitsProcessorList] = None,
+        logits_warper: Optional[LogitsProcessorList] = None,
+        stopping_criteria: Optional[StoppingCriteriaList] = None,
+        pad_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
         # init values
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
-        logits_warper = LogitsProcessorList()
-        stopping_criteria = StoppingCriteriaList()
+        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         batch_size, cur_len = input_ids.shape
         # record average score
@@ -1118,9 +1185,6 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
-        # max_length excludes the initial prompted tokens.
-        stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length + cur_len)
-
         # If the first step in the loop, encode all the prefix and obtain (1) past_key_values
         # (2) last_hidden_states (3) logit_for_next_step (4) update model kwargs for the next step
         while True:
@@ -1128,7 +1192,7 @@ class GenerationMixin(object):
 
                 model_kwargs["use_cache"] = True
 
-                model_inputs = self.prepare_inputs_for_generation(input_ids=input_ids, **model_kwargs)
+                model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
                 outputs = self(**model_inputs, return_dict=True, output_hidden_states=True, output_attentions=True)
 
                 # last decoder hidden states will be used to compute the degeneration penalty (cosine simlarity with
@@ -1159,6 +1223,7 @@ class GenerationMixin(object):
 
                 past_key_values = model_kwargs.get("past_key_values")
 
+                print(type(past_key_values))
                 if past_key_values is None:
                     raise ValueError(
                         f"{self.__class__.__name__} does not support caching and therefore **can't** be used "
@@ -1175,14 +1240,16 @@ class GenerationMixin(object):
 
             # contrastive search main logic starts:
             # contrastive search decoding consists of two steps: (1) candidate tokens recall (2) candidate rerank by degeneration penalty
-
+            logit_for_next_step = self.adjust_logits_during_generation(logit_for_next_step)
             logit_for_next_step = logits_processors(input_ids, logit_for_next_step)
 
-            if temperature and temperature != 1.0:
-                logits_warper.append(TemperatureLogitsWarper(temperature=temperature))
+            origin_probs = F.softmax(logit_for_next_step)
+            origin_probs = paddle.log(origin_probs)
 
             logit_for_next_step = logits_warper(input_ids, logit_for_next_step)
+
             next_probs = F.softmax(logit_for_next_step, axis=-1)
+
             top_k_probs, top_k_ids = paddle.topk(next_probs, k=top_k, axis=-1)
 
             # Replicates the new past_key_valuse to match the  `top_k` candidates
@@ -1198,7 +1265,8 @@ class GenerationMixin(object):
             # compute the candidate tokens by the langugae model and collects their hidden states
 
             tmp = paddle.reshape(top_k_ids, (-1, 1))
-            # paddlenlp 在后期更新的版本中，cache中有内容，但是模型中的该方法，若cache有内容，只返回最后一个token，所以需要清空
+
+            # need to clear cache
             model_kwargs["cache"] = None
             next_model_inputs = self.prepare_inputs_for_generation(tmp, **model_kwargs)
 
@@ -1228,7 +1296,7 @@ class GenerationMixin(object):
 
             next_tokens = top_k_ids[0 : len(top_k_ids), selected_idx.item()].unsqueeze(1)
 
-            next_scores = paddle.index_sample(next_probs, next_tokens)
+            next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             next_hidden = paddle.stack(paddle.split(next_hidden.squeeze(axis=1), top_k), axis=1)
             next_hidden = next_hidden[0:batch_size, selected_idx.item(), :]
@@ -1261,7 +1329,6 @@ class GenerationMixin(object):
                     past_key_values=next_past_key_values,
                     decoder_hidden_states=next_decoder_hidden_states,
                 )
-
             else:
                 outputs = CausalLMOutputWithPast(
                     past_key_values=next_past_key_values,
@@ -1295,20 +1362,15 @@ class GenerationMixin(object):
         self,
         input_ids: paddle.Tensor,
         logits_processors: Optional[LogitsProcessorList] = None,
-        max_length: Optional[int] = None,
+        logits_warper: Optional[LogitsProcessorList] = None,
+        stopping_criteria: Optional[StoppingCriteriaList] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
-        top_k=None,
-        top_p=None,
-        temperature=None,
-        min_tokens_to_keep=1,
         **model_kwargs
     ):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
-
-        # paddlenlp 中generate的接口是否需要传入下面两个参数？
-        stopping_criteria = StoppingCriteriaList()
-        logits_warper = LogitsProcessorList()
+        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         batch_size, cur_len = input_ids.shape
         # record average score
@@ -1316,9 +1378,6 @@ class GenerationMixin(object):
         # keep track of which sequences are already finished
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-
-        # max_length includes the initial prompted tokens
-        stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         while True:
             # prepare model inputs and get model output
@@ -1334,15 +1393,8 @@ class GenerationMixin(object):
 
             logits = logits[:, -1, :]
 
-            # define particular logits_warger
-            if temperature and temperature != 1.0:
-                logits_warper.append(TemperatureLogitsWarper(temperature=temperature))
-            if top_k and top_k != 0:
-                logits_warper.append(TopKLogitsWarper(top_k=top_k, min_tokens_to_keep=min_tokens_to_keep))
-            if top_p and top_p < 1.0:
-                logits_warper.append(TopPLogitsWarper(top_p=top_p, min_tokens_to_keep=min_tokens_to_keep))
-
             # pre-process distribution
+            logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
 
             # record score
@@ -1387,15 +1439,12 @@ class GenerationMixin(object):
 
     def sample_d2s(
         self,
-        input_ids,
-        logits_processors,
-        max_length,
-        pad_token_id,
-        eos_token_id,
-        top_k=None,
-        top_p=None,
-        temperature=None,
-        min_tokens_to_keep=1,
+        input_ids: paddle.Tensor,
+        logits_processors: Optional[LogitsProcessorList] = None,
+        logits_warper: Optional[LogitsProcessorList] = None,
+        stopping_criteria: Optional[StoppingCriteriaList] = None,
+        pad_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
 
@@ -1442,15 +1491,8 @@ class GenerationMixin(object):
             origin_probs = F.softmax(logits)
             origin_probs = paddle.log(origin_probs)
 
-            if temperature is not None or temperature != 1.0:
-                logits = logits / temperature
-
+            logits = logits_warper(input_ids, logits)
             probs = F.softmax(logits)
-            if top_k is not None and top_k != 0:
-                probs = TopKProcess(probs, top_k, min_tokens_to_keep)
-            if top_p is not None and top_p < 1.0:
-                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
             if paddle.get_default_dtype() not in ["float32", "float64"]:
                 probs = probs.astype("float32")
@@ -1484,9 +1526,10 @@ class GenerationMixin(object):
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
         model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
-        max_length = paddle.full([1], max_length, dtype="int64")
 
-        while cur_len < max_length:
+        # max_length = paddle.full([1], max_length, dtype="int64")
+
+        while True:
             input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                 _forward_(**model_kwargs),
                 input_ids,
@@ -1499,7 +1542,7 @@ class GenerationMixin(object):
             paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
 
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or stopping_criteria(input_ids, scores):
                 break
 
         return input_ids[:, origin_len:], scores
@@ -1781,37 +1824,3 @@ def _ranking_fast(
     contrastive_score = paddle.stack(paddle.split(contrastive_score, beam_width), axis=-1)
     selected_idx = paddle.argmax(contrastive_score, axis=-1)
     return selected_idx
-
-
-def TopKProcess(probs, top_k, min_tokens_to_keep):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-    # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
-    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
-    return probs
-
-
-def TopPProcess(probs, top_p, min_tokens_to_keep):
-    sorted_probs = paddle.sort(probs, descending=True)
-    sorted_indices = paddle.argsort(probs, descending=True)
-    cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-
-    # Remove tokens with cumulative probs above the top_p, But keep at
-    # least min_tokens_to_keep tokens
-    sorted_indices_to_remove = cumulative_probs > top_p
-    if min_tokens_to_keep > 1:
-        # Set 'min_tokens_to_keep - 1' because the first token is kept
-        sorted_indices_to_remove[:, : min_tokens_to_keep - 1] = 0
-    # Keep the first token
-    sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-    sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-    sorted_indices_to_remove[:, 0] = 0
-
-    # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
-    condition = paddle.scatter(
-        sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-    )
-    condition = paddle.cast(condition, "bool").reshape(probs.shape)
-    probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
-    return probs

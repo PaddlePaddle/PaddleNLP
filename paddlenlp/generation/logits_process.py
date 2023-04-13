@@ -246,7 +246,6 @@ class LogitsWarper:
     """Abstract base class for all logit warpers that can be applied during generation with multinomial sampling."""
 
     def __call__(self, input_ids, scores):
-        """Torch method for warping logits."""
         raise NotImplementedError(
             f"{self.__class__} is an abstract class. Only classes inheriting this class can be called."
         )
@@ -267,7 +266,7 @@ class TemperatureLogitsWarper(LogitsWarper):
 
         self.temperature = temperature
 
-    def __call__(self, input_ids: paddle.tensor, scores: paddle.tensor):
+    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor):
         scores = scores / self.temperature
         return scores
 
