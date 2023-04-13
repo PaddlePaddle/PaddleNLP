@@ -1539,8 +1539,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 **kwargs,
             )
 
-        dtype = kwargs.pop("dtype", config.dtype)
-
         init_contexts = []
         if low_cpu_mem_usage:
             load_state_as_np = True
@@ -1549,19 +1547,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
 
-        # Fix me for loading dtype paddle.int64 but cast paddle.float32
-        # if dtype is None, use config.dtype instead
-        if dtype is None and config.dtype is not None:
-            dtype = config.dtype
-
+        dtype = kwargs.pop("dtype", config.dtype)
         if dtype:
             init_contexts.append(dtype_guard(dtype))
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
-        # PretrainedConfig auto contains dtype field
-        dtype = kwargs.pop("dtype", config.get("dtype", None))
         init_contexts = []
         if low_cpu_mem_usage:
             load_state_as_np = True
