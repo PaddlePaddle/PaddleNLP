@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle import LazyGuard
@@ -25,6 +26,7 @@ from paddle.optimizer.lr import LambdaDecay
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers import BloomConfig, PretrainedModel
+from paddlenlp.transformers.model_utils import PADDLE_WEIGHT_FILE_NAME, _add_variant
 from paddlenlp.utils.log import logger
 
 
@@ -164,3 +166,68 @@ def load_model(args: str, model_class: Type[PretrainedModel]):
 
     model.set_state_dict(state_dict)
     return model
+
+
+def init_parallel_weights(model_name_or_path: str, tensor_parallel_degree: int = 1):
+    """init parallel model state weigth files when it's saved as the sharded model weight file
+
+    Args:
+        model_name_or_path (str): the model name or model path
+        tensor_parallel_degree (int, optional): the degree to of tensor parallel. Defaults to 1.
+    """
+    # 1. only works under the local dir and tensor_parallel_degree is greater than 1
+    if tensor_parallel_degree <= 1 or not os.path.isdir(model_name_or_path):
+        return
+
+    final_wegiht_file_path = os.path.join(model_name_or_path, PADDLE_WEIGHT_FILE_NAME)
+    if os.path.exists(final_wegiht_file_path):
+        return
+
+    state_dict = {}
+
+    def concat(tensor_1, tenosr_2, axis=-1):
+        """concat the paddle tensor or numpy ndarray
+
+        Args:
+            tensor_1 (first tensor): the first tensor
+            tenosr_2 (second tensor): the second tensor
+
+        Returns:
+            paddle.Tensor | numpy.ndarray: concatted tensor
+        """
+        if paddle.is_tensor(tensor_1):
+            return paddle.concat([tensor_1, tenosr_2], axis=axis)
+        return np.concatenate([tensor_1, tenosr_2], axis=axis)
+
+    def get_axis(state_dict_key: str):
+        # 1. column parallel
+        keys = [
+            "self_attention.query_key_value.weight",
+            "self_attention.query_key_value.bias",
+            "mlp.dense_h_to_4h.bias",
+            "mlp.dense_h_to_4h.weight",
+        ]
+        if any([key in state_dict_key for key in keys]):
+            return -1
+
+        keys = ["word_embeddings.weight", ".self_attention.dense.weight", ".mlp.dense_4h_to_h.weight"]
+        if any([key in state_dict_key for key in keys]):
+            return 0
+
+        return None
+
+    # 2. load checkpoint from weight files
+    for index in range(tensor_parallel_degree):
+        weight_name = _add_variant(PADDLE_WEIGHT_FILE_NAME, f"tp{index:0>2d}")
+        weight_file_path = os.path.join(model_name_or_path, weight_name)
+        logger.info(f"start to loading shard checkpoint file<{weight_file_path}>")
+        rank_state_dict = paddle.load(weight_file_path)
+        for key, tensor in rank_state_dict.items():
+            if key in state_dict:
+                axis = get_axis(key)
+                if axis is not None:
+                    state_dict[key] = concat(state_dict[key], tensor, axis=axis)
+            else:
+                state_dict[key] = tensor
+
+    paddle.save(state_dict, final_wegiht_file_path)
