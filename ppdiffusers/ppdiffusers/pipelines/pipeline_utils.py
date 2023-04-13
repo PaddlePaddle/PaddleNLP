@@ -632,8 +632,16 @@ class DiffusionPipeline(ConfigMixin):
                 from_hf_hub=from_hf_hub,
             )
 
-            # retrieve all folder_names that contain relevant files
-            folder_names = [k for k, v in config_dict.items() if isinstance(v, list)]
+            # retrieve all folder_names that contain relevant files (we will ignore `None`` data)
+            folder_names = []
+            for k, v in config_dict.items():
+                # if we pass specifc module, we won't donwload this
+                if k in kwargs:
+                    continue
+                if isinstance(v, list):
+                    if None in v:
+                        continue
+                    folder_names.append(k)
 
             if from_hf_hub:
                 if not local_files_only:
@@ -753,6 +761,7 @@ class DiffusionPipeline(ConfigMixin):
                     variant=variant,
                     max_workers=max_workers,
                     is_fastdeploy_model=is_fastdeploy_model,
+                    local_files_only=local_files_only,
                 )
         else:
             is_local_dir = True
@@ -947,7 +956,7 @@ class DiffusionPipeline(ConfigMixin):
                 except Exception as e:
                     # (TODO, junnyu)
                     # if we cant find this file, we will try to download this
-                    if not is_local_dir and not from_hf_hub:
+                    if not local_files_only and not is_local_dir and not from_hf_hub:
                         loaded_sub_model = load_method(
                             pretrained_model_name_or_path + "/" + name, cache_dir=cache_dir, **loading_kwargs
                         )
