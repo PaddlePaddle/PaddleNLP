@@ -169,6 +169,7 @@ class ChatGLMAttention(nn.Layer):
             learnable=False,
         )
         self.scale_mask_softmax = False
+        self.dtype = paddle.get_default_dtype()
 
         self.attention_scale = config.attention_scale
 
@@ -264,10 +265,9 @@ class ChatGLMAttention(nn.Layer):
         attention_scale_coeff = float(layer_id) + 1.0
         if self.attention_scale:
             # [s, b, n, h/n]
-            dtype = q_layer.dtype
             q_layer = q_layer.astype("float32")
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(dtype)
+            q_layer = q_layer.astype(self.dtype)
 
         # [b, n, s, s]
         output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
@@ -290,13 +290,13 @@ class ChatGLMAttention(nn.Layer):
                 # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
                 # attention_scores = attention_scores + (-10000.0) * attention_mask
                 attention_scores = paddle.where(
-                    attention_mask > 0, paddle.full_like(attention_mask, -10000.0), attention_scores
+                    attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
                 )
             attention_scores = attention_scores.astype("float32")
             attention_scores = attention_scores * attention_scale_coeff
             attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.config.dtype)
-            v_layer = v_layer.astype(self.config.dtype)
+            attention_probs = attention_probs.astype(self.dtype)
+            v_layer = v_layer.astype(self.dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
