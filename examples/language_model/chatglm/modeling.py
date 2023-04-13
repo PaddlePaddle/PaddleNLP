@@ -265,7 +265,6 @@ class ChatGLMAttention(nn.Layer):
         attention_scale_coeff = float(layer_id) + 1.0
         if self.attention_scale:
             # [s, b, n, h/n]
-            q_layer = q_layer.astype("float32")
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
             q_layer = q_layer.astype(self.dtype)
 
