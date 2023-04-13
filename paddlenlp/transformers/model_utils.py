@@ -1523,6 +1523,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        dtype = kwargs.pop("dtype", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1539,6 +1540,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 **kwargs,
             )
 
+        dtype = config.dtype if dtype is None else dtype
+
         init_contexts = []
         if low_cpu_mem_usage:
             load_state_as_np = True
@@ -1547,7 +1550,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
 
-        dtype = kwargs.pop("dtype", config.dtype)
         if dtype:
             init_contexts.append(dtype_guard(dtype))
 
