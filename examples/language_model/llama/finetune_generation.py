@@ -120,7 +120,7 @@ def main():
         model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
     # Load the dataset.
