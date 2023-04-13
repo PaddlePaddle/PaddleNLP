@@ -589,7 +589,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # predict the noise residual
-                # Also applies classifier-free guidance as described in the UniDiffuser paper
                 noise_pred = self.get_noise_pred(
                     mode,
                     latents,
@@ -681,7 +680,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 negative_prompt_embeds=negative_prompt_embeds,
             )
             # contexts_low_dim
-            prompt_embeds = self.caption_decoder.encode_prefix(prompt_embeds)
+            prompt_embeds = self.unet.encode_prefix(prompt_embeds)
 
         else:
             # 3.2. Prepare text image latent variables, if necessary

@@ -170,6 +170,8 @@ class UViTModel(ModelMixin, ConfigMixin):
         assert self.img_size[0] % patch_size == 0 and self.img_size[1] % patch_size == 0
         self.num_patches = (self.img_size[0] // patch_size) * (self.img_size[1] // patch_size)
 
+        self.encode_prefix = nn.Linear(768, text_dim)
+
         self.text_embed = nn.Linear(text_dim, embed_dim)
         self.text_out = nn.Linear(embed_dim, text_dim)
         self.clip_img_embed = nn.Linear(clip_img_dim, embed_dim)
