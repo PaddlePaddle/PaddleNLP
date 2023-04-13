@@ -107,6 +107,7 @@ def main():
             r=2,
             lora_alpha=4,
             merge_weights=False,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
         )
         model = get_lora_model(model, lora_config)
         mark_only_lora_as_trainable(model)
