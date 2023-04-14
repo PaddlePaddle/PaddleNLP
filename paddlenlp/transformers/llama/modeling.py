@@ -195,7 +195,7 @@ class RMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         default_type = hidden_states.dtype
-        if self.config.opt_level is not None:
+        if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
