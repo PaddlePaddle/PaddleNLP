@@ -260,6 +260,10 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+            
+        if self.need_weights:
+            assert not self.use_memory_attn, "the output of memory attn doesn't have weights"
+            
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
             attn_outs = recompute(self.core_attn, q, k, v, attn_mask)
         elif self.use_flash_attn and attn_mask is None:
@@ -269,9 +273,6 @@ class MultiHeadAttention(nn.Layer):
         else:
             attn_outs = self.core_attn(q, k, v, attn_mask=attn_mask)
 
-        if self.need_weights:
-            assert not self.use_memory_attn, "the output of memory attn doesn't have weights"
-            
         if self.use_memory_attn:
             out = attn_outs
         else:

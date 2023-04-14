@@ -313,7 +313,7 @@ class MultiHeadAttention(nn.Layer):
         if self.sequence_parallel:
             perm = [1, 0, 2]
             out = tensor.transpose(x=out, perm=perm)
-        return out, weights
+        return (out, weights) if self.need_weights else out
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
         
@@ -408,21 +408,18 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self._memory_efficient_attention
         else:
             attn_func = self.core_attn
-
-        if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            attn_outs = recompute(attn_func, q, k, v, attn_mask)
-        else:
-            attn_outs = attn_func(q, k, v, attn_mask=attn_mask)
         
         if self.need_weights:
             assert not self.use_memory_attn, "the output of memory attn doesn't have weights"
-            
-        if self.use_memory_attn:
-            out = attn_outs
-        else:
-            out = attn_outs[0]
-            weights = attn_outs[1]
 
+        if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
+            out = recompute(attn_func, q, k, v, attn_mask)
+        else:
+            out = attn_func(q, k, v, attn_mask=attn_mask)
+
+        if self.need_weights:
+            out, weights = out
+            
         # project to output
         # if sequence_parallel is true, out shape are [s/n, b, h],
         # else their shape are [b, s, h], n is mp parallelism.
