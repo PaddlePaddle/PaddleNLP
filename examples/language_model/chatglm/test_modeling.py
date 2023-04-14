@@ -24,7 +24,8 @@ inputs = [
 
 def run_mp_paddle():
     import paddle
-    from modeling import ChatGLMForConditionalGeneration
+
+    from paddlenlp.transformers import ChatGLMForConditionalGeneration
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     strategy = paddle.distributed.fleet.DistributedStrategy()
@@ -57,7 +58,8 @@ def run_mp_paddle():
 
 def run_paddle():
     import paddle
-    from modeling import ChatGLMForConditionalGeneration
+
+    from paddlenlp.transformers import ChatGLMForConditionalGeneration
 
     paddle.set_default_dtype("float32")
     model = ChatGLMForConditionalGeneration.from_pretrained(

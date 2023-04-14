@@ -58,15 +58,24 @@ class ChatGLMTrainer(Trainer):
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         loss = None
 
+        n_token_id = self.tokenizer.convert_tokens_to_ids("<n>")
         model.eval()
         with paddle.no_grad():
-            generated_tokens = model.generate(**inputs, **self._gen_kwargs.copy())[0]
+            generated_tokens = model.generate(
+                **inputs,
+                **self._gen_kwargs.copy(),
+                decode_strategy="sampling",
+                top_k=1,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.end_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+                use_cache=True,
+            )[0]
             all_preds = []
             for pred_tokens in generated_tokens:
-                print(pred_tokens)
-                all_preds.append(pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist())
-                print("predicted tokens")
-                print(all_preds[-1])
+                pred_tokens = pred_tokens[pred_tokens != self.tokenizer.pad_token_id]
+                pred_tokens = pred_tokens[pred_tokens != n_token_id].tolist()
+                all_preds.append(pred_tokens)
                 print(self.tokenizer.decode(all_preds[-1]))
             max_pred_length = max([len(x) for x in all_preds])
             for index, preds in enumerate(all_preds):

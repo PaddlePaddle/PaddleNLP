@@ -18,22 +18,21 @@ from functools import partial
 
 import paddle
 from data import convert_example, read_local_dataset
-from modeling import ChatGLMForConditionalGeneration
-from tokenizer import ChatGLMTokenizer
 from utils import ChatGLMTrainer
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 from paddlenlp.utils.log import logger
 
 
 @dataclass
 class DataArgument:
     task_path: str = field(default="./data/", metadata={"help": "Path to data"})
-    src_length: int = field(default=64, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=64, metadata={"help": "The max length of target text."})
+    src_length: int = field(default=128, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
 
 

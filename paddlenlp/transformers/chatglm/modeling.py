@@ -22,18 +22,18 @@ from typing import Any, Dict, Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.model_outputs import (
+from ...utils.env import CONFIG_NAME
+from ...utils.log import logger
+from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
-from paddlenlp.utils.env import CONFIG_NAME
-from paddlenlp.utils.log import logger
+from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 
 __all__ = [
     "ChatGLMModel",
@@ -850,7 +850,13 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
             shift_logits = shift_logits.astype("float32")
             shift_labels = labels[..., 1:].reshape([-1])
-            loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
+                shift_logits = shift_logits[shift_labels != -100]
+                shift_labels = shift_labels[shift_labels != -100]
+                loss = self.parallel_loss_func(shift_logits, shift_labels).mean()
+            else:
+                loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
             loss = loss.astype(lm_logits.dtype)
 
         if not return_dict:

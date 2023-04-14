@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import paddle
-from configuration import ChatGLMConfig
-from modeling import ChatGLMForConditionalGeneration
 from paddle.distributed import fleet
-from tokenizer import ChatGLMTokenizer
+
+from paddlenlp.transformers import (
+    ChatGLMConfig,
+    ChatGLMForConditionalGeneration,
+    ChatGLMTokenizer,
+)
 
 
 def parse_arguments():

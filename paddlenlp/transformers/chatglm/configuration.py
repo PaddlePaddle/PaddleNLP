@@ -14,7 +14,7 @@
 
 """ ChatGLM model configuration """
 
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from ..configuration_utils import PretrainedConfig
 
 __all__ = [
     "ChatGLMConfig",

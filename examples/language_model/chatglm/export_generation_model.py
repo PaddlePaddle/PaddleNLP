@@ -16,8 +16,8 @@ import argparse
 import os
 
 import paddle
-from modeling import ChatGLMForConditionalGeneration
-from tokenizer import ChatGLMTokenizer
+
+from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 
 
 def parse_args():
