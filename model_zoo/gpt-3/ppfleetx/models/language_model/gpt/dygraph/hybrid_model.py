@@ -324,7 +324,7 @@ class MultiHeadAttention(nn.Layer):
             v = tensor.transpose(x=v, perm=perm)
             
         if attn_mask is None:
-            mask = paddle.full(shape=[q.shape[0], q.shape[2], q.shape[1], k.shape[1]], fill_value=-np.inf)
+            mask = paddle.full(shape=[q.shape[0], q.shape[2], q.shape[1], k.shape[1]], fill_value=-np.inf, dtype=p.dtype)
             attn_mask = paddle.triu(mask, diagonal=1)
             attn_mask.stop_gradient = False
             # attn_mask = ab.LowerTriangularMask()
