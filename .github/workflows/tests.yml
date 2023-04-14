@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - 'paddlenlp/*'
+      - 'model_zoo/*'
+      - 'examples/*'
       - 'tests/*'
   pull_request:
     paths:
       - 'paddlenlp/*'
+      - 'model_zoo/*'
+      - 'examples/*'
       - 'tests/*'
 
 
