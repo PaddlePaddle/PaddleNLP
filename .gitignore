@@ -124,3 +124,11 @@ FETCH_HEAD
 # vscode
 .vscode
 ./ppdiffusers/ppdiffusers/version.py
+
+# data and parameter
+model_zoo/gpt-3/data/
+model_zoo/gpt-3/log_mea_175B/
+model_zoo/gpt-3/log/
+model_zoo/gpt-3/output/
+model_zoo/gpt-3/my-gpt2_text/
+model_zoo/gpt-3/__MACOSX/
