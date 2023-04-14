@@ -316,10 +316,6 @@ class MultiHeadAttention(nn.Layer):
         return out, weights
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
-        perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
-        q_temp = tensor.transpose(x=q, perm=perm)
-        k_temp = tensor.transpose(x=k, perm=perm)
-        product = paddle.matmul(x=q_temp, y=k_temp, transpose_y=True)
         
         if self.sequence_parallel:
             perm = [1, 0, 2, 3]
@@ -328,7 +324,8 @@ class MultiHeadAttention(nn.Layer):
             v = tensor.transpose(x=v, perm=perm)
             
         if attn_mask is None:
-            attn_mask = get_triangle_upper_mask(product, attn_mask)
+            mask = paddle.full(shape=[q.shape[0], q.shape[2], q.shape[1], k.shape[1]], fill_value=-np.inf)
+            attn_mask = paddle.triu(mask, diagonal=1)
             attn_mask.stop_gradient = False
             # attn_mask = ab.LowerTriangularMask()
             
