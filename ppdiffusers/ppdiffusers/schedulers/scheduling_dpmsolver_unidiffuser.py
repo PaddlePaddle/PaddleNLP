@@ -21,6 +21,63 @@ from ..configuration_utils import ConfigMixin, register_to_config
 from .scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin, SchedulerOutput
 
 
+def logaddexp(x, y):
+    return paddle.log(1 + paddle.exp(paddle.minimum(x, y) - paddle.maximum(x, y))) + paddle.maximum(x, y)
+
+
+def interpolate_fn(x: paddle.Tensor, xp: paddle.Tensor, yp: paddle.Tensor) -> paddle.Tensor:
+    """Performs piecewise linear interpolation for x, using xp and yp keypoints (knots).
+    Performs separate interpolation for each channel.
+    Args:
+        x: [N, C] points to be calibrated (interpolated). Batch with C channels.
+        xp: [C, K] x coordinates of the PWL knots. C is the number of channels, K is the number of knots.
+        yp: [C, K] y coordinates of the PWL knots. C is the number of channels, K is the number of knots.
+    Returns:
+        Interpolated points of the shape [N, C].
+    The piecewise linear function extends for the whole x axis (the outermost keypoints define the outermost
+    infinite lines).
+    For example:
+    >>> calibrate1d(paddle.to_tensor([[0.5]]), paddle.to_tensor([[0.0, 1.0]]), paddle.to_tensor([[0.0, 2.0]]))
+    tensor([[1.0000]])
+    >>> calibrate1d(paddle.to_tensor([[-10]]), paddle.to_tensor([[0.0, 1.0]]), paddle.to_tensor([[0.0, 2.0]]))
+    tensor([[-20.0000]])
+    """
+    x_breakpoints = paddle.concat([x.unsqueeze(2), xp.unsqueeze(0).tile((x.shape[0], 1, 1))], axis=2)
+    num_x_points = xp.shape[1]
+    sorted_x_breakpoints = paddle.sort(x_breakpoints, axis=2)
+    x_indices = paddle.argsort(x_breakpoints, axis=2)
+    x_idx = paddle.argmin(x_indices, axis=2)
+    cand_start_idx = x_idx - 1
+    start_idx = paddle.where(
+        paddle.equal(x_idx, 0),
+        paddle.to_tensor([1]),
+        paddle.where(
+            paddle.equal(x_idx, num_x_points),
+            paddle.to_tensor([num_x_points - 2]),
+            cand_start_idx,
+        ),
+    )
+    end_idx = paddle.where(paddle.equal(start_idx, cand_start_idx), start_idx + 2, start_idx + 1)
+    start_x = paddle.take_along_axis(arr=sorted_x_breakpoints, axis=2, indices=start_idx.unsqueeze(axis=2)).squeeze(
+        axis=2
+    )
+    end_x = paddle.take_along_axis(arr=sorted_x_breakpoints, axis=2, indices=end_idx.unsqueeze(axis=2)).squeeze(axis=2)
+    start_idx2 = paddle.where(
+        paddle.equal(x_idx, 0),
+        paddle.to_tensor([0]),
+        paddle.where(
+            paddle.equal(x_idx, num_x_points),
+            paddle.to_tensor([num_x_points - 2]),
+            cand_start_idx,
+        ),
+    )
+    y_positions_expanded = yp.unsqueeze(0).expand([x.shape[0], -1, -1])
+    start_y = paddle.take_along_axis(y_positions_expanded, axis=2, indices=start_idx2.unsqueeze(2)).squeeze(2)
+    end_y = paddle.take_along_axis(y_positions_expanded, axis=2, indices=(start_idx2 + 1).unsqueeze(2)).squeeze(2)
+    cand = start_y + (x - start_x) * (end_y - start_y) / (end_x - start_x)
+    return cand
+
+
 class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
     """
     DPM-Solver (and the improved version DPM-Solver++) is a fast dedicated high-order solver for diffusion ODEs with
@@ -94,14 +151,15 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.00085,
         beta_end: float = 0.0120,
         beta_schedule: str = "scaled_linear",
+        schedule: str = "discrete",
         trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         solver_order: int = 2,
-        prediction_type: str = "epsilon",
+        prediction_type: str = "epsilon",  # named predict_epsilon in old code
         thresholding: bool = False,
         dynamic_thresholding_ratio: float = 0.995,
         sample_max_value: float = 1.0,
-        algorithm_type: str = "dpmsolver++",
-        solver_type: str = "midpoint",
+        algorithm_type: str = "dpmsolver++",  # named predict_x0 in old code
+        solver_type: str = "midpoint",  # old dpmsolver, never be taylor/heun
         lower_order_final: bool = True,
     ):
         if trained_betas is not None:
@@ -114,34 +172,70 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         else:
             raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
-        self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
-        # Currently we only support VP-type noise schedule
-        self.alpha_t = paddle.sqrt(self.alphas_cumprod)
-        self.sigma_t = paddle.sqrt(1 - self.alphas_cumprod)
-        self.lambda_t = paddle.log(self.alpha_t) - paddle.log(self.sigma_t)
+        if schedule == "discrete":
+            log_alphas = 0.5 * paddle.log(1 - self.betas).cumsum(axis=0)
+            self.total_N = len(log_alphas)
+            self.t_discrete = paddle.linspace(1.0 / self.total_N, 1.0, self.total_N).reshape([1, -1])
+            self.log_alpha_discrete = log_alphas.reshape((1, -1))
+        else:
+            raise ValueError
 
+        self.noise_prev_list = []
+        self.t_prev_list = []
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = 1.0
 
         # settings for DPM-Solver
-        if algorithm_type not in ["dpmsolver", "dpmsolver++"]:
+        if algorithm_type not in ["dpmsolver++"]:
             if algorithm_type == "deis":
                 algorithm_type = "dpmsolver++"
             else:
                 raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
-        if solver_type not in ["midpoint", "heun"]:
+        if solver_type not in ["midpoint", "heun"]:  # dpmsolver/taylor
             if solver_type in ["logrho", "bh1", "bh2"]:
                 solver_type = "midpoint"
             else:
                 raise NotImplementedError(f"{solver_type} does is not implemented for {self.__class__}")
 
-        # setable values
-        self.num_inference_steps = None
-        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=np.float32)[::-1].copy()
-        self.timesteps = paddle.to_tensor(timesteps)
-        self.model_outputs = [None] * solver_order
-        self.lower_order_nums = 0
+    def marginal_log_mean_coeff(self, t):
+        """
+        Compute log(alpha_t) of a given continuous-time label t in [0, T].
+        """
+        if self.schedule == "discrete":
+            return interpolate_fn(
+                t.reshape((-1, 1)), self.t_discrete.clone(), self.log_alpha_discrete.clone()
+            ).reshape((-1,))
+        else:
+            raise ValueError
+
+    def marginal_alpha(self, t):
+        return paddle.exp(self.marginal_log_mean_coeff(t))
+
+    def marginal_std(self, t):
+        """
+        Compute sigma_t of a given continuous-time label t in [0, T].
+        """
+        return paddle.sqrt(1.0 - paddle.exp(2.0 * self.marginal_log_mean_coeff(t)))
+
+    def marginal_lambda(self, t):
+        """
+        Compute lambda_t = log(alpha_t) - log(sigma_t) of a given continuous-time label t in [0, T].
+        """
+        log_mean_coeff = self.marginal_log_mean_coeff(t)
+        log_std = 0.5 * paddle.log(1.0 - paddle.exp(2.0 * log_mean_coeff))
+        return log_mean_coeff - log_std
+
+    def inverse_lambda(self, lamb):
+        if self.schedule == "discrete":
+            log_alpha = -0.5 * logaddexp(paddle.zeros((1,)), -2.0 * lamb)
+            t = interpolate_fn(
+                log_alpha.reshape((-1, 1)),
+                paddle.flip(self.log_alpha_discrete.clone(), [1]),
+                paddle.flip(self.t_discrete.clone(), [1]),
+            )
+            return t.reshape((-1,))
+        else:
+            raise ValueError
 
     def set_timesteps(self, num_inference_steps: int):
         """
@@ -152,13 +246,7 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
         self.num_inference_steps = num_inference_steps
-        timesteps = (
-            np.linspace(0, self.num_train_timesteps - 1, num_inference_steps + 1)
-            .round()[::-1][:-1]
-            .copy()
-            .astype(np.int64)
-        )
-        self.timesteps = paddle.to_tensor(timesteps)
+        self.timesteps = paddle.linspace(1.0, 0.001, num_inference_steps + 1)
         self.model_outputs = [
             None,
         ] * self.config.solver_order
@@ -187,58 +275,21 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         # DPM-Solver++ needs to solve an integral of the data prediction model.
         if self.config.algorithm_type == "dpmsolver++":
             if self.config.prediction_type == "epsilon":
-                alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
+                alpha_t, sigma_t = self.marginal_alpha(timestep), self.marginal_std(timestep)
+                # alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
                 x0_pred = (sample - sigma_t * model_output) / alpha_t
-            elif self.config.prediction_type == "sample":
-                x0_pred = model_output
-            elif self.config.prediction_type == "v_prediction":
-                alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
-                x0_pred = alpha_t * sample - sigma_t * model_output
             else:
                 raise ValueError(
-                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample`, or"
-                    " `v_prediction` for the DPMSolverMultistepScheduler."
+                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon` for the DPMSolverUniDiffuserScheduler."
                 )
-
-            if self.config.thresholding:
-                # Dynamic thresholding in https://arxiv.org/abs/2205.11487
-                orig_dtype = x0_pred.dtype
-                if orig_dtype not in [paddle.float32, paddle.float64]:
-                    x0_pred = x0_pred.cast("float32")
-                dynamic_max_val = paddle.quantile(
-                    paddle.abs(x0_pred).reshape((x0_pred.shape[0], -1)), self.config.dynamic_thresholding_ratio, axis=1
-                )
-                dynamic_max_val = paddle.maximum(
-                    dynamic_max_val,
-                    self.config.sample_max_value * paddle.ones_like(dynamic_max_val),
-                )[(...,) + (None,) * (x0_pred.ndim - 1)]
-                x0_pred = paddle.clip(x0_pred, -dynamic_max_val, dynamic_max_val) / dynamic_max_val
-                x0_pred = x0_pred.cast(orig_dtype)
             return x0_pred
-        # DPM-Solver needs to solve an integral of the noise prediction model.
-        elif self.config.algorithm_type == "dpmsolver":
-            if self.config.prediction_type == "epsilon":
-                return model_output
-            elif self.config.prediction_type == "sample":
-                alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
-                epsilon = (sample - alpha_t * model_output) / sigma_t
-                return epsilon
-            elif self.config.prediction_type == "v_prediction":
-                alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
-                epsilon = alpha_t * model_output + sigma_t * sample
-                return epsilon
-            else:
-                raise ValueError(
-                    f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample`, or"
-                    " `v_prediction` for the DPMSolverMultistepScheduler."
-                )
 
     def dpm_solver_first_order_update(
         self,
-        model_output: paddle.Tensor,
-        timestep: int,
-        prev_timestep: int,
-        sample: paddle.Tensor,
+        model_output: paddle.Tensor,  # noise_s
+        timestep: int,  # s
+        prev_timestep: int,  # t
+        sample: paddle.Tensor,  # x
     ) -> paddle.Tensor:
         """
         One step for the first-order DPM-Solver (equivalent to DDIM).
@@ -255,14 +306,21 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             `paddle.Tensor`: the sample tensor at the previous timestep.
         """
-        lambda_t, lambda_s = self.lambda_t[prev_timestep], self.lambda_t[timestep]
-        alpha_t, alpha_s = self.alpha_t[prev_timestep], self.alpha_t[timestep]
-        sigma_t, sigma_s = self.sigma_t[prev_timestep], self.sigma_t[timestep]
+        # lambda_t, lambda_s = self.lambda_t[prev_timestep], self.lambda_t[timestep] # marginal_lambda
+        # alpha_t, alpha_s = self.alpha_t[prev_timestep], self.alpha_t[timestep] # marginal_log_mean_coeff
+        # sigma_t, sigma_s = self.sigma_t[prev_timestep], self.sigma_t[timestep] # marginal_std
+        lambda_t, lambda_s = self.marginal_lambda(prev_timestep), self.marginal_lambda(timestep)  # marginal_lambda
+        alpha_t, alpha_s = self.marginal_log_mean_coeff(prev_timestep), self.marginal_log_mean_coeff(
+            timestep
+        )  # marginal_log_mean_coeff
+        sigma_t, sigma_s = self.marginal_std(prev_timestep), self.marginal_std(timestep)  # marginal_std
+
+        alpha_t = paddle.exp(alpha_t)
         h = lambda_t - lambda_s
         if self.config.algorithm_type == "dpmsolver++":
             x_t = (sigma_t / sigma_s) * sample - (alpha_t * (paddle.exp(-h) - 1.0)) * model_output
-        elif self.config.algorithm_type == "dpmsolver":
-            x_t = (alpha_t / alpha_s) * sample - (sigma_t * (paddle.exp(h) - 1.0)) * model_output
+        # elif self.config.algorithm_type == "dpmsolver":
+        #     x_t = (alpha_t / alpha_s) * sample - (sigma_t * (paddle.exp(h) - 1.0)) * model_output
         return x_t
 
     def multistep_dpm_solver_second_order_update(
@@ -270,7 +328,7 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         model_output_list: List[paddle.Tensor],
         timestep_list: List[int],
         prev_timestep: int,
-        sample: paddle.Tensor,
+        sample: paddle.Tensor,  # x
     ) -> paddle.Tensor:
         """
         One step for the second-order multistep DPM-Solver.
@@ -288,39 +346,22 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         """
         t, s0, s1 = prev_timestep, timestep_list[-1], timestep_list[-2]
         m0, m1 = model_output_list[-1], model_output_list[-2]
-        lambda_t, lambda_s0, lambda_s1 = self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1]
-        alpha_t, alpha_s0 = self.alpha_t[t], self.alpha_t[s0]
-        sigma_t, sigma_s0 = self.sigma_t[t], self.sigma_t[s0]
+        # lambda_t, lambda_s0, lambda_s1 = self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1]
+        # alpha_t, alpha_s0 = self.alpha_t[t], self.alpha_t[s0]
+        # sigma_t, sigma_s0 = self.sigma_t[t], self.sigma_t[s0]
+        lambda_t, lambda_s0, lambda_s1 = self.marginal_lambda(t), self.marginal_lambda(s0), self.marginal_lambda(s1)
+        alpha_t, alpha_s0 = self.marginal_log_mean_coeff(t), self.marginal_log_mean_coeff(s0)
+        sigma_t, sigma_s0 = self.marginal_std(t), self.marginal_std(s0)
         h, h_0 = lambda_t - lambda_s0, lambda_s0 - lambda_s1
         r0 = h_0 / h
         D0, D1 = m0, (1.0 / r0) * (m0 - m1)
         if self.config.algorithm_type == "dpmsolver++":
             # See https://arxiv.org/abs/2211.01095 for detailed derivations
-            if self.config.solver_type == "midpoint":
+            if self.config.solver_type == "midpoint":  # named dpm_solver in old codes
                 x_t = (
                     (sigma_t / sigma_s0) * sample
                     - (alpha_t * (paddle.exp(-h) - 1.0)) * D0
                     - 0.5 * (alpha_t * (paddle.exp(-h) - 1.0)) * D1
-                )
-            elif self.config.solver_type == "heun":
-                x_t = (
-                    (sigma_t / sigma_s0) * sample
-                    - (alpha_t * (paddle.exp(-h) - 1.0)) * D0
-                    + (alpha_t * ((paddle.exp(-h) - 1.0) / h + 1.0)) * D1
-                )
-        elif self.config.algorithm_type == "dpmsolver":
-            # See https://arxiv.org/abs/2206.00927 for detailed derivations
-            if self.config.solver_type == "midpoint":
-                x_t = (
-                    (alpha_t / alpha_s0) * sample
-                    - (sigma_t * (paddle.exp(h) - 1.0)) * D0
-                    - 0.5 * (sigma_t * (paddle.exp(h) - 1.0)) * D1
-                )
-            elif self.config.solver_type == "heun":
-                x_t = (
-                    (alpha_t / alpha_s0) * sample
-                    - (sigma_t * (paddle.exp(h) - 1.0)) * D0
-                    - (sigma_t * ((paddle.exp(h) - 1.0) / h - 1.0)) * D1
                 )
         return x_t
 
@@ -347,14 +388,22 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
         """
         t, s0, s1, s2 = prev_timestep, timestep_list[-1], timestep_list[-2], timestep_list[-3]
         m0, m1, m2 = model_output_list[-1], model_output_list[-2], model_output_list[-3]
+        # lambda_t, lambda_s0, lambda_s1, lambda_s2 = (
+        #     self.lambda_t[t],
+        #     self.lambda_t[s0],
+        #     self.lambda_t[s1],
+        #     self.lambda_t[s2],
+        # )
+        # alpha_t, alpha_s0 = self.alpha_t[t], self.alpha_t[s0]
+        # sigma_t, sigma_s0 = self.sigma_t[t], self.sigma_t[s0]
         lambda_t, lambda_s0, lambda_s1, lambda_s2 = (
-            self.lambda_t[t],
-            self.lambda_t[s0],
-            self.lambda_t[s1],
-            self.lambda_t[s2],
+            self.marginal_lambda(t),
+            self.marginal_lambda(s0),
+            self.marginal_lambda(s1),
+            self.marginal_lambda(s2),
         )
-        alpha_t, alpha_s0 = self.alpha_t[t], self.alpha_t[s0]
-        sigma_t, sigma_s0 = self.sigma_t[t], self.sigma_t[s0]
+        alpha_t, alpha_s0 = self.marginal_log_mean_coeff(t), self.marginal_log_mean_coeff(s0)
+        sigma_t, sigma_s0 = self.marginal_std(t), self.marginal_std(s0)
         h, h_0, h_1 = lambda_t - lambda_s0, lambda_s0 - lambda_s1, lambda_s1 - lambda_s2
         r0, r1 = h_0 / h, h_1 / h
         D0 = m0
@@ -369,21 +418,13 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
                 + (alpha_t * ((paddle.exp(-h) - 1.0) / h + 1.0)) * D1
                 - (alpha_t * ((paddle.exp(-h) - 1.0 + h) / h**2 - 0.5)) * D2
             )
-        elif self.config.algorithm_type == "dpmsolver":
-            # See https://arxiv.org/abs/2206.00927 for detailed derivations
-            x_t = (
-                (alpha_t / alpha_s0) * sample
-                - (sigma_t * (paddle.exp(h) - 1.0)) * D0
-                - (sigma_t * ((paddle.exp(h) - 1.0) / h - 1.0)) * D1
-                - (sigma_t * ((paddle.exp(h) - 1.0 - h) / h**2 - 0.5)) * D2
-            )
         return x_t
 
     def step(
         self,
-        model_output: paddle.Tensor,
+        model_output: paddle.Tensor,  # noise_pred [1, 16896]
         timestep: int,
-        sample: paddle.Tensor,
+        sample: paddle.Tensor,  # latents [1, 16896]
         return_dict: bool = True,
     ) -> Union[SchedulerOutput, Tuple]:
         """
@@ -411,39 +452,56 @@ class DPMSolverUniDiffuserScheduler(SchedulerMixin, ConfigMixin):
             step_index = len(self.timesteps) - 1
         else:
             step_index = step_index.item()
-        prev_timestep = 0 if step_index == len(self.timesteps) - 1 else self.timesteps[step_index + 1]
-        lower_order_final = (
-            (step_index == len(self.timesteps) - 1) and self.config.lower_order_final and len(self.timesteps) < 15
-        )
-        lower_order_second = (
-            (step_index == len(self.timesteps) - 2) and self.config.lower_order_final and len(self.timesteps) < 15
-        )
+        # prev_timestep = 0 if step_index == len(self.timesteps) - 1 else self.timesteps[step_index + 1]
+        # lower_order_final = (
+        #     (step_index == len(self.timesteps) - 1) and self.config.lower_order_final and len(self.timesteps) < 15
+        # )
+        # lower_order_second = (
+        #     (step_index == len(self.timesteps) - 2) and self.config.lower_order_final and len(self.timesteps) < 15
+        # )
+        # model_output = self.convert_model_output(model_output, timestep, sample)
 
-        model_output = self.convert_model_output(model_output, timestep, sample)
-        for i in range(self.config.solver_order - 1):
-            self.model_outputs[i] = self.model_outputs[i + 1]
-        self.model_outputs[-1] = model_output
+        order = 3
+        if step_index == 0:
+            # vec_t = self.timesteps[0].expand([sample.shape[0]])
+            vec_t = timestep.expand([sample.shape[0]])
+            model_output = self.convert_model_output(model_output, vec_t, sample)
+            self.noise_prev_list.append(model_output)  # img [1, 16896]    text [1, 77, 64] # -1727.95214844
+            self.t_prev_list.append(vec_t)
 
-        if self.config.solver_order == 1 or self.lower_order_nums < 1 or lower_order_final:
-            prev_sample = self.dpm_solver_first_order_update(model_output, timestep, prev_timestep, sample)
-        elif self.config.solver_order == 2 or self.lower_order_nums < 2 or lower_order_second:
-            timestep_list = [self.timesteps[step_index - 1], timestep]
-            prev_sample = self.multistep_dpm_solver_second_order_update(
-                self.model_outputs, timestep_list, prev_timestep, sample
-            )
-        else:
-            timestep_list = [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep]
-            prev_sample = self.multistep_dpm_solver_third_order_update(
-                self.model_outputs, timestep_list, prev_timestep, sample
-            )
+        if step_index > 0 and step_index < order:
+            vec_t = timestep.expand([sample.shape[0]])
+            sample = self.dpm_multistep_update(sample, self.noise_prev_list, self.t_prev_list, vec_t, step_index)
+            model_output = self.convert_model_output(model_output, vec_t, sample)
+            self.noise_prev_list.append(model_output)
+            self.t_prev_list.append(vec_t)
 
-        if self.lower_order_nums < self.config.solver_order:
-            self.lower_order_nums += 1
+        if step_index >= order and step_index < len(self.timesteps):
+            vec_t = timestep.expand([sample.shape[0]])
+            sample = self.dpm_multistep_update(sample, self.noise_prev_list, self.t_prev_list, vec_t, order)
+            for i in range(order - 1):
+                self.t_prev_list[i] = self.t_prev_list[i + 1]
+                self.noise_prev_list[i] = self.noise_prev_list[i + 1]
+            self.t_prev_list[-1] = vec_t
+            if step_index < len(self.timesteps) - 1:
+                self.noise_prev_list[-1] = self.convert_model_output(model_output, vec_t, sample)
+
+        prev_sample = sample
 
         if not return_dict:
             return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
+
+    def dpm_multistep_update(self, x, noise_prev_list, t_prev_list, t, order):
+        if order == 1:
+            return self.dpm_solver_first_order_update(noise_prev_list[-1], t, t_prev_list[-1], x)
+        elif order == 2:
+            return self.multistep_dpm_solver_second_order_update(noise_prev_list, t_prev_list, t, x)
+        elif order == 3:
+            return self.multistep_dpm_solver_third_order_update(noise_prev_list, t_prev_list, t, x)
+        else:
+            raise ValueError("Solver order must be 1 or 2 or 3, got {}".format(order))
 
     def scale_model_input(self, sample: paddle.Tensor, *args, **kwargs) -> paddle.Tensor:
         """
