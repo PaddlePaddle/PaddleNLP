@@ -37,6 +37,7 @@ def parse_args():
         # required=True,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
     args = parser.parse_args()
     return args
 
@@ -44,11 +45,11 @@ def parse_args():
 def main():
     args = parse_args()
 
-    paddle.set_default_dtype("float32")
+    paddle.set_default_dtype(args.dtype)
 
     tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
     model = ChatGLMForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, load_state_as_np=True, dtype="float32"
+        args.model_name_or_path, load_state_as_np=True, dtype=args.dtype
     )
 
     model.eval()

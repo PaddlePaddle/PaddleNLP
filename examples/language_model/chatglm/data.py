@@ -14,6 +14,8 @@
 
 import json
 
+import numpy as np
+
 
 def read_local_dataset(path):
     with open(path, "r", encoding="utf-8") as fp:
@@ -44,25 +46,36 @@ def convert_example(example, tokenizer, data_args, is_test=True):
         }
     # dataset for training
     else:
-        src_ids = tokenizer.encode(prompt, add_special_tokens=False).input_ids
-        tgt_ids = tokenizer.encode(response, add_special_tokens=False).input_ids
-
-        if len(src_ids) > data_args.src_length - 1:
-            src_ids = src_ids[: data_args.src_length - 1]
-
-        if len(tgt_ids) > data_args.tgt_length - 2:
-            tgt_ids = tgt_ids[: data_args.tgt_length - 2]
+        src_ids = tokenizer(
+            prompt,
+            add_special_tokens=False,
+            max_length=data_args.src_length - 1,
+            truncation=True,
+            truncation_side="left",
+        )["input_ids"]
+        tgt_ids = tokenizer(
+            response,
+            add_special_tokens=False,
+            max_length=data_args.tgt_length - 2,
+            truncation=True,
+            truncation_side="right",
+        )["input_ids"]
 
         input_ids = tokenizer.build_inputs_with_special_tokens(src_ids, tgt_ids)
 
         context_length = input_ids.index(tokenizer.bos_token_id)
         mask_position = context_length - 1
+
+        attention_mask = np.tri(len(input_ids), len(input_ids))
+        attention_mask[:, :context_length] = 1
+        attention_mask = attention_mask[None, :, :]
+        attention_mask = (attention_mask < 0.5).astype("int64")
+
         labels = [-100] * context_length + input_ids[mask_position + 1 :]
 
-        pad_length = data_args.src_length + data_args.tgt_length - len(input_ids)
         inputs = {
-            "input_ids": input_ids + [tokenizer.pad_token_id] * pad_length,
-            "labels": labels + [tokenizer.pad_token_id] * pad_length,
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
         }
-    inputs["labels"] = [l if l != tokenizer.pad_token_id else -100 for l in inputs["labels"]]
     return inputs

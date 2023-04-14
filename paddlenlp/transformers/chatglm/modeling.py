@@ -118,7 +118,7 @@ class RotaryEmbeddings(nn.Layer):
         # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
         #    self.max_seq_len_cached = None if self.learnable else seq_len
         # [s]
-        t = paddle.arange(seq_len)
+        t = paddle.arange(seq_len).astype(self.dtype)
         # [s, h/n/2]
         # TODO: Failed for fp16 when converting to static graph.
         freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
@@ -329,6 +329,7 @@ class ChatGLMBlock(nn.Layer):
         super(ChatGLMBlock, self).__init__()
         self.config = config
         self.layer_id = layer_id
+        self.dtype = paddle.get_default_dtype()
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = ChatGLMAttention(config)
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
@@ -343,7 +344,9 @@ class ChatGLMBlock(nn.Layer):
         cache: Tensor = None,
     ):
         # Layer norm before transformer layer
+        hidden_states = hidden_states.astype("float32")
         attention_input = self.input_layernorm(hidden_states)
+        attention_input.astype(self.dtype)
         # Self attention
         attention_output, cache, _ = self.attention(
             hidden_states=attention_input,
@@ -584,8 +587,11 @@ class ChatGLMPretrainedModel(PretrainedModel):
         attention_mask = (attention_mask < 0.5).astype("int64")
         return attention_mask
 
-    def get_position_ids(self, input_ids, mask_positions, gmask=False):
+    def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
+        if use_gmasks is None:
+            use_gmasks = [False] * batch_size
+
         context_lengths = []
         for seq in input_ids:
             context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
@@ -606,8 +612,8 @@ class ChatGLMPretrainedModel(PretrainedModel):
             position_ids = paddle.stack((position_ids, block_position_ids), axis=1)
         else:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
-            if not gmask:
-                for i, context_length in enumerate(context_lengths):
+            for i, context_length in enumerate(context_lengths):
+                if not use_gmasks[i]:
                     position_ids[context_length:] = mask_positions[i]
 
         return position_ids
@@ -691,14 +697,15 @@ class ChatGLMModel(ChatGLMPretrainedModel):
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
-            all_ids = input_ids.reshape([-1])
-            mask_token = gMASK if gMASK in all_ids else MASK
-            use_gmask = True if gMASK in all_ids else False
 
+            use_gmasks = []
             mask_positions = []
             for seq in input_ids:
+                mask_token = gMASK if gMASK in seq else MASK
+                use_gmask = mask_token == gMASK
+                use_gmasks.append(use_gmask)
                 mask_positions.append(paddle.where(seq == mask_token)[0][0])
-            position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
+            position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         logits, new_caches = self.transformer(
@@ -726,17 +733,20 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         self.chatglm = ChatGLMModel(config)
 
         self.lm_head = self.chatglm.get_input_embeddings()
+        # from paddlenlp.transformers import ChatGLMTokenizer
+        # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
 
     def prepare_inputs_for_generation(
         self, input_ids, position_ids=None, attention_mask=None, past_key_values=None, cache=None, **kwargs
     ):
         batch_size, seq_length = input_ids.shape
         MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
-        all_ids = input_ids.reshape([-1])
-        mask_token = gMASK if gMASK in all_ids else MASK
-        use_gmask = True if gMASK in all_ids else False
+        use_gmasks = []
         mask_positions = []
         for seq in input_ids:
+            mask_token = gMASK if gMASK in seq else MASK
+            use_gmask = mask_token == gMASK
+            use_gmasks.append(use_gmask)
             mask_positions.append(paddle.where(seq == mask_token)[0][0])
 
         if cache is not None or past_key_values is not None:
@@ -776,7 +786,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
             if attention_mask is None:
                 attention_mask = self.get_masks(input_ids)
             if position_ids is None:
-                position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, gmask=use_gmask)
+                position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
             return {
                 "input_ids": input_ids,
@@ -846,10 +856,19 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         lm_logits = lm_logits.transpose([1, 0, 2])
         loss = None
         if labels is not None:
+            """
+            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
+                print("prediction")
+                print(self.tokenizer.decode(p[l != -100].tolist()))
+                print("labels")
+                print(self.tokenizer.decode(l[l != -100].tolist()))
+            """
+
             shift_logits = lm_logits[..., :-1, :]
             shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
             shift_logits = shift_logits.astype("float32")
             shift_labels = labels[..., 1:].reshape([-1])
+
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
                 shift_logits = shift_logits[shift_labels != -100]

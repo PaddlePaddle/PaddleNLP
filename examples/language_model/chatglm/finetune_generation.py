@@ -95,7 +95,7 @@ def main():
     test_ds = dev_ds.map(trans_func)
 
     collate_fn = DataCollatorWithPadding(
-        tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding="max_length"
+        tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
     def compute_metrics(eval_preds):
@@ -128,8 +128,8 @@ def main():
         data_collator=collate_fn,
         data_args=data_args,
     )
-    if training_args.fp16_opt_level == "O2":
-        trainer.disable_autocast_context_manager()
+    # if training_args.fp16_opt_level == "O2":
+    #     trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)

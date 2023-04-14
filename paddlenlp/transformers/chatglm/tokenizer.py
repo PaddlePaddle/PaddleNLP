@@ -184,6 +184,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         end_token="</s>",
         mask_token="[MASK]",
         gmask_token="[gMASK]",
+        pad_token="<pad>",
         padding_side="left",
         num_image_tokens=20000,
         **kwargs
@@ -191,6 +192,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         super().__init__(
             do_lower_case=do_lower_case,
             remove_space=remove_space,
+            pad_token=pad_token,
             padding_side=padding_side,
             unk_token=unk_token,
             bos_token=bos_token,
@@ -339,21 +341,10 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         Returns:
             `List[int]`: List of [input IDs](../glossary#input-ids) with the appropriate special tokens.
         """
-        mask_ids = self.sp_tokenizer[self.mask_token]
-        gmask_ids = self.sp_tokenizer[self.gmask_token]
-        eos_id = self.sp_tokenizer[self.eos_token]
-        if mask_ids not in token_ids_0 and gmask_ids not in token_ids_0:
-            token_ids_0 += [gmask_ids]
-
-        if token_ids_0[-1] != mask_ids and token_ids_0[-1] != gmask_ids:
-            token_ids_0 += [self.sp_tokenizer[self.end_token]]
-
-        token_ids_0 += [self.sp_tokenizer[self.bos_token]]
+        token_ids_0 += [self.sp_tokenizer[self.gmask_token], self.sp_tokenizer[self.bos_token]]
 
         if token_ids_1 is not None:
-            if not token_ids_1 or token_ids_1[-1] != eos_id:
-                token_ids_1 += [eos_id]
-            token_ids_0 += token_ids_1
+            token_ids_0 = token_ids_0 + token_ids_1 + [self.sp_tokenizer[self.eos_token]]
 
         return token_ids_0
 
@@ -385,11 +376,11 @@ class ChatGLMTokenizer(PretrainedTokenizer):
 
         # Initialize attention mask if not present.
         if max_length is not None:
+            if bos_token_id in required_input:
+                context_length = required_input.index(bos_token_id)
+            else:
+                context_length = seq_length
             if "attention_mask" not in encoded_inputs:
-                if bos_token_id in required_input:
-                    context_length = required_input.index(bos_token_id)
-                else:
-                    context_length = seq_length
                 attention_mask = np.ones((1, seq_length, seq_length))
                 attention_mask = np.tril(attention_mask)
                 attention_mask[:, :, :context_length] = 1
@@ -418,7 +409,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
                     encoded_inputs["attention_mask"],
                     pad_width=[(0, 0), (difference, 0), (difference, 0)],
                     mode="constant",
-                    constant_values=True,
+                    constant_values=1,
                 )
             if "token_type_ids" in encoded_inputs:
                 encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
@@ -429,6 +420,13 @@ class ChatGLMTokenizer(PretrainedTokenizer):
             if "position_ids" in encoded_inputs:
                 encoded_inputs["position_ids"] = np.pad(
                     encoded_inputs["position_ids"], pad_width=[(0, 0), (difference, 0)]
+                )
+            if "labels" in encoded_inputs:
+                encoded_inputs["labels"] = np.pad(
+                    encoded_inputs["labels"],
+                    pad_width=[(difference, 0)],
+                    mode="constant",
+                    constant_values=-100,
                 )
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
