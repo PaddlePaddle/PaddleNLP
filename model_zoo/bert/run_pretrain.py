@@ -282,10 +282,12 @@ def do_train(args):
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
     # decorate @to_static for benchmark, skip it by default.
-    # if args.to_static:
-    #     specs = create_input_specs()
-    #     model = paddle.jit.to_static(model, input_spec=specs)
-    #     logger.info("Successfully to apply @to_static with specs: {}".format(specs))
+    if args.to_static:
+        specs = create_input_specs()
+        specs = None
+        # model = paddle.jit.to_static(model, input_spec=specs)
+        model.bert.encoder = paddle.jit.to_static(model.bert.encoder)
+        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.

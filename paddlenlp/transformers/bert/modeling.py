@@ -319,7 +319,6 @@ class BertModel(BertPretrainedModel):
                 act_dropout=0,
             )
             self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
-            self.encoder = paddle.jit.to_static(self.encoder)
         self.pooler = BertPooler(config)
         self.apply(self.init_weights)
 
