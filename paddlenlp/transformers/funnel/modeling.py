@@ -1666,22 +1666,6 @@ class FunnelPreTrainedModel(PreTrainedModel):
             if module.word_embeddings._padding_idx is not None:
                 module.word_embeddings.weight.data[module._padding_idx].zero_()
 
-    def init_weights(self):
-        """
-        If needed prunes and maybe initializes weights.
-        """
-        # Prune heads if needed
-        if self.config2.pruned_heads:
-            self.prune_heads(self.config2.pruned_heads)
-        _init_weights = True
-        if _init_weights:
-            # Initialize weights
-            self.apply(self._init_weights)
-
-            # Tie weights should be skipped when not initializing all weights
-            # since from_pretrained(...) calls tie weights anyways
-            # self.tie_weights()
-
     def prune_heads(self, heads_to_prune):
         """
         Prunes heads of the base model.

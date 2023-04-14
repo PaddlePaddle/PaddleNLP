@@ -707,13 +707,6 @@ class T5PretrainedModel(PretrainedModel):
         }
         return dummy_inputs
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         """Initialize the weights"""
         # Used for testing weights initialization
@@ -1176,8 +1169,6 @@ class T5Model(T5PretrainedModel):
         decoder_config.num_layers = config.num_decoder_layers
         self.decoder = T5Stack(decoder_config, self.shared)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.shared
 
@@ -1407,8 +1398,6 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         self.t5 = T5Model(config)
         if not self.t5.config["tie_word_embeddings"]:
             self.lm_head = nn.Linear(self.t5.config["d_model"], self.t5.config["vocab_size"], bias_attr=False)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.t5.shared
@@ -1751,9 +1740,6 @@ class T5EncoderModel(T5PretrainedModel):
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = T5Stack(encoder_config, embed_tokens=self.shared)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     @property
     def t5(self):

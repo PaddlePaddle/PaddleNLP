@@ -426,13 +426,6 @@ class BlipPretrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def gradient_checkpointing_enable(self):
         """
         Activates gradient checkpointing for the current model.
@@ -602,8 +595,6 @@ class BlipVisionModel(BlipPretrainedModel):
         self.encoder = BlipEncoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.embeddings
 
@@ -736,9 +727,6 @@ class BlipModel(BlipPretrainedModel):
             )
             * config.logit_scale_init_value
         )
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_text_features(
         self,
@@ -1024,9 +1012,6 @@ class BlipForConditionalGeneration(BlipPretrainedModel):
         self.decoder_input_ids = config.text_config.bos_token_id
         self.decoder_pad_token_id = config.text_config.pad_token_id
 
-        # Initialize weights and apply final processing
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
 
@@ -1231,9 +1216,6 @@ class BlipForQuestionAnswering(BlipPretrainedModel):
 
         self.decoder_pad_token_id = config.text_config.pad_token_id
         self.decoder_bos_token_id = config.text_config.bos_token_id
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1474,9 +1456,6 @@ class BlipForImageTextRetrieval(BlipPretrainedModel):
 
         self.decoder_pad_token_id = config.text_config.pad_token_id
         self.decoder_bos_token_id = config.text_config.bos_token_id
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding

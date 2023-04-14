@@ -105,13 +105,6 @@ class ErnieViLPretrainedModel(PretrainedModel):
     base_model_prefix = "ernie_vil"
     supports_gradient_checkpointing = True
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, nn.TransformerEncoder):
             module.enable_recompute = value
@@ -196,8 +189,6 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             default_initializer=nn.initializer.Constant(config.logit_scale_init_value),
             dtype=paddle.get_default_dtype(),
         )
-
-        self.init_weights()
 
     def get_image_features(
         self,
@@ -517,8 +508,6 @@ class ErnieViLTextModel(ErnieViLPretrainedModel):
         super().__init__(config)
         self.text_model = ErnieModel(config)
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.word_embeddings
 
@@ -624,8 +613,6 @@ class ErnieViLVisionModel(ErnieViLPretrainedModel):
         super().__init__(config)
 
         self.vision_model = ErnieViLVisionTransformer(config)
-
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.conv1

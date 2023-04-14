@@ -530,6 +530,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
         initialization logic in `_init_weights`.
         """
+        # pure head when needed
         if _init_weights:
             # Initialize weights
             self.apply(self._initialize_weights)

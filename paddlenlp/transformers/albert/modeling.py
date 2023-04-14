@@ -358,10 +358,6 @@ class AlbertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = ALBERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ALBERT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, nn.Linear):
@@ -423,8 +419,6 @@ class AlbertModel(AlbertPretrainedModel):
         else:
             self.pooler = None
             self.pooler_activation = None
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings

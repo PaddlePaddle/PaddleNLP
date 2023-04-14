@@ -160,13 +160,6 @@ class ElectraPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = ELECTRA_PRETRAINED_RESOURCE_FILES_MAP
     config_class = ElectraConfig
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -222,8 +215,6 @@ class ElectraModel(ElectraPretrainedModel):
             act_dropout=0,
         )
         self.encoder = TransformerEncoder(encoder_layer, config.num_hidden_layers)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -374,7 +365,6 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
         self.electra = ElectraModel(config)
         self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -451,7 +441,6 @@ class ElectraGenerator(ElectraPretrainedModel):
             self.generator_lm_head_bias = self.create_parameter(
                 shape=[config.vocab_size], dtype=paddle.get_default_dtype(), is_bias=True
             )
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.electra.embeddings.word_embeddings
@@ -613,8 +602,6 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         self.discriminator_csp = ElectraClassificationHead(config)
 
-        self.init_weights()
-
     def forward(self, input_ids, candidate_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
 
@@ -677,7 +664,6 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
         self.num_labels = config.num_labels
         self.electra = ElectraModel(config)
         self.classifier = ElectraClassificationHead(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -790,7 +776,6 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.init_weights()
 
     def forward(
         self,
@@ -897,9 +882,6 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         self.generator = ElectraGenerator(config)
         self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
-        self.init_weights()
-        # Tie weights if needed
-        self.tie_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:
@@ -1070,7 +1052,6 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         self.generator = ElectraGenerator(config)
         self.discriminator = ErnieHealthDiscriminator(config)
         self.initializer_range = config.initializer_range
-        self.init_weights()
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample
@@ -1186,7 +1167,6 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         self.dropout = nn.Dropout(dropout_p)
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.init_weights()
 
     def forward(
         self,
@@ -1560,7 +1540,6 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
         super(ElectraForQuestionAnswering, self).__init__(config)
         self.electra = ElectraModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.init_weights()
 
     def forward(
         self,
