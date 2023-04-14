@@ -114,13 +114,14 @@ def main():
             r=4,
             lora_alpha=8,
             merge_weights=False,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
     # Load the dataset.

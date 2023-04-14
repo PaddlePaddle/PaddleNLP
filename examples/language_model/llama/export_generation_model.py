@@ -35,6 +35,7 @@ def parse_args():
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     args = parser.parse_args()
     return args
 
@@ -44,7 +45,7 @@ def main():
 
     paddle.seed(100)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path, add_bos_token=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
@@ -61,7 +62,7 @@ def main():
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            100,  # max length
+            args.tgt_length,  # max length
             0,  # min length
             "sampling",  # decode_strategy
             1.0,  # temperature
