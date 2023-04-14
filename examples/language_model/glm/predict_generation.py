@@ -15,6 +15,7 @@
 import paddle
 from paddle.distributed import fleet
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 
 
@@ -25,6 +26,7 @@ def parse_arguments():
     parser.add_argument(
         "--model_name_or_path", default="THUDM/glm-large-chinese", required=True, help="The directory of model."
     )
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
@@ -70,7 +72,8 @@ class Predictor(object):
             tensor_parallel_rank=tensor_parallel_rank,
             load_state_as_np=True,
         )
-
+        if self.args.lora_path is not None:
+            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
         self.model.eval()
 
     def preprocess(self, input_text):
