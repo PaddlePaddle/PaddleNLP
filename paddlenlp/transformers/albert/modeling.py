@@ -22,8 +22,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
-from ...utils.converter import StateDictNameMapping
 from ...layers import Linear as TransposedLinear
+from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
