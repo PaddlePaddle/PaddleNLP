@@ -14,9 +14,12 @@
 # limitations under the License.
 from __future__ import annotations
 
+import tempfile
 import unittest
 
+import numpy as np
 import paddle
+from parameterized import parameterized
 
 from paddlenlp.transformers import (
     DistilBertForMaskedLM,
@@ -27,7 +30,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.distilbert.configuration import DistilBertConfig
 
-from ...testing_utils import slow
+from ...testing_utils import require_package, slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
@@ -286,6 +289,133 @@ class DistilBertModelTest(ModelTesterMixin, unittest.TestCase):
         )
         assert model.num_labels == 4
         assert model.dropout.p == 0.3
+
+
+class DistilBertModelCompatibilityTest(unittest.TestCase):
+    model_id = "hf-internal-testing/tiny-random-DistilBertModel"
+
+    @require_package("transformers", "torch")
+    def test_distilBert_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import DistilBertModel
+
+            paddle_model = DistilBertModel.from_pretrained(self.model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch model
+            import torch
+            from transformers import DistilBertModel
+
+            torch_model = DistilBertModel.from_pretrained(self.model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids))[0]
+
+            # 4. compare results
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_distilBert_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. forward the torch  model
+            from transformers import DistilBertModel
+
+            torch_model = DistilBertModel.from_pretrained(self.model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import DistilBertModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                DistilBertModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_distilBert_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import DistilBertModel
+
+            torch_model = DistilBertModel.from_pretrained(self.model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids))[0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import DistilBertModel
+
+            paddle_model = DistilBertModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @parameterized.expand(
+        [
+            ("DistilBertModel",),
+            ("DistilBertForQuestionAnswering",),
+            ("DistilBertForSequenceClassification",),
+            ("DistilBertForTokenClassification",),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_distilBert_classes_from_local_dir(self, class_name, pytorch_class_name=None):
+        pytorch_class_name = pytorch_class_name or class_name
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, pytorch_class_name)
+            torch_model = torch_model_class.from_pretrained(self.model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids))[0]
+
+            # 3. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    atol=1e-3,
+                )
+            )
 
 
 class DistilBertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
