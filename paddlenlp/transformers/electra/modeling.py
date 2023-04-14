@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 import paddle
 import paddle.nn as nn
@@ -22,6 +22,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
+from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
@@ -159,6 +160,135 @@ class ElectraPretrainedModel(PretrainedModel):
     pretrained_init_configuration = ELECTRA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ELECTRA_PRETRAINED_RESOURCE_FILES_MAP
     config_class = ElectraConfig
+
+    @classmethod
+    def _get_name_mappings(cls, config: ElectraConfig) -> List[StateDictNameMapping]:
+        model_mappings = [
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["embeddings_project.weight", "embeddings_project.weight", "transpose"],
+            ["embeddings_project.bias", "embeddings_project.bias"],
+        ]
+
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        # base-model prefix "ElectraModel"
+        if "ElectraModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "electra." + mapping[0]
+                mapping[1] = "electra." + mapping[1]
+
+        # downstream mappings
+        if "ElectraForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+
+        if "ElectraForMultipleChoice" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["sequence_summary.summary.weight", "sequence_summary.dense.weight", "transpose"],
+                    ["sequence_summary.summary.bias", "sequence_summary.dense.bias"],
+                    ["classifier.weight", "classifier.weight", "transpose"],
+                    ["classifier.bias", "classifier.bias"],
+                ]
+            )
+
+        if "ElectraForSequenceClassification" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["classifier.dense.weight", "classifier.dense.weight", "transpose"],
+                    ["classifier.dense.bias", "classifier.dense.bias"],
+                    ["classifier.out_proj.weight", "classifier.out_proj.weight", "transpose"],
+                    ["classifier.out_proj.bias", "classifier.out_proj.bias"],
+                ]
+            )
+
+        if "ElectraForTokenClassification" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["classifier.weight", "classifier.weight", "transpose"],
+                    ["classifier.bias", "classifier.bias"],
+                ]
+            )
+
+        # TODO: need to tie weights
+        if "ElectraForMaskedLM" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["generator_predictions.LayerNorm.weight", "generator_predictions.layer_norm.weight", "transpose"],
+                    ["generator_predictions.LayerNorm.bias", "generator_predictions.layer_norm.bias"],
+                    ["generator_predictions.dense.weight", "generator_predictions.dense.weight", "transpose"],
+                    ["generator_predictions.dense.bias", "generator_predictions.dense.bias"],
+                    ["generator_lm_head.bias", "generator_lm_head_bias"],
+                ]
+            )
+
+        return [StateDictNameMapping(*mapping) for mapping in model_mappings]
 
     def init_weights(self):
         """
