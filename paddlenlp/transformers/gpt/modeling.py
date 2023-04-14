@@ -878,7 +878,7 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = self.decoder(encoder_outputs)
+        logits = self.lm_head(encoder_outputs)
 
         if use_cache:
             return logits, cached_kvs
