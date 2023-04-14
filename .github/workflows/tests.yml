@@ -1,6 +1,15 @@
 name: Test
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'paddlenlp/*'
+      - 'tests/*'
+  pull_request:
+    paths:
+      - 'paddlenlp/*'
+      - 'tests/*'
+
 
 jobs:
   Test:
