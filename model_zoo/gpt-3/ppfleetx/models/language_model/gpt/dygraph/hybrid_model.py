@@ -430,7 +430,7 @@ class MultiHeadAttention(nn.Layer):
 
         outs = [out]
         if self.need_weights:
-            assert self.use_memory_attn, "the output of memory attn doesn't have weights"
+            assert not self.use_memory_attn, "the output of memory attn doesn't have weights"
             outs.append(weights)
         if use_cache:
             outs.append(cache)
