@@ -25,7 +25,7 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
-import paddle.incubate.nn.attn_bias as ab
+# import paddle.incubate.nn.attn_bias as ab
 from paddle.autograd import PyLayer
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.meta_parallel import (
@@ -330,13 +330,13 @@ class MultiHeadAttention(nn.Layer):
             # attn_mask = ab.LowerTriangularMask()
             
         out = memory_efficient_attention(
-            q, 
-            k, 
-            v, 
-            attn_mask, 
-            self.dropout, 
-            -1.0, 
-            self.training
+            query=q, 
+            key=k, 
+            value=v, 
+            attn_bias=attn_mask, 
+            p=self.dropout, 
+            scale=None, 
+            training=self.training,
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
@@ -793,10 +793,10 @@ class GPTModelHybrid(nn.Layer):
 
         if use_memory_attn:
             if memory_efficient_attention:
-                logger.info("Memory-attntion enabled.")
+                logger.info("Memory-efficient-attention enabled.")
             else:
                 use_memory_attn = False
-                logger.warning("Memory-attntion is not support in this Paddle version.")
+                logger.warning("Memory-efficient-attention is not support in this Paddle version.")
                 
         hcg = env.get_hcg()
         mp_size = hcg.get_model_parallel_world_size()

@@ -206,13 +206,13 @@ class MultiHeadAttention(nn.Layer):
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
         out = memory_efficient_attention(
-            q, 
-            k, 
-            v, 
-            attn_mask, 
-            self.dropout, 
-            None, 
-            self.training
+            query=q, 
+            key=k, 
+            value=v, 
+            attn_bias=attn_mask, 
+            p=self.dropout, 
+            scale=None, 
+            training=self.training,
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return out 
@@ -578,10 +578,10 @@ class GPTModel(nn.Layer):
 
         if use_memory_attn:
             if memory_efficient_attention:
-                logger.info("Memory-attntion enabled.")
+                logger.info("Memory-efficient-attention enabled.")
             else:
                 use_memory_attn = False
-                logger.warning("Memory-attntion is not support in this Paddle version.")
+                logger.warning("Memory-efficient-attention is not support in this Paddle version.")
             
         self.embeddings = GPTEmbeddings(
             vocab_size,
