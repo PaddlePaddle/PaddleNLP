@@ -107,7 +107,7 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         fp16_opt_level=training_args.fp16_opt_level,
-        use_flash_atttention=model_args.use_flash_atttention,
+        use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
     )
     if model_args.lora:

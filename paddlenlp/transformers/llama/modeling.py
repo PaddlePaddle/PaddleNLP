@@ -138,7 +138,7 @@ def scaled_dot_product_attention(
             with paddle.amp.auto_cast(False):
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
-            attn_weights = F.softmax(attn_weights, axis=-1)
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -195,7 +195,13 @@ class RMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         default_type = hidden_states.dtype
-        with paddle.amp.auto_cast(False):
+        if self.config.opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
+                output = hidden_states * self.weight
+                output = output.astype(default_type)
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
             output = hidden_states * self.weight
@@ -704,6 +710,8 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, masked_lm_labels, pad_token_id):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        # The loss is will not be converted into static graph
+        # we do not set the opt_level
         with paddle.amp.auto_cast(False):
             masked_lm_loss = masked_lm_loss.astype("float32")
             masked_lm_loss = masked_lm_loss[masked_lm_labels != pad_token_id]
@@ -722,7 +730,11 @@ class LlamaLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states, parallel_output=False):
-        with paddle.amp.auto_cast(False):
+        if self.config.fp16_opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                hidden_states = hidden_states.astype("float32")
+                logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
+        else:
             hidden_states = hidden_states.astype("float32")
             logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
         return logits
