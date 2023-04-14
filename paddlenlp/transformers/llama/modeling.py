@@ -144,7 +144,7 @@ class LlamaRMSNorm(nn.Layer):
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
+        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
         self.register_buffer("inv_freq", inv_freq)
 
         t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
