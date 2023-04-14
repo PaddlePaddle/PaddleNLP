@@ -98,4 +98,5 @@ class MegatronBertTokenizer(BertTokenizer):
             pad_token=pad_token,
             cls_token=cls_token,
             mask_token=mask_token,
+            **kwargs,
         )

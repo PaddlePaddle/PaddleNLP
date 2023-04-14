@@ -16,6 +16,7 @@ import argparse
 import logging
 import os
 import random
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -99,16 +100,10 @@ def parse_args():
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.",
-    )
-    parser.add_argument(
         "--max_steps",
-        default=-1,
+        default=1000000,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="Set total number of training steps to perform. ",
     )
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 
@@ -294,10 +289,7 @@ def do_train(args):
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
-    # BUG: train_data_loader is undefined variable here hence the noqa: F821
-    num_training_steps = (
-        args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs  # noqa: F821
-    )
+    num_training_steps = args.max_steps
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
 
@@ -321,7 +313,7 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(sys.maxsize):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)

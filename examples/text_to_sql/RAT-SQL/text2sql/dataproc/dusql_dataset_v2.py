@@ -12,23 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
 import json
-import collections
+import logging
+import os
+import pickle
+import sys
+from pathlib import Path
+
 import attr
 import networkx as nx
-import pickle
-from pathlib import Path
-import tqdm
-
-import numpy as np
 import paddle
-
-from text2sql.utils import text_utils
-from text2sql.utils import linking_utils
+import tqdm
+from text2sql.utils import linking_utils, text_utils
 
 g_ernie_input_parser = None
 g_match_score_threshold = 0.3
@@ -165,7 +160,7 @@ def load_tables(schema_file, content_file):
 
             schemas[db_id] = DB(db_id, tables, columns, foreign_key_graph, schema_dict)
             # TODO
-            ##eval_foreign_key_maps[db_id] = evaluation.build_foreign_key_map(schema_dict)
+            # eval_foreign_key_maps[db_id] = evaluation.build_foreign_key_map(schema_dict)
 
     return schemas, eval_foreign_key_maps
 

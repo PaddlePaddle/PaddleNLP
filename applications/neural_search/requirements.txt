@@ -1,5 +1,5 @@
 pymilvus>=2.1.0
-pandas==0.25.1 
+pandas
 paddlenlp>=2.1.1    
 paddlepaddle-gpu>=2.2.3
 hnswlib>=0.5.2

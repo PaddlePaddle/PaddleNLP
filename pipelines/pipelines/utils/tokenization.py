@@ -16,14 +16,12 @@
 Tokenization classes.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-from typing import Dict, Any, Tuple, Optional, List, Union
 
-import re
 import logging
+
 import numpy as np
 
 from paddlenlp.transformers.tokenizer_utils_base import TruncationStrategy
-
 from pipelines.data_handler.samples import SampleBasket
 
 logger = logging.getLogger(__name__)

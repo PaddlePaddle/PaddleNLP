@@ -12,36 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
 import random
-import time
 import sys
+import time
 
 import numpy as np
 import paddle
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
+    DygraphShardingOptimizer,
+)
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
+from paddle.distributed.sharding import group_sharded_parallel
 from visualdl import LogWriter
-from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.utils.log import logger
+
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+    LinearAnnealingWithWarmupDecay,
+)
 from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(filepath, "../"))
-
-from dataset import create_pretrained_dataset
-from args import parse_args
-import lr
-from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
-from paddle.fluid.dygraph.parallel import sync_params_buffers
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-
-# add sharding stage2/3
-from paddle.distributed.sharding import group_sharded_parallel
+# import lr  # noqa e402
+from args import parse_args  # noqa e402
+from dataset import create_pretrained_dataset  # noqa e402
+from modeling import (  # noqa e402
+    GPTForPretraining,
+    GPTForPretrainingPipe,
+    GPTModel,
+    GPTPretrainingCriterion,
+)
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -178,6 +187,9 @@ def do_train(args):
 
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
+    if args.mp_degree > 1:
+        GPTForPretraining.resource_files_names = {"model_state": "model_state_mp_{:0>2d}.pdparams".format(mp_rank)}
+
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
@@ -185,7 +197,7 @@ def do_train(args):
 
         model_config["num_partitions"] = args.mp_degree
         model_config["use_recompute"] = args.use_recompute
-        model_config["fuse"] = args.fuse_transformer
+        model_config["enable_fuse_transformer"] = args.fuse_transformer
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:
@@ -201,17 +213,31 @@ def do_train(args):
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 
+    # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
-    warmup_step = args.warmup_rate * args.decay_steps
+    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
+    args.warmup_steps = args.warmup_rate * args.max_steps
 
     lr_scheduler = None
 
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
+            last_epoch=0,
+        )
+    elif args.lr_decay_style == "linear":
+        lr_scheduler = LinearAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=args.warmup_steps,
+            decay_step=args.decay_steps,
+            last_epoch=0,
         )
 
     clip = None
@@ -254,6 +280,7 @@ def do_train(args):
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = None
+        paddle.jit.ignore_module([os])
         model = paddle.jit.to_static(model, input_spec=specs)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
@@ -262,12 +289,17 @@ def do_train(args):
         # level O2 means converting the network to FP16
         if args.sharding_stage not in [2, 3]:
             scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(models=model, level="O2", save_dtype="float32")
+        model = paddle.amp.decorate(models=model, level="O2")
 
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
         if args.dp_degree > 1:
+            try:
+                from paddle.fluid.dygraph.parallel import sync_params_buffers
+            except ImportError:
+                from paddle.distributed.parallel import sync_params_buffers
+
             sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
 
         scaler = scaler if args.use_pure_fp16 else None
@@ -287,7 +319,7 @@ def do_train(args):
             logger.warning("No optimizer checkpoint file found in %s." % opt_path)
 
     global_step = 0
-    tic_train = time.time()
+    # tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = get_train_data_file(args)
         files.sort()
@@ -302,6 +334,7 @@ def do_train(args):
                 data_world_rank=data_world_rank,
                 max_seq_len=args.max_seq_len,
                 eos_id=tokenizer.eos_token_id,
+                old_version_accumulate_compatible=True,
             )
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -414,7 +447,7 @@ def do_train(args):
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
 
-                    tic_train = time.time()
+                    # tic_train = time.time()
                     train_reader_cost = 0.0
                     train_run_cost = 0.0
 

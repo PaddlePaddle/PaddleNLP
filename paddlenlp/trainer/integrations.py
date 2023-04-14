@@ -19,6 +19,7 @@
 import importlib
 import json
 
+from ..layers.lora import LoRAModel
 from ..transformers import PretrainedModel
 from ..utils.log import logger
 from .trainer_callback import TrainerCallback
@@ -26,6 +27,10 @@ from .trainer_callback import TrainerCallback
 
 def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
+
+
+def is_ray_available():
+    return importlib.util.find_spec("ray.air") is not None
 
 
 def get_available_reporting_integrations():
@@ -93,6 +98,8 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs:
                 model = kwargs["model"]
+                if isinstance(model, LoRAModel):
+                    model = kwargs["model"].model
                 if isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config():
                     model.config.architectures = [model.__class__.__name__]
                     self.vdl_writer.add_text("model_config", str(model.config))
@@ -108,7 +115,7 @@ class VisualDLCallback(TrainerCallback):
             return
 
         if self.vdl_writer is None:
-            self._init_summary_writer(args)
+            return
 
         if self.vdl_writer is not None:
             logs = rewrite_logs(logs)
@@ -130,8 +137,32 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer = None
 
 
+class AutoNLPCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that sends the logs to [`Ray Tune`] for [`AutoNLP`]
+    """
+
+    def __init__(self):
+        if not is_ray_available():
+            raise RuntimeError(
+                "AutoNLPCallback requires extra dependencies to be installed. Please install paddlenlp with 'pip install paddlenlp[autonlp]'."
+            )
+        self.session = importlib.import_module("ray.air.session")
+        self.tune = importlib.import_module("ray.tune")
+
+    # report session metrics to Ray to track trial progress
+    def on_evaluate(self, args, state, control, **kwargs):
+        if not state.is_world_process_zero:
+            return
+
+        metrics = kwargs.get("metrics", None)
+        if self.tune.is_session_enabled() and metrics is not None and isinstance(metrics, dict):
+            self.session.report(metrics)
+
+
 INTEGRATION_TO_CALLBACK = {
     "visualdl": VisualDLCallback,
+    "autonlp": AutoNLPCallback,
 }
 
 

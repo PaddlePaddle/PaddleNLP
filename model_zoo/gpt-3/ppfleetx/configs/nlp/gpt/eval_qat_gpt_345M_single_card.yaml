@@ -1,0 +1,33 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+
+Model:
+  module: GPTEvalModule
+
+Compress:
+  pretrained:
+  Quantization:
+    enable: True
+    weight_quantize_type: 'abs_max'
+    activation_quantize_type: 'moving_average_abs_max'
+    activation_preprocess_type: 'PACT'
+    weight_bits: 8
+    activation_bits: 8
+    quantizable_layer_type: ['Linear', 'ColumnParallelLinear', 'RowParallelLinear']
+    onnx_format: True
+    skip_tensor_map: 
+      block_3: ['linear2']
+      block_5: ['linear1']
+      block_6: ['linear2']
+      block_7: ['linear2']
+      block_10: ['linear2']
+      block_20: ['linear2']
+      block_21: ['linear2']
+
+Offline_Eval:
+  eval_path: ./wikitext-103/wiki.valid.tokens
+  cloze_eval: False
+  overlapping_eval: 32
+  batch_size: 8
+  max_seq_len: 1024
+  logging_freq: 10

@@ -44,6 +44,8 @@ class TestModeling(unittest.TestCase):
             BertModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
 
     @slow
     def test_from_pretrained_cache_dir_pretrained_init(self):
@@ -52,6 +54,8 @@ class TestModeling(unittest.TestCase):
             BertModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            # check against double appending model_name in cache_dir
+            self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
 
     @slow
     def test_from_pretrained_with_load_as_state_np_params(self):

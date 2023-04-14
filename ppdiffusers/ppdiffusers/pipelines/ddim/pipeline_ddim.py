@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,13 +17,15 @@ from typing import List, Optional, Tuple, Union
 
 import paddle
 
-from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
+from ...schedulers import DDIMScheduler
+from ...utils import randn_tensor
+from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 
 
 class DDIMPipeline(DiffusionPipeline):
     r"""
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Parameters:
         unet ([`UNet2DModel`]): U-Net architecture to denoise the encoded image.
@@ -34,6 +36,10 @@ class DDIMPipeline(DiffusionPipeline):
 
     def __init__(self, unet, scheduler):
         super().__init__()
+
+        # make sure scheduler can always be converted to DDIM
+        scheduler = DDIMScheduler.from_config(scheduler.config)
+
         self.register_modules(unet=unet, scheduler=scheduler)
 
     @paddle.no_grad()
@@ -65,13 +71,13 @@ class DDIMPipeline(DiffusionPipeline):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
             return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`~pipeline_utils.ImagePipelineOutput`] instead of a plain tuple.
+                Whether or not to return a [`~pipelines.ImagePipelineOutput`] instead of a plain tuple.
 
         Returns:
-            [`~pipeline_utils.ImagePipelineOutput`] or `tuple`: [`~pipelines.utils.ImagePipelineOutput`] if
-            `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
-            generated images.
+            [`~pipelines.ImagePipelineOutput`] or `tuple`: [`~pipelines.utils.ImagePipelineOutput`] if `return_dict` is
+            True, otherwise a `tuple. When returning a tuple, the first element is a list with the generated images.
         """
+
         # Sample gaussian noise to begin loop
         if isinstance(self.unet.sample_size, int):
             image_shape = (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size)
@@ -84,12 +90,7 @@ class DDIMPipeline(DiffusionPipeline):
                 f" size of {batch_size}. Make sure the batch size matches the length of the generators."
             )
 
-        if isinstance(generator, list):
-            shape = (1,) + image_shape[1:]
-            image = [paddle.randn(shape, generator=generator[i], dtype=self.unet.dtype) for i in range(batch_size)]
-            image = paddle.concat(image, axis=0)
-        else:
-            image = paddle.randn(image_shape, generator=generator, dtype=self.unet.dtype)
+        image = randn_tensor(image_shape, generator=generator, dtype=self.unet.dtype)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)

@@ -14,28 +14,32 @@
 """
  This file is used to fine-tune pretrained models
 """
-from functools import partial
 import argparse
 import os
 import random
-import time
 import sys
+import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+from paddlenlp.transformers.roberta.tokenizer import (
+    RobertaBPETokenizer,
+    RobertaTokenizer,
+)
 
 sys.path.append("..")
 sys.path.append("../../..")
-from roberta.modeling import RobertaForSequenceClassification
+from roberta.modeling import RobertaForSequenceClassification  # noqa: E402
 
 sys.path.remove("../../..")
 sys.path.remove("..")
-from utils import convert_example
+from utils import convert_example  # noqa: E402
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--base_model", type=str, choices=["roberta_base", "roberta_large"])

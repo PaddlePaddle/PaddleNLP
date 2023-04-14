@@ -47,11 +47,11 @@ __all__ = [
 ]
 
 MT5_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "mt5-small",
-    "mt5-base",
-    "mt5-large",
-    "mt5-xl",
-    "mt5-xxl",
+    "google/mt5-small",
+    "google/mt5-base",
+    "google/mt5-large",
+    "google/mt5-xl",
+    "google/mt5-xxl",
 ]
 
 DATA_TYPE_MAP = {
@@ -1713,14 +1713,8 @@ class MT5ForConditionalGeneration(MT5PretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class MT5EncoderModel(MT5PretrainedModel):

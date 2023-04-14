@@ -1,3 +1,5 @@
+# flake8: noqa
+# isort: skip_file
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +16,6 @@
 """
 Pretrain  GPT in static graph mode.
 """
-import argparse
-import math
 import os
 import random
 import time
@@ -33,7 +33,6 @@ from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
 from paddlenlp.utils import profiler
-import paddlenlp.ops as ops
 from visualdl import LogWriter
 
 # Used to load the data_tools path, should import before dataset
@@ -206,7 +205,7 @@ def do_train(args):
         assert (
             args.mp_degree == 1 and args.pp_degree == 1
         ), "When amp level is O2, mp_degree and pp_degree should be 1."
-        assert args.use_sharding == False, "When amp level is O2, use_sharding should be False."
+        assert args.use_sharding is False, "When amp level is O2, use_sharding should be False."
 
     assert args.device in ["cpu", "gpu", "xpu"], "Invalid device! Available device should be cpu, gpu, or xpu."
     place = paddle.set_device(args.device)
@@ -282,7 +281,7 @@ def do_train(args):
                     model_config["fuse"] = args.fuse_transformer
 
                     model = guard(f"gpu:{args.pp_degree -1}")(GPTForPretraining)(
-                        guard(f"gpu:0")(GPTModel)(**model_config)
+                        guard("gpu:0")(GPTModel)(**model_config)
                     )
                 else:
                     model, _ = GPTForPretraining.from_pretrained(
@@ -434,11 +433,11 @@ def do_train(args):
                                 speed,
                                 speed * args.global_batch_size * args.max_seq_len,
                                 speed * args.global_batch_size * args.max_seq_len / worker_num,
-                                lr_return[0],
+                                lr_return,
                             )
                         )
                         log_writer.add_scalar("loss", loss_return[0], global_step)
-                        log_writer.add_scalar("learning_rate", lr_return[0], global_step)
+                        log_writer.add_scalar("learning_rate", lr_return, global_step)
                     tic_train = time.time()
                     train_reader_cost = 0.0
                     train_run_cost = 0.0
@@ -537,11 +536,11 @@ def do_train(args):
                                     speed,
                                     speed * args.global_batch_size * args.max_seq_len,
                                     speed * args.global_batch_size * args.max_seq_len / worker_num,
-                                    lr_return[0],
+                                    lr_return,
                                 )
                             )
                             log_writer.add_scalar("loss", loss_return[0], global_step)
-                            log_writer.add_scalar("learning_rate", lr_return[0], global_step)
+                            log_writer.add_scalar("learning_rate", lr_return, global_step)
                         tic_train = time.time()
                         train_reader_cost = 0.0
                         train_run_cost = 0.0

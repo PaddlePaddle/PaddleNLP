@@ -1,0 +1,55 @@
+_base_: ./pretrain_gpt_base.yaml
+
+
+Engine:
+  mix_precision:
+    enable: True
+    dtype: "float16"
+    level: "o2"
+    scale_loss: 32768.0
+    custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div", "where"]
+    custom_white_list: ["lookup_table", "lookup_table_v2"]
+    use_fp16_guard: False
+
+
+Generation:
+  top_k: 50
+  top_p: 0.75
+  temperature: 1.0
+  min_dec_len: 1
+  max_dec_len: 200
+  num_return_sequences: 1
+  decode_strategy: "sampling"
+
+
+Model:
+  module: GPTGenerationModuleAuto
+  vocab_size: 50304
+  hidden_size: 1024
+  num_layers: 24
+  num_attention_heads: 16
+  ffn_hidden_size: 4096
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 1024
+  type_vocab_size: 16
+  initializer_range: 0.02
+  use_recompute: False
+  fuse_attn_qkv: True
+
+
+Distributed:
+  dp_degree: 1
+  mp_degree: 2
+  pp_degree: 1
+  sharding:
+    sharding_degree: 1
+    sharding_stage: 1
+
+
+Quantization:
+  enable: True
+  channel_wise_abs_max: False
+  weight_bits: 8
+  activation_bits: 8
+  onnx_format: True

@@ -7,6 +7,7 @@ unset http_proxy https_proxy
 python3 -m pip install -r ../requirements.txt #-i https://pypi.tuna.tsinghua.edu.cn/simple
 python3 -m pip install pybind11 regex sentencepiece tqdm visualdl #-i https://mirror.baidu.com/pypi/simple
 python3 -m pip install --upgrade paddlenlp
+python3 -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
 # get data
 cd ../examples/language_model/gpt-3/dygraph/
 rm -rf data

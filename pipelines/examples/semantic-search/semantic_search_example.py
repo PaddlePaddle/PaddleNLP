@@ -37,6 +37,7 @@ parser.add_argument("--params_path", default="checkpoints/model_40/model_state.p
 parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--port', type=str, default="8530", help='port of ANN search engine')
+parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 args = parser.parse_args()
 # yapf: enable
@@ -57,7 +58,7 @@ def get_faiss_retriever(use_gpu):
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False,
+            embed_title=args.embed_title,
         )
     else:
         doc_dir = "data/dureader_dev"
@@ -84,7 +85,7 @@ def get_faiss_retriever(use_gpu):
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False,
+            embed_title=args.embed_title,
         )
 
         # update Embedding
@@ -118,7 +119,7 @@ def get_milvus_retriever(use_gpu):
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False,
+            embed_title=args.embed_title,
         )
     else:
         doc_dir = "data/dureader_dev"
@@ -144,7 +145,7 @@ def get_milvus_retriever(use_gpu):
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False,
+            embed_title=args.embed_title,
         )
 
         document_store.write_documents(dicts)
@@ -174,11 +175,16 @@ def semantic_search_tutorial():
     prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}})
 
     print_documents(prediction)
+
     # Batch prediction
     predictions = pipe.run_batch(queries=["亚马逊河流的介绍", "期货交易手续费指的是什么?"], params={"Retriever": {"top_k": 10}})
     for i in range(len(predictions["queries"])):
         result = {"documents": predictions["documents"][i], "query": predictions["queries"][i]}
         print_documents(result)
+
+    pipe = SemanticSearchPipeline(retriever)
+    prediction = pipe.run(query="dev621.txt，五笔", params={"Retriever": {"top_k": 20}})
+    print_documents(prediction)
 
 
 if __name__ == "__main__":

@@ -17,10 +17,8 @@ import json
 import os
 import pickle
 import shutil
-import sys
 
 import sqlparse
-
 from postprocess_eval import get_candidate_tables
 
 
@@ -63,7 +61,6 @@ def read_database_schema(database_schema_filename, schema_tokens, column_names, 
         column_names_surface_form = []
         column_names = []
         column_names_original = table_schema["column_names_original"]
-        table_names = table_schema["table_names"]
         table_names_original = table_schema["table_names_original"]
         for i, (table_id, column_name) in enumerate(column_names_original):
             if table_id >= 0:
@@ -350,9 +347,6 @@ def parse_sql(sql_string, db_id, column_names, output_vocab, schema_tokens, sche
     format_sql = sqlparse.format(sql_string, reindent=True)
     format_sql_2 = normalize_space(format_sql)
 
-    num_from = sum([1 for sub_sql in format_sql_2.split("\n") if sub_sql.startswith("from")])
-    num_select = format_sql_2.count("select ") + format_sql_2.count("select\n")
-
     format_sql_3, used_tables, used_tables_list = remove_from_with_join(format_sql_2)
 
     format_sql_3 = "\n".join(format_sql_3)
@@ -365,10 +359,6 @@ def parse_sql(sql_string, db_id, column_names, output_vocab, schema_tokens, sche
     format_sql_final = normalize_final_sql(format_sql_5)
 
     candidate_tables_id, table_names_original = get_candidate_tables(format_sql_final, schema)
-
-    failure = False
-    if len(candidate_tables_id) != len(used_tables):
-        failure = True
 
     check_oov(format_sql_final, output_vocab, schema_tokens)
 
@@ -508,7 +498,7 @@ def read_data_json(
                         schema_tokens[db_id],
                         database_schemas[db_id],
                     )
-                except:
+                except Exception:
                     print("continue")
                     continue
             else:

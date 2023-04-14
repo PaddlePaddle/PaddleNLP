@@ -12,25 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import io
-import os
 import sys
 
 sys.path.append("../../")
 
-from functools import partial
-import numpy as np
+import numpy as np  # noqa: E402
+import paddle  # noqa: E402
+from args import parse_args  # noqa: E402
+from data import create_infer_loader  # noqa: E402
+from predict import post_process_seq  # noqa: E402
 
-import paddle
-from paddle import inference
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics import BLEU
-
-from args import parse_args
-from data import create_infer_loader
-from predict import post_process_seq
-from paddlenlp.data import Vocab
+from paddlenlp.data import Vocab  # noqa: E402
+from paddlenlp.datasets import load_dataset  # noqa: E402
+from paddlenlp.metrics import BLEU  # noqa: E402
 
 
 class Predictor(object):

@@ -13,64 +13,37 @@
 # limitations under the License.
 
 import argparse
-import os
 from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+from tqdm import tqdm
+
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepCrfForTokenClassification, SkepTokenizer
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    "--model_name",
+    choices=["skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"],
+    default="skep_ernie_1.0_large_ch",
+    help="Select which model to train, defaults to skep_ernie_1.0_large_ch.",
+)
+parser.add_argument("--ckpt_dir", type=str, default=None, help="The directory of saved model checkpoint.")
+parser.add_argument(
+    "--max_seq_len",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
+)
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
 args = parser.parse_args()
-# yapf: enable
-
-
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    """
-    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed
-    to be used in a sequence-pair classification task.
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
-    ::
-
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
-
-    Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask.
-    """
-    tokens = example["tokens"]
-    encoded_inputs = tokenizer(tokens, return_length=True, is_split_into_words="token", max_seq_len=max_seq_length)
-    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
-    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
-    seq_len = np.array(encoded_inputs["seq_len"], dtype="int64")
-
-    return input_ids, token_type_ids, seq_len
 
 
 @paddle.no_grad()
@@ -85,11 +58,47 @@ def predict(model, data_loader, label_map):
     """
     model.eval()
     results = []
-    for input_ids, token_type_ids, seq_lens in data_loader:
+    for batch in tqdm(data_loader):
+        input_ids, token_type_ids, seq_lens = batch["input_ids"], batch["token_type_ids"], batch["seq_lens"]
         preds = model(input_ids, token_type_ids, seq_lens=seq_lens)
         tags = parse_predict_result(preds.numpy(), seq_lens.numpy(), label_map)
         results.extend(tags)
     return results
+
+
+def convert_example_to_feature(example, tokenizer, max_seq_len=512):
+    """
+    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
+    by concatenating and adding special tokens.
+
+    Args:
+        example(obj:`dict`): Dict of input data, containing text and label if it have label.
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
+            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
+            Sequences longer than this will be truncated, sequences shorter will be padded.
+
+    Returns:
+        input_ids(obj:`list[int]`): The list of token ids.
+        token_type_ids(obj: `list[int]`): The list of token_type_ids.
+    """
+    tokens = example["tokens"]
+    new_tokens = [tokenizer.cls_token]
+
+    for index, token in enumerate(tokens):
+        sub_tokens = tokenizer.tokenize(token)
+        if not sub_tokens:
+            sub_tokens = [tokenizer.unk_token]
+        new_tokens.extend(sub_tokens)
+
+    new_tokens = new_tokens[: max_seq_len - 1]
+    new_tokens.append(tokenizer.sep_token)
+
+    input_ids = [tokenizer.convert_tokens_to_ids(token) for token in new_tokens]
+    token_type_ids = [0] * len(input_ids)
+    seq_len = len(input_ids)
+
+    return {"input_ids": input_ids, "token_type_ids": token_type_ids, "seq_lens": seq_len}
 
 
 def parse_predict_result(predictions, seq_lens, label_map):
@@ -122,29 +131,21 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     test_ds = load_dataset("cote", "dp", splits=["test"])
+    label_list = test_ds.label_list
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {0: "B", 1: "I", 2: "O"}
     # `no_entity_label` represents that the token isn't an entity.
     no_entity_label_idx = 2
 
-    skep = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
-    model = SkepCrfForTokenClassification(skep, num_classes=len(test_ds.label_list))
-    tokenizer = SkepTokenizer.from_pretrained("skep_ernie_1.0_large_ch")
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
+    model = SkepCrfForTokenClassification.from_pretrained(args.ckpt_dir, num_labels=len(label_list))
+    print("Loaded model from %s" % args.ckpt_dir)
 
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
-
-    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
-        Stack(dtype="int64"),  # sequence lens
-    ): [data for data in fn(samples)]
+    trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, max_seq_len=args.max_seq_len)
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=no_entity_label_idx)
 
     test_data_loader = create_dataloader(
-        test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        test_ds, mode="test", batch_size=args.batch_size, batchify_fn=data_collator, trans_fn=trans_func
     )
 
     results = predict(model, test_data_loader, label_map)

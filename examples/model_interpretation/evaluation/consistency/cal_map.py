@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-	This script includes code to calculating MAP score for results form
-	sentiment analysis, textual similarity, and mrc task
+This script includes code to calculating MAP score for results form
+sentiment analysis, textual similarity, and mrc task
 """
-import json
-import re
-import os
-import math
-import numpy as np
 import argparse
+import json
+import math
+import os
 
 
 def get_args():
@@ -96,7 +94,6 @@ def _calc_map(evids, key, ins_num):
 
     adv_num = 0
     ori_num = 0
-    sample_length = len(evids)
     for ori_idx in evids:
         if evids[ori_idx]["sample_type"] == "ori":
             ori = evids[ori_idx]

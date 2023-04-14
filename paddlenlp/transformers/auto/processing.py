@@ -19,10 +19,10 @@ import json
 import os
 from collections import OrderedDict
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.log import logger
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ...utils.import_utils import import_module
+from ...utils.log import logger
+from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoProcessor",
@@ -33,6 +33,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
         ("ChineseCLIPProcessor", "chineseclip"),
         ("CLIPProcessor", "clip"),
         ("ErnieViLProcessor", "ernie_vil"),
+        ("CLIPSegProcessor", "clipseg"),
     ]
 )
 
@@ -40,7 +41,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.procesing")
+        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
@@ -79,7 +80,7 @@ class AutoProcessor:
 
         if init_class:
             class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.procesing")
+            import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
             processor_class = getattr(import_class, init_class)
             return processor_class
         # If no `init_class`, we use pattern recognition to recognize the processor class.
@@ -125,7 +126,11 @@ class AutoProcessor:
             processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """
-
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
+            cache_dir=kwargs.pop("cache_dir", None),
+        )
         all_processor_names = []
         for names, processor_class in cls._processor_mapping.items():
             for name in names:
@@ -154,10 +159,8 @@ class AutoProcessor:
             community_config_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
             )
-
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

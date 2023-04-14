@@ -15,10 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, List
-import sys
 
 
 def tuple_offset(offset):
@@ -33,7 +33,7 @@ def warning_tp_increment(gold, pred, prefix):
     sys.stderr.write(f"{prefix} TP Increment Warning, Pred Offset: {pred['offset']}\n")
     sys.stderr.write(f"{prefix} TP Increment Warning, Gold String: {gold['string']}\n")
     sys.stderr.write(f"{prefix} TP Increment Warning, Pred String: {pred['string']}\n")
-    sys.stderr.write(f"===============\n")
+    sys.stderr.write("===============\n")
 
 
 class Metric:

@@ -16,8 +16,9 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
 from paddlenlp.seq2vec.encoder import BoWEncoder, LSTMEncoder
-from paddlenlp.transformers import SkepPretrainedModel
+from paddlenlp.transformers import SkepConfig, SkepModel, SkepPretrainedModel
 
 
 class BoWModel(nn.Layer):
@@ -34,7 +35,7 @@ class BoWModel(nn.Layer):
         padding_idx(int, optional): The padding value in the embedding, the padding_idx of embedding value will
             not be updated, the default value is 0.
         hidden_size(int, optional): The output size of linear that after the bow, default value is 128.
-        fc_hidden_size(int, optional): The output size of linear that after the fisrt linear, default value is 96.
+        fc_hidden_size(int, optional): The output size of linear that after the first linear, default value is 96.
     """
 
     def __init__(self, vocab_size, num_classes, emb_dim=128, padding_idx=0, hidden_size=128, fc_hidden_size=96):
@@ -71,15 +72,15 @@ class LSTMModel(nn.Layer):
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     Args:
         vocab_size(int): The vocab size that used to create the embedding.
-        num_class(int):  The num clas of the classifier.
+        num_class(int):  The num class of the classifier.
         emb_dim(int. optional): The size of the embedding, default value is 128.
         padding_idx(int, optional): The padding value in the embedding, the padding_idx of embedding value will
             not be updated, the default value is 0.
-        lstm_hidden_size(int, optional): The output size of the lstm, defalut value 198.
+        lstm_hidden_size(int, optional): The output size of the lstm, default value 198.
         direction(string, optional): The direction of lstm, default value is `forward`.
         lstm_layers(string, optional): The num of lstm layer.
         dropout(float, optional): The dropout rate of lstm.
-        pooling_type(float, optional): The pooling type of lstm. Defalut value is None,
+        pooling_type(float, optional): The pooling type of lstm. Default value is None,
             if `pooling_type` is None, then the LSTMEncoder will return the hidden state of the last time step at last layer as a single vector.
     """
 
@@ -126,21 +127,26 @@ class LSTMModel(nn.Layer):
 
 
 class SkepSequenceModel(SkepPretrainedModel):
-    def __init__(self, skep, num_classes=2, dropout=None):
-        super(SkepSequenceModel, self).__init__()
-        self.num_classes = num_classes
-        self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.skep.config["hidden_size"], num_classes)
+    def __init__(self, config: SkepConfig):
+        super(SkepSequenceModel, self).__init__(config)
+        self.skep = SkepModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         outputs = self.skep(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
+
         pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
+
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1)
+
         return idx, probs

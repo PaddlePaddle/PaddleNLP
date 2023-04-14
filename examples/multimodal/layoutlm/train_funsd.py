@@ -1,28 +1,42 @@
-import os
-import sys
-
-import paddle
-
-import numpy as np
-import random
-
-from tqdm import tqdm, trange
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
+import os
+import random
 
-logger = logging.getLogger(__name__)
-
+import numpy as np
+import paddle
+from funsd import FunsdDataset
 from seqeval.metrics import (
     classification_report,
     f1_score,
     precision_score,
     recall_score,
 )
+from tqdm import tqdm, trange
 
 # relative reference
 from utils import parse_args
-from funsd import FunsdDataset
-from paddlenlp.transformers import LayoutLMModel, LayoutLMForTokenClassification, LayoutLMTokenizer
+
+from paddlenlp.transformers import (
+    LayoutLMForTokenClassification,
+    LayoutLMModel,
+    LayoutLMTokenizer,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def get_labels(path):
@@ -109,7 +123,7 @@ def train(args):
     logger.info("  Total optimization steps = %d", t_total)
 
     global_step = 0
-    tr_loss, logging_loss = 0.0, 0.0
+    tr_loss = 0.0
     model.clear_gradients()
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     set_seed(args)
@@ -164,7 +178,6 @@ def train(args):
                             mode="test",
                         )
                         logger.info("results: {}".format(results))
-                    logging_loss = tr_loss
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
@@ -213,7 +226,6 @@ def evaluate(args, model, tokenizer, all_labels, loss_fct, pad_token_label_id, m
                 "bbox": batch[4],
             }
             labels = batch[3]
-            attention_mask = batch[1]
             logits = model(**inputs)
             tmp_eval_loss = loss_fct(
                 logits.reshape([-1, len(all_labels)]),

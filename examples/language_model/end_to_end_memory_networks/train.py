@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from importlib import import_module
-import os, math
+import math
+import os
 import random
+from importlib import import_module
 
-import paddle
-from paddle import nn
 import numpy as np
-
-from model import MemN2N
+import paddle
 from config import Config
-from eval import eval
 from data import load_data
+from eval import eval
+from model import MemN2N
+from paddle import nn
 
 
 def train_single_epoch(model: MemN2N, lr, data, config):

@@ -23,7 +23,7 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
+- python >= 3.7.3
 - paddlenlp >= 2.4.3
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
@@ -120,7 +120,7 @@ python examples/semantic-search/multi_recall_semantic_search_example.py --device
 #### 3.4.1 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann.py --index_name dureader_nano_query_encoder \
+python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
                             --delete_index
@@ -129,7 +129,7 @@ python utils/offline_ann.py --index_name dureader_nano_query_encoder \
 
 ```
 # 打印几条数据
-curl http://localhost:9200/dureader_nano_query_encoder/_search
+curl http://localhost:9200/dureader_robust_query_encoder/_search
 ```
 
 参数含义说明

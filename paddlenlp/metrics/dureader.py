@@ -19,15 +19,11 @@ This file is expected to map question ID's to the model's predicted probability
 that a question is unanswerable.
 """
 import collections
-import re
-import string
 import json
-import numpy as np
-import os
 import math
+
 from paddlenlp.metrics.bleu import BLEU
 from paddlenlp.metrics.rouge import RougeL
-from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 
 
 def compute_predictions(

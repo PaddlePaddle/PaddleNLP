@@ -13,12 +13,10 @@
 # limitations under the License.
 """duee finance data predict post-process"""
 
-import os
-import sys
-import json
 import argparse
+import json
 
-from utils import read_by_lines, write_by_lines, extract_result
+from utils import extract_result, read_by_lines, write_by_lines
 
 enum_event_type = "公司上市"
 enum_role = "环节"

@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -257,7 +257,7 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 # Prepare a sequence from our tokenizer vocabulary
                 sequence, ids = self.get_clean_sequence(tokenizer, with_prefix_space=True, max_length=20)
-                # sequence_no_prefix_space = sequence.strip()
+
                 # Test encode for pretokenized inputs
                 output_sequence = tokenizer.encode(sequence, return_token_type_ids=None, add_special_tokens=False)[
                     "input_ids"

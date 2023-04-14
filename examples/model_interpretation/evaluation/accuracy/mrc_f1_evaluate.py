@@ -15,13 +15,11 @@
   This script is used to evaluate the performance of the mrc model (F1)
 """
 from __future__ import print_function
-from collections import OrderedDict
-import io
-from paddlenlp.data import Pad, Dict
-import json
-import sys
-import ast
+
 import argparse
+import json
+from collections import OrderedDict
+
 from paddlenlp.metrics.squad import squad_evaluate
 
 

@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import json
+import logging
 import os
 import traceback
-import logging
-import json
 
 import paddle
 
@@ -32,12 +31,12 @@ def init_ernie_model(model_class, model_dir):
     return ernie, config["hidden_size"]
 
 
-def save(model, optimzer, save_path):
+def save(model, optimizer, save_path):
     try:
         paddle.save(model.state_dict(), save_path + ".pdparams")
-        paddle.save(optimzer.state_dict(), save_path + ".pdopt")
-    except Exception as e:
-        logging.error("save model and optimzer failed. save path: %s", save_path)
+        paddle.save(optimizer.state_dict(), save_path + ".pdopt")
+    except Exception:
+        logging.error("save model and optimizer failed. save path: %s", save_path)
         logging.error(traceback.format_exc())
 
 

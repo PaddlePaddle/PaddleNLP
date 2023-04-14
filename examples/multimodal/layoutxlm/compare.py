@@ -1,7 +1,22 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
+
+import numpy as np
 import paddle
 import torch
-import numpy as np
 
 sys.path.insert(0, "../../../")
 
@@ -18,9 +33,8 @@ def get_input_demo(platform="paddle", device="cpu"):
 
 
 def test_layoutlm_paddle():
-    from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
+    from paddlenlp.transformers import LayoutXLMModel
 
-    tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
     model = LayoutXLMModel.from_pretrained("layoutxlm-base-uncased")
     model.eval()
 
@@ -41,7 +55,7 @@ def test_layoutlm_paddle():
 
 def test_layoutlm_torch():
     # import pytorch models
-    from layoutlmft.models.layoutxlm import LayoutXLMModel, LayoutXLMTokenizer
+    from layoutlmft.models.layoutxlm import LayoutXLMModel
 
     model = LayoutXLMModel.from_pretrained("microsoft/layoutxlm-base")
     model.eval()

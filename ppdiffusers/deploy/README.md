@@ -50,7 +50,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle --device gpu
+python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 参数说明
@@ -72,7 +72,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fd_astronaut_rides_horse.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
 
@@ -83,7 +83,7 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语句为 **"A fantasy landscape, trending on artstation"**，待变换的图像为：
@@ -99,7 +99,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm"
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle --device gpu
+python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 参数说明
@@ -121,9 +121,23 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `fantasy_landscape.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>
+
+同时，我们还提供基于 CycleDiffusion 的文本引导的图像变换示例。下面将指定模型目录，运行 `text_guided_img_to_img_infer.py` 脚本，完成文本引导的图像变换任务。
+
+```
+python text_guided_img_to_img_infer.py --model_dir stable-diffusion-v1-4/ --backend paddle_tensorrt --use_fp16 True --device gpu
+```
+
+脚本输入的源提示语句为 **"An astronaut riding a horse"**，目标提示语句为 **"An astronaut riding an elephant"**， 待变换的图像为：
+
+![horse](https://raw.githubusercontent.com/ChenWu98/cycle-diffusion/main/data/dalle2/An%20astronaut%20riding%20a%20horse.png)
+
+运行得到的图像文件为 horse_to_elephant.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
+
+![image](https://user-images.githubusercontent.com/10826371/223315865-4490b586-1de7-4616-a245-9c008c3ffb6b.png)
 
 <a name="文本引导的图像编辑"></a>
 
@@ -136,7 +150,7 @@ python img_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler
 下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_legacy_infer.py` 脚本，完成文本引导的图像编辑任务。
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-4/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-4/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，待变换的图像为：
@@ -155,15 +169,15 @@ mask 图像为：
 如果使用 stable-diffusion-v1-5 模型，则可执行以下命令完成推理：
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 #### 正式版本
 
-下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_legacy_infer.py` 脚本，完成文本引导的图像编辑任务。
+下面将指定模型目录，推理引擎后端，硬件以及 scheduler 类型，运行 `inpaint_infer.py` 脚本，完成文本引导的图像编辑任务。
 
 ```
-python inpaint_legacy_infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler_ancestral --device gpu --backend paddle
+python inpaint_infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler_ancestral --backend paddle_tensorrt --use_fp16 True --device gpu
 ```
 
 脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，待变换的图像为：
@@ -194,9 +208,10 @@ mask 图像为：
 | --device | 运行设备。默认为 `cpu`，可选列表：`['cpu', 'gpu', 'huawei_ascend_npu', 'kunlunxin_xpu']`。 |
 | --scheduler | StableDiffusion 模型的 scheduler。默认为 `'pndm'`。可选列表：`['pndm', 'euler_ancestral']`。|
 | --unet_model_prefix | UNet 模型前缀。默认为 `unet`。 |
-| --vae_model_prefix | VAE 模型前缀。默认为 `vae_decoder`。 |
+| --vae_decoder_model_prefix | VAE Decoder 模型前缀。默认为 `vae_decoder`。 |
+| --vae_encoder_model_prefix | VAE Encoder 模型前缀。默认为 `vae_encoder`。 |
 | --text_encoder_model_prefix | TextEncoder 模型前缀。默认为 `text_encoder`。 |
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `cat_on_bench_new.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |

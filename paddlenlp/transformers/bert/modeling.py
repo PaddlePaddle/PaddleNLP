@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
@@ -429,7 +430,6 @@ class BertModel(BertPretrainedModel):
                 batch_size = past_key_values[0][0].shape[0]
                 past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
-
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
@@ -859,23 +859,15 @@ class BertLMPredictionHead(Layer):
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super(BertLMPredictionHead, self).__init__()
 
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
-            )
-            if embedding_weights is None
-            else embedding_weights
-        )
-
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -885,7 +877,7 @@ class BertLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
@@ -896,16 +888,12 @@ class BertPretrainingHeads(Layer):
     Args:
         config (:class:`BertConfig`):
             An instance of BertConfig used to construct BertForPretraining.
-        embedding_weights (Tensor, optional):
-            Decoding weights used to map hidden_states to logits of the masked token prediction.
-            Its data type should be float32 and its shape is [vocab_size, hidden_size].
-            Defaults to `None`, which means use the same weights of the embedding layer.
 
     """
 
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super(BertPretrainingHeads, self).__init__()
-        self.predictions = BertLMPredictionHead(config, embedding_weights)
+        self.predictions = BertLMPredictionHead(config)
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -991,9 +979,13 @@ class BertForPretraining(BertPretrainedModel):
     def __init__(self, config: BertConfig):
         super(BertForPretraining, self).__init__(config)
         self.bert = BertModel(config)
-        self.cls = BertPretrainingHeads(config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
+        self.cls = BertPretrainingHeads(config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
@@ -1301,9 +1293,9 @@ class BertForMultipleChoice(BertPretrainedModel):
 
 
 class BertOnlyMLMHead(nn.Layer):
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.predictions = BertLMPredictionHead(config=config, embedding_weights=embedding_weights)
+        self.predictions = BertLMPredictionHead(config=config)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1324,9 +1316,13 @@ class BertForMaskedLM(BertPretrainedModel):
         super(BertForMaskedLM, self).__init__(config)
         self.bert = BertModel(config)
 
-        self.cls = BertOnlyMLMHead(config=config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
+        self.cls = BertOnlyMLMHead(config=config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
@@ -1334,6 +1330,7 @@ class BertForMaskedLM(BertPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
+        masked_positions: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1397,7 +1394,7 @@ class BertForMaskedLM(BertPretrainedModel):
             return_dict=return_dict,
         )
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output, masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:

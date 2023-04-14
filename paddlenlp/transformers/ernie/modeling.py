@@ -19,7 +19,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.fluid.dygraph.base import in_declarative_mode
 
+from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -93,7 +95,7 @@ class ErnieEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
@@ -737,7 +739,6 @@ class ErnieLMPredictionHead(nn.Layer):
     def __init__(
         self,
         config: ErnieConfig,
-        embedding_weights=None,
         weight_attr=None,
     ):
         super(ErnieLMPredictionHead, self).__init__()
@@ -745,19 +746,9 @@ class ErnieLMPredictionHead(nn.Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size],
-                dtype=self.transform.weight.dtype,
-                attr=weight_attr,
-                is_bias=False,
-            )
-            if embedding_weights is None
-            else embedding_weights
-        )
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -767,7 +758,8 @@ class ErnieLMPredictionHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
+        # hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
@@ -775,11 +767,10 @@ class ErniePretrainingHeads(nn.Layer):
     def __init__(
         self,
         config: ErnieConfig,
-        embedding_weights=None,
         weight_attr=None,
     ):
         super(ErniePretrainingHeads, self).__init__()
-        self.predictions = ErnieLMPredictionHead(config, embedding_weights, weight_attr)
+        self.predictions = ErnieLMPredictionHead(config, weight_attr)
         self.seq_relationship = nn.Linear(config.hidden_size, 2, weight_attr=weight_attr)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -834,11 +825,14 @@ class ErnieForPretraining(ErniePretrainedModel):
         )
         self.cls = ErniePretrainingHeads(
             config=config,
-            embedding_weights=self.ernie.embeddings.word_embeddings.weight,
             weight_attr=weight_attr,
         )
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
@@ -978,9 +972,9 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
 
 class ErnieOnlyMLMHead(nn.Layer):
-    def __init__(self, config: ErnieConfig, embedding_weights):
+    def __init__(self, config: ErnieConfig):
         super().__init__()
-        self.predictions = ErnieLMPredictionHead(config=config, embedding_weights=embedding_weights)
+        self.predictions = ErnieLMPredictionHead(config=config)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1000,12 +994,13 @@ class ErnieForMaskedLM(ErniePretrainedModel):
     def __init__(self, config: ErnieConfig):
         super(ErnieForMaskedLM, self).__init__(config)
         self.ernie = ErnieModel(config)
-        self.cls = ErnieOnlyMLMHead(
-            config=config,
-            embedding_weights=self.ernie.embeddings.word_embeddings.weight,
-        )
+        self.cls = ErnieOnlyMLMHead(config=config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
+
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
