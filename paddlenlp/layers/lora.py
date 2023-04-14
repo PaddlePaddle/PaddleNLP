@@ -883,3 +883,15 @@ class LoRAModel(nn.Layer):
             return super().__getattr__(name)  # defer to nn.Layer's logic
         except AttributeError:
             return getattr(self.model, name)
+
+    def train(self):
+        self.model.training = True
+        for layer in self.model.sublayers():
+            layer.training = True
+            layer.train()
+
+    def eval(self):
+        self.model.training = False
+        for layer in self.model.sublayers():
+            layer.training = False
+            layer.eval()
