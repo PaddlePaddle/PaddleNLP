@@ -205,14 +205,13 @@ class MultiHeadAttention(nn.Layer):
         return out, weights
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
-        scale_qk_coeff = self.scale_qk_coeff * self.head_dim**0.5
         out = memory_efficient_attention(
             q, 
             k, 
             v, 
             attn_mask, 
             self.dropout, 
-            1.0 / scale_qk_coeff, 
+            None, 
             self.training
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
