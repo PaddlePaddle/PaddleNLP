@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import paddle
+from paddle.distributed import fleet
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 
 
@@ -21,10 +23,17 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", required=True, help="The directory of model.")
+    parser.add_argument(
+        "--model_name_or_path", default="THUDM/glm-large-chinese", required=True, help="The directory of model."
+    )
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument(
+        "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
+    )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
+
     return parser.parse_args()
 
 
@@ -39,10 +48,32 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
         self.batch_size = args.batch_size
         self.args = args
-        self.model = AutoModelForConditionalGeneration.from_pretrained(args.model_path)
+
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        tensor_parallel_rank = 0
+        if tensor_parallel_degree > 1:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+
+        self.model = AutoModelForConditionalGeneration.from_pretrained(
+            args.model_name_or_path,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+            load_state_as_np=True,
+        )
+        if self.args.lora_path is not None:
+            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -101,3 +132,10 @@ if __name__ == "__main__":
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
             print("{}\n{}".format(text, result))
+
+    if args.merge_tensor_parallel_path is not None:
+        predictor.model.save_pretrained(
+            save_dir=args.merge_tensor_parallel_path,
+            merge_tensor_parallel=True,
+        )
+        predictor.tokenizer.save_pretrained(args.merge_tensor_parallel_path)

@@ -640,7 +640,7 @@ class TrainingArguments:
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // self.tensor_parallel_degree
+                    self.sharding_parallel_degree = world_size // tensor_parallel_degree
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
 

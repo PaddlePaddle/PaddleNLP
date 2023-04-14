@@ -20,6 +20,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ..initializer import zeros_
 from .attention import AdaGroupNorm
 
 
@@ -806,3 +807,58 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     out_w = (in_w * up_x + pad_x0 + pad_x1 - kernel_w) // down_x + 1
 
     return out.reshape([-1, channel, out_h, out_w])
+
+
+class TemporalConvLayer(nn.Layer):
+    """
+    Temporal convolutional layer that can be used for video (sequence of images) input Code mostly copied from:
+    https://github.com/modelscope/modelscope/blob/1509fdb973e5871f37148a4b5e5964cafd43e64d/modelscope/models/multi_modal/video_synthesis/unet_sd.py#L1016
+    """
+
+    def __init__(self, in_dim, out_dim=None, dropout=0.0):
+        super().__init__()
+        out_dim = out_dim or in_dim
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.conv1 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=in_dim),
+            nn.Silu(),
+            nn.Conv3D(in_channels=in_dim, out_channels=out_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv2 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv3 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv4 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        zeros_(self.conv4[-1].weight)
+        zeros_(self.conv4[-1].bias)
+
+    def forward(self, hidden_states, num_frames=1):
+        hidden_states = (
+            hidden_states[(None), :]
+            .reshape((-1, num_frames) + tuple(hidden_states.shape[1:]))
+            .transpose(perm=[0, 2, 1, 3, 4])
+        )
+        identity = hidden_states
+        hidden_states = self.conv1(hidden_states)
+        hidden_states = self.conv2(hidden_states)
+        hidden_states = self.conv3(hidden_states)
+        hidden_states = self.conv4(hidden_states)
+        hidden_states = identity + hidden_states
+        hidden_states = hidden_states.transpose(perm=[0, 2, 1, 3, 4]).reshape(
+            (hidden_states.shape[0] * hidden_states.shape[2], -1) + tuple(hidden_states.shape[3:])
+        )
+        return hidden_states

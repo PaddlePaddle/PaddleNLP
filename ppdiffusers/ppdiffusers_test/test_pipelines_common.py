@@ -30,6 +30,13 @@ from ppdiffusers.utils import logging
 from ppdiffusers.utils.testing_utils import require_paddle
 
 
+def to_np(tensor):
+    if isinstance(tensor, paddle.Tensor):
+        tensor = tensor.detach().cpu().numpy()
+
+    return tensor
+
+
 @require_paddle
 class PipelineTesterMixin:
     """
@@ -124,7 +131,7 @@ class PipelineTesterMixin:
             pipe_loaded.set_progress_bar_config(disable=None)
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
-        max_diff = np.abs(output - output_loaded).max()
+        max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
         self.assertLess(max_diff, 0.0001)
 
     def test_pipeline_call_signature(self):
@@ -269,7 +276,7 @@ class PipelineTesterMixin:
 
         output = pipe(**self.get_dummy_inputs())[0]
         output_tuple = pipe(**self.get_dummy_inputs(), return_dict=False)[0]
-        max_diff = np.abs(output - output_tuple).max()
+        max_diff = np.abs(to_np(output) - to_np(output_tuple)).max()
         self.assertLess(max_diff, 0.0001)
 
     def test_components_function(self):
@@ -290,7 +297,7 @@ class PipelineTesterMixin:
         pipe_fp16.set_progress_bar_config(disable=None)
         output = pipe(**self.get_dummy_inputs())[0]
         output_fp16 = pipe_fp16(**self.get_dummy_inputs())[0]
-        max_diff = np.abs(output - output_fp16).max()
+        max_diff = np.abs(to_np(output) - to_np(output_fp16)).max()
         self.assertLess(max_diff, 0.01, "The outputs of the fp16 and fp32 pipelines are too different.")
 
     def test_save_load_float16(self):
@@ -318,7 +325,7 @@ class PipelineTesterMixin:
         #         )
         # inputs = self.get_dummy_inputs()
         # output_loaded = pipe_loaded(**inputs)[0]
-        # max_diff = np.abs(output - output_loaded).max()
+        # max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
         # self.assertLess(max_diff, 5, "The output of the fp16 pipeline changed after saving and loading.")
 
     def test_save_load_optional_components(self):
@@ -344,7 +351,7 @@ class PipelineTesterMixin:
             )
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
-        max_diff = np.abs(output - output_loaded).max()
+        max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
         self.assertLess(max_diff, 0.0001)
 
     # def test_to_device(self):
@@ -361,7 +368,7 @@ class PipelineTesterMixin:
     #     model_devices = [str(component.device) for component in components.values() if hasattr(component, "device")]
     #     self.assertTrue(all(device == "Place(gpu:0)" for device in model_devices))
     #     output_cuda = pipe(**self.get_dummy_inputs())[0]
-    #     self.assertTrue(np.isnan(output_cuda).sum() == 0)
+    #     self.assertTrue(np.isnan(to_np(output_cuda)).sum() == 0)
 
     def test_attention_slicing_forward_pass(self):
         self._test_attention_slicing_forward_pass()
@@ -380,7 +387,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_with_slicing = pipe(**inputs)[0]
         if test_max_difference:
-            max_diff = np.abs(output_with_slicing - output_without_slicing).max()
+            max_diff = np.abs(to_np(output_with_slicing) - to_np(output_without_slicing)).max()
             self.assertLess(max_diff, expected_max_diff, "Attention slicing should not affect the inference results")
         assert_mean_pixel_difference(output_with_slicing[0], output_without_slicing[0])
 
