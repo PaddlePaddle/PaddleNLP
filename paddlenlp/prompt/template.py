@@ -253,8 +253,6 @@ class Template(nn.Layer):
             inputs.append(dict(zip(input_names, value)))
 
         input_dict = self.prompt_tokenizer(inputs)
-        if "labels" in example:
-            input_dict.update({"labels": example["labels"]})
         unused_example = {k: v for k, v in example.items() if k not in self.example_keys}
 
         return {**input_dict, **unused_example}

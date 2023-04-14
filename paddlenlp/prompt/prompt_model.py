@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional
+import inspect
+from typing import Any, Dict, List, Optional
 
 import paddle
+import paddle.nn.functional as F
 from paddle.static import InputSpec
 
 from ..transformers.generation_utils import GenerationMixin
 from ..transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
     MaskedLMOutput,
+    ModelOutput,
     MultipleChoiceModelOutput,
     SequenceClassifierOutput,
 )
@@ -174,7 +177,6 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         template: Template,
         freeze_plm: bool = False,
         freeze_dropout: bool = False,
-        max_predict_len: int = 32,
     ):
         super(PromptModelForGeneration, self).__init__()
         self.plm = model
@@ -189,10 +191,10 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
         self.forward_keys = signature(self.plm.forward)
         self._mask_token_id = self.template.tokenizer.mask_token_id
         self._pad_token_id = self.template.tokenizer.pad_token_id
-        if isinstance(self.template, PrefixTemplate):
-            self.plm = self.template.process_model(self.plm)
-            self.forward_keys.append("past_key_values")
-        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
+        if not isinstance(self.template, PrefixTemplate):
+            raise TypeError(f"{self.__class__.__name__} is not compatible with {self.template.__class__.__name__} ")
+        self.plm = self.template.process_model(self.plm)
+        self.forward_keys.append("past_key_values")
 
     def forward(
         self,
@@ -234,15 +236,18 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
                     )
                 )
             model_inputs.pop("past_key_values")
+        model_inputs.pop("labels")
         model_outputs = self.plm(**model_inputs, return_dict=True, use_cache=True)
-
         logits = model_outputs.logits
-        shift_logits = logits[..., :-1, :]
-        mask = input_dict["token_type_ids"] == 1
-        labels = labels * mask
-        shift_labels = labels[..., 1:]
-        loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=0, reduction="sum")
-        loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+
+        loss = None
+        if labels is not None:
+            shift_labels = labels[..., 1:]
+            shift_logits = logits[..., : shift_labels.shape[1], :]
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=-100, reduction="mean")
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,))).reshape(
+                [-1]
+            )
 
         if not return_dict:
             output = (logits,)
@@ -260,3 +265,74 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
             past_key_values=model_outputs.past_key_values,
             hidden_states=model_outputs.logits,
         )
+
+    def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        batch_size, cur_len = input_ids.shape
+        origin_len = cur_len
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        while cur_len < max_length:
+            # prepare model inputs & get model output
+            if "use_cache" in model_kwargs:
+                del model_kwargs["use_cache"]
+            if "attention_mask" in model_kwargs:
+                del model_kwargs["attention_mask"]
+            if "labels" in model_kwargs:
+                del model_kwargs["labels"]
+            outputs = self(input_ids, **model_kwargs)
+            outputs = outputs[1] if isinstance(outputs, tuple) else outputs
+
+            # To hundle the logits is a ModelOutput
+            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+
+            # [batch_size, vocab_size]
+            next_token_logits = logits[:, -1, :]
+
+            # pre-process distribution
+            next_token_logits = self.adjust_logits_during_generation(next_token_logits)
+            next_tokens_scores = logits_processors(input_ids, next_token_logits)
+            # greedy
+            probs = F.softmax(next_tokens_scores)
+            probs = paddle.log(probs)
+            next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
+            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+
+            if eos_token_id is not None:
+                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+
+            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+
+            cur_len += 1
+            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
+
+            if eos_token_id is not None:
+                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+
+            # Stop when there is a </s> in all sentences
+            if not paddle.any(unfinished_flag):
+                break
+
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+            )
+            model_kwargs["soft_token_ids"] = paddle.concat(
+                [model_kwargs["soft_token_ids"], paddle.to_tensor([[0]])], axis=1
+            )
+
+        return input_ids[:, origin_len:], scores
+
+
+class LogitsProcessorList(List):
+    def __call__(self, input_ids, logits, **kwargs):
+        for processor in self:
+            processor_args = inspect.signature(processor.__call__).parameters
+            if len(processor_args) > 2:
+                assert all(
+                    arg in kwargs for arg in list(processor_args.keys())[2:]
+                ), f"The parameters don't match for {processor.__class__}"
+                logits = processor(input_ids, logits, **kwargs)
+            else:
+                logits = processor(input_ids, logits)
+        return logits

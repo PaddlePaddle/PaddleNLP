@@ -27,9 +27,9 @@ def compute_metrics(eval_preds, tokenizer):
     all_labels = []
     labels = eval_preds.label_ids
     preds = eval_preds.predictions
-    all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+    all_preds.extend(tokenizer.convert_ids_to_string(pred.tolist()) for pred in preds)
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-    all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+    all_labels.extend(tokenizer.convert_ids_to_string(label.tolist()) for label in labels)
 
     assert len(all_preds) == len(all_labels), (
         "The length of pred_responses should be equal to the length of "
@@ -182,14 +182,10 @@ class PromptTrainerForGeneration(PromptTrainer):
             )
 
         has_labels = "labels" in inputs
-        inputs = self._prepare_inputs(inputs)
+        labels = inputs["labels"]
+        # inputs = self._prepare_inputs(inputs)
 
         gen_kwargs = self._gen_kwargs.copy()
-        if gen_kwargs.get("max_length") is None and gen_kwargs.get("max_new_tokens") is None:
-            gen_kwargs["max_length"] = self.model.config.max_length
-        gen_kwargs["num_beams"] = (
-            gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.model.config.num_beams
-        )
 
         if "attention_mask" in inputs:
             gen_kwargs["attention_mask"] = inputs.get("attention_mask", None)
@@ -201,6 +197,7 @@ class PromptTrainerForGeneration(PromptTrainer):
             **gen_kwargs,
             use_cache=True,
             use_fp16_decoding=True,
+            repetition_penalty=2.0,
         )
 
         # different from hf returns: tuple[Tensor]: It is a tuple contains two elements: ids and scores.
@@ -225,17 +222,6 @@ class PromptTrainerForGeneration(PromptTrainer):
         if self.args.prediction_loss_only:
             return (loss, None, None)
 
-        if has_labels:
-            labels = inputs["labels"]
-            if gen_kwargs.get("max_length") is not None and labels.shape[-1] < gen_kwargs["max_length"]:
-                labels = self._pad_tensors_to_max_len(labels, gen_kwargs["max_length"])
-            elif gen_kwargs.get("max_new_tokens") is not None and labels.shape[-1] < (
-                gen_kwargs["max_new_tokens"] + 1
-            ):
-                labels = self._pad_tensors_to_max_len(labels, (gen_kwargs["max_new_tokens"] + 1))
-        else:
-            labels = None
-
         return (loss, generated_tokens, labels)
 
     def _pad_tensors_to_max_len(self, tensor, max_length):
@@ -245,8 +231,8 @@ class PromptTrainerForGeneration(PromptTrainer):
                 self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
             )
         else:
-            if self.model.config.pad_token_id is not None:
-                pad_token_id = self.model.config.pad_token_id
+            if self.tokenizer.pad_token_id is not None:
+                pad_token_id = self.tokenizer.pad_token_id
             else:
                 raise ValueError("Pad_token_id must be set in the configuration of the model, in order to pad tensors")
         # paddle.ones need to support device args.

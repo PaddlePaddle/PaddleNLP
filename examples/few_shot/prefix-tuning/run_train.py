@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Optional
 
 import paddle
-from paddle.static import InputSpec
 from utils import PromptTrainerForGeneration, compute_metrics
 
 from paddlenlp.datasets import load_dataset
@@ -35,9 +33,10 @@ from paddlenlp.utils.log import logger
 @dataclass
 class DataArguments:
     prompt: str = field(
-        default="{'prefix':'文本摘要'}{'text':'text'}{'sep'}{'text':'labels', 'token_type': 1}",
-        metadata={"help": "Add prompt.'文本摘要'、'text' variable and 'labels' immutable."},
+        default="{'prefix':'None'}{'text':'text'}{'sep'}{'text':'labels', 'token_type': 1}",
+        metadata={"help": "Add prompt.'prefix'、'text' variable and 'text':'labels' immutable."},
     )
+    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
 
 
 @dataclass
@@ -53,11 +52,11 @@ class ModelArguments:
         metadata={"help": ("Whether to generate in predcit.")},
     )
     num_beams: Optional[int] = field(
-        default=1,
+        default=2,
         metadata={"help": ("The number of beams to use in beam search.")},
     )
     max_target_length: Optional[int] = field(
-        default=64,
+        default=16,
         metadata={
             "help": (
                 "The maximum total sequence length for target text after "
@@ -97,11 +96,11 @@ def main():
     logger.info("Using template: {}".format(template.prompt))
 
     # Load datasets.
-    train_ds, dev_ds = load_dataset("lcsts_new")
+    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
 
     def convert_label_keyword(input_dict):
         if "text" not in input_dict:
-            input_dict["text"] = input_dict.pop("source")
+            input_dict["text"] = input_dict.pop("title") + tokenizer.sep_token + input_dict.pop("source")
         if "labels" not in input_dict:
             input_dict["labels"] = input_dict.pop("target")
         return input_dict
@@ -115,7 +114,6 @@ def main():
         template,
         freeze_plm=training_args.freeze_plm,
         freeze_dropout=training_args.freeze_dropout,
-        max_predict_len=training_args.generation_max_length,
     )
 
     dev_compute_metrics = partial(compute_metrics, tokenizer=tokenizer)
@@ -141,23 +139,6 @@ def main():
     if training_args.do_eval:
         eval_metrics = trainer.evaluate()
         trainer.log_metrics("eval", eval_metrics)
-
-    # Export static model.
-    if training_args.do_export:
-        template = prompt_model.template
-        template_keywords = template.extract_template_keywords(template.prompt)
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
-            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
-            InputSpec(shape=[None], dtype="int64"),  # masked_positions
-            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
-        ]
-        if "encoder" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # encoder_ids
-        export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
 
 
 if __name__ == "__main__":

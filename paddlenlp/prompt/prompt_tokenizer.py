@@ -61,6 +61,8 @@ class MLMPromptTokenizer(object):
                 else:
                     input_ids = orig_input_ids[index][: max_lengths[index]]
                 encoded_inputs["soft_token_ids"].append([0] * len(input_ids))
+                if part["token_types"] == 1:
+                    encoded_inputs["labels"].append(input_ids)
             else:
                 input_ids = soft_token_ids
                 encoded_inputs["soft_token_ids"].append(soft_token_ids)
