@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
-from .globalpointer import (
-    GlobalPointerForEntityExtraction,
-    GPLinkerForEventExtraction,
-    GPLinkerForRelationExtraction,
-)
-from .linear import Linear
-from .lora import *
-from .sequence import sequence_mask
-from .tcn import TCN, TemporalBlock
+import unittest
+
+import paddle
+
+from paddlenlp.layers import Linear
+
+
+class TestLinear(unittest.TestCase):
+    def test_linear_layer(self):
+        x = paddle.randn([2, 3], "float32")
+        layer = Linear(in_features=3, out_features=7)
+        self.assertEqual(layer(x).shape, [2, 7])
+        self.assertEqual(layer.weight.shape, [7, 3])
+        self.assertEqual(layer.bias.shape, [7])
