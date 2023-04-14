@@ -121,7 +121,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
+    tokenizer.padding_side = "left"  # Allow batch inference
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])

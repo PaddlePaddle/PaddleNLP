@@ -52,7 +52,7 @@ class Predictor(object):
             args.model_dir,
             add_bos_token=False,
         )
-        self.tokenizer.padding_side = "left"
+        self.tokenizer.padding_side = "left"  # Allow batch inference
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.batch_size = args.batch_size
 
