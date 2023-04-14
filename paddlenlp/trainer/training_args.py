@@ -438,6 +438,7 @@ class TrainingArguments:
         },
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
+    pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
     recompute: bool = field(
         default=False,
         metadata={
@@ -445,6 +446,7 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
@@ -627,32 +629,42 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1:
+        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
-            assert (
-                world_size % self.tensor_parallel_degree == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree:{self.tensor_parallel_degree}."
-
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+
+            assert (
+                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // tensor_parallel_degree
+                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
 
-            assert world_size % (sharding_parallel_degree * tensor_parallel_degree) == 0, (
-                "The world size for workers should be divided by sharding_parallel_degree and tensor_parallel_degree, "
-                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree},"
+            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) == 0, (
+                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, and pipeline_parallel_degree, "
+                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, "
+                "pipeline_parallel_degree:{pipeline_parallel_degree}, "
                 " world_size:{world_size}"
             )
-            self.data_parallel_degree = world_size // (sharding_parallel_degree * tensor_parallel_degree)
+            self.data_parallel_degree = world_size // (
+                sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
+            )
 
             if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
                 warnings.warn("`offload` and `stage3` is not supported NOW!")
+
+            if pipeline_parallel_degree > 1:
+                if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
+                    raise ValueError(
+                        "pipeline parallel is not compatible for sharding stage2 or stage3, please using sharding stage1"
+                    )
 
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
@@ -660,7 +672,7 @@ class TrainingArguments:
                 strategy.hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
-                    "pp_degree": 1,
+                    "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
                 }
                 fleet.init(is_collective=True, strategy=strategy)
@@ -784,14 +796,22 @@ class TrainingArguments:
             return 0
 
     @property
+    def pipeline_parallel_rank(self):
+        if self.use_hybrid_parallel:
+            hcg = fleet.get_hybrid_communicate_group()
+            rank = hcg.get_stage_id()
+            return max(rank, 0)
+        else:
+            return 0
+
+    @property
     def optimizer_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-            # TODO: support pipeline parallel
-            # if self.pipeline_parallel_degree > 1:
-            #     name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
@@ -805,9 +825,8 @@ class TrainingArguments:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-            # TODO: support pipeline parallel
-            # if self.pipeline_parallel_degree > 1:
-            #     name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
         else:
             return None
