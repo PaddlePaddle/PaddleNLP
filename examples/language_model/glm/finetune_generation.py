@@ -23,7 +23,7 @@ from utils import GLMTrainer
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.metrics import Rouge1, Rouge2, RougeL
+from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -118,6 +118,7 @@ def main():
             lora_alpha=8,
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
@@ -137,6 +138,7 @@ def main():
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
+        bleu4 = BLEU(n_size=4)
         predictions = [x[x != -100] for x in eval_preds.predictions]
         references = [x[x != -100] for x in eval_preds.label_ids]
 
@@ -146,10 +148,12 @@ def main():
         rouge2_score = rouge2.score(predictions, references)
         for pred, ref in zip(predictions, references):
             rougel.add_inst(pred, [ref])
+            bleu4.add_inst(pred, [ref])
         return {
             "rouge1": rouge1_score,
             "rouge2": rouge2_score,
             "rougel": rougel.score(),
+            "bleu4": bleu4.score(),
         }
 
     trainer = GLMTrainer(
