@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # from collections import namedtuple
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import os
-import hashlib
 import argparse
+import hashlib
+import os
 
 import paddle
 from paddle.static import InputSpec
