@@ -18,6 +18,7 @@ import os
 import re
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
+from functools import partial
 from typing import Dict, List, Optional, Union
 
 import paddle
@@ -26,7 +27,9 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
-from ..transformers.model_utils import PretrainedModel
+from ..transformers.conversion_utils import ConversionMixin
+from ..transformers.model_utils import PretrainedModel, _add_variant
+from ..utils.distributed import distributed_gather
 from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
 
@@ -523,6 +526,7 @@ class LoRAConfig:
             "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
         },
     )
+    tensor_parallel_degree: int = field(default=1, metadata={"help": ("1 for not use tensor parallel")})
 
     @property
     def __dict__(self):
@@ -601,31 +605,98 @@ class LoRAModel(nn.Layer):
         super().__init__()
         self.lora_config = lora_config
         self.model = self.get_lora_model(model, lora_config)
+        if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
+            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+            logger.warning(
+                f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
+            )
         self.forward = self.model.forward
 
     @classmethod
     def from_pretrained(cls, model, lora_path):
         lora_config = LoRAConfig.from_pretrained(lora_path)
+        if lora_config.tensor_parallel_degree > 1:
+            if lora_config.tensor_parallel_degree != model.config.tensor_parallel_degree:
+                raise ValueError(
+                    f"{lora_config.tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please save LoRA parameters as onepiece model."
+                )
+            lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+        elif lora_config.tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
+            # TODO[lugimzzz] will support in next PR
+            raise NotImplementedError("Onepiece LoRA parameters does not support MP loading.")
+        else:
+            lora_weight_name = LORA_WEIGHT_FILE_NAME
         lora_model = cls(model, lora_config)
-        lora_weight_path = os.path.join(lora_path, LORA_WEIGHT_FILE_NAME)
+        lora_weight_path = os.path.join(lora_path, lora_weight_name)
         if os.path.exists(lora_weight_path):
             logger.info(f"Loading the LoRA weights from {lora_weight_path}")
             lora_state_dict = paddle.load(lora_weight_path)
             lora_model.model.set_state_dict(lora_state_dict)
         else:
-            logger.info(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+            logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
         return lora_model
 
-    def save_pretrained(self, save_directory: str, **kwargs):
+    def _merge_trainable_tensor_parallel(self):
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=False,
+            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
+            num_attention_heads=self.model.config.num_attention_heads,
+        )
+        trainable_state_dict = self.get_trainable_state_dict()
+        trainable_name_action_mappings = {}
+        for k in trainable_state_dict:
+            if "lora_B" in k:
+                trainable_name_action_mappings[k] = partial(fn, is_column=False)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+        state_keys_map = ConversionMixin._resolve_prefix_keys(
+            name_action_mappings.keys(), self.model.state_dict().keys()
+        )
+        for k, v in state_keys_map.items():
+            if v in trainable_state_dict:
+                trainable_name_action_mappings[v] = name_action_mappings[k]
+
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        is_dst = paddle.distributed.get_rank(mp_group) == 0
+
+        for key in trainable_state_dict:
+            tensor = trainable_state_dict[key]
+            if key in trainable_name_action_mappings:
+                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                action = trainable_name_action_mappings[key]
+                tensor = action(ret) if is_dst else None
+                trainable_state_dict[key] = tensor
+            else:
+                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+
+        if self.model.config.tensor_parallel_rank != 0:
+            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+            return
+        self.lora_config.tensor_parallel_degree = 1
+        return trainable_state_dict
+
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False):
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
-
-        self.lora_config.save_pretrained(save_directory)
-        weight_filename = os.path.join(save_directory, LORA_WEIGHT_FILE_NAME)
-        trainable_state_dict = self.get_trainable_state_dict()
+        lora_weight_name = LORA_WEIGHT_FILE_NAME
+        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+            trainable_state_dict = self._merge_trainable_tensor_parallel()
+        else:
+            trainable_state_dict = self.get_trainable_state_dict()
+            if self.model.config.tensor_parallel_degree > 1:
+                lora_weight_name = _add_variant(
+                    LORA_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+                )
+        weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
+        if self.model.config.tensor_parallel_rank == 0:
+            self.lora_config.save_pretrained(save_directory)
+            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -794,7 +865,7 @@ class LoRAModel(nn.Layer):
     def restore_original_model(self):
         # make sure W and lora weights are not merged before we restore the original model
         if self.lora_config.merge_weights:
-            self.model.train()
+            self.train()
 
         for layer_name, layer in self.model.named_sublayers():
             if (
@@ -812,3 +883,15 @@ class LoRAModel(nn.Layer):
             return super().__getattr__(name)  # defer to nn.Layer's logic
         except AttributeError:
             return getattr(self.model, name)
+
+    def train(self):
+        self.model.training = True
+        for layer in self.model.sublayers():
+            layer.training = True
+            layer.train()
+
+    def eval(self):
+        self.model.training = False
+        for layer in self.model.sublayers():
+            layer.training = False
+            layer.eval()

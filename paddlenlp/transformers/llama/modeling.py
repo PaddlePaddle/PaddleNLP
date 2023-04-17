@@ -122,7 +122,7 @@ def _expand_mask(mask, dtype, tgt_length):
     return masked_fill(inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min))
 
 
-class RMSNorm(nn.Layer):
+class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -135,19 +135,17 @@ class RMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        default_type = hidden_states.dtype
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
-            output = hidden_states * self.weight
-            output = output.astype(default_type)
-        return output
+            hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+        return hidden_states * self.weight
 
 
-class RotaryEmbedding(nn.Layer):
+class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        self.inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
+        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        self.register_buffer("inv_freq", inv_freq)
 
         t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
         freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
@@ -275,7 +273,7 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        self.rotary_emb = RotaryEmbedding(self.head_dim)
+        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim)
         self.config = config
 
     def forward(
@@ -372,8 +370,8 @@ class LlamaDecoderLayer(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config)
         self.mlp = LlamaMLP(config)
-        self.input_layernorm = RMSNorm(config)
-        self.post_attention_layernorm = RMSNorm(config)
+        self.input_layernorm = LlamaRMSNorm(config)
+        self.post_attention_layernorm = LlamaRMSNorm(config)
 
     def forward(
         self,
@@ -516,7 +514,7 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
         self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
-        self.norm = RMSNorm(config)
+        self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
 
@@ -681,12 +679,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
-    def forward(self, prediction_scores, masked_lm_labels, pad_token_id):
+    def forward(self, prediction_scores, masked_lm_labels):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-        with paddle.amp.auto_cast(False):
-            masked_lm_loss = masked_lm_loss.astype("float32")
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != pad_token_id]
-            loss = paddle.mean(masked_lm_loss)
+        loss = paddle.mean(masked_lm_loss)
         return loss
 
 
@@ -702,8 +697,7 @@ class LlamaLMHead(nn.Layer):
 
     def forward(self, hidden_states, parallel_output=False):
         with paddle.amp.auto_cast(False):
-            hidden_states = hidden_states.astype("float32")
-            logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
+            logits = parallel_matmul(hidden_states, self.weight, parallel_output=parallel_output)
         return logits
 
 
@@ -719,7 +713,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_output=True,
         )
-        self.pad_token_id = config.pad_token_id
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -836,7 +829,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             shift_logits = logits[..., :-1, :]
             shift_labels = labels[..., 1:]
             # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels, self.pad_token_id)
+            loss = self.criterion(shift_logits, shift_labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
