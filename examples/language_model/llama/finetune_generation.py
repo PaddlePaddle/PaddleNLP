@@ -127,14 +127,14 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
-    tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.pad_token = tokenizer.eos_token
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
 
     trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func))
-    dev_ds = dev_ds.map(partial(trans_func))
+    dev_ds = dev_ds.map(partial(trans_func, is_eval=True))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
     def compute_metrics_trainer(eval_preds, tokenizer):

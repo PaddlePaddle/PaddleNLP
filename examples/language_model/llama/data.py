@@ -23,7 +23,7 @@ from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 IGNORE_INDEX = -100
 
 
-def convert_example(example, tokenizer, data_args):
+def convert_example(example, tokenizer, data_args, is_eval=False):
     """
     Convert an example into necessary features.
     """
@@ -67,6 +67,12 @@ def convert_example(example, tokenizer, data_args):
     input_ids = example_tokenized["input_ids"][0]
     labels = copy.deepcopy(input_ids)
     labels[:source_input_ids_len] = IGNORE_INDEX
+
+    if is_eval:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
+        )
 
     return dict(
         input_ids=input_ids,
