@@ -20,8 +20,7 @@ import paddle
 
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-# IGNORE_INDEX = -100
-IGNORE_INDEX = 0
+IGNORE_INDEX = -100
 
 
 def convert_example(example, tokenizer, data_args):
