@@ -344,8 +344,9 @@ class BloomAttention(nn.Layer):
         self.hidden_dropout = config.hidden_dropout
         self.config = config
 
-        assert self.num_heads % config.tensor_parallel_degree == 0
-        self.num_heads = self.num_heads // config.tensor_parallel_degree
+        if config.tensor_parallel_degree > 1:
+            assert self.num_heads % config.tensor_parallel_degree == 0
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
@@ -947,7 +948,7 @@ class BloomModel(BloomPreTrainedModel):
             input_shape=(batch_size, seq_length),
             past_key_values_length=past_key_values_length,
         )
-        if self.config.tensor_parallel_degree > 0:
+        if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[
                 :, self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size
