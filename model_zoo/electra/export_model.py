@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # from collections import namedtuple
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import os
-import hashlib
 import argparse
-import json
+import hashlib
+import os
 
 import paddle
 import paddle.nn as nn
 from paddle.static import InputSpec
 
-from paddlenlp.transformers import ElectraForTotalPretraining, ElectraDiscriminator, ElectraGenerator, ElectraModel
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
+from paddlenlp.transformers import (
+    ElectraDiscriminator,
+    ElectraForSequenceClassification,
+    ElectraForTotalPretraining,
+    ElectraGenerator,
+    ElectraModel,
+    ElectraTokenizer,
+)
 
 
 def get_md5sum(file_path):
@@ -54,7 +57,7 @@ def main():
         exit(1)
     elif "classifier.dense.weight" in model_state_dict:
         print("we are load glue fine-tuning model")
-        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir, num_classes=num_classes)
+        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir)
         print("total model layers : ", len(model_state_dict))
     else:
         print("the model file : %s may not be fine-tuning model, please check" % input_model_file)
