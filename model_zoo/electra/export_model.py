@@ -12,24 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # from collections import namedtuple
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
-import argparse
-import hashlib
 import os
+import hashlib
+import argparse
 
 import paddle
-import paddle.nn as nn
 from paddle.static import InputSpec
 
-from paddlenlp.transformers import (
-    ElectraDiscriminator,
-    ElectraForSequenceClassification,
-    ElectraForTotalPretraining,
-    ElectraGenerator,
-    ElectraModel,
-    ElectraTokenizer,
-)
+from paddlenlp.transformers import ElectraForSequenceClassification
 
 
 def get_md5sum(file_path):
