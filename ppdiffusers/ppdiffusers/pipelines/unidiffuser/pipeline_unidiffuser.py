@@ -609,7 +609,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
-        use_beam_search: Optional[int] = True,
+        use_beam_search: Optional[bool] = True,
         **kwargs,
     ):
         # 0. Default height and width to unet
@@ -756,7 +756,9 @@ class UniDiffuserPipeline(DiffusionPipeline):
         if mode == "joint":
             image_vae_latents, image_clip_latents, text_latents = outs
             gen_image = self.decode_image_latents(image_vae_latents)
-            gen_text = self.caption_decoder.generate_captions(self.caption_tokenizer, text_latents)
+            gen_text = self.caption_decoder.generate_captions(
+                self.caption_tokenizer, text_latents, use_beam_search=use_beam_search
+            )
 
         elif mode in ["t2i", "i", "t2i2t"]:
             image_vae_latents, image_clip_latents = outs
