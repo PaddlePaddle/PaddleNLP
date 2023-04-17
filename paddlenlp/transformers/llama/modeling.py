@@ -25,6 +25,11 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -87,6 +92,60 @@ def finfo(dtype: paddle.dtype = None):
         return np.finfo(np.float64)
 
 
+def scaled_dot_product_attention(
+    query_states, config, key_states, value_states, attention_mask, output_attentions, is_causal=True
+):
+
+    bsz, q_len, num_heads, head_dim = query_states.shape
+    _, kv_seq_len, _, _ = value_states.shape
+
+    if config.use_flash_attention and flash_attention:
+        # Flash Attention now ignore attention mask
+        # Current Flash Attention doesn't support attn maskt
+        # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+        # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        attn_output, attn_weights = flash_attention(
+            query_states,
+            key_states,
+            value_states,
+            causal=is_causal and query_states.shape[1] != 1,
+            return_softmax=output_attentions,
+        )
+
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+    else:
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3])
+        # merge with the next tranpose
+        key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+        value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+
+        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(head_dim)
+
+        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                f" {attn_weights.shape}"
+            )
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+            )
+        attn_weights = attention_mask + attn_weights
+
+        if config.fp16_opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+
+        attn_output = paddle.matmul(attn_weights, value_states)
+        attn_output = attn_output.transpose([0, 2, 1, 3])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+
+
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
@@ -135,9 +194,15 @@ class LlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        with paddle.amp.auto_cast(False):
+        default_type = hidden_states.dtype
+        if self.config.fp16_opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+            
         return hidden_states * self.weight
 
 
@@ -151,13 +216,14 @@ class LlamaRotaryEmbedding(nn.Layer):
         freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
-        self.cos_cached = emb.cos()[None, None, :, :]
-        self.sin_cached = emb.sin()[None, None, :, :]
+        # [bs, seqlen, nhead, head_dim]
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         return (
-            self.cos_cached[:, :, :seq_len, ...],
-            self.sin_cached[:, :, :seq_len, ...],
+            self.cos_cached[:, :seq_len, :, ...],
+            self.sin_cached[:, :seq_len, :, ...],
         )
 
 
@@ -169,8 +235,8 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
-    cos = cos[..., offset : q.shape[-2] + offset, :]
-    sin = sin[..., offset : q.shape[-2] + offset, :]
+    cos = cos[:, offset : q.shape[1] + offset, :, :]
+    sin = sin[:, offset : q.shape[1] + offset, :, :]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -287,27 +353,15 @@ class LlamaAttention(nn.Layer):
         """Input shape: Batch x Time x Channel"""
 
         bsz, q_len, _ = hidden_states.shape
-        query_states = (
-            self.q_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
-        key_states = (
-            self.k_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
-        value_states = (
-            self.v_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
+        query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
 
-        kv_seq_len = key_states.shape[-2]
+        kv_seq_len = key_states.shape[-3]
         offset = 0
 
         if past_key_value is not None:
-            offset = past_key_value[0].shape[-2]
+            offset = past_key_value[0].shape[-3]
             kv_seq_len += offset
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
@@ -316,46 +370,19 @@ class LlamaAttention(nn.Layer):
 
         if past_key_value is not None:
             # reuse k, v, self_attention
-            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
+            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
-
-        if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of shape {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.shape}"
-            )
-
-        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len]).astype(query_states.dtype)
-
-        if attention_mask is not None:
-            if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
-                raise ValueError(
-                    f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
-                )
-            attn_weights = attention_mask + attn_weights
-            attn_weights = paddle.maximum(
-                attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
-            )
-
-        # Upcast attention to fp32
-        with paddle.amp.auto_cast(False):
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-
-        attn_output = paddle.matmul(attn_weights, value_states)
-
-        if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
-            raise ValueError(
-                f"`attn_output` should be of shape {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
-                f" {attn_output.shape}"
-            )
-
-        attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, self.head_dim * self.num_heads])
-
+        attn_output, attn_weights = scaled_dot_product_attention(
+            config=self.config,
+            query_states=query_states,
+            key_states=key_states,
+            value_states=value_states,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+        )
         attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
@@ -696,8 +723,7 @@ class LlamaLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states, parallel_output=False):
-        with paddle.amp.auto_cast(False):
-            logits = parallel_matmul(hidden_states, self.weight, parallel_output=parallel_output)
+        logits = parallel_matmul(hidden_states, self.weight, parallel_output=parallel_output)
         return logits
 
 

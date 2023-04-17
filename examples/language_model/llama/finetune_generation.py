@@ -56,6 +56,7 @@ class ModelArgument:
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
 
 def main():
@@ -105,7 +106,9 @@ def main():
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        use_recompute=True,
+        fp16_opt_level=training_args.fp16_opt_level,
+        use_flash_attention=model_args.use_flash_attention,
+        use_recompute=training_args.recompute,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
