@@ -82,7 +82,7 @@ class BartPretrainedModel(PretrainedModel):
     base_model_prefix = "bart"
     config_class = BartConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -145,7 +145,6 @@ class BartEncoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -256,7 +255,6 @@ class BartDecoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -367,7 +365,6 @@ class BartModel(BartPretrainedModel):
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         self.encoder = BartEncoder(config, self.shared)
         self.decoder = BartDecoder(config, self.shared)
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.encoder
@@ -619,7 +616,6 @@ class BartForSequenceClassification(BartPretrainedModel):
             config.num_labels,
             config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -777,7 +773,6 @@ class BartForQuestionAnswering(BartPretrainedModel):
         super().__init__(config)
         self.bart = BartModel(config)
         self.classifier = nn.Linear(config.d_model, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -944,7 +939,6 @@ class BartForConditionalGeneration(BartPretrainedModel):
             shape=[config.vocab_size, config.d_model], dtype=self.bart.shared.weight.dtype, is_bias=False
         )
         self.register_buffer("final_logits_bias", paddle.zeros((1, config.vocab_size)))
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.bart.get_encoder()

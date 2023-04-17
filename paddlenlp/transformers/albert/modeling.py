@@ -620,7 +620,6 @@ class AlbertForPretraining(AlbertPretrainedModel):
         self.predictions = AlbertMLMHead(config)
         self.sop_classifier = AlbertSOPHead(config)
         self.config = config
-        self.init_weights()
         self.vocab_size = config.vocab_size
 
     def get_output_embeddings(self):
@@ -798,8 +797,6 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         self.transformer = AlbertModel(config)
         self.predictions = AlbertMLMHead(config)
         self.config = config
-        self.init_weights()
-        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.predictions.decoder
@@ -928,9 +925,6 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         self.transformer = AlbertModel(config)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def forward(
         self,
@@ -1067,8 +1061,6 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids,
@@ -1191,7 +1183,6 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         self.config = config
         self.transformer = AlbertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
-        self.init_weights()
 
     def forward(
         self,
@@ -1345,7 +1336,6 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.config = config
-        self.init_weights()
 
     def forward(
         self,

@@ -246,7 +246,7 @@ class BertPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -320,7 +320,6 @@ class BertModel(BertPretrainedModel):
             )
             self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = BertPooler(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -507,7 +506,6 @@ class BertForQuestionAnswering(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -639,7 +637,6 @@ class BertForSequenceClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -761,7 +758,6 @@ class BertForTokenClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -980,9 +976,6 @@ class BertForPretraining(BertPretrainedModel):
         self.bert = BertModel(config)
         self.cls = BertPretrainingHeads(config)
 
-        self.apply(self.init_weights)
-        self.tie_weights()
-
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
 
@@ -1152,7 +1145,6 @@ class BertForMultipleChoice(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1316,9 +1308,6 @@ class BertForMaskedLM(BertPretrainedModel):
         self.bert = BertModel(config)
 
         self.cls = BertOnlyMLMHead(config=config)
-
-        self.apply(self.init_weights)
-        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder

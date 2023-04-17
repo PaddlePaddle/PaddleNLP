@@ -169,7 +169,7 @@ class LayoutLMPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "layoutlm"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -285,7 +285,6 @@ class LayoutLMModel(LayoutLMPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = LayoutLMPooler(hidden_size, pool_act)
-        self.apply(self.init_weights)
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
@@ -437,7 +436,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         self.layoutlm = layoutlm
         self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"], num_classes)
-        self.classifier.apply(self.init_weights)
+        self.classifier.apply(self._init_weights)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
@@ -537,7 +536,6 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
         self.num_classes = num_classes
         self.dropout = nn.Dropout(self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
@@ -676,7 +674,6 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
             self.layoutlm.config["hidden_act"],
             embedding_weights=self.layoutlm.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """

@@ -79,7 +79,7 @@ class DistilBertPretrainedModel(PretrainedModel):
     config_class = DistilBertConfig
     model_config_file = CONFIG_NAME
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -166,7 +166,6 @@ class DistilBertModel(DistilBertPretrainedModel):
             act_dropout=0,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -243,7 +242,6 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -305,7 +303,6 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -374,7 +371,6 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -430,8 +426,6 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
         self.activation = nn.GELU()
         self.vocab_layer_norm = nn.LayerNorm(config.hidden_size)
         self.vocab_projector = nn.Linear(config.hidden_size, config.vocab_size)
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
         r"""
