@@ -16,12 +16,13 @@
 
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.initializer import normal_, ones_, zeros_
 from ..model_outputs import BaseModelOutputWithPooling, ModelOutput
 from ..model_utils import PretrainedModel
@@ -356,6 +357,238 @@ class CLIPPretrainedModel(PretrainedModel):
     base_model_prefix = "clip"
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
+
+    @classmethod
+    def _get_name_mappings(cls, config: CLIPConfig) -> List[StateDictNameMapping]:
+        mappings: List[StateDictNameMapping] = []
+
+        model_type = config.get("model_type", "clip")
+
+        num_layer_key = "num_hidden_layers"
+        num_text_layer = 0
+        num_vision_layer = 0
+
+        if model_type in ["clip", "clip_text_model"]:
+            text_config = config.get("text_config")
+            if text_config:
+                num_text_layer = text_config.get(num_layer_key, 0)
+            else:
+                num_text_layer = config.get(num_layer_key, 0)
+
+        if model_type in ["clip", "clip_vision_model"]:
+            vision_config = config.get("vision_config")
+            if vision_config:
+                num_vision_layer = vision_config.get(num_layer_key, 0)
+            else:
+                num_vision_layer = config.get(num_layer_key, 0)
+
+        has_text_layer = num_text_layer > 0
+        has_text_projection_layer = has_text_layer and (
+            "CLIPModel" in (config.architectures or [])
+            or "CLIPTextModelWithProjection" in (config.architectures or [])
+            or cls.__name__ in ["CLIPModel", "CLIPTextModelWithProjection"]
+        )
+
+        has_vision_layer = num_vision_layer > 0
+        has_vision_projection_layer = has_vision_layer and (
+            "CLIPModel" in (config.architectures or [])
+            or "CLIPVisionModelWithProjection" in (config.architectures or [])
+            or cls.__name__ in ["CLIPModel", "CLIPVisionModelWithProjection"]
+        )
+
+        if model_type == "clip":
+            hard_mappings = [["logit_scale", "logit_scale"]]
+        else:
+            hard_mappings = []
+
+        # text model
+        if has_text_layer:
+            text_model_layer_mappings = [
+                ["text_model.embeddings.token_embedding.weight", "text_model.token_embedding.weight"],
+                ["text_model.embeddings.position_embedding.weight", "text_model.positional_embedding.weight"],
+                ["text_model.final_layer_norm.weight", "text_model.ln_final.weight"],
+                ["text_model.final_layer_norm.bias", "text_model.ln_final.bias"],
+            ]
+
+            if has_text_projection_layer:
+                text_model_layer_mappings.extend([["text_projection.weight", "text_projection", "transpose"]])
+
+            hard_mappings.extend(text_model_layer_mappings)
+
+            for layer_index in range(num_text_layer):
+                text_model_layer_mappings = [
+                    # qkv out
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.q_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.q_proj.bias",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.k_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.k_proj.bias",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.v_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.v_proj.bias",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.out_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                        f"text_model.transformer.layers.{layer_index}.self_attn.out_proj.bias",
+                    ],
+                    # fc1
+                    [
+                        f"text_model.encoder.layers.{layer_index}.mlp.fc1.weight",
+                        f"text_model.transformer.layers.{layer_index}.linear1.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.mlp.fc1.bias",
+                        f"text_model.transformer.layers.{layer_index}.linear1.bias",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.layer_norm1.weight",
+                        f"text_model.transformer.layers.{layer_index}.norm1.weight",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.layer_norm1.bias",
+                        f"text_model.transformer.layers.{layer_index}.norm1.bias",
+                    ],
+                    # fc2
+                    [
+                        f"text_model.encoder.layers.{layer_index}.mlp.fc2.weight",
+                        f"text_model.transformer.layers.{layer_index}.linear2.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.mlp.fc2.bias",
+                        f"text_model.transformer.layers.{layer_index}.linear2.bias",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.layer_norm2.weight",
+                        f"text_model.transformer.layers.{layer_index}.norm2.weight",
+                    ],
+                    [
+                        f"text_model.encoder.layers.{layer_index}.layer_norm2.bias",
+                        f"text_model.transformer.layers.{layer_index}.norm2.bias",
+                    ],
+                ]
+                hard_mappings.extend(text_model_layer_mappings)
+
+        # vision model
+        if has_vision_layer:
+            vision_model_layer_mappings = [
+                ["vision_model.embeddings.class_embedding", "vision_model.class_embedding"],
+                ["vision_model.embeddings.patch_embedding.weight", "vision_model.conv1.weight"],
+                ["vision_model.embeddings.position_embedding.weight", "vision_model.positional_embedding.weight"],
+                ["vision_model.pre_layrnorm.weight", "vision_model.ln_pre.weight"],
+                ["vision_model.pre_layrnorm.bias", "vision_model.ln_pre.bias"],
+                ["vision_model.post_layernorm.weight", "vision_model.ln_post.weight"],
+                ["vision_model.post_layernorm.bias", "vision_model.ln_post.bias"],
+            ]
+
+            if has_vision_projection_layer:
+                vision_model_layer_mappings.extend([["visual_projection.weight", "vision_projection", "transpose"]])
+
+            hard_mappings.extend(vision_model_layer_mappings)
+            for layer_index in range(num_vision_layer):
+                vision_model_layer_mappings = [
+                    # qkv out
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.q_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.q_proj.bias",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.k_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.k_proj.bias",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.v_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.v_proj.bias",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.out_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                        f"vision_model.transformer.layers.{layer_index}.self_attn.out_proj.bias",
+                    ],
+                    # fc1
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.mlp.fc1.weight",
+                        f"vision_model.transformer.layers.{layer_index}.linear1.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.mlp.fc1.bias",
+                        f"vision_model.transformer.layers.{layer_index}.linear1.bias",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.layer_norm1.weight",
+                        f"vision_model.transformer.layers.{layer_index}.norm1.weight",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.layer_norm1.bias",
+                        f"vision_model.transformer.layers.{layer_index}.norm1.bias",
+                    ],
+                    # fc2
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.mlp.fc2.weight",
+                        f"vision_model.transformer.layers.{layer_index}.linear2.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.mlp.fc2.bias",
+                        f"vision_model.transformer.layers.{layer_index}.linear2.bias",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.layer_norm2.weight",
+                        f"vision_model.transformer.layers.{layer_index}.norm2.weight",
+                    ],
+                    [
+                        f"vision_model.encoder.layers.{layer_index}.layer_norm2.bias",
+                        f"vision_model.transformer.layers.{layer_index}.norm2.bias",
+                    ],
+                ]
+                hard_mappings.extend(vision_model_layer_mappings)
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mappings)]
+        return mappings
 
     def init_weights(self):
         """

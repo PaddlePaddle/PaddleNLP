@@ -865,7 +865,7 @@ class LoRAModel(nn.Layer):
     def restore_original_model(self):
         # make sure W and lora weights are not merged before we restore the original model
         if self.lora_config.merge_weights:
-            self.model.train()
+            self.train()
 
         for layer_name, layer in self.model.named_sublayers():
             if (
@@ -883,3 +883,15 @@ class LoRAModel(nn.Layer):
             return super().__getattr__(name)  # defer to nn.Layer's logic
         except AttributeError:
             return getattr(self.model, name)
+
+    def train(self):
+        self.model.training = True
+        for layer in self.model.sublayers():
+            layer.training = True
+            layer.train()
+
+    def eval(self):
+        self.model.training = False
+        for layer in self.model.sublayers():
+            layer.training = False
+            layer.eval()
