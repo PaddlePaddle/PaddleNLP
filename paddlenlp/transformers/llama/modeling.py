@@ -163,7 +163,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
 
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros(target_length, past_key_values_length), mask], axis=-1)
+        mask = paddle.concat([paddle.zeros([target_length, past_key_values_length]), mask], axis=-1)
 
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
