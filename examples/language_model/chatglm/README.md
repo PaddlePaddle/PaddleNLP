@@ -74,20 +74,18 @@ python infer_generation.py \
 python predict_generation.py \
     --model_name_or_path  ./checkpoints/chatglm-6b
 ```
-当ckpt为使用的`tensor parallel`存储为多分片格式时，也可使用此脚本预测，或者合并为一个单分片权重
-例如下面4分片的例子（此模型为`glm-10b-chinese`）
+当ckpt为使用的`tensor parallel`存储为多分片格式时，也可使用此脚本预测，或者合并为一个单分片权重。例如下面4分片的例子
 ```
 (base) root@localhost glm $ ll ./checkpoints/chatglm-6b/checkpoint-100/
-total 130G
-drwxr-xr-x 2 root root 4.0K Apr  7 18:21 ./
-drwxr-xr-x 4 root root 4.0K Apr  7 20:02 ../
--rw-r--r-- 1 root root  201 Apr  7 18:20 added_tokens.json
--rw-r--r-- 1 root root 998K Apr  7 18:20 cog-pretrain.model
--rw-r--r-- 1 root root  892 Apr  7 18:20 config.json
--rw-r--r-- 1 root root 4.7G Apr  7 18:20 model_state.tp00.pdparams
--rw-r--r-- 1 root root 4.7G Apr  7 18:20 model_state.tp01.pdparams
--rw-r--r-- 1 root root 4.7G Apr  7 18:20 model_state.tp02.pdparams
--rw-r--r-- 1 root root 4.7G Apr  7 18:20 model_state.tp03.pdparams
+total 82G
+drwxr-xr-x 2 root root 4.0K Apr 16 22:41 ./
+drwxr-xr-x 4 root root 4.0K Apr 16 22:41 ../
+-rw-r--r-- 1 root root  811 Apr 16 22:40 config.json
+-rw-r--r-- 1 root root 2.6M Apr 16 22:40 ice_text.model
+-rw-r--r-- 1 root root 3.2G Apr 16 22:40 model_state.tp00.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 16 22:40 model_state.tp01.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 16 22:40 model_state.tp02.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 16 22:40 model_state.tp03.pdparams
 ```
 设置 merge_tensor_parallel_path，可以将merge好的参数存储到对应位置。不过不设置此参数，将只跑前向预测。
 ```
