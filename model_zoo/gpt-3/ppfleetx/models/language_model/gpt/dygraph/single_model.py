@@ -43,6 +43,12 @@ try:
 except:
     flash_attention = None
 
+try:
+    from paddle.incubate.nn.memory_efficient_attention import (
+    memory_efficient_attention,
+)
+except:
+    memory_efficient_attention = None
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -80,6 +86,7 @@ class MultiHeadAttention(nn.Layer):
         recompute_granularity="full",
         do_recompute=True,
         use_flash_attn=False,
+        use_memory_attn=False,
     ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -94,6 +101,7 @@ class MultiHeadAttention(nn.Layer):
         self.recompute_granularity = recompute_granularity
         self.do_recompute = do_recompute
         self.use_flash_attn = use_flash_attn if flash_attention else None
+        self.use_memory_attn = use_memory_attn if memory_efficient_attention else None
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -195,6 +203,19 @@ class MultiHeadAttention(nn.Layer):
         out, weights = flash_attention(q, k, v, self.dropout, causal=True, return_softmax=self.need_weights)
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return out, weights
+    
+    def _memory_efficient_attention(self, q, k, v, attn_mask=None):
+        out = memory_efficient_attention(
+            query=q, 
+            key=k, 
+            value=v, 
+            attn_bias=attn_mask, 
+            p=self.dropout, 
+            scale=None, 
+            training=self.training,
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        return out 
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [0, 2, 1, 3]
@@ -234,18 +255,30 @@ class MultiHeadAttention(nn.Layer):
         key = query if key is None else key
         value = query if value is None else value
         # compute q ,k ,v
+        
         if self.fuse_attn_qkv:
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
-
+            
+        if self.need_weights:
+            assert not self.use_memory_attn, "the output of memory attn doesn't have weights"
+            
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            out, weights = recompute(self.core_attn, q, k, v, attn_mask)
+            attn_outs = recompute(self.core_attn, q, k, v, attn_mask)
         elif self.use_flash_attn and attn_mask is None:
-            out, weights = self._flash_attention(q, k, v)
+            attn_outs = self._flash_attention(q, k, v)
+        elif self.use_memory_attn and not self.need_weights:
+            attn_outs = self._memory_efficient_attention(q, k, v, attn_mask)
         else:
-            out, weights = self.core_attn(q, k, v, attn_mask=attn_mask)
+            attn_outs = self.core_attn(q, k, v, attn_mask=attn_mask)
 
+        if self.use_memory_attn:
+            out = attn_outs
+        else:
+            out = attn_outs[0]
+            weights = attn_outs[1]
+            
         # project to output
         out = self.out_proj(out)
 
@@ -362,6 +395,7 @@ class TransformerDecoderLayer(nn.Layer):
         do_recompute=True,
         skip_quant_tensors=[],
         use_flash_attn=False,
+        use_memory_attn=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -395,6 +429,7 @@ class TransformerDecoderLayer(nn.Layer):
             recompute_granularity=recompute_granularity,
             do_recompute=do_recompute,
             use_flash_attn=use_flash_attn,
+            use_memory_attn=use_memory_attn,
         )
 
         self.linear1 = Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -522,6 +557,7 @@ class GPTModel(nn.Layer):
         skip_tensor_map={},
         freeze_embedding=False,
         use_flash_attn=False,
+        use_memory_attn=False,
         fused_softmax_with_triangular=False,
     ):
 
@@ -541,6 +577,13 @@ class GPTModel(nn.Layer):
                 use_flash_attn = False
                 logger.warning("Flash-attention is not support in this Paddle version.")
 
+        if use_memory_attn:
+            if memory_efficient_attention:
+                logger.info("Memory-efficient-attention enabled.")
+            else:
+                use_memory_attn = False
+                logger.warning("Memory-efficient-attention is not support in this Paddle version.")
+            
         self.embeddings = GPTEmbeddings(
             vocab_size,
             hidden_size,
@@ -580,6 +623,7 @@ class GPTModel(nn.Layer):
                     do_recompute=i not in no_recompute_layers,
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
+                    use_memory_attn=use_memory_attn,
                 )
             )
 
