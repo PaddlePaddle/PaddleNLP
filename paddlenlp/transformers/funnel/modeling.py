@@ -1988,7 +1988,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
             config = FunnelConfig(**config)
 
         self.funnel = FunnelModel(config)
-        self.lm_head = nn.Linear(config.d_model, config.vocab_size)
+        self.lm_head = nn.Linear(config.vocab_size, config.d_model)
 
         self.init_weights()
 
@@ -2029,7 +2029,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         )
 
         last_hidden_state = outputs[0]
-        prediction_logits = self.lm_head(last_hidden_state)
+        prediction_logits = paddle.matmul(last_hidden_state, self.lm_head.weight, transpose_y=True) + self.lm_head.bias
 
         masked_lm_loss = None
         if labels is not None:

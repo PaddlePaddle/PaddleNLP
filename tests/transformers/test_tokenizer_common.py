@@ -2171,7 +2171,7 @@ class TokenizerTesterMixin:
             string = tokenizer.convert_tokens_to_string(tokens)
             encoding = tokenizer(
                 text=string,
-                runcation=True,
+                truncation=True,
                 return_offsets_mapping=True,
             )
             self.assertEqual(len(encoding["input_ids"]), 4)

@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+from typing import Optional
 
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
 
+from ..utils import is_ppxformers_available
 from .resnet import Downsample1D, ResidualTemporalBlock1D, Upsample1D, rearrange_dims
 
 
@@ -299,7 +301,9 @@ class Downsample1d(nn.Layer):
 
     def forward(self, hidden_states):
         hidden_states = F.pad(hidden_states, (self.pad,) * 2, self.pad_mode, data_format="NCL")
-        weight = paddle.zeros([hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]])
+        weight = paddle.zeros(
+            [hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]], dtype=hidden_states.dtype
+        )
         indices = paddle.arange(hidden_states.shape[1])
         weight[indices, indices] = self.kernel.cast(weight.dtype)
         return F.conv1d(hidden_states, weight, stride=2)
@@ -309,13 +313,15 @@ class Upsample1d(nn.Layer):
     def __init__(self, kernel="linear", pad_mode="reflect"):
         super().__init__()
         self.pad_mode = pad_mode
-        kernel_1d = paddle.to_tensor(_kernels[kernel]) * 2
+        kernel_1d = paddle.to_tensor(_kernels[kernel])
         self.pad = kernel_1d.shape[0] // 2 - 1
         self.register_buffer("kernel", kernel_1d)
 
     def forward(self, hidden_states, temb=None):
         hidden_states = F.pad(hidden_states, ((self.pad + 1) // 2,) * 2, self.pad_mode, data_format="NCL")
-        weight = paddle.zeros([hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]])
+        weight = paddle.zeros(
+            [hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]], dtype=hidden_states.dtype
+        )
         indices = paddle.arange(hidden_states.shape[1])
         weight[indices, indices] = self.kernel.cast(weight.dtype)
         return F.conv1d_transpose(hidden_states, weight, stride=2, padding=self.pad * 2 + 1)
@@ -327,6 +333,8 @@ class SelfAttention1d(nn.Layer):
         self.channels = in_channels
         self.group_norm = nn.GroupNorm(1, num_channels=in_channels)
         self.num_heads = n_head
+        self.head_size = in_channels // n_head
+        self.scale = 1 / math.sqrt(self.head_size)
 
         self.query = nn.Linear(self.channels, self.channels)
         self.key = nn.Linear(self.channels, self.channels)
@@ -336,12 +344,44 @@ class SelfAttention1d(nn.Layer):
 
         self.dropout = nn.Dropout(dropout_rate)
 
-    # (TODO junnyu) refactor self attention
-    def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
-        new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
-        # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
-        return new_projection
+        self._use_memory_efficient_attention_xformers = False
+        self._attention_op = None
+
+    def reshape_heads_to_batch_dim(self, tensor, transpose=True):
+        tensor = tensor.reshape([0, 0, self.num_heads, self.head_size])
+        if transpose:
+            tensor = tensor.transpose([0, 2, 1, 3])
+        return tensor
+
+    def reshape_batch_dim_to_heads(self, tensor, transpose=True):
+        if transpose:
+            tensor = tensor.transpose([0, 2, 1, 3])
+        tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])
+        return tensor
+
+    def set_use_memory_efficient_attention_xformers(
+        self, use_memory_efficient_attention_xformers: bool, attention_op: Optional[str] = None
+    ):
+        if self.head_size > 128 and attention_op == "flash":
+            attention_op = "cutlass"
+        if use_memory_efficient_attention_xformers:
+            if not is_ppxformers_available():
+                raise NotImplementedError(
+                    "requires the scaled_dot_product_attention but your PaddlePaddle donot have this. Checkout the instructions on the installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment."
+                )
+            else:
+                try:
+                    _ = F.scaled_dot_product_attention_(
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        attention_op=attention_op,
+                    )
+                except Exception as e:
+                    raise e
+
+        self._use_memory_efficient_attention_xformers = use_memory_efficient_attention_xformers
+        self._attention_op = attention_op
 
     def forward(self, hidden_states):
         residual = hidden_states
@@ -353,28 +393,42 @@ class SelfAttention1d(nn.Layer):
         key_proj = self.key(hidden_states)
         value_proj = self.value(hidden_states)
 
-        query_states = self.transpose_for_scores(query_proj)
-        key_states = self.transpose_for_scores(key_proj)
-        value_states = self.transpose_for_scores(value_proj)
+        query_proj = self.reshape_heads_to_batch_dim(
+            query_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
+        key_proj = self.reshape_heads_to_batch_dim(
+            key_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
+        value_proj = self.reshape_heads_to_batch_dim(
+            value_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
 
-        scale = 1 / math.sqrt(math.sqrt(key_states.shape[-1]))
+        if self._use_memory_efficient_attention_xformers:
+            hidden_states = F.scaled_dot_product_attention_(
+                query_proj,
+                key_proj,
+                value_proj,
+                attn_mask=None,
+                scale=self.scale,
+                dropout_p=0.0,
+                training=self.training,
+                attention_op=self._attention_op,
+            )
+        else:
+            attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
+            attention_probs = F.softmax(attention_scores.cast("float32"), axis=-1).cast(attention_scores.dtype)
+            hidden_states = paddle.matmul(attention_probs, value_proj)
 
-        attention_scores = paddle.matmul(query_states * scale, key_states * scale, transpose_y=True)
-        attention_probs = F.softmax(attention_scores, axis=-1)
-
-        # compute attention output
-        hidden_states = paddle.matmul(attention_probs, value_states)
-
-        hidden_states = hidden_states.transpose([0, 2, 1, 3])
-        new_hidden_states_shape = hidden_states.shape[:-2] + [
-            self.channels,
-        ]
-        hidden_states = hidden_states.reshape(new_hidden_states_shape)
+        # reshape hidden_states
+        hidden_states = self.reshape_batch_dim_to_heads(
+            hidden_states, transpose=not self._use_memory_efficient_attention_xformers
+        )
 
         # compute next hidden_states
         hidden_states = self.proj_attn(hidden_states)
         hidden_states = hidden_states.transpose([0, 2, 1])
         hidden_states = self.dropout(hidden_states)
+
         output = hidden_states + residual
 
         return output
@@ -578,6 +632,7 @@ class UpBlock1D(nn.Layer):
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None):
         res_hidden_states = res_hidden_states_tuple[-1]
         hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
+
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 
@@ -602,6 +657,7 @@ class UpBlock1DNoSkip(nn.Layer):
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None):
         res_hidden_states = res_hidden_states_tuple[-1]
         hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
+
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 

@@ -1268,7 +1268,7 @@ class ErnieConfig(PretrainedConfig):
         fuse: bool = False,
         layer_norm_eps=1e-12,
         use_cache=False,
-        use_task_id=True,
+        use_task_id=False,
         enable_recompute=False,
         **kwargs
     ):

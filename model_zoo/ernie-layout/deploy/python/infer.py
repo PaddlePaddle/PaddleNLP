@@ -13,9 +13,6 @@
 # limitations under the License.
 
 import argparse
-import collections
-
-import paddle
 
 from predictor import Predictor
 

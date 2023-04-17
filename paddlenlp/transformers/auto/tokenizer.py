@@ -21,7 +21,10 @@ from collections import OrderedDict
 from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url_with_filelock,
+)
 from paddlenlp.utils.import_utils import import_module, is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
 
@@ -54,6 +57,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieTokenizer", "ernie"),
         ("FNetTokenizer", "fnet"),
         ("FunnelTokenizer", "funnel"),
+        ("LlamaTokenizer", "llama"),
         ("LayoutXLMTokenizer", "layoutxlm"),
         ("LayoutLMv2Tokenizer", "layoutlmv2"),
         ("LayoutLMTokenizer", "layoutlm"),
@@ -95,6 +99,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMBertTokenizer", "glm"),
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
+        ("BloomTokenizer", "bloom"),
     ]
 )
 
@@ -284,7 +289,7 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(
                     pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
                 )
@@ -320,9 +325,7 @@ class AutoTokenizer:
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
 
-                        logger.info(
-                            "We are using %s to load '%s'." % (actual_tokenizer_class, pretrained_model_name_or_path)
-                        )
+                        logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
@@ -333,15 +336,17 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
+                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -356,5 +361,5 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, resolved_vocab_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

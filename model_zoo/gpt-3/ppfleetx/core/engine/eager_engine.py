@@ -22,15 +22,21 @@ from paddle.distributed.fleet.meta_parallel import TensorParallel
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.distributed.parallel import sync_params_buffers
+try:
+    from paddle.distributed.parallel import sync_params_buffers
+except Exception:
+    pass
 from paddle.distributed.sharding import group_sharded_parallel
 from paddle.incubate.distributed.utils.io import save_for_auto_inference
 from paddle.profiler import SummaryView
 from ppfleetx.core.engine import BasicEngine, InferenceEngine, TensorRTConfig
 from ppfleetx.core.module import BasicModule
 from ppfleetx.distributed.apis import amp, env
-from ppfleetx.optims import build_lr_scheduler, build_optimizer
-from ppfleetx.utils.compression_helper import prune_model, quant_model
+try:
+    from ppfleetx.optims import build_lr_scheduler, build_optimizer
+    from ppfleetx.utils.compression_helper import prune_model, quant_model
+except Exception:
+    pass
 from ppfleetx.utils.device import synchronize as device_synchronize
 from ppfleetx.utils.export import export_inference_model
 from ppfleetx.utils.log import convert_timestamp_to_data, get_timestamp, logger

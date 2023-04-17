@@ -234,7 +234,7 @@ class FNetLMPredictionHead(Layer):
         self.transform = FNetPredictionHeadTransform(hidden_size, layer_norm_eps, hidden_act)
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.decoder = nn.Linear(hidden_size, vocab_size)
+        self.decoder = nn.Linear(vocab_size, hidden_size)
 
         self.bias = self.create_parameter(
             [vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0)
@@ -243,7 +243,7 @@ class FNetLMPredictionHead(Layer):
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
-        hidden_states = self.decoder(hidden_states)
+        hidden_states = paddle.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.bias
         return hidden_states
 
 
@@ -790,6 +790,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
         )
 
         self.init_weights()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder

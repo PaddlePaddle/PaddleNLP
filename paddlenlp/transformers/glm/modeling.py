@@ -170,7 +170,14 @@ class GLMAttention(nn.Layer):
         # [bs,  num_head, seq_len, seq_len(+cache_len)]
         attention_scores = paddle.multiply(attention_scores, ltor_mask)
         if self.attention_scale > 1.0:
-            max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+            # Fixme for max op not support fp16 https://github.com/PaddlePaddle/Paddle/issues/52601
+            if attention_scores.dtype != paddle.float32:
+                old_type = attention_scores.dtype
+                max_attention_scores = attention_scores.astype("float32").max(axis=-1, keepdim=True)[0]
+                max_attention_scores = max_attention_scores.astype(old_type)
+            else:
+                max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+
             attention_scores -= max_attention_scores
             attention_scores *= self.attention_scale
 
@@ -314,9 +321,8 @@ class GLMStack(nn.Layer):
         batch_size, query_length = hidden_states.shape[:2]
         memory_length = cache[0].shape[1] if cache is not None else 0
 
-        is_scalar = (paddle.numel(attention_mask) == 1)[0]
-        is_sep = is_scalar or paddle.numel(attention_mask) == batch_size
-        if is_sep:
+        if attention_mask.dim == 1:
+            is_scalar = bool(paddle.numel(attention_mask) == 1)
             scalar_sep = attention_mask[0] if is_scalar else attention_mask
 
             # attention mask is the beginning postion of B region in [0, query_len)
@@ -339,7 +345,7 @@ class GLMStack(nn.Layer):
                 return mask
 
             attention_mask = build_mask_matrix(query_length, scalar_sep, memory_length=memory_length)
-        else:
+        elif attention_mask.dim == 2 or attention_mask.dim == 4:
             if attention_mask.dim() == 2:
                 attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
             attention_mask = attention_mask[:, :, :, -query_length - memory_length :]
@@ -387,12 +393,12 @@ class GLMStack(nn.Layer):
         query_length = hiddens[0].shape[1]
         new_memory_length = memory_length + query_length
 
-        new_memories = []
+        new_memories = cache if cache is not None else []
         for i in range(len(hiddens)):
-            if new_memory_length <= query_length or cache is None:
-                new_memories.append(hiddens[i][-new_memory_length:])
+            if cache is None:
+                new_memories.append((hiddens[i][-new_memory_length:]))
             else:
-                new_memories.append(paddle.concat([cache[i][:, -memory_length:], hiddens[i]], axis=1))
+                new_memories[i] = paddle.concat([cache[i][:, -memory_length:], hiddens[i]], axis=1)
         return new_memories
 
 
@@ -413,27 +419,16 @@ class GLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = GLM_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config):
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
-        import numpy as np
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
-        from paddlenlp.transformers.conversion_utils import (
-            naive_merged_qkv_to_tensor_parallel_qkv,
-            split_tensor_parallel_weight,
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
         )
-
-        def fn(x, is_column=True, transpose=False, is_old_qkv=False):
-            if transpose:
-                x = np.transpose(x, [1, 0])
-            if is_old_qkv:
-                assert is_column, "QKV vectors should be column parallel linear."
-                x = naive_merged_qkv_to_tensor_parallel_qkv(x, config.num_attention_heads)
-            return split_tensor_parallel_weight(
-                x,
-                tensor_parallel_degree=config.tensor_parallel_degree,
-                tensor_parallel_rank=config.tensor_parallel_rank,
-                is_column=is_column,
-            )
 
         def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
@@ -458,12 +453,9 @@ class GLMPretrainedModel(PretrainedModel):
 
             return final_actions
 
-        tp_split_mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
-        # prefix = ""
-        prefix = "glm."
-
-        return [StateDictNameMapping(prefix + key, prefix + key, action) for key, action in tp_split_mappings.items()]
+        return mappings
 
     @classmethod
     def _get_name_mappings(cls, config):
@@ -579,7 +571,7 @@ class GLMPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
@@ -650,7 +642,6 @@ class GLMModel(GLMPretrainedModel):
             )
 
         self.transformer = GLMStack(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -696,6 +687,7 @@ class GLMModel(GLMPretrainedModel):
 
             if not return_dict:
                 outputs = (logits,) + outputs[1:]
+
                 return outputs
 
             return CausalLMOutputWithCrossAttentions(
@@ -720,7 +712,6 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -776,7 +767,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def _reorder_cache(self, cache, beam_index):
         # Speedy decoding is disabled and no reorder is needed if decoder cache is not given.
@@ -793,28 +783,29 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         self,
         input_ids: Tensor,
         position_ids: Tensor = None,
-        generation_attention_mask: Tensor = None,
+        attention_mask: Tensor = None,
         cache: Tensor = None,
         **kwargs
     ):
-        attention_mask = generation_attention_mask
+        attention_mask_gen = attention_mask
         seq_length = input_ids.shape[1]
         if cache:
             if position_ids is not None:
                 position_ids = position_ids[:, :, seq_length - 1].unsqueeze(-1)
             if attention_mask is not None:
-                attention_mask = attention_mask[:, :, seq_length - 1, :seq_length].unsqueeze(-2)
+                attention_mask_gen = attention_mask[:, :, seq_length - 1, :seq_length].unsqueeze(-2)
             input_ids = input_ids[:, -1].unsqueeze(-1)
         else:
             if position_ids is not None:
                 position_ids = position_ids[:, :, :seq_length]
             if attention_mask is not None:
-                attention_mask = attention_mask[:, :, :seq_length, :seq_length]
+                attention_mask_gen = attention_mask[:, :, :seq_length, :seq_length]
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,
-            "attention_mask": attention_mask,
+            "attention_mask": attention_mask_gen,
             "cache": cache,
+            "use_cache": True,
         }
 
     def forward(
@@ -826,13 +817,13 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         cache: Tensor = None,
         return_dict: bool = None,
         loss_mask: Tensor = None,
+        use_cache=True,
     ):
         model_output = self.glm(input_ids, position_ids, attention_mask, cache=cache, return_dict=return_dict)
         if return_dict:
             lm_logits, cache = model_output.logits, model_output.past_key_values
         else:
             lm_logits, cache = model_output
-
         # lm_logits [bs, seq_length, vocab_size]
         loss = None
         if labels is not None:
