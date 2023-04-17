@@ -473,6 +473,7 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
         super().__init__(config)
         self.ctrl = CTRLModel(config)
         self.lm_head = TransposedLinear(config.hidden_size, config.vocab_size)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head

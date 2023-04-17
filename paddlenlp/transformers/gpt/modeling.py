@@ -823,6 +823,7 @@ class GPTForPretraining(GPTPretrainedModel):
         super(GPTForPretraining, self).__init__(config)
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -1028,6 +1029,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         super(GPTLMHeadModel, self).__init__(config)
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder

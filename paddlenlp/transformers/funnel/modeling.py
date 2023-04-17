@@ -1968,6 +1968,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
 
         self.funnel = FunnelModel(config)
         self.lm_head = nn.Linear(config.vocab_size, config.d_model)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head

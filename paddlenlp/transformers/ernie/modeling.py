@@ -990,6 +990,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         super(ErnieForMaskedLM, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.cls = ErnieOnlyMLMHead(config=config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder

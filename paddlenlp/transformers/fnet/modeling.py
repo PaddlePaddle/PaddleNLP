@@ -778,6 +778,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
             self.fnet.config["layer_norm_eps"],
             self.fnet.config["hidden_act"],
         )
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder

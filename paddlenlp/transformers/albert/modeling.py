@@ -477,10 +477,6 @@ class AlbertPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, nn.Linear):
@@ -920,6 +916,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         self.transformer = AlbertModel(config)
         self.predictions = AlbertMLMHead(config)
         self.config = config
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.predictions.decoder

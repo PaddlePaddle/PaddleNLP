@@ -1012,6 +1012,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         self.generator = ElectraGenerator(config)
         self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
+        self.tie_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:

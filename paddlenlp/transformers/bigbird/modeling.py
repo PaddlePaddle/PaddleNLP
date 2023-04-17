@@ -1499,6 +1499,7 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
         super(BigBirdForMaskedLM, self).__init__(config)
         self.bigbird = BigBirdModel(config)
         self.lm_head = BigBirdLMPredictionHead(config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -1603,6 +1604,7 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
         super(BigBirdForCausalLM, self).__init__(config)
         self.bigbird = BigBirdModel(config)
         self.lm_head = BigBirdLMPredictionHead(config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder

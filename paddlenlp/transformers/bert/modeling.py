@@ -975,6 +975,7 @@ class BertForPretraining(BertPretrainedModel):
         super(BertForPretraining, self).__init__(config)
         self.bert = BertModel(config)
         self.cls = BertPretrainingHeads(config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
@@ -1308,6 +1309,7 @@ class BertForMaskedLM(BertPretrainedModel):
         self.bert = BertModel(config)
 
         self.cls = BertOnlyMLMHead(config=config)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
