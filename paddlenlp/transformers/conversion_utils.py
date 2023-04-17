@@ -393,7 +393,7 @@ class StateDictNameMapping:
     """NameMapping of StateDict between two models"""
 
     source_name: str
-    target_name: str
+    target_name: str = None
 
     action: Optional[str] = None  # the value can be: transpose, merge_last_two_dim
     index: Optional[int] = None
