@@ -41,14 +41,6 @@ def get_md5sum(file_path):
 
 
 def main():
-    # check and load config
-    with open(os.path.join(args.input_model_dir, "model_config.json"), "r") as f:
-        config_dict = json.load(f)
-        num_classes = config_dict["num_classes"]
-    if num_classes is None or num_classes <= 0:
-        print("%s/model_config.json may not be right, please check" % args.input_model_dir)
-        exit(1)
-
     # check and load model
     input_model_file = os.path.join(args.input_model_dir, "model_state.pdparams")
     print("load model to get static model : %s \nmodel md5sum : %s" % (input_model_file, get_md5sum(input_model_file)))
