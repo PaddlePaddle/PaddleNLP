@@ -19,7 +19,7 @@ import paddle
 from paddle import nn
 from paddle.nn import functional as F
 
-from paddlenlp.transformers import GPTConfig, GPTLMHeadModel, GPTTokenizer
+from paddlenlp.transformers import GPTConfig, GPTLMHeadModel
 
 from ...configuration_utils import ConfigMixin, register_to_config
 from ...models.modeling_utils import ModelMixin
@@ -31,23 +31,36 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
         self,
         prefix_length: int = 77,
         hidden_dim: int = 64,
-        use_beam_search: bool = True,
+        vocab_size: int = 50258,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: int = "gelu",
+        hidden_dropout_prob: int = 0.1,
+        attention_probs_dropout_prob: int = 0.1,
+        max_position_embeddings: int = 1024,
+        initializer_range: int = 0.02,
+        eos_token_id: int = 50257,
     ):
         super(CaptionDecoder, self).__init__()
         self.prefix_length = prefix_length
-        eos = "<|EOS|>"
-        special_tokens_dict = {"eos_token": eos}
-        self.tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
-        self.tokenizer.add_special_tokens(special_tokens_dict)
-        config = GPTConfig.from_pretrained(
-            "gpt2-en", vocab_size=len(self.tokenizer), eos_token_id=self.tokenizer.eos_token_id
+        config = GPTConfig(
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            num_hidden_layers=num_hidden_layers,
+            intermediate_size=intermediate_size,
+            hidden_act=hidden_act,
+            hidden_dropout_prob=hidden_dropout_prob,
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+            max_position_embeddings=max_position_embeddings,
+            initializer_range=initializer_range,
+            eos_token_id=eos_token_id,
         )
         self.gpt = GPTLMHeadModel(config)
 
         self.hidden_dim = hidden_dim
-        self.encode_prefix = nn.Linear(768, hidden_dim) if hidden_dim is not None else nn.Identity()
-        self.decode_prefix = nn.Linear(hidden_dim, 768) if hidden_dim is not None else nn.Identity()
-        self.use_beam_search = use_beam_search
+        self.encode_prefix = nn.Linear(hidden_size, hidden_dim) if hidden_dim is not None else nn.Identity()
+        self.decode_prefix = nn.Linear(hidden_dim, hidden_size) if hidden_dim is not None else nn.Identity()
 
     def get_dummy_token(self, batch_size: int) -> paddle.Tensor:
         return paddle.zeros([batch_size, self.prefix_length], dtype=paddle.int64)
@@ -56,7 +69,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
         self,
         tokens: paddle.Tensor,
         prefix: paddle.Tensor,
-        mask: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
         labels: Optional[paddle.Tensor] = None,
     ):
         embedding_text = self.gpt.gpt.embeddings.word_embeddings(tokens)
@@ -67,7 +80,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
         if labels is not None:
             dummy_token = self.get_dummy_token(tokens.shape[0])
             labels = paddle.concat((dummy_token, tokens), axis=1)
-        out = self.gpt(inputs_embeds=embedding_cat, labels=labels, attention_mask=mask)
+        out = self.gpt(inputs_embeds=embedding_cat, labels=labels, attention_mask=attention_mask)
 
         if self.hidden_dim:
             return out, hidden
@@ -75,29 +88,29 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
             return out
 
     @paddle.no_grad()
-    def generate_captions(self, features):
+    def generate_captions(self, tokenizer, features, use_beam_search=True):
         # the low dimension representation of clip feature
         features = paddle.split(features, 1, axis=0)
         generated_captions = []
         for feature in features:
             feature = self.decode_prefix(feature)  # back to the clip feature
-            if self.use_beam_search:
-                generated_captions.append(self.generate_beam(embedding=feature)[0])
+            if use_beam_search:
+                generated_captions.append(self.generate_beam(tokenizer=tokenizer, embedding=feature)[0])
             else:
-                generated_captions.append(self.generate2(embedding=feature))
+                generated_captions.append(self.generate2(tokenizer=tokenizer, embedding=feature))
         return generated_captions
 
     @paddle.no_grad()
     def generate_beam(
         self,
+        tokenizer,
         prompt=None,
         embedding=None,
         beam_size: int = 5,
         entry_length: int = 67,  # maximum number of words
         temperature: float = 1.0,
-        stop_token: str = "<|EOS|>",
     ):
-        stop_token_index = self.tokenizer.encode(stop_token)["input_ids"][0]
+        stop_token_index = self.gpt.config.eos_token_id
         tokens = None
         scores = None
         seq_lengths = paddle.ones([beam_size])
@@ -107,9 +120,9 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
             generated = embedding
         else:
             if tokens is None:
-                tokens = paddle.to_tensor(self.tokenizer.encode(prompt)["input_ids"])
+                tokens = paddle.to_tensor(tokenizer.encode(prompt)["input_ids"])
                 tokens = tokens.unsqueeze(0)
-                generated = self.gpt.gpt.embeddings.word_embeddings(tokens)
+                generated = self.gpt.get_input_embeddings()(tokens)
 
         for i in range(entry_length):
             logits = self.gpt(inputs_embeds=generated)
@@ -143,7 +156,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                 is_stopped = is_stopped[next_tokens_source]
                 is_stopped = paddle.cast(is_stopped, "bool")
 
-            next_token_embed = self.gpt.gpt.embeddings.word_embeddings(next_tokens.squeeze()).reshape(
+            next_token_embed = self.gpt.get_input_embeddings()(next_tokens.squeeze()).reshape(
                 [generated.shape[0], 1, -1]
             )
             generated = paddle.concat((generated, next_token_embed), axis=1)
@@ -154,7 +167,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
         scores = scores / seq_lengths
         output_list = tokens.cpu().numpy()
         output_texts = [
-            self.tokenizer.decode(output[: int(length)], skip_special_tokens=True)
+            tokenizer.decode(output[: int(length)], skip_special_tokens=True)
             for output, length in zip(output_list, seq_lengths)
         ]
         order = scores.argsort(descending=True)
@@ -164,6 +177,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
     @paddle.no_grad()
     def generate2(
         self,
+        tokenizer,
         tokens=None,
         prompt=None,
         embedding=None,
@@ -171,10 +185,9 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
         entry_length: int = 67,  # maximum number of words
         top_p: float = 0.8,
         temperature: float = 1.0,
-        stop_token: str = "<|EOS|>",
     ):
         generated_list = []
-        stop_token_index = self.tokenizer.encode(stop_token)["input_ids"][0]
+        stop_token_index = self.gpt.config.eos_token_id
         filter_value = -float("Inf")
 
         for i in range(entry_count):
@@ -182,9 +195,9 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                 generated = embedding
             else:
                 if tokens is None:
-                    tokens = paddle.to_tensor(self.tokenizer.encode(prompt))
+                    tokens = paddle.to_tensor(tokenizer.encode(prompt))
                     tokens = tokens.unsqueeze(0)
-                generated = self.gpt.gpt.embeddings.word_embeddings(tokens)
+                generated = self.gpt.get_input_embeddings()(tokens)
 
             for entry_idx in range(entry_length):
                 logits = self.gpt(inputs_embeds=generated)
@@ -199,7 +212,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                 indices_to_remove = sorted_indices[sorted_indices_to_remove]
                 logits[:, indices_to_remove] = filter_value
                 next_token = paddle.argmax(logits, -1).unsqueeze(0)
-                next_token_embed = self.gpt.gpt.embeddings.word_embeddings(next_token)
+                next_token_embed = self.gpt.get_input_embeddings()(next_token)
                 if tokens is None:
                     tokens = next_token
                 else:
@@ -209,7 +222,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                     break
 
             output_list = list(tokens.squeeze().cpu().numpy())
-            output_text = self.tokenizer.decode(output_list)
+            output_text = tokenizer.decode(output_list)
             generated_list.append(output_text)
 
         return generated_list[0]

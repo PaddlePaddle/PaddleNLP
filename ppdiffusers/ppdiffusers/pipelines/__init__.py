@@ -15,6 +15,7 @@
 
 from ..utils import (
     OptionalDependencyNotAvailable,
+    is_einops_available,
     is_fastdeploy_available,
     is_k_diffusion_available,
     is_librosa_available,
@@ -87,7 +88,6 @@ else:
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
     from .text_to_video_synthesis import TextToVideoSDPipeline
     from .unclip import UnCLIPImageVariationPipeline, UnCLIPPipeline
-    from .unidiffuser import UniDiffuserPipeline
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
@@ -127,3 +127,12 @@ except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_and_k_diffusion_objects import *  # noqa F403
 else:
     from .stable_diffusion import StableDiffusionKDiffusionPipeline
+
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
+else:
+    from .unidiffuser import UniDiffuserPipeline
