@@ -48,11 +48,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            args.model_dir,
-            add_bos_token=False,
-        )
-        self.tokenizer.padding_side = "left"
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.batch_size = args.batch_size
 

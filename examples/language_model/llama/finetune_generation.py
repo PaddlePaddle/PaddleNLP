@@ -120,9 +120,11 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.model_name_or_path,
+        padding_side="left",  # Allow batch inference
+    )
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
