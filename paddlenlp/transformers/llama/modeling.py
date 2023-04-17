@@ -200,7 +200,7 @@ class LlamaRMSNorm(nn.Layer):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
         else:
-            variance = hidden_states).pow(2).mean(-1, keepdim=True)
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
             
         return hidden_states * self.weight
