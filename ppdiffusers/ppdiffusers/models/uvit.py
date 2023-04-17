@@ -146,7 +146,7 @@ class UViTModel(ModelMixin, ConfigMixin):
         pos_drop_rate=0.0,
         drop_rate=0.0,
         attn_drop_rate=0.0,
-        norm_layer=nn.LayerNorm,
+        norm_type="layer_norm",
         text_dim=64,
         num_text_tokens=77,
         clip_img_dim=512,
@@ -184,7 +184,8 @@ class UViTModel(ModelMixin, ConfigMixin):
             shape=(1, self.num_tokens, embed_dim),
             default_initializer=nn.initializer.Constant(0.0),
         )
-
+        assert norm_type == "layer_norm", "We only support norm_type == layer_norm. "
+        norm_layer = nn.LayerNorm
         self.pos_drop = nn.Dropout(p=pos_drop_rate)
 
         self.in_blocks = nn.LayerList(
