@@ -127,7 +127,7 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
-    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
