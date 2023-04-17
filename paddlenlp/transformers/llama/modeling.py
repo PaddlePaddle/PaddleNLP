@@ -194,7 +194,6 @@ class LlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        default_type = hidden_states.dtype
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -202,7 +201,7 @@ class LlamaRMSNorm(nn.Layer):
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
-            
+
         return hidden_states * self.weight
 
 
@@ -706,8 +705,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
-    def forward(self, prediction_scores, masked_lm_labels):
+    def forward(self, prediction_scores, masked_lm_labels, ignore_index=-100):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index]
         loss = paddle.mean(masked_lm_loss)
         return loss
 
