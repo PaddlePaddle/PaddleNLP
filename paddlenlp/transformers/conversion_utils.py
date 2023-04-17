@@ -400,6 +400,9 @@ class StateDictNameMapping:
 
     slots: list[str] = None
 
+    def __post_init__(self):
+        self.target_name = self.target_name or self.source_name
+
     def should_transpose(self) -> bool:
         return self.action == "transpose"
 
