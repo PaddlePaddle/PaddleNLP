@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Google Brain and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,7 @@ from typing import List, Optional, Tuple, Union
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import BaseOutput, randn_tensor
 from .scheduling_utils import SchedulerMixin, SchedulerOutput
 
 
@@ -197,7 +197,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         drift = drift - diffusion**2 * model_output
 
         #  equation 6: sample noise for the diffusion term of
-        noise = paddle.randn(sample.shape, generator=generator)
+        noise = randn_tensor(sample.shape, generator=generator, dtype=sample.dtype)
         prev_sample_mean = sample - drift  # subtract because `dt` is a small negative timestep
         # TODO is the variable diffusion the correct scaling term for the noise?
         prev_sample = prev_sample_mean + diffusion * noise  # add impact of diffusion field g
@@ -237,7 +237,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
         # For small batch sizes, the paper "suggest replacing norm(z) with sqrt(d), where d is the dim. of z"
         # sample noise for correction
-        noise = paddle.randn(sample.shape, generator=generator)
+        noise = randn_tensor(sample.shape, generator=generator)
 
         # compute step size from the model_output, the noise, and the snr
         grad_norm = paddle.norm(model_output.reshape([model_output.shape[0], -1]), axis=-1).mean()
@@ -257,6 +257,18 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
             return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
+
+    def add_noise(
+        self,
+        original_samples: paddle.Tensor,
+        noise: paddle.Tensor,
+        timesteps: paddle.Tensor,
+    ) -> paddle.Tensor:
+        # Make sure sigmas and timesteps have the same dtype as original_samples
+        sigmas = self.discrete_sigmas[timesteps]
+        noise = paddle.randn(original_samples.shape, dtype=original_samples.dtype) * sigmas[:, None, None, None]
+        noisy_samples = noise + original_samples
+        return noisy_samples
 
     def __len__(self):
         return self.config.num_train_timesteps

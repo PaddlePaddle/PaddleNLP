@@ -30,7 +30,7 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-  
+
 * **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
   * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)
   * 💎 产业应用：信息抽取、文本分类、情感分析、智能问答 四大应用全新升级，发布文档信息抽取 [UIE-X](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列预训练小模型，在低资源和域外数据效果更强，开源 模型裁剪、模型量化、FastDeploy 推理加速、边缘端部署 端到端部署方案，降低预训练模型部署难度
@@ -40,7 +40,7 @@
 * **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
   * 🔨 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
   * 💎 产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持小样本学习和 TrustAI 可信计算模型训练与调优。
-  * 🍭 AIGC ：新增代码生成 SOTA 模型[CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#文图生成) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；
+  * 🍭 AIGC ：新增代码生成 SOTA 模型[CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen)，支持多种编程语言代码生成；
   * 💪 框架升级：[模型自动压缩 API](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[小样本 Prompt](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
 
@@ -72,16 +72,7 @@ Taskflow提供丰富的**📦开箱即用**的产业级NLP预置模型，覆盖�
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
-Taskflow最新集成了文生图的趣玩应用，三行代码体验 **Stable Diffusion**
-```python
-from paddlenlp import Taskflow
-text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
-image_list = text_to_image('"In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation"')
-```
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/16698950/194882669-f7cc7c98-d63a-45f4-99c1-0514c6712368.png">
-
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
-
 ### 丰富完备的中文模型库
 
 #### 🀄 业界最全的中文预训练模型

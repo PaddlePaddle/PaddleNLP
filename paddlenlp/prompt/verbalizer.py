@@ -24,6 +24,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from paddlenlp.layers import Linear as TransposedLinear
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -346,67 +347,45 @@ class SoftVerbalizer(Verbalizer):
         return self.head(outputs).squeeze(1)
 
     def head_parameters(self):
-        return [(n, p) for n, p in self.head.named_parameters() if self.weight_name in n or self.bias_name in n]
+        # possible head parameters: decoder.weight, decoder_bias, bias
+        return [(n, p) for n, p in self.head.named_parameters() if self.head_name[-1] in n or n == "bias"]
 
     def non_head_parameters(self):
-        return [(n, p) for n, p in self.head.named_parameters() if not (self.weight_name in n or self.bias_name in n)]
-
-    def _get_vocab_size(self, model: PretrainedModel):
-        try:
-            vocab_size = model.config.vocab_size
-        except AttributeError:
-            model_name = None
-            for name in model.state_dict():
-                if "layers" in name:
-                    model_name = name.split(".")[0]
-                    break
-            vocab_size = getattr(model, model_name).config["vocab_size"]
-        return vocab_size
+        return [(n, p) for n, p in self.head.named_parameters() if self.head_name[-1] not in n and n != "bias"]
 
     def _extract_head(self, model: PretrainedModel):
-        # Find all parameters shaped with [..., vocab_size].
-        weight_name, bias_name, is_linear = None, None, False
-        vocab_size = self._get_vocab_size(model)
-        for name in model.state_dict():
-            if vocab_size in model.state_dict()[name].shape and "embeddings" not in name:
-                if "bias" in name and (bias_name is None or len(name.split(".")) > len(bias_name)):
-                    bias_name = name.split(".")
-                elif "weight" in name:
-                    weight_name = name.split(".")
-                    if ".weight" in name:
-                        is_linear = True
-        if weight_name is None:
+        # Find the nn.Linear layer with in_features = vocab_size
+        module_name = None
+        for i in model.named_sublayers():
+            if isinstance(i[1], TransposedLinear):
+                module_name = i[0]
+                break
+        if module_name is None:
             raise ValueError("Can not find output layer, make sure type of the input model is AutoModelForMaskedLM.")
 
-        # Reconstruct found parameters according to label words.
-        end_index = len(weight_name) - int(is_linear)
-        self.head_name = weight_name[:end_index]
-        self.head = copy.deepcopy(getattr(model, weight_name[0]))
-        module = self.head
-        for name in self.head_name[1:-1]:
-            module = getattr(module, name)
-        self.head = copy.deepcopy(module)
+        # recursively get the parent module to the decoder linear layer
+        parent_module = model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        self.head = copy.deepcopy(parent_module)
 
-        self.weight_name = weight_name[end_index - 1]
-        self.bias_name = bias_name[end_index - 1] if bias_name is not None else None
-        if is_linear:
-            module = getattr(self.head, self.weight_name)
-            setattr(self.head, self.weight_name, nn.Linear(module.weight.shape[0], len(self.labels), bias_attr=False))
-            getattr(self.head, self.weight_name).weight.set_value(self._create_init_weight(module.weight))
-        else:
-            module = paddle.to_tensor(getattr(self.head, self.weight_name))
-            new_head = nn.Linear(len(self.labels), module.shape[1], bias_attr=False)
-            new_head.weight.set_value(self._create_init_weight(module.T).T)
-
-            setattr(self.head, self.weight_name, new_head.weight)
-            getattr(self.head, self.weight_name).stop_gradient = False
-            if self.bias_name is not None:
-                setattr(
-                    self.head,
-                    self.bias_name,
-                    self.head.create_parameter(shape=[len(self.labels)], dtype=new_head.weight.dtype, is_bias=True),
-                )
-                getattr(self.head, self.bias_name).stop_gradient = False
+        # replace the decoder linear layer with a linear linear with the trimmed vocab size
+        # we create a new decoder linear here instead of `resize_token_embeddings` because we only want to change the output embeddings
+        # this also invalidates any previous tie_weights
+        self.head_name = attribute_chain
+        module_name = attribute_chain[-1]
+        module = getattr(self.head, module_name)
+        # modify weight
+        module_weight = module.weight
+        module_bias = module.bias
+        selected_weight = self._create_init_weight(module_weight)
+        selected_bias = self._create_init_weight(module_bias, is_bias=True)
+        setattr(
+            self.head, module_name, TransposedLinear(in_features=module.weight.shape[1], out_features=len(self.labels))
+        )
+        getattr(self.head, module_name).weight.set_value(selected_weight.T)
+        getattr(self.head, module_name).bias.set_value(selected_bias)
 
     def _create_init_weight(self, weight: Tensor, is_bias: bool = False):
         token_ids = self.token_ids.squeeze(1)
@@ -417,8 +396,8 @@ class SoftVerbalizer(Verbalizer):
             bias = self.aggregate(bias, token_mask, aggr_type)
             return bias
         else:
-            word_shape = [weight.shape[0], *token_ids.shape]
-            weight = paddle.index_select(weight, token_ids.reshape([-1]), axis=1).reshape(word_shape)
+            word_shape = [weight.shape[1], *token_ids.shape]
+            weight = paddle.index_select(weight, token_ids.reshape([-1]), axis=0).reshape(word_shape)
             weight = self.aggregate(weight, token_mask, aggr_type)
             return weight
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 NVIDIA and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
@@ -20,7 +21,7 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import BaseOutput, randn_tensor
 from .scheduling_utils import SchedulerMixin
 
 
@@ -130,7 +131,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
             )
             for i in self.timesteps
         ]
-        self.schedule = paddle.to_tensor(schedule, dtype="float32")
+        self.schedule = paddle.to_tensor(schedule, dtype=paddle.float32)
 
     def add_noise_to_input(
         self, sample: paddle.Tensor, sigma: float, generator: Optional[paddle.Generator] = None
@@ -147,7 +148,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
             gamma = 0
 
         # sample eps ~ N(0, S_noise^2 * I)
-        eps = self.config.s_noise * paddle.randn(sample.shape, generator=generator)
+        eps = self.config.s_noise * randn_tensor(sample.shape, generator=generator)
         sigma_hat = sigma + gamma * sigma
         sample_hat = sample + ((sigma_hat**2 - sigma**2) ** 0.5 * eps)
 

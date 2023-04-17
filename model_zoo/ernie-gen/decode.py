@@ -11,18 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import re
-import argparse
-import logging
-import json
-import numpy as np
 from collections import namedtuple
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-import numpy as np
-from paddlenlp.utils.log import logger
 
 
 def gen_bias(encoder_inputs, decoder_inputs, step):

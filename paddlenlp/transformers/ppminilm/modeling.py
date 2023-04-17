@@ -11,16 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 
 import paddle
-from paddle.common_ops_import import core
 import paddle.nn as nn
-import paddle.nn.functional as F
 
-from paddlenlp.utils.log import logger
-from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    PPMINILM_PRETRAINED_INIT_CONFIGURATION,
+    PPMINILM_PRETRAINED_RESOURCE_FILES_MAP,
+    PPMiniLMConfig,
+)
 
 __all__ = [
     "PPMiniLMModel",
@@ -36,23 +37,14 @@ class PPMiniLMEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        pad_token_id=0,
-        weight_attr=None,
-    ):
+    def __init__(self, config: PPMiniLMConfig):
         super(PPMiniLMEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id, weight_attr=weight_attr)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size, weight_attr=weight_attr)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size, weight_attr=weight_attr)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
@@ -67,7 +59,6 @@ class PPMiniLMEmbeddings(nn.Layer):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
-
         embeddings = input_embedings + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -75,9 +66,9 @@ class PPMiniLMEmbeddings(nn.Layer):
 
 
 class PPMiniLMPooler(nn.Layer):
-    def __init__(self, hidden_size, weight_attr=None):
+    def __init__(self, config: PPMiniLMConfig):
         super(PPMiniLMPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size, weight_attr=weight_attr)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -89,7 +80,7 @@ class PPMiniLMPooler(nn.Layer):
         return pooled_output
 
 
-class PPMiniLMPretrainedModel(FasterPretrainedModel):
+class PPMiniLMPretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained PPMiniLM models. It provides PPMiniLM related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
@@ -98,34 +89,13 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
-
-    pretrained_init_configuration = {
-        "ppminilm-6l-768h": {
-            "attention_probs_dropout_prob": 0.1,
-            "intermediate_size": 3072,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 6,
-            "type_vocab_size": 4,
-            "vocab_size": 21128,
-            "pad_token_id": 0,
-        },
-    }
-    resource_files_names = {"model_state": "model_state.pdparams", "vocab_file": "vocab.txt"}
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ppminilm-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/ppminilm-6l-768h.pdparams",
-        },
-        "vocab_file": {
-            "ppminilm-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
-        },
-    }
+    model_config_file = CONFIG_NAME
+    config_class = PPMiniLMConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ppminilm"
-    use_faster_tokenizer = False
+
+    pretrained_init_configuration = PPMINILM_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = PPMINILM_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -136,53 +106,12 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ppminilm.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-12
-
-    def add_faster_tokenizer_op(self):
-        self.ppminilm.tokenizer = FasterTokenizer(
-            self.ppminilm.vocab,
-            do_lower_case=self.ppminilm.do_lower_case,
-            is_split_into_words=self.ppminilm.is_split_into_words,
-        )
-
-    def to_static(self, output_path, use_faster_tokenizer=True, is_text_pair=False):
-        self.eval()
-        self.use_faster_tokenizer = use_faster_tokenizer
-        # Convert to static graph with specific input description
-        if self.use_faster_tokenizer:
-            self.add_faster_tokenizer_op()
-            if is_text_pair:
-                model = paddle.jit.to_static(
-                    self,
-                    input_spec=[
-                        paddle.static.InputSpec(shape=[None], dtype=core.VarDesc.VarType.STRINGS, name="text"),
-                        paddle.static.InputSpec(shape=[None], dtype=core.VarDesc.VarType.STRINGS, name="text_pair"),
-                    ],
-                )
-            else:
-                model = paddle.jit.to_static(
-                    self,
-                    input_spec=[
-                        paddle.static.InputSpec(shape=[None], dtype=core.VarDesc.VarType.STRINGS, name="text")
-                    ],
-                )
-        else:
-            model = paddle.jit.to_static(
-                self,
-                input_spec=[
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
-                    paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),  # segment_ids
-                ],
-            )
-        paddle.jit.save(model, output_path)
-        logger.info("Already save the static model to the path %s" % output_path)
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -198,123 +127,43 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `PPMiniLMModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `PPMiniLMModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids`.
-            Defaults to `2`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer for initializing all weight matrices.
-            Defaults to `0.02`.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`PPMiniLMPretrainedModel._init_weights()` for how weights are initialized in `PPMiniLMModel`.
-
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
+        config (:class:`PPMiniLMConfig`):
+            An instance of PPMiniLMConfig used to construct PPMiniLMModel.
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        vocab_file,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        pad_token_id=0,
-        do_lower_case=True,
-        is_split_into_words=False,
-        max_seq_len=128,
-        pad_to_max_seq_len=False,
-    ):
-        super(PPMiniLMModel, self).__init__()
-        if not os.path.isfile(vocab_file):
-            raise ValueError(
-                "Can't find a vocabulary file at path '{}'. To load the "
-                "vocabulary from a pretrained model please use "
-                "`model = PPMiniLMModel.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
-            )
-        self.vocab = self.load_vocabulary(vocab_file)
-        self.do_lower_case = do_lower_case
-        self.max_seq_len = max_seq_len
-        self.is_split_into_words = is_split_into_words
-        self.pad_token_id = pad_token_id
-        self.pad_to_max_seq_len = pad_to_max_seq_len
-        self.initializer_range = initializer_range
-        weight_attr = paddle.ParamAttr(
-            initializer=nn.initializer.TruncatedNormal(mean=0.0, std=self.initializer_range)
-        )
-        self.embeddings = PPMiniLMEmbeddings(
-            vocab_size,
-            hidden_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
-            pad_token_id,
-            weight_attr,
-        )
+    def __init__(self, config: PPMiniLMConfig):
+        super(PPMiniLMModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.embeddings = PPMiniLMEmbeddings(config)
+
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,
-            weight_attr=weight_attr,
-            normalize_before=False,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
+            act_dropout=0.0,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = PPMiniLMPooler(hidden_size, weight_attr)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = PPMiniLMPooler(config)
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         Args:
-            input_ids (Tensor, List[string]):
+            input_ids (Tensor):
                 If `input_ids` is a Tensor object, it is an indices of input
                 sequence tokens in the vocabulary. They are numerical
                 representations of tokens that build the input sequence. It's
                 data type should be `int64` and has a shape of [batch_size, sequence_length].
-                If `input_ids` is a list of string, `self.use_faster_tokenizer`
-                should be True, and the network contains `faster_tokenizer`
-                operator.
             token_type_ids (Tensor, string, optional):
                 If `token_type_ids` is a Tensor object:
                 Segment token indices to indicate different portions of the inputs.
@@ -327,9 +176,6 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
-
-                If `token_type_ids` is a list of string: `self.use_faster_tokenizer`
-                should be True, and the network contains `faster_tokenizer` operator.
 
             position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
@@ -377,18 +223,16 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
-        # Only for saving
-        if self.use_faster_tokenizer:
-            input_ids, token_type_ids = self.tokenizer(
-                text=input_ids,
-                text_pair=token_type_ids,
-                max_seq_len=self.max_seq_len,
-                pad_to_max_seq_len=self.pad_to_max_seq_len,
-            )
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
             )
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
+                attention_mask = (1.0 - attention_mask) * -1e4
+
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids
         )
@@ -415,12 +259,14 @@ class PPMiniLMForSequenceClassification(PPMiniLMPretrainedModel):
             of `paddlenlp.transformers.PPMiniLMModel` instance. Defaults to `None`.
     """
 
-    def __init__(self, ppminilm, num_classes=2, dropout=None):
-        super(PPMiniLMForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.ppminilm = ppminilm  # allow ppminilm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ppminilm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"], num_classes)
+    def __init__(self, config: PPMiniLMConfig):
+        super(PPMiniLMForSequenceClassification, self).__init__(config)
+        self.ppminilm = PPMiniLMModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -453,7 +299,6 @@ class PPMiniLMForSequenceClassification(PPMiniLMPretrainedModel):
                 logits = model(**inputs)
 
         """
-        self.ppminilm.use_faster_tokenizer = self.use_faster_tokenizer
         _, pooled_output = self.ppminilm(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
@@ -474,10 +319,13 @@ class PPMiniLMForQuestionAnswering(PPMiniLMPretrainedModel):
             An instance of `PPMiniLMModel`.
     """
 
-    def __init__(self, ppminilm):
-        super(PPMiniLMForQuestionAnswering, self).__init__()
-        self.ppminilm = ppminilm  # allow ppminilm to be config
-        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"], 2)
+    def __init__(self, config: PPMiniLMConfig):
+        super(PPMiniLMForQuestionAnswering, self).__init__(config)
+        self.ppminilm = PPMiniLMModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -547,12 +395,14 @@ class PPMiniLMForMultipleChoice(PPMiniLMPretrainedModel):
             instance `ppminilm`. Defaults to None.
     """
 
-    def __init__(self, ppminilm, num_choices=2, dropout=None):
-        super(PPMiniLMForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.ppminilm = ppminilm
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ppminilm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"], 1)
+    def __init__(self, config: PPMiniLMConfig):
+        super(PPMiniLMForMultipleChoice, self).__init__(config)
+        self.num_choices = config.num_choices
+        self.ppminilm = PPMiniLMModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):

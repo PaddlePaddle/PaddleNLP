@@ -59,7 +59,11 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+try:
+    from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+except:
+    FusedDropoutAdd = None
+FusedDropoutAdd = None
 
 
 def get_attr(layer, name):
@@ -291,12 +295,14 @@ class MultiHeadAttention(nn.Layer):
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        out, weights = flash_attention(q, k, v, self.dropout, causal=True, return_softmax=self.need_weights)
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
             perm = [1, 0, 2]
             out = tensor.transpose(x=out, perm=perm)
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
@@ -336,7 +342,7 @@ class MultiHeadAttention(nn.Layer):
         # else out shape is [b, s, h]
         out = tensor.reshape(x=out, shape=[0, 0, -1])
 
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
         r"""
@@ -361,9 +367,12 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self.core_attn
 
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            out, weights = recompute(attn_func, q, k, v, attn_mask)
+            out = recompute(attn_func, q, k, v, attn_mask)
         else:
-            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
+            out = attn_func(q, k, v, attn_mask=attn_mask)
+
+        if self.need_weights:
+            out, weights = out
 
         # project to output
         # if sequence_parallel is true, out shape are [s/n, b, h],
@@ -570,8 +579,12 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
-        self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
+        if not FusedDropoutAdd:
+            self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+        else:
+            self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
+            self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
 
         self.activation = getattr(F, activation)
 
@@ -595,7 +608,10 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add1(tgt, residual)
+            if not FusedDropoutAdd:
+                tgt = residual + self.dropout1(tgt)
+            else:
+                tgt = self.fused_dropout_add1(tgt, residual)
 
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -605,7 +621,10 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
+            if not FusedDropoutAdd:
+                tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
+            else:
+                tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)

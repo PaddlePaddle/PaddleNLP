@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -1115,6 +1116,7 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
         self.lm_head = RobertaLMHead(config)
 
         self.apply(self.init_weights)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -1227,12 +1229,9 @@ class RobertaLMHead(nn.Layer):
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
-        tensor = paddle.zeros((config.vocab_size,))
-        self.bias = paddle.create_parameter(
-            shape=tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor)
-        )
-        self.decoder = nn.Linear(config.hidden_size, config.vocab_size)
-        self.decoder.bias = self.bias
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.bias = self.decoder.bias
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -1260,6 +1259,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
         self.apply(self.init_weights)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder

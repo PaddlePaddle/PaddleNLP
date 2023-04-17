@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 
 import paddle
+
 from paddlenlp import Taskflow
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    # yapf: disable
+    # fmt: off
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    # yapf: enable
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    # fmt: on
 
     args = parser.parse_args()
     return args

@@ -23,6 +23,11 @@ from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
+from .configuration import (
+    PROPHETNET_PRETRAINED_INIT_CONFIGURATION,
+    PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP,
+    ProphetNetConfig,
+)
 
 __all__ = [
     "ProphetNetModel",
@@ -129,54 +134,17 @@ class ProphetNetPretrainedModel(PretrainedModel):
     loading pretrained models.
     """
 
-    pretrained_init_configuration = {
-        "prophetnet-large-uncased": {
-            "activation_dropout": 0.1,
-            "activation_function": "gelu",
-            "attention_dropout": 0.1,
-            "bos_token_id": 102,
-            "decoder_ffn_dim": 4096,
-            "decoder_layerdrop": 0.0,
-            "decoder_max_position_embeddings": 514,
-            "decoder_start_token_id": 102,
-            "disable_ngram_loss": False,
-            "dropout": 0.1,
-            "encoder_ffn_dim": 4096,
-            "encoder_layerdrop": 0.0,
-            "encoder_max_position_embeddings": 513,
-            "eos_token_id": 102,
-            "eps": 0.1,
-            "hidden_size": 1024,
-            "init_std": 0.02,
-            "max_position_embeddings": 512,
-            "ngram": 2,
-            "num_buckets": 32,
-            "num_decoder_attention_heads": 16,
-            "num_decoder_layers": 12,
-            "num_encoder_attention_heads": 16,
-            "num_encoder_layers": 12,
-            "pad_token_id": 0,
-            "relative_max_distance": 128,
-            "length_penalty": 2.0,
-            "no_repeat_ngram_size": 3,
-            "num_beams": 4,
-            "max_length": 142,
-            "vocab_size": 30522,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "prophetnet-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/prophetnet/prophetnet-large-uncased.pdparams"
-        }
-    }
+    pretrained_init_configuration = PROPHETNET_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = PROPHETNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "prophetnet"
+    config_class = ProphetNetConfig
 
     def init_weights(self, layer):
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.init_std if hasattr(self, "init_std") else self.prophetnet.config["init_std"],
+                    std=self.config.init_std,
                     shape=layer.weight.shape,
                 )
             )
@@ -184,11 +152,11 @@ class ProphetNetPretrainedModel(PretrainedModel):
                 layer.bias.set_value(paddle.tensor.zeros(layer.bias.shape))
 
     def _shift_right(self, input_ids):
-        decoder_start_token_id = self.prophetnet.decoder_start_token_id
-        pad_token_id = self.prophetnet.config["pad_token_id"]
+        decoder_start_token_id = self.config.decoder_start_token_id
+        pad_token_id = self.config.pad_token_id
 
         assert decoder_start_token_id is not None, (
-            "self.model.config.decoder_start_token_id has to be defined. "
+            "self.config.decoder_start_token_id has to be defined. "
             "In ProphetNet it is usually set to the pad_token_id. See ProphetNet docs for more information"
         )
 
@@ -197,7 +165,7 @@ class ProphetNetPretrainedModel(PretrainedModel):
         shifted_input_ids[..., 1:] = input_ids[..., :-1].clone()
         shifted_input_ids[..., 0] = decoder_start_token_id
 
-        assert pad_token_id is not None, "self.model.config.pad_token_id has to be defined."
+        assert pad_token_id is not None, "self.config.pad_token_id has to be defined."
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids_mask = paddle.cast(shifted_input_ids == -100, dtype=paddle.int32)
         shifted_input_ids = shifted_input_ids_mask * pad_token_id + (1 - shifted_input_ids_mask) * shifted_input_ids
@@ -214,9 +182,11 @@ class ProphetNetPositionalEmbeddings(nn.Embedding):
     ProphetNetPositional Embeddings.
     """
 
-    def __init__(self, max_position_embeddings, hidden_size, pad_token_id):
-        self.max_length = max_position_embeddings
-        super(ProphetNetPositionalEmbeddings, self).__init__(max_position_embeddings, hidden_size, pad_token_id)
+    def __init__(self, config: ProphetNetConfig):
+        self.max_length = config.max_position_embeddings
+        super(ProphetNetPositionalEmbeddings, self).__init__(
+            config.max_position_embeddings, config.hidden_size, config.pad_token_id
+        )
 
     def forward(self, inputs_shape, attention_mask=None, past_key_values=None, position_ids=None):
         assert (position_ids is None) or (
@@ -735,26 +705,23 @@ class ProphetNetEncoderLayer(Layer):
     Encoder block for Prophetnet
     """
 
-    def __init__(
-        self,
-        hidden_size,
-        encoder_ffn_dim,
-        activation_function,
-        activation_dropout,
-        attention_dropout,
-        dropout,
-        num_encoder_attention_heads,
-    ):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetEncoderLayer, self).__init__()
         # 1st residual block
-        self.self_attn = ProphetNetAttention(hidden_size, attention_dropout, dropout, num_encoder_attention_heads)
-        self.self_attn_layer_norm = nn.LayerNorm(hidden_size)
+        self.self_attn = ProphetNetAttention(
+            config.hidden_size, config.attention_dropout, config.dropout, config.num_encoder_attention_heads
+        )
+        self.self_attn_layer_norm = nn.LayerNorm(config.hidden_size)
 
         # 2nd residual block
         self.feed_forward = ProphetNetFeedForward(
-            hidden_size, activation_function, activation_dropout, dropout, encoder_ffn_dim
+            config.hidden_size,
+            config.activation_function,
+            config.activation_dropout,
+            config.dropout,
+            config.encoder_ffn_dim,
         )
-        self.feed_forward_layer_norm = nn.LayerNorm(hidden_size)
+        self.feed_forward_layer_norm = nn.LayerNorm(config.hidden_size)
 
     def forward(self, hidden_states, attention_mask):
         # 1st residual block
@@ -772,43 +739,36 @@ class ProphetNetDecoderLayer(Layer):
     Decoder block for Prophetnet
     """
 
-    def __init__(
-        self,
-        hidden_size,
-        num_buckets,
-        relative_max_distance,
-        num_decoder_attention_heads,
-        activation_function,
-        activation_dropout,
-        dropout,
-        attention_dropout,
-        ngram,
-        decoder_ffn_dim,
-        add_cross_attention,
-    ):
+    def __init__(self, config: ProphetNetConfig):
         super(ProphetNetDecoderLayer, self).__init__()
         # 1st residual block
         self.self_attn = ProphetNetNgramSelfAttention(
-            hidden_size,
-            num_buckets,
-            relative_max_distance,
-            num_decoder_attention_heads,
-            dropout,
-            attention_dropout,
-            ngram,
+            config.hidden_size,
+            config.num_buckets,
+            config.relative_max_distance,
+            config.num_decoder_attention_heads,
+            config.dropout,
+            config.attention_dropout,
+            config.ngram,
         )
-        self.self_attn_layer_norm = nn.LayerNorm(hidden_size)
+        self.self_attn_layer_norm = nn.LayerNorm(config.hidden_size)
 
         # 2nd residual block
-        if add_cross_attention:
-            self.cross_attn = ProphetNetAttention(hidden_size, attention_dropout, dropout, num_decoder_attention_heads)
-            self.cross_attn_layer_norm = nn.LayerNorm(hidden_size)
+        if config.add_cross_attention:
+            self.cross_attn = ProphetNetAttention(
+                config.hidden_size, config.attention_dropout, config.dropout, config.num_decoder_attention_heads
+            )
+            self.cross_attn_layer_norm = nn.LayerNorm(config.hidden_size)
 
         # 3rd residual block
         self.feed_forward = ProphetNetFeedForward(
-            hidden_size, activation_function, activation_dropout, dropout, decoder_ffn_dim
+            config.hidden_size,
+            config.activation_function,
+            config.activation_dropout,
+            config.dropout,
+            config.decoder_ffn_dim,
         )
-        self.feed_forward_layer_norm = nn.LayerNorm(hidden_size)
+        self.feed_forward_layer_norm = nn.LayerNorm(config.hidden_size)
 
     def forward(
         self,
@@ -871,46 +831,18 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
         pre-defined word embeddings instead of randomly initialized word embeddings.
     """
 
-    def __init__(
-        self,
-        word_embeddings,
-        vocab_size,
-        hidden_size,
-        pad_token_id,
-        max_position_embeddings,
-        encoder_ffn_dim,
-        activation_function,
-        activation_dropout,
-        attention_dropout,
-        dropout,
-        num_encoder_attention_heads,
-        num_encoder_layers,
-        init_std,
-    ):
-        super(ProphetNetEncoder, self).__init__()
-        self.init_std = init_std
+    def __init__(self, word_embeddings, config: ProphetNetConfig):
+        super(ProphetNetEncoder, self).__init__(config)
+        self.init_std = config.init_std
         if word_embeddings is not None:
             self.word_embeddings = word_embeddings
         else:
-            self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+            self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
 
-        self.position_embeddings = ProphetNetPositionalEmbeddings(max_position_embeddings, hidden_size, pad_token_id)
-        self.embeddings_layer_norm = nn.LayerNorm(hidden_size)
+        self.position_embeddings = ProphetNetPositionalEmbeddings(config)
+        self.embeddings_layer_norm = nn.LayerNorm(config.hidden_size)
 
-        self.layers = nn.LayerList(
-            [
-                ProphetNetEncoderLayer(
-                    hidden_size,
-                    encoder_ffn_dim,
-                    activation_function,
-                    activation_dropout,
-                    attention_dropout,
-                    dropout,
-                    num_encoder_attention_heads,
-                )
-                for _ in range(num_encoder_layers)
-            ]
-        )
+        self.layers = nn.LayerList([ProphetNetEncoderLayer(config) for _ in range(config.num_encoder_layers)])
 
         self.apply(self.init_weights)
 
@@ -923,7 +855,7 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
         if attention_mask is not None:
             extended_attention_mask = (
                 paddle.tile(
-                    1.0 - attention_mask.unsqueeze(1), repeat_times=[self.config["num_encoder_attention_heads"], 1, 1]
+                    1.0 - attention_mask.unsqueeze(1), repeat_times=[self.config.num_encoder_attention_heads, 1, 1]
                 )
             ) * -10000.0
             extended_attention_mask = paddle.cast(extended_attention_mask, dtype=inputs_embeds.dtype)
@@ -935,7 +867,7 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
 
         hidden_states = inputs_embeds + position_embeddings
         hidden_states = self.embeddings_layer_norm(hidden_states)
-        hidden_states = F.dropout(hidden_states, p=self.config["dropout"], training=self.training)
+        hidden_states = F.dropout(hidden_states, p=self.config.dropout, training=self.training)
 
         for idx, encoder_layer in enumerate(self.layers):
             hidden_states = encoder_layer(hidden_states, attention_mask=extended_attention_mask)
@@ -943,61 +875,25 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
 
 
 class ProphetNetDecoder(ProphetNetPretrainedModel):
-    def __init__(
-        self,
-        word_embeddings,
-        vocab_size,
-        hidden_size,
-        pad_token_id,
-        max_position_embeddings,
-        relative_max_distance,
-        ngram,
-        num_buckets,
-        num_decoder_attention_heads,
-        decoder_ffn_dim,
-        activation_function,
-        activation_dropout,
-        dropout,
-        attention_dropout,
-        add_cross_attention,
-        num_decoder_layers,
-        init_std,
-    ):
-        super(ProphetNetDecoder, self).__init__()
-        self.init_std = init_std
-        self.ngram = ngram
-        self.num_buckets = num_buckets
-        self.relative_max_distance = relative_max_distance
-        self.dropout = dropout
-        self.max_target_positions = max_position_embeddings
-        self.add_cross_attention = add_cross_attention
+    def __init__(self, word_embeddings, config: ProphetNetConfig):
+        super(ProphetNetDecoder, self).__init__(config)
+        self.init_std = config.init_std
+        self.ngram = config.ngram
+        self.num_buckets = config.num_buckets
+        self.relative_max_distance = config.relative_max_distance
+        self.dropout = config.dropout
+        self.max_target_positions = config.max_position_embeddings
+        self.add_cross_attention = config.add_cross_attention
         if word_embeddings is not None:
             self.word_embeddings = word_embeddings
         else:
-            self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+            self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
 
-        self.position_embeddings = ProphetNetPositionalEmbeddings(max_position_embeddings, hidden_size, pad_token_id)
+        self.position_embeddings = ProphetNetPositionalEmbeddings(config)
 
-        self.ngram_embeddings = nn.Embedding(self.ngram, hidden_size)
-        self.layers = nn.LayerList(
-            [
-                ProphetNetDecoderLayer(
-                    hidden_size,
-                    num_buckets,
-                    relative_max_distance,
-                    num_decoder_attention_heads,
-                    activation_function,
-                    activation_dropout,
-                    dropout,
-                    attention_dropout,
-                    ngram,
-                    decoder_ffn_dim,
-                    add_cross_attention,
-                )
-                for _ in range(num_decoder_layers)
-            ]
-        )
-        self.embeddings_layer_norm = nn.LayerNorm(hidden_size)
+        self.ngram_embeddings = nn.Embedding(self.ngram, config.hidden_size)
+        self.layers = nn.LayerList([ProphetNetDecoderLayer(config) for _ in range(config.num_decoder_layers)])
+        self.embeddings_layer_norm = nn.LayerNorm(config.hidden_size)
 
         self.apply(self.init_weights)
 
@@ -1060,7 +956,7 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
             extended_encoder_attention_mask = (
                 1.0
                 - paddle.tile(
-                    encoder_attention_mask[:, None, :], repeat_times=[self.config["num_decoder_attention_heads"], 1, 1]
+                    encoder_attention_mask[:, None, :], repeat_times=[self.config.num_decoder_attention_heads, 1, 1]
                 )
             ) * -10000.0
             extended_encoder_attention_mask = paddle.cast(extended_encoder_attention_mask, dtype=inputs_embeds.dtype)
@@ -1150,7 +1046,7 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
         else:
             extended_attention_mask = extended_causal_mask
         return paddle.cast(
-            paddle.tile(extended_attention_mask, repeat_times=[self.config["num_decoder_attention_heads"], 1, 1]),
+            paddle.tile(extended_attention_mask, repeat_times=[self.config.num_decoder_attention_heads, 1, 1]),
             dtype=hidden_states.dtype,
         )
 
@@ -1188,84 +1084,25 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
         else:
             extended_predict_attention_mask = extended_predict_causal_mask
         return paddle.cast(
-            extended_predict_attention_mask.tile([1, self.config["num_decoder_attention_heads"], 1, 1]),
+            extended_predict_attention_mask.tile([1, self.config.num_decoder_attention_heads, 1, 1]),
             dtype=hidden_states.dtype,
         )
 
 
 @register_base_model
 class ProphetNetModel(ProphetNetPretrainedModel):
-    def __init__(
-        self,
-        vocab_size,
-        bos_token_id=102,
-        pad_token_id=0,
-        eos_token_id=102,
-        hidden_size=1024,
-        decoder_start_token_id=102,
-        max_position_embeddings=512,
-        activation_function="gelu",
-        activation_dropout=0.1,
-        dropout=0.1,
-        relative_max_distance=128,
-        ngram=2,
-        num_buckets=32,
-        encoder_ffn_dim=4096,
-        num_encoder_attention_heads=16,
-        num_encoder_layers=12,
-        decoder_ffn_dim=4096,
-        num_decoder_attention_heads=16,
-        num_decoder_layers=12,
-        attention_dropout=0.1,
-        init_std=0.02,
-        eps=0.1,
-        add_cross_attention=True,
-        disable_ngram_loss=False,
-        **kwargs
-    ):
-        super(ProphetNetModel, self).__init__()
-        self.init_std = init_std
-        self.eps = eps
-        self.pad_token_id = pad_token_id
-        self.disable_ngram_loss = disable_ngram_loss
-        self.decoder_start_token_id = decoder_start_token_id
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+    def __init__(self, config: ProphetNetConfig):
+        super(ProphetNetModel, self).__init__(config)
+        self.init_std = config.init_std
+        self.eps = config.eps
+        self.pad_token_id = config.pad_token_id
+        self.disable_ngram_loss = config.disable_ngram_loss
+        self.decoder_start_token_id = config.decoder_start_token_id
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
 
-        self.encoder = ProphetNetEncoder(
-            self.word_embeddings,
-            vocab_size,
-            hidden_size,
-            pad_token_id,
-            max_position_embeddings,
-            encoder_ffn_dim,
-            activation_function,
-            activation_dropout,
-            attention_dropout,
-            dropout,
-            num_encoder_attention_heads,
-            num_encoder_layers,
-            init_std,
-        )
+        self.encoder = ProphetNetEncoder(self.word_embeddings, config)
 
-        self.decoder = ProphetNetDecoder(
-            self.word_embeddings,
-            vocab_size,
-            hidden_size,
-            pad_token_id,
-            max_position_embeddings,
-            relative_max_distance,
-            ngram,
-            num_buckets,
-            num_decoder_attention_heads,
-            decoder_ffn_dim,
-            activation_function,
-            activation_dropout,
-            dropout,
-            attention_dropout,
-            add_cross_attention,
-            num_decoder_layers,
-            init_std,
-        )
+        self.decoder = ProphetNetDecoder(self.word_embeddings, config)
 
         self.apply(self.init_weights)
 
@@ -1274,6 +1111,12 @@ class ProphetNetModel(ProphetNetPretrainedModel):
 
     def get_decoder(self):
         return self.decoder
+
+    def get_input_embeddings(self):
+        return self.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.word_embeddings = value
 
     def forward(
         self,
@@ -1331,12 +1174,12 @@ class Linear_wo_bias(Layer):
 
 
 class ProphetNetForConditionalGeneration(ProphetNetPretrainedModel):
-    def __init__(self, prophetnet):
-        super(ProphetNetForConditionalGeneration, self).__init__()
-        self.prophetnet = prophetnet
-        self.padding_idx = prophetnet.word_embeddings._padding_idx
+    def __init__(self, config: ProphetNetConfig):
+        super(ProphetNetForConditionalGeneration, self).__init__(config)
+        self.prophetnet = ProphetNetModel(config)
+        self.padding_idx = self.prophetnet.word_embeddings._padding_idx
 
-        self.lm_head = Linear_wo_bias(self.prophetnet.config["hidden_size"], self.prophetnet.config["vocab_size"])
+        self.lm_head = Linear_wo_bias(config.hidden_size, config.vocab_size)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -1367,9 +1210,7 @@ class ProphetNetForConditionalGeneration(ProphetNetPretrainedModel):
 
         batch_size, sequence_length = decoder_input_ids.shape
 
-        predicting_streams = paddle.reshape(
-            outputs[1], (batch_size, self.prophetnet.config["ngram"], sequence_length, -1)
-        )
+        predicting_streams = paddle.reshape(outputs[1], (batch_size, self.config.ngram, sequence_length, -1))
         predict_logits = self.lm_head(predicting_streams)
 
         logits = predict_logits[:, 0]
@@ -1415,11 +1256,5 @@ class ProphetNetForConditionalGeneration(ProphetNetPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)

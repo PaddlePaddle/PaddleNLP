@@ -11,20 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
 import argparse
 import os
 import os.path as osp
-
-import paddle
-import paddle.nn as nn
-import paddlenlp
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.embeddings import TokenEmbedding
-from paddlenlp.data import JiebaTokenizer, Vocab, Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset
+from functools import partial
 
 import data
+import paddle
+import paddle.nn as nn
+
+import paddlenlp
+from paddlenlp.data import Pad, Stack, Tuple, Vocab
+from paddlenlp.datasets import load_dataset
+from paddlenlp.embeddings import TokenEmbedding
+from paddlenlp.utils.downloader import get_path_from_url
 
 # yapf: disable
 parser = argparse.ArgumentParser()

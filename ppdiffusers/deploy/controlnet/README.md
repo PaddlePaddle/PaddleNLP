@@ -51,10 +51,10 @@ python controlnet_infer.py --model_dir ./control_sd15_canny --scheduler "pndm" -
 
 ![controlnet_bird](https://user-images.githubusercontent.com/50394665/224997460-81b82457-d9ee-485f-9bc7-d703a716a2de.png)
 
-如果使用 `paddle-tensorrt` 推理引擎后端及开启`半精度推理`，则可执行以下命令完成推理：
+如果使用 `paddle_tensorrt` 推理引擎后端及开启`半精度推理`，则可执行以下命令完成推理：
 
 ```sh
-python controlnet_infer.py --model_dir control_sd15_canny --scheduler "euler_ancestral" --backend paddle-tensorrt --device gpu --benchmark_steps 10 --use_fp16 True
+python controlnet_infer.py --model_dir control_sd15_canny --scheduler "euler_ancestral" --backend paddle_tensorrt --device gpu --benchmark_steps 10 --use_fp16 True
 ```
 
 经测试，使用上述命令，在 80G A100 机器上能够跑出 `1.111716 s` 的成绩。
@@ -82,6 +82,6 @@ python controlnet_infer.py --model_dir control_sd15_canny --scheduler "euler_anc
 | --inference_steps | UNet 模型运行的次数，默认为 50。 |
 | --image_path | 生成图片的路径。默认为 `controlnet_bird.png`。  |
 | --device_id | gpu 设备的 id。若 `device_id` 为-1，视为使用 cpu 推理。 |
-| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle-tensorrt 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 fp16 精度。默认为 `False`。使用 tensorrt 或者 paddle_tensorrt 后端时可以设为 `True` 开启。 |
 
 </details>

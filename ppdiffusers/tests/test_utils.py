@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,28 +25,22 @@ class DeprecateTester(unittest.TestCase):
 
     def test_deprecate_function_arg(self):
         kwargs = {"deprecated_arg": 4}
-
         with self.assertWarns(FutureWarning) as warning:
             output = deprecate("deprecated_arg", self.higher_version, "message", take_from=kwargs)
-
         assert output == 4
         assert (
             str(warning.warning)
-            == f"The `deprecated_arg` argument is deprecated and will be removed in version {self.higher_version}."
-            " message"
+            == f"The `deprecated_arg` argument is deprecated and will be removed in version {self.higher_version}. message"
         )
 
     def test_deprecate_function_arg_tuple(self):
         kwargs = {"deprecated_arg": 4}
-
         with self.assertWarns(FutureWarning) as warning:
             output = deprecate(("deprecated_arg", self.higher_version, "message"), take_from=kwargs)
-
         assert output == 4
         assert (
             str(warning.warning)
-            == f"The `deprecated_arg` argument is deprecated and will be removed in version {self.higher_version}."
-            " message"
+            == f"The `deprecated_arg` argument is deprecated and will be removed in version {self.higher_version}. message"
         )
 
     def test_deprecate_function_args(self):
@@ -61,21 +55,17 @@ class DeprecateTester(unittest.TestCase):
         assert output_2 == 8
         assert (
             str(warning.warnings[0].message)
-            == "The `deprecated_arg_1` argument is deprecated and will be removed in version"
-            f" {self.higher_version}. Hey"
+            == f"The `deprecated_arg_1` argument is deprecated and will be removed in version {self.higher_version}. Hey"
         )
         assert (
             str(warning.warnings[1].message)
-            == "The `deprecated_arg_2` argument is deprecated and will be removed in version"
-            f" {self.higher_version}. Hey"
+            == f"The `deprecated_arg_2` argument is deprecated and will be removed in version {self.higher_version}. Hey"
         )
 
     def test_deprecate_function_incorrect_arg(self):
         kwargs = {"deprecated_arg": 4}
-
         with self.assertRaises(TypeError) as error:
             deprecate(("wrong_arg", self.higher_version, "message"), take_from=kwargs)
-
         assert "test_deprecate_function_incorrect_arg in" in str(error.exception)
         assert "line" in str(error.exception)
         assert "got an unexpected keyword argument `deprecated_arg`" in str(error.exception)
@@ -83,7 +73,6 @@ class DeprecateTester(unittest.TestCase):
     def test_deprecate_arg_no_kwarg(self):
         with self.assertWarns(FutureWarning) as warning:
             deprecate(("deprecated_arg", self.higher_version, "message"))
-
         assert (
             str(warning.warning)
             == f"`deprecated_arg` is deprecated and will be removed in version {self.higher_version}. message"
@@ -92,8 +81,7 @@ class DeprecateTester(unittest.TestCase):
     def test_deprecate_args_no_kwarg(self):
         with self.assertWarns(FutureWarning) as warning:
             deprecate(
-                ("deprecated_arg_1", self.higher_version, "Hey"),
-                ("deprecated_arg_2", self.higher_version, "Hey"),
+                ("deprecated_arg_1", self.higher_version, "Hey"), ("deprecated_arg_2", self.higher_version, "Hey")
             )
         assert (
             str(warning.warnings[0].message)
@@ -110,7 +98,6 @@ class DeprecateTester(unittest.TestCase):
 
         with self.assertWarns(FutureWarning) as warning:
             arg = deprecate(("arg", self.higher_version, "message"), take_from=Args())
-
         assert arg == 5
         assert (
             str(warning.warning)
@@ -129,7 +116,6 @@ class DeprecateTester(unittest.TestCase):
                 ("does not exist", self.higher_version, "message"),
                 take_from=Args(),
             )
-
         assert arg_1 == 5
         assert arg_2 == 7
         assert (
@@ -146,25 +132,21 @@ class DeprecateTester(unittest.TestCase):
         )
 
     def test_deprecate_incorrect_version(self):
-        kwargs = {"wrong_arg": 4}
-
+        kwargs = {"deprecated_arg": 4}
         with self.assertRaises(ValueError) as error:
             deprecate(("wrong_arg", self.lower_version, "message"), take_from=kwargs)
-
         assert (
             str(error.exception)
-            == "The deprecation tuple ('wrong_arg', '0.0.1', 'message') should be removed since ppdiffusers' version"
-            f" {__version__} is >= {self.lower_version}"
+            == f"The deprecation tuple ('wrong_arg', '0.0.1', 'message') should be removed since ppdiffusers' version {__version__} is >= {self.lower_version}"
         )
 
     def test_deprecate_incorrect_no_standard_warn(self):
         with self.assertWarns(FutureWarning) as warning:
             deprecate(("deprecated_arg", self.higher_version, "This message is better!!!"), standard_warn=False)
-
         assert str(warning.warning) == "This message is better!!!"
 
     def test_deprecate_stacklevel(self):
         with self.assertWarns(FutureWarning) as warning:
             deprecate(("deprecated_arg", self.higher_version, "This message is better!!!"), standard_warn=False)
         assert str(warning.warning) == "This message is better!!!"
-        assert "ppdiffusers/tests/test_utils.py" in warning.filename or "tests/test_utils.py" in warning.filename
+        assert "test_utils.py" in warning.filename

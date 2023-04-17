@@ -19,7 +19,7 @@ import paddle
 import paddle.nn.functional as F
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
-from model import SimultaneousTransformer
+from model import SimultaneousTransformer  # noqa: E402
 
 
 class SimultaneousTransformerDemo(SimultaneousTransformer):

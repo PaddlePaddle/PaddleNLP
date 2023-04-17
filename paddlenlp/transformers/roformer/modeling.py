@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
+from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
@@ -43,6 +44,11 @@ __all__ = [
     "RoFormerForMultipleChoice",
     "RoFormerForCausalLM",
 ]
+from .configuration import (
+    ROFORMER_PRETRAINED_INIT_CONFIGURATION,
+    ROFORMER_PRETRAINED_RESOURCE_FILES_MAP,
+    RoFormerConfig,
+)
 
 
 class RoFormerEmbeddings(nn.Layer):
@@ -243,194 +249,117 @@ class RoFormerPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
-
-    pretrained_init_configuration = {
-        "roformer-chinese-small": {
-            "vocab_size": 50000,
-            "embedding_size": 384,
-            "hidden_size": 384,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 6,
-            "intermediate_size": 1536,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": False,
-        },
-        "roformer-chinese-base": {
-            "vocab_size": 50000,
-            "embedding_size": 768,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1536,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": False,
-        },
-        "roformer-chinese-char-small": {
-            "vocab_size": 12000,
-            "embedding_size": 384,
-            "hidden_size": 384,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 6,
-            "intermediate_size": 1536,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": False,
-        },
-        "roformer-chinese-char-base": {
-            "vocab_size": 12000,
-            "embedding_size": 768,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": False,
-        },
-        "roformer-chinese-sim-char-ft-small": {
-            "vocab_size": 12000,
-            "embedding_size": 384,
-            "hidden_size": 384,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 6,
-            "intermediate_size": 1536,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 102,
-            "rotary_value": False,
-            "pool_act": "linear",
-        },
-        "roformer-chinese-sim-char-ft-base": {
-            "vocab_size": 12000,
-            "embedding_size": 768,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 102,
-            "rotary_value": False,
-            "pool_act": "linear",
-        },
-        "roformer-chinese-sim-char-small": {
-            "vocab_size": 12000,
-            "embedding_size": 384,
-            "hidden_size": 384,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 6,
-            "intermediate_size": 1536,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 102,
-            "rotary_value": False,
-            "pool_act": "linear",
-        },
-        "roformer-chinese-sim-char-base": {
-            "vocab_size": 12000,
-            "embedding_size": 768,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 102,
-            "rotary_value": False,
-            "pool_act": "linear",
-        },
-        "roformer-english-small-discriminator": {
-            "vocab_size": 30522,
-            "embedding_size": 128,
-            "hidden_size": 256,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 4,
-            "intermediate_size": 1024,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 128,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": True,
-        },
-        "roformer-english-small-generator": {
-            "vocab_size": 30522,
-            "embedding_size": 128,
-            "hidden_size": 64,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 1,
-            "intermediate_size": 256,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 128,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "rotary_value": True,
-        },
-    }
-
-    pretrained_resource_files_map = {
-        "model_state": {
-            "roformer-chinese-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-small/model_state.pdparams",
-            "roformer-chinese-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-base/model_state.pdparams",
-            "roformer-chinese-char-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-small/model_state.pdparams",
-            "roformer-chinese-char-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-base/model_state.pdparams",
-            "roformer-chinese-sim-char-ft-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-small/model_state.pdparams",
-            "roformer-chinese-sim-char-ft-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-base/model_state.pdparams",
-            "roformer-chinese-sim-char-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-small/model_state.pdparams",
-            "roformer-chinese-sim-char-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-base/model_state.pdparams",
-            "roformer-english-small-discriminator": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-discriminator/model_state.pdparams",
-            "roformer-english-small-generator": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/model_state.pdparams",
-        }
-    }
-
+    config_class = RoFormerConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "roformer"
+    pretrained_init_configuration = ROFORMER_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ROFORMER_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_name_mappings(cls, config: RoFormerConfig) -> List[StateDictNameMapping]:
+        mappings: List[StateDictNameMapping] = []
+        model_mappings = [
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
+            ["pooler.dense.bias", "pooler.dense.bias"],
+            # for TokenClassification
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        # base-model prefix "RoFormerModel"
+        if "RoFormerModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "roformer." + mapping[0]
+                mapping[1] = "roformer." + mapping[1]
+
+        if "RoFormerForMaskedLM" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["cls.predictions.transform.dense.weight", "cls.predictions.transform.weight", "transpose"],
+                    ["cls.predictions.transform.dense.bias", "cls.predictions.transform.bias"],
+                    ["cls.predictions.transform.LayerNorm.weight", "cls.predictions.layer_norm.weight"],
+                    ["cls.predictions.transform.LayerNorm.bias", "cls.predictions.layer_norm.bias"],
+                    ["cls.predictions.decoder.bias", "cls.predictions.decoder_bias"],
+                ]
+            )
+        # downstream mappings
+        if "RoFormerForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+        if (
+            "RoFormerForMultipleChoice" in config.architectures
+            or "RoFormerForSequenceClassification" in config.architectures
+            or "RoFormerForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -441,14 +370,13 @@ class RoFormerPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.roformer.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
+
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-12
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -464,104 +392,39 @@ class RoFormerModel(RoFormerPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `RoFormerModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `RoFormerModel`.
-        embedding_size (int, optional):
-            Dimensionality of the embedding layer. Defaults to `768`.
-        hidden_size (int, optional):
-            Dimensionality of the, encoder layers and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `2`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`RoFormerPretrainedModel.init_weights()` for how weights are initialized in `RoFormerModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-        eos_token_id (int, optional):
-            The id of the `eos` token. Defaults to `102`.
-        pool_act (str, optional):
-            The non-linear activation function in the pooler.
-            Defaults to `"tanh"`.
-        rotary_value (`bool`, optional):
-            Whether or not apply rotay position embeddings to value.
-            Defaults to `False`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerModel.
     """
 
     def __init__(
         self,
-        vocab_size,
-        embedding_size=768,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=1536,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        pad_token_id=0,
-        eos_token_id=102,
-        pool_act="tanh",
-        rotary_value=False,
+        config: RoFormerConfig,
     ):
-        super().__init__()
-        self.pad_token_id = pad_token_id
-        self.eos_token_id = eos_token_id
-        self.initializer_range = initializer_range
-        if embedding_size != hidden_size:
-            self.embeddings_project = nn.Linear(embedding_size, hidden_size)
+        super().__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.eos_token_id = config.eos_token_id
+        self.initializer_range = config.initializer_range
+        if config.embedding_size != config.hidden_size:
+            self.embeddings_project = nn.Linear(config.embedding_size, config.hidden_size)
         self.embeddings = RoFormerEmbeddings(
-            vocab_size,
-            embedding_size,
-            hidden_dropout_prob,
-            type_vocab_size,
+            config.vocab_size,
+            config.embedding_size,
+            config.hidden_dropout_prob,
+            config.type_vocab_size,
         )
         encoder_layer = TransformerEncoderLayerWithRotary(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
-            rotary_value=rotary_value,
-            max_position_embeddings=max_position_embeddings,
+            rotary_value=config.rotary_value,
+            max_position_embeddings=config.max_position_embeddings,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = RoFormerPooler(hidden_size, pool_act)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = RoFormerPooler(config.hidden_size, config.pool_act)
 
         self.apply(self.init_weights)
 
@@ -657,10 +520,12 @@ class RoFormerModel(RoFormerPretrainedModel):
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
 
         # init the default bool value
-        output_attentions = output_attentions if output_attentions is not None else False
-        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
-        return_dict = return_dict if return_dict is not None else False
-        use_cache = use_cache if use_cache is not None else False
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         past_key_values_length = 0
         if past_key_values is not None:
@@ -720,19 +585,17 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
      and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        roformer (:class:`RoFormerModel`):
-            An instance of RoFormerModel.
-        dropout (float, optional):
-            The dropout probability for output of RoFormer.
-            If None, use the same value as `hidden_dropout_prob` of `RoFormerModel`
-            instance `roformer`. Defaults to `None`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForQuestionAnswering.
     """
 
-    def __init__(self, roformer, dropout=None):
-        super().__init__()
-        self.roformer = roformer  # allow roformer to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.roformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roformer.config["hidden_size"], 2)
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.roformer = RoFormerModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(
@@ -796,6 +659,8 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                 outputs = model(**tokenized_inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         outputs = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
@@ -846,22 +711,18 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        roformer (:class:`RoFormerModel`):
-            An instance of `RoFormerModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of RoFormer.
-            If None, use the same value as `hidden_dropout_prob`
-            of `RoFormerModel` instance `roformer`. Defaults to `None`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForSequenceClassification.
     """
 
-    def __init__(self, roformer, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.roformer = roformer  # allow roformer to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.roformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roformer.config["hidden_size"], num_classes)
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.roformer = RoFormerModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -889,8 +750,8 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -936,12 +797,12 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -964,22 +825,18 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        roformer (:class:`RoFormerModel`):
-            An instance of `RoFormerModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of RoFormer.
-            If None, use the same value as `hidden_dropout_prob`
-            of `RoFormerModel` instance `roformer`. Defaults to `None`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForTokenClassification.
     """
 
-    def __init__(self, roformer, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.roformer = roformer  # allow roformer to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.roformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roformer.config["hidden_size"], num_classes)
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.roformer = RoFormerModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -1006,7 +863,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
             inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -1035,6 +892,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                 logits = model(**tokenized_inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
@@ -1052,7 +910,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
 
         if not return_dict:
             output = (logits,) + outputs[2:]
@@ -1072,24 +930,18 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        roformer (:class:`RoFormerModel`):
-            An instance of RoFormerModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of RoFormer.
-            If None, use the same value as `hidden_dropout_prob` of `RoFormerModel`
-            instance `roformer`. Defaults to None.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForMultipleChoice.
     """
 
-    def __init__(self, roformer, num_choices=2, dropout=None):
-        super().__init__()
-
-        self.roformer = roformer
-        self.num_choices = num_choices
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.roformer.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roformer.config["hidden_size"], 1)
-
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.roformer = RoFormerModel(config)
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(
@@ -1171,6 +1023,7 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                 print(reshaped_logits.shape)
                 # [2, 2]
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         input_ids = input_ids.reshape((-1, input_ids.shape[-1])) if input_ids is not None else None
         token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1])) if token_type_ids is not None else None
@@ -1213,19 +1066,19 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
     RoFormer Model with a `masked language modeling` head on top.
 
     Args:
-        roformer (:class:RoFormerModel`):
-            An instance of :class:`RoFormerModel`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForMaskedLM.
 
     """
 
-    def __init__(self, roformer):
-        super().__init__()
-        self.roformer = roformer
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.roformer = RoFormerModel(config)
         self.cls = RoFormerOnlyMLMHead(
-            self.roformer.config["embedding_size"],
-            self.roformer.config["hidden_size"],
-            self.roformer.config["vocab_size"],
-            self.roformer.config["hidden_act"],
+            config.embedding_size,
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
         self.apply(self.init_weights)
@@ -1286,6 +1139,7 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                 logits = model(**tokenized_inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.roformer(
             input_ids,
@@ -1324,19 +1178,19 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
     RoFormer Model with a `Causal language modeling` head on top.
 
     Args:
-        roformer (:class:RoFormerModel`):
-            An instance of :class:`RoFormerModel`.
+        config (:class:`RoFormerConfig`):
+            An instance of RoFormerConfig used to construct RoFormerForCausalLM.
 
     """
 
-    def __init__(self, roformer):
-        super().__init__()
-        self.roformer = roformer
+    def __init__(self, config: RoFormerConfig):
+        super().__init__(config)
+        self.roformer = RoFormerModel(config)
         self.cls = RoFormerOnlyMLMHead(
-            self.roformer.config["embedding_size"],
-            self.roformer.config["hidden_size"],
-            self.roformer.config["vocab_size"],
-            self.roformer.config["hidden_act"],
+            config.embedding_size,
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
         self.apply(self.init_weights)
@@ -1404,6 +1258,7 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
                 print(logits.shape)
                 # [1, 11, 12000]
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.roformer(
             input_ids,
@@ -1517,15 +1372,3 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
             model_kwargs["attention_mask"] = attention_mask
 
         return model_kwargs
-
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
