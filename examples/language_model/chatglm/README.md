@@ -127,6 +127,9 @@ python export_generation_model.py \
 pip install fastdeploy-gpu-python==0.0.0 -f https://www.paddlepaddle.org.cn/whl/fastdeploy_nightly_build.html`
 ```
 
+运行以下命令，使用静态图进行模型推理。
+
+```
 python infer_generation.py \
     --model_path  ./checkpoints/infer \
     --model_prefix chatglm
