@@ -13,17 +13,10 @@
 # limitations under the License.
 
 
-import paddle
-
 from ppdiffusers import UniDiffuserPipeline
 
-mode = "t2i"
-generator = paddle.Generator().manual_seed(0)
-
 pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
-
 prompt = "an elephant under the sea"
-result = pipe(mode=mode, image=None, prompt=prompt, generator=generator)
-
+result = pipe(mode="t2i", image=None, prompt=prompt)
 image = result.images[0]
-image.save("./unidiffuser-{}.png".format(mode))
+image.save("text_to_image_generation-unidiffuser-result.png")

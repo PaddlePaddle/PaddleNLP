@@ -13,18 +13,11 @@
 # limitations under the License.
 
 
-import paddle
-
 from ppdiffusers import UniDiffuserPipeline
 
-mode = "t2i2t"
-generator = paddle.Generator().manual_seed(0)
-
 pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
-
 prompt = "an elephant under the sea"
-result = pipe(mode=mode, image=None, prompt=prompt, generator=generator)
-
+result = pipe(mode="t2i2t", image=None, prompt=prompt)
 text = result.texts[0]
-with open("./unidiffuser-{}.txt".format(mode), "w") as f:
+with open("text_variation-unidiffuser-result.txt", "w") as f:
     print("{}\n".format(text), file=f)

@@ -13,18 +13,11 @@
 # limitations under the License.
 
 
-import paddle
-
 from ppdiffusers import UniDiffuserPipeline
 from ppdiffusers.utils import load_image
 
-generator = paddle.Generator().manual_seed(0)
-mode = "i2t2i"
-
 pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
-
 image = load_image("https://bj.bcebos.com/v1/paddlenlp/models/community/thu-ml/data/space.jpg")
-result = pipe(mode=mode, image=image, prompt=None, generator=generator)
-
+result = pipe(mode="i2t2i", image=image, prompt=None)
 image = result.images[0]
-image.save("./unidiffuser-{}.png".format(mode))
+image.save("image_variation-unidiffuser-result.png")

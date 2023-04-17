@@ -12,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-
 from ppdiffusers import UniDiffuserPipeline
 from ppdiffusers.utils import load_image
 
-generator = paddle.Generator().manual_seed(0)
-mode = "i2t"
-
 pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
-
 image = load_image("https://bj.bcebos.com/v1/paddlenlp/models/community/thu-ml/data/space.jpg")
-result = pipe(mode=mode, image=image, prompt=None, generator=generator)
-
+result = pipe(mode="i2t", image=image, prompt=None)
 text = result.texts[0]
-with open("./unidiffuser-{}.txt".format(mode), "w") as f:
+with open("image_to_text_generation-unidiffuser-result.txt", "w") as f:
     print("{}\n".format(text), file=f)

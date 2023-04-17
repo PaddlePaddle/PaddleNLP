@@ -13,16 +13,9 @@
 # limitations under the License.
 
 
-import paddle
-
 from ppdiffusers import UniDiffuserPipeline
 
-mode = "i"
-generator = paddle.Generator().manual_seed(0)
-
 pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
-
-result = pipe(mode=mode, image=None, prompt=None, generator=generator)
-
+result = pipe(mode="i", image=None, prompt=None)
 image = result.images[0]
-image.save("./unidiffuser-{}.png".format(mode))
+image.save("unconditional_image_generation-unidiffuser-result.png")
