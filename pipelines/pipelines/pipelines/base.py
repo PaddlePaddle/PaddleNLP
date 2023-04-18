@@ -757,8 +757,6 @@ class Pipeline(BasePipeline):
         components: dict = {}  # instances of component objects.
         for node in pipeline_definition["nodes"]:
             name = node["name"]
-            # if name == "QAFilterPostprocessor":
-            #     print("exit")
             component = cls._load_or_get_component(name=name, definitions=component_definitions, components=components)
             pipeline.add_node(component=component, name=name, inputs=node.get("inputs", []))
 

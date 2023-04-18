@@ -22,10 +22,26 @@ from pipelines.nodes.base import BaseComponent
 
 
 class ErnieBot(BaseComponent):
+    """
+    The ErnieBot class is a subclass of the BaseComponent class, which is designed to interface with
+    the Ernie Bot API for generating AI chatbot responses. It handles the interaction with the API using
+    the provided access token. It allows you to make a request with a given query and optional conversation
+    history, receiving a response from the chatbot and extending the conversation history accordingly.
+    """
+
     outgoing_edges = 1
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
     def __init__(self, ernie_bot_access_token=None):
+        """
+        Initialize the ErnieBot instance with the provided access token or retrieve it from an
+        environment variable.
+
+        :param ernie_bot_access_token: The access token to authenticate with the Ernie Bot API. If not provided,
+            the method will attempt to retrieve it from the `ernie_bot_access_token` environment variable.
+            Defaults to None.
+        """
+
         access_token = ernie_bot_access_token or os.environ.get("ernie_bot_access_token", None)
         if access_token is None:
             raise ValueError(
@@ -35,7 +51,15 @@ class ErnieBot(BaseComponent):
         self.url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={access_token}"
 
     def run(self, query, history=None, stream=False):
-        print("real input history", history)
+        """
+        Send a request to the Ernie Bot API with the given query and optional conversation history.
+        Returns the chatbot response and updates the conversation history accordingly.
+
+        :param query: The user's input/query to be sent to the Ernie Bot API.
+        :param history: A list of dictionaries representing the conversation history,
+        :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
+        """
+
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:

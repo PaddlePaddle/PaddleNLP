@@ -11,16 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from pipelines.nodes.base import BaseComponent
 
 
 class TruncatedConversationHistory(BaseComponent):
+    """This class represents a component that truncates conversation history to a specified maximum length."""
+
     outgoing_edges = 1
 
     def __init__(self, max_length):
+        """Initializes the TruncatedConversationHistory class with the specified maximum length."""
         self.max_length = max_length
 
     def run(self, query, history=None):
+        """Truncates the conversation history to the maximum allowed length, then returns the modified history along with the query."""
         if history is None:
             return {"query": query}, "output_1"
         for past_msg in history:
