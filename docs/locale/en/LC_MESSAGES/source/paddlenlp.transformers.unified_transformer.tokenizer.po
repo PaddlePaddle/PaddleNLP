@@ -493,7 +493,7 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:51
 msgid ""
 "Whether to add the special token \"[CLS]\" at the end of sequence as the "
-"begining of the response when running inference to force the model to "
+"beginning of the response when running inference to force the model to "
 "start generating response sequence. Defaults to False."
 msgstr ""
 
