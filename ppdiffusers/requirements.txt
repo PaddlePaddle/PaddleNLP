@@ -3,4 +3,3 @@ safetensors
 ftfy
 regex
 Pillow
-einops
