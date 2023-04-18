@@ -507,7 +507,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             self.config = init_dict
 
         # only execute when it's the base method
-        if original_init.__module__ != "paddlenlp.transformers.model_utils" and self.__class__.init_weights is PretrainedModel.init_weights:
+        if (
+            original_init.__module__ != "paddlenlp.transformers.model_utils"
+            and self.__class__.init_weights is PretrainedModel.init_weights
+        ):
             self.init_weights()
 
     def _init_weights(self, layer):
