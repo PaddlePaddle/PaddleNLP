@@ -23,7 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 
 from ...layers import Linear as TransposedLinear
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
@@ -362,69 +362,51 @@ class AlbertPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: AlbertConfig) -> List[StateDictNameMapping]:
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["encoder.embedding_hidden_mapping_in.weight", "encoder.embedding_hidden_mapping_in.weight", "transpose"],
-            ["encoder.embedding_hidden_mapping_in.bias", "encoder.embedding_hidden_mapping_in.bias"],
+            ["encoder.embedding_hidden_mapping_in.weight", None, "transpose"],
+            "encoder.embedding_hidden_mapping_in.bias",
         ]
 
         if config.add_pooling_layer:
             model_mappings.extend(
                 [
-                    ["pooler.weight", "pooler.weight", "transpose"],
-                    ["pooler.bias", "pooler.bias"],
+                    ["pooler.weight", None, "transpose"],
+                    ["pooler.bias"],
                 ]
             )
 
         for group_index in range(config.num_hidden_groups):
             group_mappings = [
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
-                ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.LayerNorm.weight",
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.layer_norm.weight",
@@ -435,25 +417,20 @@ class AlbertPretrainedModel(PretrainedModel):
                 ],
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
                 [
                     f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.weight",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
-                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
-                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
             ]
             model_mappings.extend(group_mappings)
 
+        init_name_mappings(model_mappings)
         # base-model prefix "AlbertModel"
         if "AlbertModel" not in config.architectures:
             for mapping in model_mappings:
