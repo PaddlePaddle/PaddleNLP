@@ -23,7 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Embedding, Layer, MultiHeadAttention
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -86,7 +86,7 @@ class BartPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: BartConfig) -> List[StateDictNameMapping]:
         model_mappings = [
-            ["shared.weight", "shared.weight"],
+            "shared.weight",
         ]
 
         num_encoder_layers = config.num_encoder_layers or 0
@@ -305,6 +305,8 @@ class BartPretrainedModel(PretrainedModel):
                 ]
 
                 model_mappings.extend(decoder_mappings)
+
+        init_name_mappings(model_mappings)
 
         # base-model prefix "BartModel"
         if "BartModel" not in config.architectures:
