@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 from ...layers import Linear as TransposedLinear
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -153,13 +153,13 @@ class BertPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
-            ["pooler.dense.bias", "pooler.dense.bias"],
+            ["pooler.dense.weight", None, "transpose"],
+            "pooler.dense.bias",
             # for TokenClassification
         ]
         for layer_index in range(config.num_hidden_layers):
@@ -224,6 +224,8 @@ class BertPretrainedModel(PretrainedModel):
                 [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
             ]
             model_mappings.extend(layer_mappings)
+
+        init_name_mappings(model_mappings)
 
         # base-model prefix "BertModel"
         if "BertModel" not in config.architectures:
