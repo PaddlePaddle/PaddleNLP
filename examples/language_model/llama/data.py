@@ -109,9 +109,10 @@ class DataCollatorForSupervisedDataset(object):
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
         input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
         labels = left_padding(labels, pad_id=IGNORE_INDEX)
+        attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
 
         return dict(
             input_ids=input_ids,
             labels=labels,
-            attention_mask=input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)),
+            attention_mask=attention_mask,
         )
