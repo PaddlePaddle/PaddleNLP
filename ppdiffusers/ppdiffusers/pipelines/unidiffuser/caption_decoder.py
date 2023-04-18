@@ -224,7 +224,7 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
                     break
 
             output_list = list(tokens.squeeze().cpu().numpy())
-            output_text = tokenizer.decode(output_list)
+            output_text = tokenizer.decode(output_list, skip_special_tokens=True)
             generated_list.append(output_text)
 
         return generated_list[0]
