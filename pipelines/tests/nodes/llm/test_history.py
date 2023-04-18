@@ -21,7 +21,7 @@ class TestTruncatedConversationHistory(unittest.TestCase):
     def test_truncated_conversation_history(self):
         max_length = 10
         component = TruncatedConversationHistory(max_length)
-
+        query = "test_query"
         history = [
             {"content": "This is a very long message."},
             {"content": "Short message."},
@@ -34,16 +34,19 @@ class TestTruncatedConversationHistory(unittest.TestCase):
             {"content": "This one i"},
         ]
 
-        truncated_history, output_key = component.run(history)
+        truncated_history, output_key = component.run(query=query, history=history)
 
+        self.assertEqual(truncated_history["query"], query)
         self.assertEqual(truncated_history["history"], expected_history)
-        self.assertEqual(output_key, "history_output")
+        self.assertEqual(output_key, "output_1")
 
     def test_no_history(self):
         max_length = 10
         component = TruncatedConversationHistory(max_length)
+        query = "test_query"
 
-        truncated_history, output_key = component.run(None)
+        truncated_history, output_key = component.run(query=query)
 
-        self.assertEqual(truncated_history, {})
-        self.assertEqual(output_key, "history_output")
+        self.assertEqual(truncated_history["query"], query)
+        self.assertNotIn("history", truncated_history)
+        self.assertEqual(output_key, "output_1")
