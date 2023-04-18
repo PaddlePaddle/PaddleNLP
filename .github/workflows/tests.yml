@@ -1,19 +1,6 @@
 name: Test
 
-on:
-  push:
-    paths:
-      - 'paddlenlp/*'
-      - 'model_zoo/*'
-      - 'examples/*'
-      - 'tests/*'
-  pull_request:
-    paths:
-      - 'paddlenlp/*'
-      - 'model_zoo/*'
-      - 'examples/*'
-      - 'tests/*'
-
+on: [push, pull_request]
 
 jobs:
   Test:
