@@ -20,7 +20,7 @@ import paddle.nn as nn
 
 from paddlenlp.utils.env import CONFIG_NAME
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     DISTILBERT_PRETRAINED_INIT_CONFIGURATION,
@@ -86,8 +86,8 @@ class DistilBertPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: DistilBertConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
         ]
@@ -166,6 +166,7 @@ class DistilBertPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
         # base-model prefix "DistilBertModel"
         if "DistilBertModel" not in config.architectures:
             for mapping in model_mappings:
@@ -176,18 +177,18 @@ class DistilBertPretrainedModel(PretrainedModel):
         if "DistilBertForSequenceClassification" in config.architectures:
             model_mappings.extend(
                 [
-                    ["pre_classifier.weight", "pre_classifier.weight", "transpose"],
-                    ["pre_classifier.bias", "pre_classifier.bias"],
-                    ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    ["pre_classifier.weight", None, "transpose"],
+                    "pre_classifier.bias",
+                    ["classifier.weight", None, "transpose"],
+                    "classifier.bias",
                 ]
             )
 
         if "DistilBertForTokenClassification" in config.architectures:
             model_mappings.extend(
                 [
-                    ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    ["classifier.weight", None, "transpose"],
+                    "classifier.bias",
                 ]
             )
 
@@ -196,6 +197,7 @@ class DistilBertPretrainedModel(PretrainedModel):
                 [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
             )
 
+        init_name_mappings(model_mappings)
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 

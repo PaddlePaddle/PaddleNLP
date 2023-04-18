@@ -23,7 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 
 from ...layers import Linear as TransposedLinear
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -169,9 +169,9 @@ class RobertaPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: RobertaConfig) -> list[StateDictNameMapping]:
         mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
         ]
@@ -239,6 +239,7 @@ class RobertaPretrainedModel(PretrainedModel):
             ]
             mappings.extend(layer_mappings)
 
+        init_name_mappings(mappings)
         # Other than RobertaModel, other architectures will prepend model prefix
         if config.architectures is not None and "RobertaModel" not in config.architectures:
             for mapping in mappings:
@@ -259,20 +260,20 @@ class RobertaPretrainedModel(PretrainedModel):
             if "RobertaForSequenceClassification" in config.architectures:
                 mappings.extend(
                     [
-                        ["classifier.out_proj.weight", "classifier.out_proj.weight", "transpose"],
-                        ["classifier.out_proj.bias", "classifier.out_proj.bias"],
-                        ["classifier.dense.weight", "classifier.dense.weight", "transpose"],
-                        ["classifier.dense.bias", "classifier.dense.bias"],
+                        ["classifier.out_proj.weight", None, "transpose"],
+                        "classifier.out_proj.bias",
+                        ["classifier.dense.weight", None, "transpose"],
+                        "classifier.dense.bias",
                     ]
                 )
             if "RobertaForMaskedLM" in config.architectures:
                 mappings.extend(
                     [
-                        ["lm_head.bias", "lm_head.bias"],
-                        ["lm_head.dense.weight", "lm_head.dense.weight"],
-                        ["lm_head.dense.bias", "lm_head.dense.bias"],
-                        ["lm_head.layer_norm.weight", "lm_head.layer_norm.weight"],
-                        ["lm_head.layer_norm.bias", "lm_head.layer_norm.bias"],
+                        "lm_head.bias",
+                        "lm_head.dense.weight",
+                        "lm_head.dense.bias",
+                        "lm_head.layer_norm.weight",
+                        "lm_head.layer_norm.bias",
                     ]
                 )
             if (
@@ -281,8 +282,8 @@ class RobertaPretrainedModel(PretrainedModel):
             ):
                 mappings.extend(
                     [
-                        ["classifier.weight", "classifier.weight", "transpose"],
-                        ["classifier.bias", "classifier.bias"],
+                        ["classifier.weight", None, "transpose"],
+                        "classifier.bias",
                     ]
                 )
             if "RobertaForQuestionAnswering" in config.architectures:
@@ -292,7 +293,7 @@ class RobertaPretrainedModel(PretrainedModel):
                         ["qa_outputs.bias", "classifier.bias"],
                     ]
                 )
-
+        init_name_mappings(mappings)
         return [StateDictNameMapping(*mapping) for mapping in mappings]
 
     def init_weights(self, layer):
