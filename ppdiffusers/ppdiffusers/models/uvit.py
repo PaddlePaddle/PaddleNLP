@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
+from typing import Optional
 
 import einops
 import paddle
@@ -19,7 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import BaseOutput, is_ppxformers_available
 from .attention import DropPath, Mlp
 from .embeddings import PatchEmbed, get_timestep_embedding
 from .modeling_utils import ModelMixin
@@ -45,27 +46,90 @@ class Attention(nn.Layer):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
+        self.head_size = head_dim
         self.scale = qk_scale or head_dim**-0.5
         self.qkv = nn.Linear(dim, dim * 3, bias_attr=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
+        self.attn_drop = attn_drop
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    def forward(self, x):
-        B, L, C = x.shape
-        qkv = self.qkv(x)
-        # TODO: xformers support
-        with paddle.amp.auto_cast(enable=False):
-            qkv = einops.rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads).astype("float32")
-            q, k, v = qkv[0], qkv[1], qkv[2]  # B H L D
-            attn = paddle.mm(q, k.transpose([0, 1, 3, 2])) * self.scale  # B H L L
-            attn = F.softmax(attn, axis=-1)
-            attn = self.attn_drop(attn)
-            x = paddle.mm(attn, v).transpose([0, 2, 1, 3]).reshape([B, L, C])
+        self._use_memory_efficient_attention_xformers = False
+        self._attention_op = None
 
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
+    def reshape_heads_to_batch_dim(self, tensor, transpose=True):
+        tensor = tensor.reshape([0, 0, self.num_heads, self.head_size])
+        if transpose:
+            tensor = tensor.transpose([0, 2, 1, 3])
+        return tensor
+
+    def reshape_batch_dim_to_heads(self, tensor, transpose=True):
+        if transpose:
+            tensor = tensor.transpose([0, 2, 1, 3])
+        tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])
+        return tensor
+
+    def set_use_memory_efficient_attention_xformers(
+        self, use_memory_efficient_attention_xformers: bool, attention_op: Optional[str] = None
+    ):
+        if self.head_size > 128 and attention_op == "flash":
+            attention_op = "cutlass"
+        if use_memory_efficient_attention_xformers:
+            if not is_ppxformers_available():
+                raise NotImplementedError(
+                    "requires the scaled_dot_product_attention but your PaddlePaddle donot have this. Checkout the instructions on the installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment."
+                )
+            else:
+                try:
+                    _ = F.scaled_dot_product_attention_(
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        attention_op=attention_op,
+                    )
+                except Exception as e:
+                    raise e
+
+        self._use_memory_efficient_attention_xformers = use_memory_efficient_attention_xformers
+        self._attention_op = attention_op
+
+    def forward(self, x):
+        qkv = self.qkv(x)
+        if not self._use_memory_efficient_attention_xformers:
+            qkv = qkv.cast(paddle.float32)
+        query_proj, key_proj, value_proj = qkv.chunk(3, axis=-1)
+        query_proj = self.reshape_heads_to_batch_dim(
+            query_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
+        key_proj = self.reshape_heads_to_batch_dim(
+            key_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
+        value_proj = self.reshape_heads_to_batch_dim(
+            value_proj, transpose=not self._use_memory_efficient_attention_xformers
+        )
+
+        if self._use_memory_efficient_attention_xformers:
+            hidden_states = F.scaled_dot_product_attention_(
+                query_proj,
+                key_proj,
+                value_proj,
+                attn_mask=None,
+                scale=self.scale,
+                dropout_p=self.attn_drop,
+                training=self.training,
+                attention_op=self._attention_op,
+            )
+        else:
+            with paddle.amp.auto_cast(enable=False):
+                attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                hidden_states = paddle.matmul(attention_probs, value_proj)
+
+        hidden_states = self.reshape_batch_dim_to_heads(
+            hidden_states, transpose=not self._use_memory_efficient_attention_xformers
+        )
+
+        hidden_states = self.proj_drop(self.proj(hidden_states))
+        return hidden_states
 
 
 class Block(nn.Layer):
