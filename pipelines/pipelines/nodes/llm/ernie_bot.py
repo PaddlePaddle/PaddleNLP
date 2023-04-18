@@ -33,10 +33,11 @@ class ErnieBot(BaseComponent):
             )
         self.url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={access_token}"
 
-    def run(self, query, **kwargs):
+    def run(self, query, stream=False):
         payload = {"messages": [{"role": "user", "content": f"{query}"}]}
+        print("here!")
 
-        if kwargs.get("stream", False):
+        if stream:
             payload["stream"] = True
         response = requests.request("POST", self.url, headers=self.headers, data=json.dumps(payload))
         return json.loads(response.text), "eb_output"
