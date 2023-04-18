@@ -19,6 +19,7 @@ import einops
 import numpy as np
 import paddle
 import PIL
+from PIL import Image
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
@@ -38,22 +39,19 @@ from .caption_decoder import CaptionDecoder
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-def image_preprocess(image):
-    if isinstance(image, paddle.Tensor):
-        return image
-    elif isinstance(image, PIL.Image.Image):
-        image = [image]
-    else:
-        raise ValueError
-
-    if isinstance(image[0], PIL.Image.Image):
-        image = np.array(image[0])
-        image = (image / 127.5 - 1.0).astype(np.float32)
-        image = einops.rearrange(image, "h w c -> 1 c h w")
-        image = paddle.to_tensor(image)
-    elif isinstance(image[0], paddle.Tensor):
-        image = paddle.concat(image, axis=0)
-    return image
+def center_crop(width, height, img):
+    resample = {"box": Image.BOX, "lanczos": Image.LANCZOS}["lanczos"]
+    crop = np.min(img.shape[:2])
+    img = img[
+        (img.shape[0] - crop) // 2 : (img.shape[0] + crop) // 2,
+        (img.shape[1] - crop) // 2 : (img.shape[1] + crop) // 2,
+    ]  # center crop
+    try:
+        img = Image.fromarray(img, "RGB")
+    except:
+        img = Image.fromarray(img)
+    img = img.resize((width, height), resample)  # resize the center crop from [crop, crop] to [width, height]
+    return np.array(img).astype(np.uint8)
 
 
 class UniDiffuserPipeline(DiffusionPipeline):
@@ -226,7 +224,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         self,
         prompt,
         num_images_per_prompt,
-        do_classifier_free_guidance=False,
         negative_prompt=None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
@@ -241,13 +238,10 @@ class UniDiffuserPipeline(DiffusionPipeline):
             )
             prompt_embeds = self.text_encoder(text_inputs.input_ids)[0]
 
-        # TODO: do_classifier_free_guidance
         return prompt_embeds
 
     # Modified from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_instruct_pix2pix.StableDiffusionInstructPix2PixPipeline.prepare_image_latents
-    def encode_image_vae_latents(
-        self, image, batch_size, num_images_per_prompt, dtype, do_classifier_free_guidance=False, generator=None
-    ):
+    def encode_image_vae_latents(self, image, batch_size, num_images_per_prompt, dtype, generator=None):
         if not isinstance(image, paddle.Tensor):
             raise ValueError(f"`image` has to be of type `paddle.Tensor`, but is {type(image)}")
         image = image.cast(dtype)
@@ -276,7 +270,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         else:
             image_latents = paddle.concat([image_latents], axis=0)
 
-        # TODO: do_classifier_free_guidance
         return image_latents
 
     # Modified from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_instruct_pix2pix.StableDiffusionInstructPix2PixPipeline.prepare_image_latents
@@ -286,15 +279,11 @@ class UniDiffuserPipeline(DiffusionPipeline):
         batch_size,
         num_images_per_prompt,
         dtype,
-        do_classifier_free_guidance=False,
     ):
-        if not isinstance(image, (PIL.Image.Image, list)):
-            raise ValueError(f"`image` has to be of type `PIL.Image.Image` or list, but is {type(image)}")
-
         batch_size = batch_size * num_images_per_prompt
 
         # clip encode
-        inputs = self.image_feature_extractor(images=image, return_tensors="pd").pixel_values
+        inputs = self.image_feature_extractor(images=Image.fromarray(image), return_tensors="pd").pixel_values
         image_latents = self.image_encoder(inputs).image_embeds.unsqueeze(1)
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] != 0:
@@ -304,7 +293,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
         else:
             image_latents = paddle.concat([image_latents], axis=0)
 
-        # TODO: do_classifier_free_guidance
         return image_latents
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
@@ -625,11 +613,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
 
         # 2. Define call parameters
         batch_size = self._infer_batch_size(mode, image, prompt, prompt_embeds, num_samples)
-        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
-        # corresponds to doing no classifier free guidance.
-        do_classifier_free_guidance = guidance_scale > 1.0
-        do_classifier_free_guidance = False  # TODO
 
         # 3. Encode input prompt if available; otherwise prepare text latents
         if mode in ["t2i", "t2i2t"]:
@@ -638,7 +621,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
             prompt_embeds = self.encode_text_latents(
                 prompt,
                 num_images_per_prompt,
-                do_classifier_free_guidance,
                 negative_prompt,
                 prompt_embeds=prompt_embeds,
                 negative_prompt_embeds=negative_prompt_embeds,
@@ -658,29 +640,38 @@ class UniDiffuserPipeline(DiffusionPipeline):
 
         # 4. Encode input image if available; otherwise prepare image latents
         if mode in ["i2t", "i2t2i"]:
-            assert image is not None
+            assert image is not None and isinstance(image, PIL.Image.Image)
             # 4.1. Encode images, if available
-            # Encode image using VAE
-            image_vae = image_preprocess(image)
-            height, width = image_vae.shape[2:]
-            image_vae_latents = self.encode_image_vae_latents(
-                image_vae,
-                batch_size,
-                num_prompts_per_image,  # not num_images_per_prompt
-                prompt_embeds.dtype,
-                do_classifier_free_guidance,
-                generator,
-            )
+            image = np.array(image).astype(np.uint8)
+            image_crop = center_crop(height, width, image)
             # Encode image using CLIP
             image_clip_latents = self.encode_image_clip_latents(
-                image,
+                image_crop,
                 batch_size,
                 num_prompts_per_image,  # not num_images_per_prompt
                 prompt_embeds.dtype,
-                do_classifier_free_guidance,
             )
+            # Encode image using VAE
+            image_vae = (image_crop / 127.5 - 1.0).astype(np.float32)
+            image_vae = einops.rearrange(image_vae, "h w c -> 1 c h w")
+            image_vae_latents = self.encode_image_vae_latents(
+                paddle.to_tensor(image_vae),
+                batch_size,
+                num_prompts_per_image,  # not num_images_per_prompt
+                prompt_embeds.dtype,
+                generator,
+            )
+
         else:
             # 4.2. Prepare image latent variables, if necessary
+            # Prepare image CLIP latents
+            image_clip_latents = self.prepare_image_clip_latents(
+                batch_size * num_images_per_prompt,
+                self.image_encoder_clip_img_dim,
+                prompt_embeds.dtype,
+                generator,
+                clip_latents,
+            )
             # Prepare image VAE latents
             image_vae_latents = self.prepare_image_vae_latents(
                 batch_size * num_images_per_prompt,
@@ -690,14 +681,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 prompt_embeds.dtype,
                 generator,
                 vae_latents,
-            )
-            # Prepare image CLIP latents
-            image_clip_latents = self.prepare_image_clip_latents(
-                batch_size * num_images_per_prompt,
-                self.image_encoder_clip_img_dim,
-                prompt_embeds.dtype,
-                generator,
-                clip_latents,
             )
 
         # 5. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
@@ -799,6 +782,15 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 )
             else:
                 # 'i2t2i' should do 't2i' later
+                # Prepare image CLIP latents
+                image_clip_latents = self.prepare_image_clip_latents(
+                    batch_size * num_images_per_prompt,
+                    self.image_encoder_clip_img_dim,
+                    prompt_embeds.dtype,
+                    generator,
+                    clip_latents,
+                )
+                # Prepare image VAE latents
                 image_vae_latents = self.prepare_image_vae_latents(
                     batch_size * num_images_per_prompt,
                     self.num_channels_latents,
@@ -807,14 +799,6 @@ class UniDiffuserPipeline(DiffusionPipeline):
                     prompt_embeds.dtype,
                     generator,
                     vae_latents,
-                )
-                # Prepare image CLIP latents
-                image_clip_latents = self.prepare_image_clip_latents(
-                    batch_size * num_images_per_prompt,
-                    self.image_encoder_clip_img_dim,
-                    prompt_embeds.dtype,
-                    generator,
-                    clip_latents,
                 )
                 image_vae_latents, image_clip_latents = self._denoising_sample_fn(
                     "t2i",
