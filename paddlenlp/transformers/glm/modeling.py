@@ -179,7 +179,6 @@ class GLMAttention(nn.Layer):
             else:
                 max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
 
-            max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
             attention_scores -= max_attention_scores
             attention_scores *= self.attention_scale
 
