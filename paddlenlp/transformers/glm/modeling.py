@@ -149,7 +149,11 @@ class GLMAttention(nn.Layer):
 
     def forward(self, hidden_states: Tensor, ltor_mask: Tensor, cache: Tensor = None):
         # [bs, seq_len, num_head * head_dim]
-        q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
+        if self.config.tensor_parallel_degree > 1:
+            q_layer, k_layer, v_layer = self._core_parallel_attention(hidden_states, cache)
+        else:
+            # [bs,  num_head, seq_len, head_dim]
+            q_layer, k_layer, v_layer = self._core_attention(hidden_states, cache)
 
         if self.attention_scale > 1.0:
             attention_scores = paddle.matmul(
