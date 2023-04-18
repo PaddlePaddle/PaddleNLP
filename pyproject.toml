@@ -16,6 +16,7 @@ testpaths = [
     "tests/data",
     "tests/datasets",
     "tests/embeddings",
+    "tests/examples",
     "tests/experimental",
     "tests/layers",
     "tests/metrics",
