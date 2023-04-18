@@ -254,6 +254,12 @@ class LlamaMLP(nn.Layer):
                 gather_output=False,
                 has_bias=False,
             )
+            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
             self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -262,17 +268,8 @@ class LlamaMLP(nn.Layer):
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-
-        if config.tensor_parallel_degree > 1:
-            self.down_proj = fleet.meta_parallel.RowParallelLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                input_is_parallel=True,
-                has_bias=False,
-            )
-        else:
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
