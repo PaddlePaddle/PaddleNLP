@@ -261,7 +261,8 @@ class RobertaPretrainedModel(PretrainedModel):
                 mappings.extend(
                     [
                         ["classifier.out_proj.weight", None, "transpose"],
-                        "classifier.out_proj.bias"["classifier.dense.weight", "transpose"],
+                        "classifier.out_proj.bias",
+                        ["classifier.dense.weight", None, "transpose"],
                         "classifier.dense.bias",
                     ]
                 )
