@@ -51,6 +51,7 @@ class Predictor(object):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
+        self.src_length = args.src_length
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
@@ -71,7 +72,7 @@ class Predictor(object):
             input_text,
             padding=True,
             return_tensors="np",
-            max_length=self.args.src_length,
+            max_length=self.src_length,
             return_attention_mask=True,
             return_position_ids=True,
         )
