@@ -416,7 +416,7 @@ class ZeroShotTextClassificationTask(Task):
             else:
                 scores = np_sigmoid(logits)
                 output["predictions"] = []
-                if len(scores) == 1 and len(scores) != len(self._choices):
+                if scores.ndim == 2:
                     scores = scores[0]
                 for i, class_score in enumerate(scores):
                     if class_score > self._pred_threshold:
