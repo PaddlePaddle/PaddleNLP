@@ -138,7 +138,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
     This `LogitsProcessor` enforces the first generated token to be the selected `forced_bos_token`.
     Args:
         forced_bos_token_id (:obj:`int`):
-            The id of the token to to be generated as the first token.
+            The id of the token to be generated as the first token.
     """
 
     def __init__(self, forced_bos_token_id):
@@ -158,7 +158,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
     Args:
         max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
     def __init__(self, max_length, forced_eos_token_id):

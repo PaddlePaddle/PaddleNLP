@@ -28,7 +28,7 @@ class DirectoryProcessor:
     @staticmethod
     def process(input_dir, output_dir, function):
         """
-        Apply function to all files in input_dir and save the resulting ouput
+        Apply function to all files in input_dir and save the resulting output
         files in output_dir.
 
         """
@@ -76,7 +76,7 @@ class Rouge155(object):
 
     rouge_output = rouge.evaluate()
     print(rouge_output)
-    output_dict = rouge.output_to_dict(rouge_ouput)
+    output_dict = rouge.output_to_dict(rouge_output)
     print(output_dict)
     ->    {'rouge_1_f_score': 0.95652,
          'rouge_1_f_score_cb': 0.95652,
