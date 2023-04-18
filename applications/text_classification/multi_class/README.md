@@ -2,14 +2,19 @@
 
 **目录**
 
-- [1. 二分类/多分类简介](#二分类/多分类简介)
-- [2. 快速开始](#快速开始)
-    - [2.1 运行环境](#运行环境)
-    - [2.2 代码结构](#代码结构)
-    - [2.3 数据准备](#数据准备)
-    - [2.4 模型训练](#模型训练)
-    - [2.5 模型预测](#模型预测)
-    - [2.6 模型效果](#模型效果)
+- [二分类/多分类任务指南](#二分类多分类任务指南)
+  - [1. 二分类/多分类简介](#1-二分类多分类简介)
+  - [2. 快速开始](#2-快速开始)
+    - [2.1 运行环境](#21-运行环境)
+    - [2.2 代码结构](#22-代码结构)
+    - [2.3 数据准备](#23-数据准备)
+    - [2.4 模型训练](#24-模型训练)
+      - [2.4.1 预训练模型微调](#241-预训练模型微调)
+      - [2.4.2 训练评估](#242-训练评估)
+      - [2.4.3 模型裁剪(可选)](#243-模型裁剪可选)
+    - [2.5 模型预测](#25-模型预测)
+      - [可配置参数说明](#可配置参数说明)
+    - [2.6 模型效果](#26-模型效果)
 
 
 <a name="二分类/多分类简介"></a>
@@ -238,7 +243,7 @@ python -m paddle.distributed.launch --gpus 0,1 train.py \
 - `label_path`: 标签路径，默认为"./data/label.txt"。
 - `bad_case_path`: 错误样本保存路径，默认为"./data/bad_case.txt"。
 - `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
-训练脚本支持所有`TraingArguments`的参数，更多参数介绍可参考[TrainingArguments 参数介绍](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)。
+训练脚本支持所有`TrainingArguments`的参数，更多参数介绍可参考[TrainingArguments 参数介绍](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
 
