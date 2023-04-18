@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Paddle Llama model"""
+from __future__ import annotations
 
 import math
 from functools import partial
@@ -24,6 +25,11 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.conversion_utils import (
+    StateDictNameMapping,
+    init_name_mappings,
+)
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -194,7 +200,6 @@ class LlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        default_type = hidden_states.dtype
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -202,7 +207,7 @@ class LlamaRMSNorm(nn.Layer):
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
-            
+
         return hidden_states * self.weight
 
 
@@ -456,6 +461,39 @@ class LlamaPretrainedModel(PretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
     config_class = LlamaConfig
     base_model_prefix = "llama"
+
+    @classmethod
+    def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["embed_tokens.weight"],
+            ["norm.weight"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
+                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.input_layernorm.weight"],
+                [f"layers.{layer_index}.post_attention_layernorm.weight"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings=model_mappings)
+        # base-model prefix "LlamaModel"
+        if "LlamaModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "llama." + mapping[1]
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -713,7 +751,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
         shard_num = config.tensor_parallel_degree if config.tensor_parallel_degree > 1 else 1
         self.weight = self.create_parameter(
