@@ -284,7 +284,8 @@ class UniDiffuserPipeline(DiffusionPipeline):
 
         # clip encode
         inputs = self.image_feature_extractor(images=Image.fromarray(image), return_tensors="pd").pixel_values
-        image_latents = self.image_encoder(inputs).image_embeds.unsqueeze(1)
+        # TODO junnyu, support float16 we need cast dtype
+        image_latents = self.image_encoder(inputs.cast(self.image_encoder.dtype)).image_embeds.unsqueeze(1)
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] != 0:
             raise ValueError(

@@ -89,6 +89,8 @@ class CaptionDecoder(ModelMixin, ConfigMixin):
 
     @paddle.no_grad()
     def generate_captions(self, tokenizer, features, use_beam_search=True):
+        # TODO junnyu, support float16
+        features = features.cast(self.dtype)
         # the low dimension representation of clip feature
         features = paddle.split(features, 1, axis=0)
         generated_captions = []

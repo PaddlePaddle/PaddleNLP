@@ -122,7 +122,7 @@ class Attention(nn.Layer):
             with paddle.amp.auto_cast(enable=False):
                 attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
                 attention_probs = F.softmax(attention_scores, axis=-1)
-                hidden_states = paddle.matmul(attention_probs, value_proj)
+                hidden_states = paddle.matmul(attention_probs, value_proj).cast(x.dtype)
 
         hidden_states = self.reshape_batch_dim_to_heads(
             hidden_states, transpose=not self._use_memory_efficient_attention_xformers
@@ -316,6 +316,11 @@ class UViTModel(ModelMixin, ConfigMixin):
         return_dict=False,  # TODO: nf
     ):
         _, _, H, W = img.shape
+        # TODO junnyu, support float16
+        img = img.cast(self.dtype)
+        clip_img = clip_img.cast(self.dtype)
+        text = text.cast(self.dtype)
+
         img = self.patch_embed(img)
         clip_img = self.clip_img_embed(clip_img)
         text = self.text_embed(text)
@@ -323,6 +328,11 @@ class UViTModel(ModelMixin, ConfigMixin):
         t_img_token = get_timestep_embedding(t_img, self.embed_dim, True, 0).unsqueeze(axis=1)
         t_text_token = get_timestep_embedding(t_text, self.embed_dim, True, 0).unsqueeze(axis=1)
         token_embed = self.token_embedding(data_type).unsqueeze(axis=1)
+
+        # TODO junnyu, support float16
+        t_img_token = t_img_token.cast(self.dtype)
+        t_text_token = t_text_token.cast(self.dtype)
+        token_embed = token_embed.cast(self.dtype)
 
         x = paddle.concat((t_img_token, t_text_token, token_embed, text, clip_img, img), axis=1)
 
