@@ -170,9 +170,6 @@ def main():
         data_collator=collate_fn,
     )
 
-    if training_args.fp16_opt_level == "O2":
-        trainer.disable_autocast_context_manager()
-
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
