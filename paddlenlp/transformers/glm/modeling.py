@@ -25,7 +25,7 @@ from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.initializer import normal_, ones_, zeros_
 from ...utils.log import logger
@@ -461,11 +461,11 @@ class GLMPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["transformer.position_embeddings.weight", "transformer.position_embeddings.weight"],
-            ["transformer.block_position_embeddings.weight", "transformer.block_position_embeddings.weight"],
-            ["transformer.final_layernorm.weight", "transformer.final_layernorm.weight"],
-            ["transformer.final_layernorm.bias", "transformer.final_layernorm.bias"],
+            "word_embeddings.weight",
+            "transformer.position_embeddings.weight",
+            "transformer.block_position_embeddings.weight",
+            "transformer.final_layernorm.weight",
+            "transformer.final_layernorm.bias",
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = []
@@ -499,6 +499,7 @@ class GLMPretrainedModel(PretrainedModel):
                 )
 
             model_mappings.extend(layer_mappings)
+        init_name_mappings(model_mappings)
 
         import numpy as np
 
