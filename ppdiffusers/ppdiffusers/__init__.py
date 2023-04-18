@@ -64,7 +64,6 @@ else:
         UNet2DConditionModel,
         UNet2DModel,
         UNet3DConditionModel,
-        UViTModel,
         VQModel,
     )
     from .optimization import (
@@ -214,3 +213,11 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
 else:
     from .pipelines import UniDiffuserPipeline
+
+try:
+    if not (is_paddle_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_einops_objects import *  # noqa F403
+else:
+    from .models import UViTModel
