@@ -311,9 +311,6 @@ class GPTJPretrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _no_split_modules = ["GPTJBlock"]
 
-    def __init__(self, *inputs, **kwargs):
-        super().__init__(*inputs, **kwargs)
-
     def _init_weights(self, layer):
         """Initialize the weights."""
         if isinstance(layer, (nn.Linear, nn.Embedding)):

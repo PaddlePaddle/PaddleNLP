@@ -507,7 +507,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             self.config = init_dict
 
         # only execute when it's the base method
-        if self.__class__.init_weights is PretrainedModel.init_weights:
+        if original_init.__module__ != "paddlenlp.transformers.model_utils" and self.__class__.init_weights is PretrainedModel.init_weights:
             self.init_weights()
 
     def _init_weights(self, layer):
@@ -537,7 +537,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             # Tie weights should be skipped when not initializing all weights
             # since from_pretrained(...) calls tie weights anyways
-            self.tie_weights()
+
+            # TODO(wj-Mcat): enable all tie-weights later
+            # self.tie_weights()
 
     @property
     def base_model(self):
