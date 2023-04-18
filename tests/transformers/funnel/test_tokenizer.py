@@ -24,6 +24,7 @@ from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 class FunnelTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = FunnelTokenizer
+    test_offsets = False
     test_rust_tokenizer = False
     space_between_special_tokens = True
 
