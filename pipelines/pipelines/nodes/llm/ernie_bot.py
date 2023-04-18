@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import json
 import os
 
@@ -33,11 +34,31 @@ class ErnieBot(BaseComponent):
             )
         self.url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={access_token}"
 
-    def run(self, query, stream=False):
-        payload = {"messages": [{"role": "user", "content": f"{query}"}]}
-        print("here!")
-
+    def run(self, query, history=None, stream=False):
+        print("real input history", history)
+        payload = {"messages": []}
+        if history is not None:
+            if len(history) % 2 == 0:
+                for past_msg in history:
+                    if past_msg["role"] not in ["user", "assistant"]:
+                        raise ValueError(
+                            "Invalid history: The `role` in each message in history must be `user` or `assistant`."
+                        )
+                payload["messages"].extend(history)
+            else:
+                raise ValueError("Invalid history: an even number of `messages` is expected!")
+        payload["messages"].append({"role": "user", "content": f"{query}"})
+        # Do not use stream for now
         if stream:
             payload["stream"] = True
         response = requests.request("POST", self.url, headers=self.headers, data=json.dumps(payload))
-        return json.loads(response.text), "eb_output"
+        response_json = json.loads(response.text)
+        if history is None:
+            return_history = []
+        else:
+            return_history = copy.deepcopy(history)
+        return_history.extend(
+            [{"role": "user", "content": query}, {"role": "assistant", "content": response_json["result"]}]
+        )
+        response_json["history"] = return_history
+        return response_json, "eb_output"

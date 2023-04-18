@@ -12,51 +12,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from pipelines.nodes.llm import ErnieBot
 
 
 class TestErnieBot(unittest.TestCase):
-    def test_missing_access_token(self):
+    def setUp(self):
+        self.ernie_bot_access_token = "your_access_token"
+        self.valid_history = [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
+
+    def test_init_missing_access_token(self):
+        os.environ.pop("ernie_bot_access_token", None)
         with self.assertRaises(ValueError):
             ErnieBot()
 
-    @patch.dict(os.environ, {"ernie_bot_access_token": "test_token"})
-    def test_access_token_from_os_environ(self):
-        os.environ["ernie_bot_access_token"] = "test_tokens123"
-        ErnieBot()
+    def test_init_with_access_token(self):
+        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        self.assertIsNotNone(ernie_bot)
 
     @patch("requests.request")
-    def test_run(self, mock_request):
-        # Mock the API response
-        mock_response = {
-            "id": "as-bcmt5ct4iy",
-            "object": "chat.completion",
-            "created": 1680167072,
-            "result": "您好，我是百度研发的知识增强大语言模型，中文名是文心一言，英文名是ERNIE Bot。我能够与人对话互动，回答问题，协助创作，高效便捷地帮助人们获取信息、知识和灵感。",
-            "need_clear_history": False,
-            "usage": {"prompt_tokens": 7, "completion_tokens": 67, "total_tokens": 74},
-        }
+    def test_run_without_history(self, mock_request):
+        mock_response = MagicMock()
+        mock_response.text = '{"result": "Hello, how can I help you?"}'
+        mock_request.return_value = mock_response
 
-        # Configure the mock to return the response
-        mock_request.return_value.text = json.dumps(mock_response)
+        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        response, _ = ernie_bot.run("Hi")
 
-        ernie_bot = ErnieBot(ernie_bot_access_token="test_token")
-        sample_query = "介绍一下你自己"
-        result, output_key = ernie_bot.run(sample_query)
-
-        # Assert that the function call returns the expected output
-        self.assertEqual(result, mock_response)
-        self.assertEqual(output_key, "eb_output")
-
-        # Assert that the mock was called with the correct parameters
-        mock_request.assert_called_once_with(
-            "POST",
-            ernie_bot.url,
-            headers=ernie_bot.headers,
-            data=json.dumps({"messages": [{"role": "user", "content": sample_query}]}),
+        self.assertEqual(
+            response["history"],
+            [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello, how can I help you?"}],
         )
+
+    @patch("requests.request")
+    def test_run_with_valid_history(self, mock_request):
+        mock_response = MagicMock()
+        mock_response.text = '{"result": "I can help you with that."}'
+        mock_request.return_value = mock_response
+
+        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        response, _ = ernie_bot.run("What can you do?", history=self.valid_history)
+        self.assertEqual(
+            response["history"],
+            self.valid_history
+            + [
+                {"role": "user", "content": "What can you do?"},
+                {"role": "assistant", "content": "I can help you with that."},
+            ],
+        )
+
+    def test_run_with_invalid_history_role(self):
+        invalid_history = [{"role": "invalid", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
+
+        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        with self.assertRaises(ValueError):
+            ernie_bot.run("What can you do?", history=invalid_history)
+
+    def test_run_with_odd_history_length(self):
+        odd_history = [{"role": "user", "content": "Hi"}]
+
+        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        with self.assertRaises(ValueError):
+            ernie_bot.run("What can you do?", history=odd_history)

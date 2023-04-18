@@ -11,6 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from pipelines.nodes.base import BaseComponent
 
-from .ernie_bot import ErnieBot
-from .history import TruncatedConversationHistory
+
+class TruncatedConversationHistory(BaseComponent):
+    outgoing_edges = 1
+
+    def __init__(self, max_length):
+        self.max_length = max_length
+
+    def run(self, query, history=None):
+        if history is None:
+            return {"query": query}, "output_1"
+        for past_msg in history:
+            if len(past_msg["content"]) > self.max_length:
+                past_msg["content"] = past_msg["content"][: self.max_length]
+        return {"query": query, "history": history}, "output_1"
