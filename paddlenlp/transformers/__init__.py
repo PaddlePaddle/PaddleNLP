@@ -117,6 +117,7 @@ from .layoutlmv2.tokenizer import *
 from .layoutlmv2.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
+from .layoutxlm.configuration import *
 from .luke.modeling import *
 from .luke.tokenizer import *
 from .luke.configuration import *
@@ -157,6 +158,7 @@ from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
+from .squeezebert.configuration import *
 from .t5.modeling import *
 from .t5.tokenizer import *
 from .t5.configuration import *
@@ -238,6 +240,9 @@ from .clipseg.image_processing import *
 from .blip_2.modeling import *
 from .blip_2.configuration import *
 from .blip_2.processing import *
+from .chatglm.configuration import *
+from .chatglm.modeling import *
+from .chatglm.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

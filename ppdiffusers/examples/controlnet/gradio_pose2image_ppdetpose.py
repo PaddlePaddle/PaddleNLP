@@ -18,14 +18,12 @@ import random
 import cv2
 import gradio as gr
 import paddle
-from annotator.openpose import OpenposePaddleDetector
 from annotator.ppdet_hrnet import PPDetDetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
-apply_openpose = OpenposePaddleDetector()
 apply_ppdetpose = PPDetDetector()
 
 controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-openpose")
@@ -135,4 +133,4 @@ with block:
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name="0.0.0.0", server_port=8225)
+block.launch(server_name="0.0.0.0", server_port=8232)

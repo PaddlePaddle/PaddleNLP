@@ -40,7 +40,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.clip.modeling import CLIP_PRETRAINED_MODEL_ARCHIVE_LIST
 
-from ...testing_utils import get_tests_dir, slow
+from ...testing_utils import get_tests_dir, require_package, slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
@@ -504,6 +504,246 @@ def prepare_img():
     CUTE_CATS = get_tests_dir("fixtures/tests_samples/COCO/000000039769.png")
     image = Image.open(CUTE_CATS)
     return image
+
+
+class CLIPModelCompatibilityTest(unittest.TestCase):
+    model_id = "hf-internal-testing/tiny-random-CLIPModel"
+
+    def setUp(self):
+        # 1. create input
+        processor = CLIPProcessor.from_pretrained(self.model_id, from_hf_hub=True)
+        image = prepare_img()
+        self.inputs = processor(
+            text=["a photo of a cat", "a photo of a dog"], images=image, padding=True, return_tensors="np"
+        )
+
+    @require_package("transformers", "torch")
+    def test_clip_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPModel
+
+            paddle_model = CLIPModel.from_pretrained(self.model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(
+                input_ids=paddle.to_tensor(inputs["input_ids"]), pixel_values=paddle.to_tensor(inputs["pixel_values"])
+            )
+
+            # 3. forward the torch model
+            import torch
+            from transformers import CLIPModel
+
+            torch_model = CLIPModel.from_pretrained(self.model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(
+                input_ids=torch.tensor(inputs["input_ids"]), pixel_values=torch.tensor(inputs["pixel_values"])
+            )
+
+            # 4. compare results
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.logits_per_image.detach().cpu().numpy(),
+                    torch_logit.logits_per_image.detach().cpu().numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.logits_per_text.detach().cpu().numpy(),
+                    torch_logit.logits_per_text.detach().cpu().numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_clip_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. forward the torch  model
+            from transformers import CLIPModel
+
+            torch_model = CLIPModel.from_pretrained(self.model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                CLIPModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_clip_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import CLIPModel
+
+            torch_model = CLIPModel.from_pretrained(self.model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(
+                input_ids=torch.tensor(inputs["input_ids"]), pixel_values=torch.tensor(inputs["pixel_values"])
+            )
+
+            # 3. forward the paddle model
+            from paddlenlp.transformers import CLIPModel
+
+            paddle_model = CLIPModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(
+                input_ids=paddle.to_tensor(inputs["input_ids"]), pixel_values=paddle.to_tensor(inputs["pixel_values"])
+            )
+
+            # 4. compare results
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.logits_per_image.detach().cpu().numpy(),
+                    torch_logit.logits_per_image.detach().cpu().numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.logits_per_text.detach().cpu().numpy(),
+                    torch_logit.logits_per_text.detach().cpu().numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_clip_text_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPTextModel
+
+            paddle_model = CLIPTextModel.from_pretrained(self.model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(input_ids=paddle.to_tensor(inputs["input_ids"]))
+
+            # 3. forward the torch model
+            import torch
+            from transformers import CLIPTextModel
+
+            torch_model = CLIPTextModel.from_pretrained(self.model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(input_ids=torch.tensor(inputs["input_ids"]))
+
+            # 4. compare results
+            np.testing.assert_equal(
+                paddle_logit.last_hidden_state.shape,
+                torch_logit.last_hidden_state.shape,
+            )
+            np.testing.assert_equal(
+                paddle_logit.pooler_output.shape,
+                torch_logit.pooler_output.shape,
+            )
+
+    @require_package("transformers", "torch")
+    def test_clip_vision_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPVisionModel
+
+            paddle_model = CLIPVisionModel.from_pretrained(self.model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(pixel_values=paddle.to_tensor(inputs["pixel_values"]))
+
+            # 3. forward the torch model
+            import torch
+            from transformers import CLIPVisionModel
+
+            torch_model = CLIPVisionModel.from_pretrained(self.model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(pixel_values=torch.tensor(inputs["pixel_values"]))
+
+            # 4. compare results
+            np.testing.assert_equal(
+                paddle_logit.last_hidden_state.shape,
+                torch_logit.last_hidden_state.shape,
+            )
+            np.testing.assert_equal(
+                paddle_logit.pooler_output.shape,
+                torch_logit.pooler_output.shape,
+            )
+
+    @require_package("transformers", "torch")
+    def test_clip_text_with_projection_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPTextModelWithProjection
+
+            paddle_model = CLIPTextModelWithProjection.from_pretrained(
+                self.model_id, from_hf_hub=True, cache_dir=tempdir
+            )
+            paddle_model.eval()
+            paddle_logit = paddle_model(input_ids=paddle.to_tensor(inputs["input_ids"]))
+
+            # 3. forward the torch model
+            import torch
+            from transformers import CLIPTextModelWithProjection
+
+            torch_model = CLIPTextModelWithProjection.from_pretrained(
+                self.model_id, cache_dir=tempdir, ignore_mismatched_sizes=True
+            )
+            torch_model.eval()
+            torch_logit = torch_model(input_ids=torch.tensor(inputs["input_ids"]))
+
+            # 4. compare results
+            np.testing.assert_equal(
+                paddle_logit.last_hidden_state.shape,
+                torch_logit.last_hidden_state.shape,
+            )
+
+    @require_package("transformers", "torch")
+    def test_clip_vision_with_projection_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            inputs = self.inputs
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import CLIPVisionModelWithProjection
+
+            paddle_model = CLIPVisionModelWithProjection.from_pretrained(
+                self.model_id, from_hf_hub=True, cache_dir=tempdir
+            )
+            paddle_model.eval()
+            paddle_logit = paddle_model(pixel_values=paddle.to_tensor(inputs["pixel_values"]))
+
+            # 3. forward the torch model
+            import torch
+            from transformers import CLIPVisionModelWithProjection
+
+            torch_model = CLIPVisionModelWithProjection.from_pretrained(
+                self.model_id, cache_dir=tempdir, ignore_mismatched_sizes=True
+            )
+            torch_model.eval()
+            torch_logit = torch_model(pixel_values=torch.tensor(inputs["pixel_values"]))
+
+            # 4. compare results
+            np.testing.assert_equal(
+                paddle_logit.last_hidden_state.shape,
+                torch_logit.last_hidden_state.shape,
+            )
 
 
 class CLIPModelIntegrationTest(unittest.TestCase):

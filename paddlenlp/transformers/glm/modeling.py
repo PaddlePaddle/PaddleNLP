@@ -26,7 +26,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.initializer import normal_, ones_, zeros_
 from ...utils.log import logger
@@ -472,11 +472,11 @@ class GLMPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["transformer.position_embeddings.weight", "transformer.position_embeddings.weight"],
-            ["transformer.block_position_embeddings.weight", "transformer.block_position_embeddings.weight"],
-            ["transformer.final_layernorm.weight", "transformer.final_layernorm.weight"],
-            ["transformer.final_layernorm.bias", "transformer.final_layernorm.bias"],
+            "word_embeddings.weight",
+            "transformer.position_embeddings.weight",
+            "transformer.block_position_embeddings.weight",
+            "transformer.final_layernorm.weight",
+            "transformer.final_layernorm.bias",
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = []
@@ -510,6 +510,7 @@ class GLMPretrainedModel(PretrainedModel):
                 )
 
             model_mappings.extend(layer_mappings)
+        init_name_mappings(model_mappings)
 
         import numpy as np
 
@@ -582,7 +583,7 @@ class GLMPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
@@ -653,7 +654,6 @@ class GLMModel(GLMPretrainedModel):
             )
 
         self.transformer = GLMStack(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -724,7 +724,6 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -780,7 +779,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def _reorder_cache(self, cache, beam_index):
         # Speedy decoding is disabled and no reorder is needed if decoder cache is not given.
