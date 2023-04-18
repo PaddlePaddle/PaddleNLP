@@ -49,7 +49,7 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
