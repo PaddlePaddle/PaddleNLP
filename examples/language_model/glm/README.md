@@ -26,9 +26,9 @@ python finetune_generation.py \
 --warmup_ratio 0.06 \
 --weight_decay 0.1 \
 --label_smoothing 0.1 \
---save_steps 10000 \
+--save_steps 100 \
 --logging_steps 1 \
---eval_steps 4 \
+--eval_steps 100 \
 --output_dir ./checkpoints/glm-large-chinese \
 --src_length 608 \
 --tgt_length 160 \
