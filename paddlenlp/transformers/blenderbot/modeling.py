@@ -65,7 +65,7 @@ class BlenderbotPretrainedModel(PretrainedModel):
     pretrained_init_configuration = BLENDERBOT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = BLENDERBOT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if paddle.get_default_dtype() not in ["float32", "float64"]:
             # gaussian/standard_normal/randn/normal only supports [float32, float64]
@@ -143,8 +143,6 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
             normalize_before=config.normalize_before,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=config.num_encoder_layers)
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         """
@@ -320,7 +318,6 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
             normalize_before=config.normalize_before,
         )
         self.decoder = TransformerDecoder(decoder_layer=decoder_layer, num_layers=config.num_decoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -397,7 +394,6 @@ class BlenderbotModel(BlenderbotPretrainedModel):
         )
         self.encoder = BlenderbotEncoder(config)
         self.decoder = BlenderbotDecoder(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -535,8 +531,6 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
                 paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype()),
             )
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -667,8 +661,6 @@ class BlenderbotForCausalLM(BlenderbotPretrainedModel):
                 "final_logits_bias",
                 paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype()),
             )
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None, use_cache=False, cache=None, **kwargs):
         """

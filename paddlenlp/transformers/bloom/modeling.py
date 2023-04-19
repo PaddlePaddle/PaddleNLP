@@ -34,7 +34,7 @@ from paddlenlp.transformers.model_outputs import (
     TokenClassifierOutput,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.converter import StateDictNameMapping
+from paddlenlp.utils.converter import StateDictNameMapping, init_name_mappings
 from paddlenlp.utils.log import logger
 
 from .configuration import BloomConfig
@@ -344,8 +344,9 @@ class BloomAttention(nn.Layer):
         self.hidden_dropout = config.hidden_dropout
         self.config = config
 
-        assert self.num_heads % config.tensor_parallel_degree == 0
-        self.num_heads = self.num_heads // config.tensor_parallel_degree
+        if config.tensor_parallel_degree > 1:
+            assert self.num_heads % config.tensor_parallel_degree == 0
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
@@ -756,33 +757,35 @@ class BloomPreTrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: BloomConfig) -> list[StateDictNameMapping]:
         hard_mapping = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["word_embeddings_layernorm.weight", "word_embeddings_layernorm.weight"],
-            ["word_embeddings_layernorm.bias", "word_embeddings_layernorm.bias"],
-            ["ln_f.weight", "ln_f.weight"],
-            ["ln_f.bias", "ln_f.bias"],
+            "word_embeddings.weight",
+            "word_embeddings_layernorm.weight",
+            "word_embeddings_layernorm.bias",
+            "ln_f.weight",
+            "ln_f.bias",
         ]
         for i in range(config.n_layer):
             hard_mapping.extend(
                 [
-                    [f"h.{i}.input_layernorm.weight", f"h.{i}.input_layernorm.weight"],
-                    [f"h.{i}.input_layernorm.bias", f"h.{i}.input_layernorm.bias"],
+                    f"h.{i}.input_layernorm.weight",
+                    f"h.{i}.input_layernorm.bias",
                     [
                         f"h.{i}.self_attention.query_key_value.weight",
-                        f"h.{i}.self_attention.query_key_value.weight",
+                        None,
                         "transpose",
                     ],
-                    [f"h.{i}.self_attention.query_key_value.bias", f"h.{i}.self_attention.query_key_value.bias"],
-                    [f"h.{i}.self_attention.dense.weight", f"h.{i}.self_attention.dense.weight", "transpose"],
-                    [f"h.{i}.self_attention.dense.bias", f"h.{i}.self_attention.dense.bias"],
-                    [f"h.{i}.post_attention_layernorm.weight", f"h.{i}.post_attention_layernorm.weight"],
-                    [f"h.{i}.post_attention_layernorm.bias", f"h.{i}.post_attention_layernorm.bias"],
-                    [f"h.{i}.mlp.dense_h_to_4h.weight", f"h.{i}.mlp.dense_h_to_4h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_h_to_4h.bias", f"h.{i}.mlp.dense_h_to_4h.bias"],
-                    [f"h.{i}.mlp.dense_4h_to_h.weight", f"h.{i}.mlp.dense_4h_to_h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_4h_to_h.bias", f"h.{i}.mlp.dense_4h_to_h.bias"],
+                    f"h.{i}.self_attention.query_key_value.bias",
+                    [f"h.{i}.self_attention.dense.weight", None, "transpose"],
+                    f"h.{i}.self_attention.dense.bias",
+                    f"h.{i}.post_attention_layernorm.weight",
+                    f"h.{i}.post_attention_layernorm.bias",
+                    [f"h.{i}.mlp.dense_h_to_4h.weight", None, "transpose"],
+                    [f"h.{i}.mlp.dense_4h_to_h.weight", None, "transpose"],
+                    f"h.{i}.mlp.dense_h_to_4h.bias",
+                    f"h.{i}.mlp.dense_4h_to_h.bias",
                 ]
             )
+
+        init_name_mappings(hard_mapping)
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
         model_class_name = config.architectures[0]
@@ -793,10 +796,10 @@ class BloomPreTrainedModel(PretrainedModel):
                 mapping.target_name = "bloom." + mapping.target_name
 
         if model_class_name == "BloomForSequenceClassification":
-            mappings.append(StateDictNameMapping("score.weight", "score.weight", "transpose"))
+            mappings.append(StateDictNameMapping("score.weight", None, "transpose"))
         if model_class_name == "BloomForTokenClassification":
-            mappings.append(StateDictNameMapping("classifier.weight", "classifier.weight", "transpose"))
-            mappings.append(StateDictNameMapping("classifier.bias", "classifier.bias"))
+            mappings.append(StateDictNameMapping("classifier.weight", None, "transpose"))
+            mappings.append(StateDictNameMapping("classifier.bias"))
 
         return mappings
 
@@ -947,7 +950,7 @@ class BloomModel(BloomPreTrainedModel):
             input_shape=(batch_size, seq_length),
             past_key_values_length=past_key_values_length,
         )
-        if self.config.tensor_parallel_degree > 0:
+        if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[
                 :, self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size

@@ -54,7 +54,7 @@ class UNIMOPretrainedModel(PretrainedModel):
     base_model_prefix = "unimo"
     config_class = UNIMOConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -171,8 +171,6 @@ class UNIMOModel(UNIMOPretrainedModel):
             config.num_hidden_layers,
             # post_encoder_norm,
         )
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -351,7 +349,6 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             config.hidden_act,
             self.unimo.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,

@@ -23,7 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Embedding, Layer, MultiHeadAttention
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -86,7 +86,7 @@ class BartPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: BartConfig) -> List[StateDictNameMapping]:
         model_mappings = [
-            ["shared.weight", "shared.weight"],
+            "shared.weight",
         ]
 
         num_encoder_layers = config.num_encoder_layers or 0
@@ -306,6 +306,8 @@ class BartPretrainedModel(PretrainedModel):
 
                 model_mappings.extend(decoder_mappings)
 
+        init_name_mappings(model_mappings)
+
         # base-model prefix "BartModel"
         if "BartModel" not in config.architectures:
             for mapping in model_mappings:
@@ -341,7 +343,7 @@ class BartPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -404,7 +406,6 @@ class BartEncoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -515,7 +516,6 @@ class BartDecoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -626,7 +626,6 @@ class BartModel(BartPretrainedModel):
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         self.encoder = BartEncoder(config, self.shared)
         self.decoder = BartDecoder(config, self.shared)
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.encoder
@@ -878,7 +877,6 @@ class BartForSequenceClassification(BartPretrainedModel):
             config.num_labels,
             config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1036,7 +1034,6 @@ class BartForQuestionAnswering(BartPretrainedModel):
         super().__init__(config)
         self.bart = BartModel(config)
         self.classifier = nn.Linear(config.d_model, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1203,7 +1200,6 @@ class BartForConditionalGeneration(BartPretrainedModel):
             shape=[config.vocab_size, config.d_model], dtype=self.bart.shared.weight.dtype, is_bias=False
         )
         self.register_buffer("final_logits_bias", paddle.zeros((1, config.vocab_size)))
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.bart.get_encoder()

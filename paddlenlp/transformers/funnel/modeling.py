@@ -1666,22 +1666,6 @@ class FunnelPreTrainedModel(PreTrainedModel):
             if module.word_embeddings._padding_idx is not None:
                 module.word_embeddings.weight.data[module._padding_idx].zero_()
 
-    def init_weights(self):
-        """
-        If needed prunes and maybe initializes weights.
-        """
-        # Prune heads if needed
-        if self.config2.pruned_heads:
-            self.prune_heads(self.config2.pruned_heads)
-        _init_weights = True
-        if _init_weights:
-            # Initialize weights
-            self.apply(self._init_weights)
-
-            # Tie weights should be skipped when not initializing all weights
-            # since from_pretrained(...) calls tie weights anyways
-            # self.tie_weights()
-
     def prune_heads(self, heads_to_prune):
         """
         Prunes heads of the base model.
@@ -1752,8 +1736,6 @@ class FunnelBaseModel(FunnelPreTrainedModel):
         self.config2 = config
         self.embeddings = FunnelEmbeddings(config)
         self.encoder = FunnelEncoder(config)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -1826,8 +1808,6 @@ class FunnelModel(FunnelPreTrainedModel):
         self.embeddings = FunnelEmbeddings(config)
         self.encoder = FunnelEncoder(config)
         self.decoder = FunnelDecoder(config)
-
-        # self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -1916,7 +1896,6 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
 
         self.funnel = FunnelModel(config)
         self.discriminator_predictions = FunnelDiscriminatorPredictions(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -1989,8 +1968,7 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
 
         self.funnel = FunnelModel(config)
         self.lm_head = nn.Linear(config.vocab_size, config.d_model)
-
-        self.init_weights()
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -2062,7 +2040,6 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
 
         self.funnel = FunnelBaseModel(config)
         self.classifier = FunnelClassificationHead(config, config.num_labels)
-        self.init_weights()
 
     def forward(
         self,
@@ -2138,7 +2115,6 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
 
         self.funnel = FunnelBaseModel(config)
         self.classifier = FunnelClassificationHead(config, 1)
-        self.init_weights()
 
     def forward(
         self,
@@ -2213,7 +2189,6 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.num_classes = num_classes
-        self.init_weights()
 
     def forward(
         self,
@@ -2284,8 +2259,6 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
 
         self.funnel = FunnelModel(**config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-
-        self.init_weights()
 
     def forward(
         self,

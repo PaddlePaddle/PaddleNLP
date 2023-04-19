@@ -39,6 +39,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
     },
     "facebook/llama-7b": {
         "hidden_size": 4096,
@@ -55,6 +56,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
     },
     "facebook/llama-13b": {
         "hidden_size": 5120,
@@ -71,6 +73,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
     },
 }
 
@@ -149,8 +152,8 @@ class LlamaConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_pure_fp16=False,
         use_recompute=False,
+        use_flash_attention=False,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -166,8 +169,8 @@ class LlamaConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
-        self.use_pure_fp16 = use_pure_fp16
         self.use_recompute = use_recompute
+        self.use_flash_attention = use_flash_attention
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
