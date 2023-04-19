@@ -823,7 +823,7 @@ class FunnelPreTrainedModel(PreTrainedModel):
             if module.word_embeddings._padding_idx is not None:
                 module.word_embeddings.weight.data[module._padding_idx].zero_()
 
-    def _init_weights(self):
+    def init_weights(self):
         """
         If needed prunes and maybe initializes weights.
         """
