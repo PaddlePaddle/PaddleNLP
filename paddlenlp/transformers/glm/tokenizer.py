@@ -248,10 +248,6 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
     ):
         if additional_special_tokens is None:
             additional_special_tokens = [
-                "<|endoftext|>",
-                "[SEP]",
-                "[CLS]",
-                "[MASK]",
                 "[UNUSED1]",
                 "[UNUSED2]",
                 "<|startofpiece|>",
