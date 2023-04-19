@@ -59,7 +59,6 @@ class ErnieBot(BaseComponent):
         :param history: A list of dictionaries representing the conversation history,
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
-
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:
@@ -71,6 +70,7 @@ class ErnieBot(BaseComponent):
                 payload["messages"].extend(history)
             else:
                 raise ValueError("Invalid history: an even number of `messages` is expected!")
+        # breakpoint()
         payload["messages"].append({"role": "user", "content": f"{query}"})
         # Do not use stream for now
         if stream:
@@ -81,8 +81,12 @@ class ErnieBot(BaseComponent):
             return_history = []
         else:
             return_history = copy.deepcopy(history)
-        return_history.extend(
-            [{"role": "user", "content": query}, {"role": "assistant", "content": response_json["result"]}]
-        )
-        response_json["history"] = return_history
-        return response_json, "eb_output"
+        try:
+            return_history.extend(
+                [{"role": "user", "content": query}, {"role": "assistant", "content": response_json["result"]}]
+            )
+            response_json["history"] = return_history
+        except Exception as e:
+            print(e)
+            print(response_json)
+        return response_json, "output_1"
