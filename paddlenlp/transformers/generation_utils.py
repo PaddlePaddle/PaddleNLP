@@ -1081,9 +1081,12 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if paddle.get_default_dtype() not in ["float32", "float64"]:
+            if probs.dtype in [paddle.bfloat16, paddle.float16]:
                 probs = probs.astype("float32")
-            next_tokens = paddle.multinomial(probs)
+                next_tokens = paddle.argmax(probs, axis=-1)
+            else:
+                next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1711,7 +1714,7 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
     # Remove all tokens with a probability less than the last token of the top-k
     # cast to float16 to support generation & d2s
     if probs.dtype == paddle.bfloat16:
-        probs = paddle.cast(probs, paddle.float16)
+        probs = paddle.cast(probs, paddle.float32)
         topk_probs, _ = paddle.topk(probs, k=top_k)
         topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
     else:
