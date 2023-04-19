@@ -206,7 +206,7 @@ class LayoutXLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = LAYOUTXLM_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "layoutxlm"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor):
@@ -841,7 +841,6 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         self.layoutxlm = LayoutXLMModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
-        self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
@@ -935,7 +934,6 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size * 3, self.num_classes)
-        self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
@@ -1272,7 +1270,7 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(paddle.tensor.normal(mean=0.0, std=0.02, shape=layer.weight.shape))
@@ -1342,7 +1340,6 @@ class LayoutXLMForQuestionAnswering(LayoutXLMPretrainedModel):
         self.has_visual_segment_embedding = config.has_visual_segment_embedding
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.qa_outputs = nn.Linear(config.hidden_size, self.num_classes)
-        self.qa_outputs.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings

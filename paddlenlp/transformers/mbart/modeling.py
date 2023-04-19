@@ -84,7 +84,7 @@ class MBartPretrainedModel(PretrainedModel):
     base_model_prefix = "mbart"
     config_class = MBartConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -148,7 +148,6 @@ class MBartEncoder(MBartPretrainedModel):
             normalize_before=True,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers, nn.LayerNorm(config.d_model))
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -258,7 +257,6 @@ class MBartDecoder(MBartPretrainedModel):
             normalize_before=True,
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers, nn.LayerNorm(config.d_model))
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -377,7 +375,6 @@ class MBartModel(MBartPretrainedModel):
         self.encoder = MBartEncoder(config, self.shared)
 
         self.decoder = MBartDecoder(config, self.shared)
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.encoder
@@ -635,7 +632,6 @@ class MBartForSequenceClassification(MBartPretrainedModel):
             config.num_labels,
             config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -790,7 +786,6 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
         super().__init__(config)
         self.mbart = MBartModel(config)
         self.classifier = nn.Linear(config.d_model, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -958,7 +953,6 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         self.register_buffer(
             "final_logits_bias", paddle.zeros((1, config.vocab_size), dtype=paddle.get_default_dtype())
         )
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.mbart.get_encoder()

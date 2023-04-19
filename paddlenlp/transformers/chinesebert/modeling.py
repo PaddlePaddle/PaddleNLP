@@ -306,7 +306,7 @@ class ChineseBertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = CHINESEBERT_PRETRAINED_INIT_CONFIGURATION
     config_class = ChineseBertConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialize the weights."""
 
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -359,7 +359,6 @@ class ChineseBertModel(ChineseBertPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ChineseBertPooler(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -502,7 +501,6 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
         super(ChineseBertForQuestionAnswering, self).__init__(config)
         self.chinesebert = ChineseBertModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, attention_mask=None):
         r"""
@@ -577,7 +575,6 @@ class ChineseBertForSequenceClassification(ChineseBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -649,7 +646,6 @@ class ChineseBertForTokenClassification(ChineseBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -719,8 +715,6 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
             config,
             embedding_weights=self.chinesebert.embeddings.word_embeddings.weight,
         )
-
-        self.apply(self.init_weights)
 
     def forward(
         self,

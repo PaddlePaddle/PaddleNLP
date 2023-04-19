@@ -364,7 +364,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -428,8 +428,6 @@ class RoFormerModel(RoFormerPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = RoFormerPooler(config.hidden_size, config.pool_act)
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -599,7 +597,6 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -726,7 +723,6 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -840,7 +836,6 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -945,7 +940,6 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1084,7 +1078,6 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
             config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1196,7 +1189,6 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
             config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
