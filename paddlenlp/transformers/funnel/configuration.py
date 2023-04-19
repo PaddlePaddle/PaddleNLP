@@ -133,6 +133,7 @@ class FunnelConfig(PretrainedConfig):
             Whether or not to apply the pooling only to the query or to query, key and values for the attention layers.
     """
     model_type = "funnel"
+    attribute_map = {"hidden_size": "d_model", "num_attention_heads": "n_head"}
 
     def __init__(
         self,
@@ -195,14 +196,6 @@ class FunnelConfig(PretrainedConfig):
         self.separate_cls = separate_cls
         self.truncate_seq = truncate_seq
         self.pool_q_only = pool_q_only
-
-    @property
-    def hidden_size(self):
-        return self.d_model
-
-    @property
-    def num_attention_heads(self):
-        return self.n_head
 
     @property
     def num_hidden_layers(self):

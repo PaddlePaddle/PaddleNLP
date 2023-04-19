@@ -17,6 +17,7 @@
 from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
+from typing import Optional, Tuple
 
 import numpy as np
 import paddle
@@ -965,7 +966,7 @@ class FunnelModel(FunnelPreTrainedModel):
         inputs_embeds=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=True,
+        return_dict=None,
     ):
 
         output_attentions = output_attentions if output_attentions is not None else self.config2.output_attentions
@@ -1045,7 +1046,7 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=True,
+        return_dict=None,
     ):
         r"""
         labels (``paddle.Tensor`` of shape ``(batch_size, sequence_length)``, `optional`):
@@ -1383,7 +1384,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
         end_positions=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=True,
+        return_dict=None,
     ):
         r"""
         start_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -1586,9 +1587,6 @@ class BaseModelOutput(ModelOutput):
             heads.
     """
 
-    last_hidden_state = None
-    hidden_states = None
-    attentions = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    last_hidden_state: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None

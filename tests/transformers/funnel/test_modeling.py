@@ -56,6 +56,7 @@ class FunnelModelTester:
         initializer_std=None,
         layer_norm_eps=1e-9,
         num_labels=2,
+        return_dict=True,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -84,6 +85,7 @@ class FunnelModelTester:
         self.num_hidden_layers = sum(self.block_sizes)
         self.num_attention_heads = n_head
         self.num_labels = num_labels
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -97,12 +99,13 @@ class FunnelModelTester:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
         config = self.get_config()
-
+        return_dict = self.return_dict
         return (
             config,
             input_ids,
             token_type_ids,
             input_mask,
+            return_dict,
         )
 
     def get_config(self):
@@ -134,11 +137,13 @@ class FunnelModelTester:
             input_ids,
             input_mask,
             token_type_ids,
+            return_dict,
         ) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
             "attention_mask": input_mask,
             "token_type_ids": token_type_ids,
+            "return_dict": return_dict,
         }
         return config, inputs_dict
 
@@ -148,6 +153,7 @@ class FunnelModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        return_dict,
     ):
         model = FunnelModel(config)
         model.eval()
@@ -155,6 +161,7 @@ class FunnelModelTester:
             input_ids=input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            return_dict=return_dict,
         )
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.d_model])
 
@@ -164,6 +171,7 @@ class FunnelModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        return_dict,
     ):
         model = FunnelForQuestionAnswering(config)
         model.eval()
@@ -173,6 +181,7 @@ class FunnelModelTester:
             token_type_ids=token_type_ids,
             output_attentions=True,
             output_hidden_states=True,
+            return_dict=return_dict,
         )
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
 
@@ -182,6 +191,7 @@ class FunnelModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        return_dict,
     ):
         model = FunnelForSequenceClassification(config)
         model.eval()
@@ -194,13 +204,7 @@ class FunnelModelTester:
         )
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_labels])
 
-    def create_and_check_token_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
+    def create_and_check_token_classification(self, config, input_ids, token_type_ids, input_mask, return_dict):
         model = FunnelForTokenClassification(config)
         model.eval()
         result = model(
@@ -209,7 +213,7 @@ class FunnelModelTester:
             token_type_ids=token_type_ids,
             output_attentions=True,
             output_hidden_states=True,
-            return_dict=True,
+            return_dict=return_dict,
         )
         self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
@@ -249,9 +253,6 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
         encoder_seq_length = getattr(self.model_tester, "encoder_seq_length", seq_len)
         decoder_key_length = getattr(self.model_tester, "decoder_key_length", decoder_seq_length)
         encoder_key_length = getattr(self.model_tester, "key_length", encoder_seq_length)
-        chunk_length = getattr(self.model_tester, "chunk_length", None)
-        if chunk_length is not None and hasattr(self.model_tester, "num_hashes"):
-            encoder_seq_length = encoder_seq_length * self.model_tester.num_hashes
 
         for model_class in self.all_model_classes:
             signature = inspect.signature(model_class.forward)
@@ -272,17 +273,10 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
             )
 
             # TODO(guosheng): check that output_attentions also work using config
-
-            if chunk_length is not None:
-                self.assertListEqual(
-                    list(attentions[0].shape[-4:]),
-                    [self.model_tester.num_attention_heads, encoder_seq_length, chunk_length, encoder_key_length],
-                )
-            else:
-                self.assertListEqual(
-                    list(attentions[0].shape[-3:]),
-                    [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
-                )
+            self.assertListEqual(
+                list(attentions[0].shape[-3:]),
+                [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
+            )
             out_len = len(outputs)
 
             if self.is_encoder_decoder:
@@ -329,23 +323,25 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
             with paddle.no_grad():
                 outputs = model(**self._prepare_for_class(inputs_dict, model_class))
 
-            self.assertEqual(out_len, len(outputs))
+            if hasattr(self.model_tester, "num_hidden_states_types"):
+                added_hidden_states = self.model_tester.num_hidden_states_types
+            elif self.is_encoder_decoder:
+                added_hidden_states = 2
+            else:
+                added_hidden_states = 1
+
+            self.assertEqual(out_len + added_hidden_states, len(outputs))
 
             self_attentions = outputs.encoder_attentions if self.is_encoder_decoder else outputs.attentions
 
             self.assertEqual(
                 len(self_attentions), self.model_tester.num_hidden_layers + self.model_tester.num_decoder_layers
             )
-            if chunk_length is not None:
-                self.assertListEqual(
-                    list(self_attentions[0].shape[-4:]),
-                    [self.model_tester.num_attention_heads, encoder_seq_length, chunk_length, encoder_key_length],
-                )
-            else:
-                self.assertListEqual(
-                    list(self_attentions[0].shape[-3:]),
-                    [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
-                )
+
+            self.assertListEqual(
+                list(self_attentions[0].shape[-3:]),
+                [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
+            )
 
     def test_hidden_states_output(self):
         "hidden state include encoder and decoder"
@@ -368,8 +364,6 @@ class FunnelModelTest(ModelTesterMixin, unittest.TestCase):
 
             if hasattr(self.model_tester, "encoder_seq_length"):
                 seq_length = self.model_tester.encoder_seq_length
-                if hasattr(self.model_tester, "chunk_length") and self.model_tester.chunk_length > 1:
-                    seq_length = seq_length * self.model_tester.chunk_length
             else:
                 seq_length = self.model_tester.seq_length
 
