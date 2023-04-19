@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
@@ -164,13 +164,13 @@ class ElectraPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: ElectraConfig) -> List[StateDictNameMapping]:
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["embeddings_project.weight", "embeddings_project.weight", "transpose"],
-            ["embeddings_project.bias", "embeddings_project.bias"],
+            ["embeddings_project.weight", None, "transpose"],
+            "embeddings_project.bias",
         ]
 
         for layer_index in range(config.num_hidden_layers):
@@ -236,6 +236,7 @@ class ElectraPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
         # base-model prefix "ElectraModel"
         if "ElectraModel" not in config.architectures:
             for mapping in model_mappings:
@@ -272,7 +273,7 @@ class ElectraPretrainedModel(PretrainedModel):
             model_mappings.extend(
                 [
                     ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    "classifier.bias",
                 ]
             )
 
@@ -282,12 +283,13 @@ class ElectraPretrainedModel(PretrainedModel):
                 [
                     ["generator_predictions.LayerNorm.weight", "generator_predictions.layer_norm.weight", "transpose"],
                     ["generator_predictions.LayerNorm.bias", "generator_predictions.layer_norm.bias"],
-                    ["generator_predictions.dense.weight", "generator_predictions.dense.weight", "transpose"],
-                    ["generator_predictions.dense.bias", "generator_predictions.dense.bias"],
+                    ["generator_predictions.dense.weight", None, "transpose"],
+                    "generator_predictions.dense.bias",
                     ["generator_lm_head.bias", "generator_lm_head_bias"],
                 ]
             )
 
+        init_name_mappings(model_mappings)
         return [StateDictNameMapping(*mapping) for mapping in model_mappings]
 
     def init_weights(self):
