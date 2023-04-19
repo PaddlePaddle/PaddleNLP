@@ -15,9 +15,15 @@
 import os
 import sys
 
-from baidubce.auth.bce_credentials import BceCredentials
-from baidubce.bce_client_configuration import BceClientConfiguration
-from baidubce.services.bos.bos_client import BosClient
+from paddlenlp.utils.log import logger
+
+try:
+    from baidubce.auth.bce_credentials import BceCredentials
+    from baidubce.bce_client_configuration import BceClientConfiguration
+    from baidubce.services.bos.bos_client import BosClient
+except ImportError:
+    logger.info("can not import baidubce module, please install it before running this command")
+
 
 bos_config = {
     "bucket": "models",
