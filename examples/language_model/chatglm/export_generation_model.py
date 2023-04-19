@@ -102,13 +102,10 @@ def main():
     ]
     model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 
-    print("jit.to_static")
     # # Save converted static graph model
     paddle.jit.save(model, args.output_path)
-    print("jit.save")
     # # Also save tokenizer for inference usage
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
-    print("save_pretrained")
 
 
 if __name__ == "__main__":
