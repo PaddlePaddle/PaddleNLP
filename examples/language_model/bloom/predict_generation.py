@@ -14,8 +14,9 @@
 from __future__ import annotations
 
 import paddle
-from utils import load_model
+from paddle.distributed import fleet
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
 
 
@@ -28,6 +29,17 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument(
+        "--fp16",
+        action="store_true",
+        help="Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.",
+    )
+    parser.add_argument(
+        "--bf16",
+        action="store_true",
+        help="Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA architecture or using CPU (no_cuda).",
+    )
     return parser.parse_args()
 
 
@@ -46,7 +58,36 @@ class Predictor(object):
         self.tokenizer.padding_side = "left"
         self.batch_size = args.batch_size
         self.args = args
-        self.model = load_model(args, BloomForCausalLM)
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        tensor_parallel_rank = 0
+        if tensor_parallel_degree > 1:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+        if args.fp16:
+            dtype = "float16"
+        elif args.bf16:
+            dtype = "bfloat16"
+        else:
+            dtype = "float32"
+        paddle.set_default_dtype(dtype)
+        self.model = BloomForCausalLM.from_pretrained(
+            args.model_name_or_path,
+            load_state_as_np=True,
+            low_cpu_mem_usage=True,
+            dtype=dtype,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
+        if self.args.lora_path is not None:
+            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
         self.model.eval()
 
     def preprocess(self, input_text):

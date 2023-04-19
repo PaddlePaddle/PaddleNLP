@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Embedding, Layer, MultiHeadAttention
 
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -82,7 +83,267 @@ class BartPretrainedModel(PretrainedModel):
     base_model_prefix = "bart"
     config_class = BartConfig
 
-    def init_weights(self, layer):
+    @classmethod
+    def _get_name_mappings(cls, config: BartConfig) -> List[StateDictNameMapping]:
+        model_mappings = [
+            "shared.weight",
+        ]
+
+        num_encoder_layers = config.num_encoder_layers or 0
+        num_decoder_layers = config.num_decoder_layers or 0
+
+        if num_encoder_layers:
+            encoder_mappings = [
+                ["encoder.embed_positions.weight", "encoder.encoder_embed_positions.weight"],
+                ["encoder.layernorm_embedding.weight", "encoder.encoder_layernorm_embedding.weight"],
+                ["encoder.layernorm_embedding.bias", "encoder.encoder_layernorm_embedding.bias"],
+            ]
+
+            model_mappings.extend(encoder_mappings)
+
+            for layer_index in range(num_encoder_layers):
+                encoder_mappings = [
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                        f"encoder.encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.fc1.weight",
+                        f"encoder.encoder.layers.{layer_index}.linear1.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.fc1.bias",
+                        f"encoder.encoder.layers.{layer_index}.linear1.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.fc2.weight",
+                        f"encoder.encoder.layers.{layer_index}.linear2.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.fc2.bias",
+                        f"encoder.encoder.layers.{layer_index}.linear2.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn_layer_norm.weight",
+                        f"encoder.encoder.layers.{layer_index}.norm1.weight",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.self_attn_layer_norm.bias",
+                        f"encoder.encoder.layers.{layer_index}.norm1.bias",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.final_layer_norm.weight",
+                        f"encoder.encoder.layers.{layer_index}.norm2.weight",
+                    ],
+                    [
+                        f"encoder.layers.{layer_index}.final_layer_norm.bias",
+                        f"encoder.encoder.layers.{layer_index}.norm2.bias",
+                    ],
+                ]
+
+                model_mappings.extend(encoder_mappings)
+
+        if num_decoder_layers:
+            decoder_mappings = [
+                ["decoder.embed_positions.weight", "decoder.decoder_embed_positions.weight"],
+                ["decoder.layernorm_embedding.weight", "decoder.decoder_layernorm_embedding.weight"],
+                ["decoder.layernorm_embedding.bias", "decoder.decoder_layernorm_embedding.bias"],
+            ]
+
+            model_mappings.extend(decoder_mappings)
+
+            for layer_index in range(num_decoder_layers):
+                decoder_mappings = [
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.out_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn.out_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.self_attn.out_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.k_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.k_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.k_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.k_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.v_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.v_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.v_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.v_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.q_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.q_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.q_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.q_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.out_proj.weight",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.out_proj.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn.out_proj.bias",
+                        f"decoder.decoder.layers.{layer_index}.cross_attn.out_proj.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.fc1.weight",
+                        f"decoder.decoder.layers.{layer_index}.linear1.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.fc1.bias",
+                        f"decoder.decoder.layers.{layer_index}.linear1.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.fc2.weight",
+                        f"decoder.decoder.layers.{layer_index}.linear2.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.fc2.bias",
+                        f"decoder.decoder.layers.{layer_index}.linear2.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn_layer_norm.weight",
+                        f"decoder.decoder.layers.{layer_index}.norm1.weight",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.self_attn_layer_norm.bias",
+                        f"decoder.decoder.layers.{layer_index}.norm1.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn_layer_norm.weight",
+                        f"decoder.decoder.layers.{layer_index}.norm2.weight",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.encoder_attn_layer_norm.bias",
+                        f"decoder.decoder.layers.{layer_index}.norm2.bias",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.final_layer_norm.weight",
+                        f"decoder.decoder.layers.{layer_index}.norm3.weight",
+                    ],
+                    [
+                        f"decoder.layers.{layer_index}.final_layer_norm.bias",
+                        f"decoder.decoder.layers.{layer_index}.norm3.bias",
+                    ],
+                ]
+
+                model_mappings.extend(decoder_mappings)
+
+        init_name_mappings(model_mappings)
+
+        # base-model prefix "BartModel"
+        if "BartModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "bart." + mapping[1]
+
+        if "BartForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["qa_outputs.weight", "classifier.weight", "transpose"],
+                    ["qa_outputs.bias", "classifier.bias"],
+                ]
+            )
+
+        if "BartForSequenceClassification" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["classification_head.dense.weight", "classifier.dense.weight", "transpose"],
+                    ["classification_head.dense.bias", "classifier.dense.bias"],
+                    ["classification_head.out_proj.weight", "classifier.out_proj.weight", "transpose"],
+                    ["classification_head.out_proj.bias", "classifier.out_proj.bias"],
+                ]
+            )
+
+        if "BartForConditionalGeneration" in config.architectures:
+            model_mappings.extend(
+                [
+                    ["lm_head.weight", "lm_head_weight"],
+                    ["final_logits_bias", "final_logits_bias"],
+                ]
+            )
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
+
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -145,7 +406,6 @@ class BartEncoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -256,7 +516,6 @@ class BartDecoder(BartPretrainedModel):
             act_dropout=config.activation_dropout,
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -367,7 +626,6 @@ class BartModel(BartPretrainedModel):
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         self.encoder = BartEncoder(config, self.shared)
         self.decoder = BartDecoder(config, self.shared)
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.encoder
@@ -619,7 +877,6 @@ class BartForSequenceClassification(BartPretrainedModel):
             config.num_labels,
             config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -777,7 +1034,6 @@ class BartForQuestionAnswering(BartPretrainedModel):
         super().__init__(config)
         self.bart = BartModel(config)
         self.classifier = nn.Linear(config.d_model, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -944,7 +1200,6 @@ class BartForConditionalGeneration(BartPretrainedModel):
             shape=[config.vocab_size, config.d_model], dtype=self.bart.shared.weight.dtype, is_bias=False
         )
         self.register_buffer("final_logits_bias", paddle.zeros((1, config.vocab_size)))
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.bart.get_encoder()

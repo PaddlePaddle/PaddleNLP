@@ -117,7 +117,7 @@ def main(args, input_text):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
     model.eval()
 
-    args.max_dec_len = adjust_length_to_model(args.max_dec_len, model.max_position_embeddings)
+    args.max_dec_len = adjust_length_to_model(args.max_dec_len, model.config.max_position_embeddings)
 
     input_ids = tokenizer.encode(input_text)["input_ids"]
     if len(input_ids) == 0:

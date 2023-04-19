@@ -52,7 +52,8 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="bigscience/bloom-560m",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -172,6 +173,8 @@ def main():
             r=4,
             lora_alpha=8,
             merge_weights=True,
+            enable_lora_list=[[True, False, True]],
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()

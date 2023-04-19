@@ -25,6 +25,11 @@ from paddle.nn import CrossEntropyLoss, Layer
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION,
+    LAYOUTXLM_PRETRAINED_RESOURCE_FILES_MAP,
+    LayoutXLMConfig,
+)
 from .visual_backbone import build_resnet_fpn_backbone, read_config
 
 __all__ = [
@@ -90,11 +95,11 @@ def token_featue_to_sequence_feature(input_ids, seq_length, sequence_output):
 
 
 class LayoutXLMPooler(Layer):
-    def __init__(self, hidden_size, with_pool):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.with_pool = with_pool
+        self.with_pool = config.with_pool
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -111,21 +116,21 @@ class LayoutXLMEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(config["vocab_size"], config["hidden_size"], padding_idx=0)
-        self.position_embeddings = nn.Embedding(config["max_position_embeddings"], config["hidden_size"])
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
-        self.x_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.y_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.h_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.w_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["coordinate_size"])
+        self.x_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.y_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.h_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
+        self.w_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.coordinate_size)
 
-        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def _cal_spatial_position_embeddings(self, bbox):
         try:
@@ -195,82 +200,13 @@ class LayoutXLMEmbeddings(Layer):
 
 
 class LayoutXLMPretrainedModel(PretrainedModel):
-    pretrained_init_configuration = {
-        "layoutxlm-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 0,
-            "coordinate_size": 128,
-            "eos_token_id": 2,
-            "fast_qkv": False,
-            "gradient_checkpointing": False,
-            "has_relative_attention_bias": False,
-            "has_spatial_attention_bias": False,
-            "has_visual_segment_embedding": True,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-05,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 514,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 1,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 1,
-            "vocab_size": 250002,
-        },
-        "vi-layoutxlm-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 0,
-            "coordinate_size": 128,
-            "eos_token_id": 2,
-            "fast_qkv": False,
-            "gradient_checkpointing": False,
-            "has_relative_attention_bias": False,
-            "has_spatial_attention_bias": False,
-            "has_visual_segment_embedding": True,
-            "use_visual_backbone": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-05,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 514,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 1,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 1,
-            "vocab_size": 250002,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "layoutxlm-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/model_state.pdparams",
-            "vi-layoutxlm-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/vi-layoutxlm-base-uncased/model_state.pdparams",
-        }
-    }
+
+    config_class = LayoutXLMConfig
+    pretrained_init_configuration = LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LAYOUTXLM_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "layoutxlm"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor):
@@ -286,11 +222,11 @@ class LayoutXLMPretrainedModel(PretrainedModel):
 
 
 class LayoutXLMSelfOutput(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMSelfOutput, self).__init__()
-        self.dense = nn.Linear(config["hidden_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -300,23 +236,23 @@ class LayoutXLMSelfOutput(nn.Layer):
 
 
 class LayoutXLMSelfAttention(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMSelfAttention, self).__init__()
-        if config["hidden_size"] % config["num_attention_heads"] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
             raise ValueError(
                 "The hidden size {} is not a multiple of the number of attention "
-                "heads {}".format(config["hidden_size"], config["num_attention_heads"])
+                "heads {}".format(config.hidden_size, config.num_attention_heads)
             )
-        self.fast_qkv = config["fast_qkv"]
-        self.num_attention_heads = config["num_attention_heads"]
-        self.attention_head_size = int(config["hidden_size"] / config["num_attention_heads"])
+        self.fast_qkv = config.fast_qkv
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.has_relative_attention_bias = config["has_relative_attention_bias"]
-        self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
+        self.has_relative_attention_bias = config.has_relative_attention_bias
+        self.has_spatial_attention_bias = config.has_spatial_attention_bias
 
-        if config["fast_qkv"]:
-            self.qkv_linear = nn.Linear(config["hidden_size"], 3 * self.all_head_size, bias_attr=False)
+        if config.fast_qkv:
+            self.qkv_linear = nn.Linear(config.hidden_size, 3 * self.all_head_size, bias_attr=False)
             self.q_bias = self.create_parameter(
                 shape=[1, 1, self.all_head_size], default_initializer=nn.initializer.Constant(0.0)
             )
@@ -324,11 +260,11 @@ class LayoutXLMSelfAttention(nn.Layer):
                 shape=[1, 1, self.all_head_size], default_initializer=nn.initializer.Constant(0.0)
             )
         else:
-            self.query = nn.Linear(config["hidden_size"], self.all_head_size)
-            self.key = nn.Linear(config["hidden_size"], self.all_head_size)
-            self.value = nn.Linear(config["hidden_size"], self.all_head_size)
+            self.query = nn.Linear(config.hidden_size, self.all_head_size)
+            self.key = nn.Linear(config.hidden_size, self.all_head_size)
+            self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
         new_x_shape = list(x.shape[:-1]) + [self.num_attention_heads, self.attention_head_size]
@@ -404,7 +340,7 @@ class LayoutXLMSelfAttention(nn.Layer):
 
 
 class LayoutXLMAttention(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMAttention, self).__init__()
         self.self = LayoutXLMSelfAttention(config)
         self.output = LayoutXLMSelfOutput(config)
@@ -445,30 +381,26 @@ class LayoutXLMAttention(nn.Layer):
 
 
 class LayoutXLMEncoder(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMEncoder, self).__init__()
         self.config = config
-        self.layer = nn.LayerList([LayoutXLMLayer(config) for _ in range(config["num_hidden_layers"])])
+        self.layer = nn.LayerList([LayoutXLMLayer(config) for _ in range(config.num_hidden_layers)])
 
-        self.has_relative_attention_bias = config["has_relative_attention_bias"]
-        self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
+        self.has_relative_attention_bias = config.has_relative_attention_bias
+        self.has_spatial_attention_bias = config.has_spatial_attention_bias
 
         if self.has_relative_attention_bias:
-            self.rel_pos_bins = config["rel_pos_bins"]
-            self.max_rel_pos = config["max_rel_pos"]
-            self.rel_pos_onehot_size = config["rel_pos_bins"]
-            self.rel_pos_bias = nn.Linear(self.rel_pos_onehot_size, config["num_attention_heads"], bias_attr=False)
+            self.rel_pos_bins = config.rel_pos_bins
+            self.max_rel_pos = config.max_rel_pos
+            self.rel_pos_onehot_size = config.rel_pos_bins
+            self.rel_pos_bias = nn.Linear(self.rel_pos_onehot_size, config.num_attention_heads, bias_attr=False)
 
         if self.has_spatial_attention_bias:
-            self.max_rel_2d_pos = config["max_rel_2d_pos"]
-            self.rel_2d_pos_bins = config["rel_2d_pos_bins"]
-            self.rel_2d_pos_onehot_size = config["rel_2d_pos_bins"]
-            self.rel_pos_x_bias = nn.Linear(
-                self.rel_2d_pos_onehot_size, config["num_attention_heads"], bias_attr=False
-            )
-            self.rel_pos_y_bias = nn.Linear(
-                self.rel_2d_pos_onehot_size, config["num_attention_heads"], bias_attr=False
-            )
+            self.max_rel_2d_pos = config.max_rel_2d_pos
+            self.rel_2d_pos_bins = config.rel_2d_pos_bins
+            self.rel_2d_pos_onehot_size = config.rel_2d_pos_bins
+            self.rel_pos_x_bias = nn.Linear(self.rel_2d_pos_onehot_size, config.num_attention_heads, bias_attr=False)
+            self.rel_pos_y_bias = nn.Linear(self.rel_2d_pos_onehot_size, config.num_attention_heads, bias_attr=False)
 
     def _cal_1d_pos_emb(self, hidden_states, position_ids):
         rel_pos_mat = position_ids.unsqueeze(-2) - position_ids.unsqueeze(-1)
@@ -556,13 +488,13 @@ class LayoutXLMEncoder(nn.Layer):
 
 
 class LayoutXLMIntermediate(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMIntermediate, self).__init__()
-        self.dense = nn.Linear(config["hidden_size"], config["intermediate_size"])
-        if config["hidden_act"] == "gelu":
+        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+        if config.hidden_act == "gelu":
             self.intermediate_act_fn = nn.GELU()
         else:
-            assert False, "hidden_act is set as: {}, please check it..".format(config["hidden_act"])
+            assert False, "hidden_act is set as: {}, please check it..".format(config.hidden_act)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -571,11 +503,11 @@ class LayoutXLMIntermediate(nn.Layer):
 
 
 class LayoutXLMOutput(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMOutput, self).__init__()
-        self.dense = nn.Linear(config["intermediate_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -585,7 +517,7 @@ class LayoutXLMOutput(nn.Layer):
 
 
 class LayoutXLMLayer(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(LayoutXLMLayer, self).__init__()
         # since chunk_size_feed_forward is 0 as default, no chunk is needed here.
         self.seq_len_dim = 1
@@ -636,7 +568,7 @@ class LayoutXLMLayer(nn.Layer):
 
 
 class VisualBackbone(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LayoutXLMConfig):
         super(VisualBackbone, self).__init__()
         self.cfg = read_config()
         self.backbone = build_resnet_fpn_backbone(self.cfg)
@@ -647,10 +579,10 @@ class VisualBackbone(nn.Layer):
         self.register_buffer("pixel_std", paddle.to_tensor(self.cfg.MODEL.PIXEL_STD).reshape([num_channels, 1, 1]))
         self.out_feature_key = "p2"
         # is_deterministic is disabled here.
-        self.pool = nn.AdaptiveAvgPool2D(config["image_feature_pool_shape"][:2])
-        if len(config["image_feature_pool_shape"]) == 2:
-            config["image_feature_pool_shape"].append(self.backbone.output_shape()[self.out_feature_key].channels)
-        assert self.backbone.output_shape()[self.out_feature_key].channels == config["image_feature_pool_shape"][2]
+        self.pool = nn.AdaptiveAvgPool2D(config.image_feature_pool_shape[:2])
+        if len(config.image_feature_pool_shape) == 2:
+            config.image_feature_pool_shape.append(self.backbone.output_shape()[self.out_feature_key].channels)
+        assert self.backbone.output_shape()[self.out_feature_key].channels == config.image_feature_pool_shape[2]
 
     def forward(self, images):
         images_input = (paddle.to_tensor(images) - self.pixel_mean) / self.pixel_std
@@ -701,36 +633,30 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
             Defaults to ``0.02``.
     """
 
-    def __init__(
-        self,
-        with_pool="tanh",
-        use_visual_backbone=True,
-        **kwargs,
-    ):
-        super(LayoutXLMModel, self).__init__()
-        config = kwargs
-        self.config = kwargs
-        self.use_visual_backbone = use_visual_backbone
-        self.has_visual_segment_embedding = config["has_visual_segment_embedding"]
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMModel, self).__init__(config)
+        self.config = config
+        self.use_visual_backbone = config.use_visual_backbone
+        self.has_visual_segment_embedding = config.has_visual_segment_embedding
         self.embeddings = LayoutXLMEmbeddings(config)
 
         if self.use_visual_backbone is True:
             self.visual = VisualBackbone(config)
             self.visual.stop_gradient = True
-            self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1], config["hidden_size"])
+            self.visual_proj = nn.Linear(config.image_feature_pool_shape[-1], config.hidden_size)
 
         if self.has_visual_segment_embedding:
             self.visual_segment_embedding = self.create_parameter(
                 shape=[
-                    config["hidden_size"],
+                    config.hidden_size,
                 ],
                 dtype=paddle.float32,
             )
-        self.visual_LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.visual_dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.visual_LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.visual_dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.encoder = LayoutXLMEncoder(config)
-        self.pooler = LayoutXLMPooler(config["hidden_size"], with_pool)
+        self.pooler = LayoutXLMPooler(config)
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids, token_type_ids):
         words_embeddings = self.embeddings.word_embeddings(input_ids)
@@ -802,19 +728,19 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        num_position_embeds_diff = new_num_position_embeddings - self.config["max_position_embeddings"]
+        num_position_embeds_diff = new_num_position_embeddings - self.config.max_position_embeddings
 
         # no resizing needs to be done if the length stays the same
         if num_position_embeds_diff == 0:
             return
 
         logger.info(f"Setting `config.max_position_embeddings={new_num_position_embeddings}`...")
-        self.config["max_position_embeddings"] = new_num_position_embeddings
+        self.config.max_position_embeddings = new_num_position_embeddings
 
         old_position_embeddings_weight = self.embeddings.position_embeddings.weight
 
         self.embeddings.position_embeddings = nn.Embedding(
-            self.config["max_position_embeddings"], self.config["hidden_size"]
+            self.config.max_position_embeddings, self.config.hidden_size
         )
 
         with paddle.no_grad():
@@ -837,8 +763,8 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
     ):
         input_shape = paddle.shape(input_ids)
         visual_shape = list(input_shape)
-        visual_shape[1] = self.config["image_feature_pool_shape"][0] * self.config["image_feature_pool_shape"][1]
-        visual_bbox = self._calc_visual_bbox(self.config["image_feature_pool_shape"], bbox, visual_shape)
+        visual_shape[1] = self.config.image_feature_pool_shape[0] * self.config.image_feature_pool_shape[1]
+        visual_bbox = self._calc_visual_bbox(self.config.image_feature_pool_shape, bbox, visual_shape)
 
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
         if attention_mask is None:
@@ -888,11 +814,11 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         if head_mask is not None:
             if head_mask.dim() == 1:
                 head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.config["num_hidden_layers"], -1, -1, -1, -1)
+                head_mask = head_mask.expand(self.config.num_hidden_layers, -1, -1, -1, -1)
             elif head_mask.dim() == 2:
                 head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
         else:
-            head_mask = [None] * self.config["num_hidden_layers"]
+            head_mask = [None] * self.config.num_hidden_layers
 
         encoder_outputs = self.encoder(
             final_emb,
@@ -909,16 +835,12 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
 
 
 class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
-    def __init__(self, layoutxlm, num_classes=2, dropout=None):
-        super(LayoutXLMForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(layoutxlm, dict):
-            self.layoutxlm = LayoutXLMModel(**layoutxlm)
-        else:
-            self.layoutxlm = layoutxlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutxlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"], num_classes)
-        self.classifier.apply(self.init_weights)
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.layoutxlm = LayoutXLMModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
@@ -962,13 +884,12 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         logits = self.classifier(sequence_output)
 
         hidden_states = {
-            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
-            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"] for idx in range(self.layoutxlm.config.num_hidden_layers)
         }
         if self.training:
-            outputs = logits, hidden_states
+            outputs = (logits, hidden_states)
         else:
-            outputs = logits
+            outputs = (logits,)
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -1005,16 +926,14 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
 
 
 class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
-    def __init__(self, layoutxlm, num_classes=2, dropout=None):
-        super(LayoutXLMForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(layoutxlm, dict):
-            self.layoutxlm = LayoutXLMModel(**layoutxlm)
-        else:
-            self.layoutxlm = layoutxlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutxlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"] * 3, num_classes)
-        self.classifier.apply(self.init_weights)
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMForSequenceClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+
+        self.layoutxlm = LayoutXLMModel(config)
+
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size * 3, self.num_classes)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
@@ -1045,10 +964,10 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
         input_shape = paddle.shape(input_ids)
         visual_shape = list(input_shape)
         visual_shape[1] = (
-            self.layoutxlm.config["image_feature_pool_shape"][0] * self.layoutxlm.config["image_feature_pool_shape"][1]
+            self.layoutxlm.config.image_feature_pool_shape[0] * self.layoutxlm.config.image_feature_pool_shape[1]
         )
         visual_bbox = self.layoutxlm._calc_visual_bbox(
-            self.layoutxlm.config["image_feature_pool_shape"], bbox, visual_shape
+            self.layoutxlm.config.image_feature_pool_shape, bbox, visual_shape
         )
 
         visual_position_ids = paddle.arange(0, visual_shape[1]).expand([input_shape[0], visual_shape[1]])
@@ -1144,13 +1063,13 @@ class LayoutXLMPretrainingHeads(Layer):
 
 
 class LayoutXLMForPretraining(LayoutXLMPretrainedModel):
-    def __init__(self, layoutxlm):
-        super(LayoutXLMForPretraining, self).__init__()
-        self.layoutxlm = layoutxlm
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMForPretraining, self).__init__(config)
+        self.layoutxlm = LayoutXLMModel(config)
         self.cls = LayoutXLMPretrainingHeads(
-            self.layoutxlm.config["hidden_size"],
-            self.layoutxlm.config["vocab_size"],
-            self.layoutxlm.config["hidden_act"],
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             embedding_weights=self.layoutxlm.embeddings.word_embeddings.weight,
         )
 
@@ -1342,18 +1261,16 @@ class REDecoder(nn.Layer):
 
 
 class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
-    def __init__(self, layoutxlm, hidden_size=768, hidden_dropout_prob=0.1, dropout=None):
-        super(LayoutXLMForRelationExtraction, self).__init__()
-        if isinstance(layoutxlm, dict):
-            self.layoutxlm = LayoutXLMModel(**layoutxlm)
-        else:
-            self.layoutxlm = layoutxlm
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMForRelationExtraction, self).__init__(config)
 
-        self.extractor = REDecoder(hidden_size, hidden_dropout_prob)
+        self.layoutxlm = LayoutXLMModel(config)
 
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutxlm.config["hidden_dropout_prob"])
+        self.extractor = REDecoder(config.hidden_size, config.hidden_dropout_prob)
 
-    def init_weights(self, layer):
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+    def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(paddle.tensor.normal(mean=0.0, std=0.02, shape=layer.weight.shape))
@@ -1408,7 +1325,7 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
 
         sequence_output = self.dropout(sequence_output)
         loss, pred_relations = self.extractor(sequence_output, entities, relations)
-        hidden_states = [outputs[2][f"{idx}_data"] for idx in range(self.layoutxlm.config["num_hidden_layers"])]
+        hidden_states = [outputs[2][f"{idx}_data"] for idx in range(self.layoutxlm.config.num_hidden_layers)]
         hidden_states = paddle.stack(hidden_states, axis=1)
 
         res = dict(loss=loss, pred_relations=pred_relations, hidden_states=hidden_states)
@@ -1416,14 +1333,13 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
 
 
 class LayoutXLMForQuestionAnswering(LayoutXLMPretrainedModel):
-    def __init__(self, layoutxlm, num_classes=2, dropout=None, has_visual_segment_embedding=False):
-        super(LayoutXLMForQuestionAnswering, self).__init__()
-        self.num_classes = num_classes
-        self.layoutxlm = layoutxlm
-        self.has_visual_segment_embedding = has_visual_segment_embedding
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutxlm.config["hidden_dropout_prob"])
-        self.qa_outputs = nn.Linear(self.layoutxlm.config["hidden_size"], num_classes)
-        self.qa_outputs.apply(self.init_weights)
+    def __init__(self, config: LayoutXLMConfig):
+        super(LayoutXLMForQuestionAnswering, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.layoutxlm = LayoutXLMModel(config)
+        self.has_visual_segment_embedding = config.has_visual_segment_embedding
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.qa_outputs = nn.Linear(config.hidden_size, self.num_classes)
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings

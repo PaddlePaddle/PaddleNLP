@@ -55,8 +55,7 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
 
     def __init__(self, config: ArtistConfig):
         super().__init__(config)
-        self.lm_head = GPTLMHead(config.hidden_size, config.vocab_size)
-        self.apply(self.init_weights)
+        self.lm_head = GPTLMHead(config)
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):

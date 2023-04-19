@@ -4,29 +4,19 @@
 - [1. 模型下载及权重转换](#1)
 - [2. 微调](#2)
 - [3. 动转静](#3)
-- [4. 推理](#4)
+- [4. 模型预测](#4)
+- [5. 模型推理](#5)
 
 <a name="1"></a>
 
-## 模型下载及权重转换
-
-[LLaMA](https://ai.facebook.com/blog/large-language-model-llama-meta-ai/) ([arXiv](https://arxiv.org/abs/2302.13971v1)) Paddle实现，填写 [google form](https://forms.gle/jk851eBVbX1m5TAv5) 申请获得模型下载权限。
-
-通过以下方式获得paddle模型权重：
-
-```shell
-python convert_llama_weights_to_pd.py \
-    --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir /output/path
-```
-
-模型加载：
+## 模型加载：
 
 ```python
 from tokenizer import LLaMATokenizer
 from modeling import LLaMAForCausalLM
 
-tokenizer = LLaMATokenizer.from_pretrained("./llama-7b/")
-model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
+tokenizer = LLaMATokenizer.from_pretrained("facebook/llama-7b")
+model = LLaMAForCausalLM.from_pretrained("facebook/llama-7b", load_state_as_np=True)
 ```
 
 <a name="2"></a>
@@ -35,23 +25,57 @@ model = LLaMAForCausalLM.from_pretrained("./llama-7b/", load_state_as_np=True)
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3,4,5,6,7" finetune_generation.py \
-    --model_name_or_path llama-7b \
-    --num_train_epochs 3 \
-    --learning_rate 3e-5 \
-    --save_steps 1000 \
-    --recompute \
+    --gpus "0,1,2,3" finetune_generation.py \
+    --model_name_or_path facebook/llama-7b \
     --do_train \
-    --output_dir ./checkpoints/ \
-    --per_device_train_batch_size 8 \
+    --do_eval \
+    --num_train_epochs 1 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --tensor_parallel_degree 4 \
     --overwrite_output_dir \
-    --save_total_limit 1 \
-    --tensor_parallel_degree 8
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --gradient_accumulation_steps 32 \
+    --recompute \
+    --learning_rate 3e-5 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20
 ```
 
 <a name="3"></a>
 
-## 动转静
+## 模型预测
+
+```shell
+python predict_generation.py \
+    --model_name_or_path ./checkpoints/
+```
+
+当ckpt为使用的tensor parallel存储为多分片格式时，也可使用此脚本预测，或者合并为一个单分片权重 例如下面4分片的例子（此模型为glm-10b-chinese）
+
+```shell
+-rw-r--r-- 1 root root  523 Apr 13 11:46 config.json
+-rw-r--r-- 1 root root 3.2G Apr 13 11:46 model_state.tp00.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 13 11:46 model_state.tp01.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 13 11:46 model_state.tp02.pdparams
+-rw-r--r-- 1 root root 3.2G Apr 13 11:46 model_state.tp03.pdparams
+```
+
+设置 merge_tensor_parallel_path，可以将merge好的参数存储到对应位置。不过不设置此参数，将只跑前向预测。
+
+```shell
+python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
+    --model_name_or_path  ./checkpoints/checkpoint-100/ \
+    --merge_tensor_parallel_path  ./checkpoints/llama-merged
+```
+
+<a name="4"></a>
+
+## 模型导出
 
 ```shell
 python export_generation_model.py \
@@ -59,9 +83,9 @@ python export_generation_model.py \
     --output_path inference/llama
 ```
 
-<a name="4"></a>
+<a name="5"></a>
 
-## 推理
+## 模型推理
 
 ```shell
 python infer_generation.py \
