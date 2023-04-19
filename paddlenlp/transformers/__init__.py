@@ -107,6 +107,7 @@ from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .funnel.configuration import *
 from .llama.configuration import *
 from .llama.modeling import *
 from .llama.tokenizer import *
