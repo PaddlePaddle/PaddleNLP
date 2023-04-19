@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import paddle
-import paddle.nn.functional as F
 from paddle.static import InputSpec
 
-from ..transformers.generation_utils import GenerationMixin
 from ..transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
     MaskedLMOutput,
-    ModelOutput,
     MultipleChoiceModelOutput,
     SequenceClassifierOutput,
 )
@@ -166,7 +162,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         return input_spec
 
 
-class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
+class PromptModelForGeneration(paddle.nn.Layer):
     """
     PromptModel for classification tasks.
     """
@@ -195,6 +191,7 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
             raise TypeError(f"{self.__class__.__name__} is not compatible with {self.template.__class__.__name__} ")
         self.plm = self.template.process_model(self.plm)
         self.forward_keys.append("past_key_values")
+        self.base_model_prepare_inputs_for_generation = self.plm.prepare_inputs_for_generation
 
     def forward(
         self,
@@ -266,73 +263,36 @@ class PromptModelForGeneration(paddle.nn.Layer, GenerationMixin):
             hidden_states=model_outputs.logits,
         )
 
-    def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
-        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+    def generate(self, model_kwargs):
+        self.plm.prepare_inputs_for_generation = self.prepare_inputs_for_generation
+        generated_tokens = self.plm.generate(**model_kwargs)
+        return generated_tokens
 
-        batch_size, cur_len = input_ids.shape
-        origin_len = cur_len
-        unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        while cur_len < max_length:
-            # prepare model inputs & get model output
-            if "use_cache" in model_kwargs:
-                del model_kwargs["use_cache"]
-            if "attention_mask" in model_kwargs:
-                del model_kwargs["attention_mask"]
-            if "labels" in model_kwargs:
-                del model_kwargs["labels"]
-            outputs = self(input_ids, **model_kwargs)
-            outputs = outputs[1] if isinstance(outputs, tuple) else outputs
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
 
-            # To hundle the logits is a ModelOutput
-            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
-
-            # [batch_size, vocab_size]
-            next_token_logits = logits[:, -1, :]
-
-            # pre-process distribution
-            next_token_logits = self.adjust_logits_during_generation(next_token_logits)
-            next_tokens_scores = logits_processors(input_ids, next_token_logits)
-            # greedy
-            probs = F.softmax(next_tokens_scores)
-            probs = paddle.log(probs)
-            next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
-
-            if eos_token_id is not None:
-                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
-
-            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
-
-            cur_len += 1
-            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
-
-            if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
-
-            # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
-                break
-
-            model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
-            )
+        model_kwargs = self.base_model_prepare_inputs_for_generation(input_ids, cache=None, **kwargs)
+        model_kwargs["soft_token_ids"] = kwargs.get("soft_token_ids", None)
+        model_kwargs["token_type_ids"] = kwargs.get("token_type_ids", None)
+        model_kwargs["encoder_ids"] = kwargs.get("encoder_ids", None)
+        len_dif = len(model_kwargs["token_type_ids"][0]) - len(model_kwargs["soft_token_ids"][0])
+        for _ in range(len_dif):
             model_kwargs["soft_token_ids"] = paddle.concat(
                 [model_kwargs["soft_token_ids"], paddle.to_tensor([[0]])], axis=1
             )
+        input_dict = self.template.process_batch(model_kwargs)
+        model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
+        if "cache" in self.forward_keys:
+            model_inputs["cache"] = []
+            for i in range(len(model_inputs["past_key_values"])):
+                from paddlenlp.transformers.gpt.modeling import MultiHeadAttention
 
-        return input_ids[:, origin_len:], scores
+                model_inputs["cache"].append(
+                    MultiHeadAttention.Cache(
+                        k=model_inputs["past_key_values"][i][0], v=model_inputs["past_key_values"][i][1]
+                    )
+                )
+            model_inputs.pop("past_key_values")
+        model_inputs["use_cache"] = True
+        model_inputs["return_dict"] = True
 
-
-class LogitsProcessorList(List):
-    def __call__(self, input_ids, logits, **kwargs):
-        for processor in self:
-            processor_args = inspect.signature(processor.__call__).parameters
-            if len(processor_args) > 2:
-                assert all(
-                    arg in kwargs for arg in list(processor_args.keys())[2:]
-                ), f"The parameters don't match for {processor.__class__}"
-                logits = processor(input_ids, logits, **kwargs)
-            else:
-                logits = processor(input_ids, logits)
-        return logits
+        return model_inputs

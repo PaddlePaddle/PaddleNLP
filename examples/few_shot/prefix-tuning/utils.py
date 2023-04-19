@@ -85,70 +85,6 @@ class PromptTrainerForGeneration(PromptTrainer):
         )
         self.verbalizer = None
 
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-
-        Subclass and override for custom behavior.
-        """
-        outputs = model(**inputs)
-
-        # Save past state if it exists
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        # print(outputs[0])
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        # print(outputs[0], outputs.loss)
-        # URGENT
-        # print('compute_loss', outputs[0])
-        loss = outputs[0]
-
-        return (loss, outputs) if return_outputs else loss
-
-    def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval", **gen_kwargs):
-        """
-        Run evaluation and returns metrics.
-
-        The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
-        (pass it to the init `compute_metrics` argument).
-
-        You can also subclass and override this method to inject custom behavior.
-
-        Args:
-            eval_dataset (`Dataset`, *optional*):
-                Pass a dataset if you wish to override `self.eval_dataset`. If it is an [`~datasets.Dataset`], columns
-                not accepted by the `model.forward()` method are automatically removed. It must implement the `__len__`
-                method.
-            ignore_keys (`List[str]`, *optional*):
-                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
-                gathering predictions.
-            metric_key_prefix (`str`, *optional*, defaults to `"eval"`):
-                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
-                "eval_bleu" if the prefix is `"eval"` (default)
-            max_length (`int`, *optional*):
-                The maximum target length to use when predicting with the generate method.
-            num_beams (`int`, *optional*):
-                Number of beams for beam search that will be used when predicting with the generate method. 1 means no
-                beam search.
-            gen_kwargs:
-                Additional `generate` specific kwargs.
-
-        Returns:
-            A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
-            dictionary also contains the epoch number which comes from the training state.
-        """
-
-        gen_kwargs = gen_kwargs.copy()
-        if gen_kwargs.get("max_length") is None and gen_kwargs.get("max_new_tokens") is None:
-            gen_kwargs["max_length"] = self.args.generation_max_length
-        gen_kwargs["num_beams"] = (
-            gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.args.generation_num_beams
-        )
-        self._gen_kwargs = gen_kwargs
-
-        return super().evaluate(eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
-
     def prediction_step(
         self,
         model,
@@ -185,31 +121,17 @@ class PromptTrainerForGeneration(PromptTrainer):
         labels = inputs["labels"]
         # inputs = self._prepare_inputs(inputs)
 
-        gen_kwargs = self._gen_kwargs.copy()
-
-        if "attention_mask" in inputs:
-            gen_kwargs["attention_mask"] = inputs.get("attention_mask", None)
-        if "global_attention_mask" in inputs:
-            gen_kwargs["global_attention_mask"] = inputs.get("global_attention_mask", None)
-
+        max_length = 32
         generated_tokens = self.model.generate(
-            **inputs,
-            **gen_kwargs,
-            use_cache=True,
-            use_fp16_decoding=True,
-            repetition_penalty=2.0,
+            model_kwargs=inputs,
         )
 
         # different from hf returns: tuple[Tensor]: It is a tuple contains two elements: ids and scores.
         if isinstance(generated_tokens, tuple):
             generated_tokens = generated_tokens[0]
         # in case the batch is shorter than max length, the output should be padded
-        if gen_kwargs.get("max_length") is not None and generated_tokens.shape[-1] < gen_kwargs["max_length"]:
-            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_kwargs["max_length"])
-        elif gen_kwargs.get("max_new_tokens") is not None and generated_tokens.shape[-1] < (
-            gen_kwargs["max_new_tokens"] + 1
-        ):
-            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_kwargs["max_new_tokens"] + 1)
+        if max_length is not None and generated_tokens.shape[-1] < max_length:
+            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, max_length)
 
         with paddle.no_grad():
             if has_labels:

@@ -33,7 +33,7 @@ from paddlenlp.utils.log import logger
 @dataclass
 class DataArguments:
     prompt: str = field(
-        default="{'prefix':'None'}{'text':'text'}{'sep'}{'text':'labels', 'token_type': 1}",
+        default="{'prefix':'根据回答和原文得到问题', 'length':50}{'text':'text'}{'sep'}{'text':'labels', 'token_type': 1, 'truncate': False}",
         metadata={"help": "Add prompt.'prefix'、'text' variable and 'text':'labels' immutable."},
     )
     task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
@@ -100,9 +100,9 @@ def main():
 
     def convert_label_keyword(input_dict):
         if "text" not in input_dict:
-            input_dict["text"] = input_dict.pop("title") + tokenizer.sep_token + input_dict.pop("source")
+            input_dict["text"] = ("答案：" + input_dict.pop("title") + "，" + "上下文：" + input_dict.pop("source"))[:400]
         if "labels" not in input_dict:
-            input_dict["labels"] = input_dict.pop("target")
+            input_dict["labels"] = "在已知答案的前提下，问题：" + input_dict.pop("target")[:20]
         return input_dict
 
     train_ds.map(convert_label_keyword)
