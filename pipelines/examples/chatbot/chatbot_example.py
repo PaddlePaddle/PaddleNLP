@@ -16,7 +16,11 @@ import argparse
 import os
 
 from pipelines.document_stores import FAISSDocumentStore, MilvusDocumentStore
-from pipelines.nodes import DensePassageRetriever, ErnieBot
+from pipelines.nodes import (
+    DensePassageRetriever,
+    ErnieBot,
+    TruncatedConversationHistory,
+)
 from pipelines.nodes.base import BaseComponent
 from pipelines.pipelines import Pipeline
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
@@ -49,7 +53,6 @@ class PromptTemplate(BaseComponent):
         self.template = template
 
     def run(self, query=None, documents=None):
-        # kwargs = {k: v for k, v in locals().items() if v is not None}
         documents = [i.content for i in documents]
         context = "".join(documents)
         result = {"documents": context, "query": query}
@@ -177,14 +180,33 @@ def ernie_bot_tutorial():
     else:
         retriever = get_faiss_retriever(use_gpu)
 
-    # Pipeline
+    # QA over documents
     ernie_bot = ErnieBot(ernie_bot_access_token=args.ernie_bot_access_token)
     pipe = Pipeline()
     pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
     pipe.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Retriever"])
     pipe.add_node(component=ernie_bot, name="ErnieBot", inputs=["Template"])
-    prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 5}})
-    print(prediction)
+    query = "亚马逊河流的介绍"
+    prediction = pipe.run(query=query, params={"Retriever": {"top_k": 5}})
+    print("user: {}".format(query))
+    print("assistant: {}".format(prediction["result"]))
+
+    # Pipeline
+    # Chat over documents
+    pipe = Pipeline()
+    pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
+    pipe.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Retriever"])
+    pipe.add_node(component=TruncatedConversationHistory(max_length=64), name="TruncateHistory", inputs=["Template"])
+    pipe.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
+    history = []
+    num_of_runs = 4
+    for i in range(num_of_runs):
+        query = "亚马逊河流的介绍{}".format(i)
+        prediction = pipe.run(query=query, params={"Retriever": {"top_k": 5}, "TruncateHistory": {"history": history}})
+        print("user: {}".format(query))
+        print("assistant: {}".format(prediction["result"]))
+        history.append({"role": "user", "content": query})
+        history.append({"role": "assistant", "content": prediction["result"]})
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ from pipelines.nodes.file_converter import (
     TextConverter,
 )
 from pipelines.nodes.llm.ernie_bot import ErnieBot
+from pipelines.nodes.llm.history import TruncatedConversationHistory
 from pipelines.nodes.other import JoinDocuments
 from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
 from pipelines.nodes.question_generator import QuestionGenerator
