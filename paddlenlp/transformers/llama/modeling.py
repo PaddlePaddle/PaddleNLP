@@ -498,17 +498,15 @@ class LlamaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                # TODO(linjieccc): enable after normal support fp16
-                if paddle.get_default_dtype() not in ["float16"]:
-                    layer.weight.set_value(
-                        paddle.tensor.normal(
-                            mean=0.0,
-                            std=self.config.initializer_range
-                            if hasattr(self.config, "initializer_range")
-                            else self.llama.config.initializer_range,
-                            shape=layer.weight.shape,
-                        )
+                layer.weight.set_value(
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.config.initializer_range
+                        if hasattr(self.config, "initializer_range")
+                        else self.llama.config.initializer_range,
+                        shape=layer.weight.shape,
                     )
+                )
 
 
 @register_base_model

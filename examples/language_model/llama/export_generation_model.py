@@ -101,7 +101,7 @@ def main():
             # diversity_rate
             0.0,
             # use_cache
-            False,
+            True,
         ],
     )
 
