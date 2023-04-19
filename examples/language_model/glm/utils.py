@@ -52,7 +52,7 @@ class GLMTrainer(Trainer):
                 attention_mask=inputs["attention_mask"],
                 decode_strategy="sampling",
                 top_k=1,
-                repetition_penalty=2,
+                repetition_penalty=2.0,
                 bos_token_id=self.tokenizer.sop_token_id,
                 eos_token_id=self.tokenizer.eop_token_id,
                 pad_token_id=self.tokenizer.pad_token_id,
