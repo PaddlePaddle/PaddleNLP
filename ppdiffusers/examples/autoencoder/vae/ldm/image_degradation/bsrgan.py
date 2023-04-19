@@ -365,23 +365,6 @@ def add_resize(img, sf=4):
     return img
 
 
-# def add_Gaussian_noise(img, noise_level1=2, noise_level2=25):
-#     noise_level = random.randint(noise_level1, noise_level2)
-#     rnum = np.random.rand()
-#     if rnum > 0.6:  # add color Gaussian noise
-#         img += np.random.normal(0, noise_level / 255.0, img.shape).astype(np.float32)
-#     elif rnum < 0.4:  # add grayscale Gaussian noise
-#         img += np.random.normal(0, noise_level / 255.0, (*img.shape[:2], 1)).astype(np.float32)
-#     else:  # add  noise
-#         L = noise_level2 / 255.
-#         D = np.diag(np.random.rand(3))
-#         U = orth(np.random.rand(3, 3))
-#         conv = np.dot(np.dot(np.transpose(U), D), U)
-#         img += np.random.multivariate_normal([0, 0, 0], np.abs(L ** 2 * conv), img.shape[:2]).astype(np.float32)
-#     img = np.clip(img, 0.0, 1.0)
-#     return img
-
-
 def add_Gaussian_noise(img, noise_level1=2, noise_level2=25):
     noise_level = random.randint(noise_level1, noise_level2)
     rnum = np.random.rand()
@@ -622,12 +605,6 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
             # add JPEG noise
             if random.random() < jpeg_prob:
                 image = add_JPEG_noise(image)
-
-        # elif i == 6:
-        #     # add processed camera sensor noise
-        #     if random.random() < isp_prob and isp_model is not None:
-        #         with torch.no_grad():
-        #             img, hq = isp_model.forward(img.copy(), hq)
 
     # add final JPEG compression noise
     image = add_JPEG_noise(image)

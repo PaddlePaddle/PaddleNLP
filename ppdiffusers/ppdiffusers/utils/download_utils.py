@@ -527,10 +527,14 @@ def ppdiffusers_bos_dir_download(
     variant: Optional[str] = None,
     is_fastdeploy_model: Optional[str] = False,
     file_lock_timeout: int = -1,
+    local_files_only: bool = False,
 ) -> str:
     # update repo id must end with @fastdeploy
     if is_fastdeploy_model and not repo_id.endswith("@fastdeploy"):
         repo_id = f"{repo_id}@fastdeploy"
+
+    if local_files_only:
+        return os.path.join(cache_dir, repo_id)
 
     filtered_repo_files = [["model_index.json", None]]
     for subfolder in folder_names:

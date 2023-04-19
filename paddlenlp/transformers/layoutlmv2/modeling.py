@@ -183,7 +183,7 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
     pretrained_init_configuration = LAYOUTLMV2_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = LAYOUTLMV2_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor):
@@ -826,7 +826,6 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
-        self.classifier.apply(self.init_weights)
         self.num_hidden_layers = config.num_hidden_layers
 
     def get_input_embeddings(self):
@@ -1137,7 +1136,7 @@ class LayoutLMv2ForRelationExtraction(LayoutLMv2PretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(paddle.tensor.normal(mean=0.0, std=0.02, shape=layer.weight.shape))

@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import io
-import re
 import argparse
+import io
 import json
 import multiprocessing
+import os
+import re
 import sys
 import time
 
@@ -41,7 +41,14 @@ def get_args():
         "--tokenizer_name",
         type=str,
         required=True,
-        choices=["ErnieTokenizer", "BertTokenizer", "GPTTokenizer", "GPTChineseTokenizer", "ElectraTokenizer"],
+        choices=[
+            "ErnieTokenizer",
+            "BertTokenizer",
+            "GPTTokenizer",
+            "GPTChineseTokenizer",
+            "ElectraTokenizer",
+            "T5Tokenizer",
+        ],
         help="What type of tokenizer to use.",
     )
     group = parser.add_argument_group(title="data input/output")

@@ -36,6 +36,7 @@ Model:
   initializer_range: 0.02
   use_recompute: False
   fuse_attn_qkv: True
+  use_fused_dropout_add: False
 
 
 Distributed:
