@@ -55,7 +55,6 @@ class ErnieBot(BaseComponent):
         if response:
             res = response.json()
         else:
-            print("Request access token error.")
             raise RuntimeError("Request access token error.")
 
         return res["access_token"]

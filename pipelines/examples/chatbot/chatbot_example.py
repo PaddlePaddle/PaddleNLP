@@ -169,7 +169,7 @@ def ernie_bot_tutorial():
         retriever = get_faiss_retriever(use_gpu)
 
     # QA over documents
-    ernie_bot = ErnieBot(ak=args.api_key, sk=args.secret_key)
+    ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
     pipe = Pipeline()
     pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
     pipe.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Retriever"])
@@ -193,8 +193,7 @@ def ernie_bot_tutorial():
         prediction = pipe.run(query=query, params={"Retriever": {"top_k": 5}, "TruncateHistory": {"history": history}})
         print("user: {}".format(query))
         print("assistant: {}".format(prediction["result"]))
-        history.append({"role": "user", "content": query})
-        history.append({"role": "assistant", "content": prediction["result"]})
+        history = prediction["history"]
 
 
 if __name__ == "__main__":
