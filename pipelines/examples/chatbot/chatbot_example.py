@@ -19,9 +19,9 @@ from pipelines.document_stores import FAISSDocumentStore, MilvusDocumentStore
 from pipelines.nodes import (
     DensePassageRetriever,
     ErnieBot,
+    PromptTemplate,
     TruncatedConversationHistory,
 )
-from pipelines.nodes.base import BaseComponent
 from pipelines.pipelines import Pipeline
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
 
@@ -41,22 +41,10 @@ parser.add_argument('--host', type=str, default="localhost", help='host ip of AN
 parser.add_argument('--port', type=str, default="8530", help='port of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
-parser.add_argument('--ernie_bot_access_token', default="your access token", help="The AccessToken of Eerie Bot")
+parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
+parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 args = parser.parse_args()
 # yapf: enable
-
-
-class PromptTemplate(BaseComponent):
-    outgoing_edges = 1
-
-    def __init__(self, template):
-        self.template = template
-
-    def run(self, query=None, documents=None):
-        documents = [i.content for i in documents]
-        context = "".join(documents)
-        result = {"documents": context, "query": query}
-        return {"query": self.template.format(**result)}, "output_1"
 
 
 def get_faiss_retriever(use_gpu):
@@ -181,7 +169,7 @@ def ernie_bot_tutorial():
         retriever = get_faiss_retriever(use_gpu)
 
     # QA over documents
-    ernie_bot = ErnieBot(ernie_bot_access_token=args.ernie_bot_access_token)
+    ernie_bot = ErnieBot(ak=args.api_key, sk=args.secret_key)
     pipe = Pipeline()
     pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
     pipe.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Retriever"])

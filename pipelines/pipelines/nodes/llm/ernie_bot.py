@@ -14,7 +14,6 @@
 
 import copy
 import json
-import os
 
 import requests
 
@@ -32,23 +31,38 @@ class ErnieBot(BaseComponent):
     outgoing_edges = 1
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
-    def __init__(self, ernie_bot_access_token=None):
+    def __init__(self, ak=None, sk=None):
         """
         Initialize the ErnieBot instance with the provided access token or retrieve it from an
         environment variable.
 
-        :param ernie_bot_access_token: The access token to authenticate with the Ernie Bot API. If not provided,
-            the method will attempt to retrieve it from the `ernie_bot_access_token` environment variable.
-            Defaults to None.
+        :param ak: ak for applying token to request wenxin api.
+        :param sk: sk for applying token to request wenxin api.
         """
-
-        access_token = ernie_bot_access_token or os.environ.get("ernie_bot_access_token", None)
-        if access_token is None:
-            raise ValueError(
-                "Did not find `ernie_bot_access_token`, please add an environment variable `ernie_bot_access_token` which contains it, or pass"
-                "  `ernie_bot_access_token` as a named parameter."
+        if ak is None or sk is None:
+            raise Exception(
+                "Please apply api_key and secret_key from https://cloud.baidu.com/doc/WENXINWORKSHOP/s/flfmc9do2"
             )
-        self.url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={access_token}"
+        self.ak = ak
+        self.sk = sk
+        self.token = self._apply_token(self.ak, self.sk)
+
+    def _apply_token(self, ak, sk):
+        if ak is None or sk is None:
+            ak = self.ak
+            sk = self.sk
+        payload = ""
+        self.token_host = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={}&client_secret={}".format(
+            ak, sk
+        )
+        response = requests.request("POST", self.token_host, headers=self.headers, data=payload)
+        if response:
+            res = response.json()
+        else:
+            print("Request access token error.")
+            raise RuntimeError("Request access token error.")
+
+        return res["access_token"]
 
     def run(self, query, history=None, stream=False):
         """
@@ -76,8 +90,10 @@ class ErnieBot(BaseComponent):
         # Do not use stream for now
         if stream:
             payload["stream"] = True
-
-        response = requests.request("POST", self.url, headers=self.headers, data=json.dumps(payload))
+        chat_url = (
+            f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={self.token}"
+        )
+        response = requests.request("POST", chat_url, headers=self.headers, data=json.dumps(payload))
         response_json = json.loads(response.text)
         if history is None:
             return_history = []
