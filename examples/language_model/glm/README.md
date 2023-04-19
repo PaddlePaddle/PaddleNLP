@@ -42,6 +42,7 @@ python finetune_generation.py \
 --max_grad_norm 1.0 \
 --lr_scheduler_type linear \
 --fp16 \
+--fp16_opt_level O2 \
 --recompute \
 --do_train \
 --do_eval
