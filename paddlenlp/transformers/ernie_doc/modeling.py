@@ -291,7 +291,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
     pretrained_init_configuration = ERNIE_DOC_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_DOC_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -550,7 +550,6 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
             mode="upscale_in_train",
         )
         self.linear = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
@@ -641,7 +640,6 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
             mode="upscale_in_train",
         )
         self.linear = nn.Linear(config.hidden_size, self.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
@@ -733,7 +731,6 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
             mode="upscale_in_train",
         )
         self.linear = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""

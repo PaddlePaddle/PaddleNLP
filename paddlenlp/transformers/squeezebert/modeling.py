@@ -21,9 +21,15 @@ from paddle import nn
 
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
+from .configuration import (
+    SQUEEZEBERT_PRETRAINED_INIT_CONFIGURATION,
+    SQUEEZEBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    SqueezeBertConfig,
+)
 
 __all__ = [
     "SqueezeBertModel",
+    "SqueezeBertPreTrainedModel",
     "SqueezeBertForSequenceClassification",
     "SqueezeBertForTokenClassification",
     "SqueezeBertForQuestionAnswering",
@@ -42,25 +48,17 @@ def _convert_attention_mask(attention_mask, inputs):
 
 
 class SqueezeBertEmbeddings(nn.Layer):
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        layer_norm_eps=1e-12,
-    ):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=None)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=None)
 
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None):
         input_shape = input_ids.shape
@@ -138,19 +136,21 @@ class ConvActivation(nn.Layer):
 
 
 class SqueezeBertSelfAttention(nn.Layer):
-    def __init__(self, num_attention_heads, attention_probs_dropout_prob, cin, q_groups=1, k_groups=1, v_groups=1):
+    def __init__(self, config: SqueezeBertConfig, cin, q_groups=1, k_groups=1, v_groups=1):
         super().__init__()
-        if cin % num_attention_heads != 0:
-            raise ValueError(f"cin ({cin}) is not a multiple of the number of attention heads ({num_attention_heads})")
-        self.num_attention_heads = num_attention_heads
-        self.attention_head_size = int(cin / num_attention_heads)
+        if cin % config.num_attention_heads != 0:
+            raise ValueError(
+                f"cin ({cin}) is not a multiple of the number of attention heads ({config.num_attention_heads})"
+            )
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(cin / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=q_groups)
         self.key = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=k_groups)
         self.value = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=v_groups)
 
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.softmax = nn.Softmax(axis=-1)
 
         self.matmul_qk = MatMulWrapper()
@@ -220,21 +220,7 @@ class SqueezeBertSelfAttention(nn.Layer):
 
 
 class SqueezeBertLayer(nn.Layer):
-    def __init__(
-        self,
-        hidden_size,
-        intermediate_size,
-        num_attention_heads,
-        attention_probs_dropout_prob,
-        q_groups,
-        k_groups,
-        v_groups,
-        output_groups,
-        intermediate_groups,
-        post_attention_groups,
-        hidden_dropout_prob,
-        hidden_act,
-    ):
+    def __init__(self, config: SqueezeBertConfig):
         """
         - hidden_size = input chans = output chans for Q, K, V (they are all the same ... for now) = output chans for
           the module
@@ -244,24 +230,25 @@ class SqueezeBertLayer(nn.Layer):
         """
         super().__init__()
 
-        c0 = hidden_size
-        c1 = hidden_size
-        c2 = intermediate_size
-        c3 = hidden_size
+        c0 = config.hidden_size
+        c1 = config.hidden_size
+        c2 = config.intermediate_size
+        c3 = config.hidden_size
 
         self.attention = SqueezeBertSelfAttention(
-            num_attention_heads,
-            attention_probs_dropout_prob,
+            config,
             cin=c0,
-            q_groups=q_groups,
-            k_groups=k_groups,
-            v_groups=v_groups,
+            q_groups=config.q_groups,
+            k_groups=config.k_groups,
+            v_groups=config.v_groups,
         )
         self.post_attention = ConvDropoutLayerNorm(
-            cin=c0, cout=c1, groups=post_attention_groups, dropout_prob=hidden_dropout_prob
+            cin=c0, cout=c1, groups=config.post_attention_groups, dropout_prob=config.hidden_dropout_prob
         )
-        self.intermediate = ConvActivation(cin=c1, cout=c2, groups=intermediate_groups, act=hidden_act)
-        self.output = ConvDropoutLayerNorm(cin=c2, cout=c3, groups=output_groups, dropout_prob=hidden_dropout_prob)
+        self.intermediate = ConvActivation(cin=c1, cout=c2, groups=config.intermediate_groups, act=config.hidden_act)
+        self.output = ConvDropoutLayerNorm(
+            cin=c2, cout=c3, groups=config.output_groups, dropout_prob=config.hidden_dropout_prob
+        )
 
     def forward(self, hidden_states, attention_mask, output_attentions):
         att = self.attention(hidden_states, attention_mask, output_attentions)
@@ -279,46 +266,14 @@ class SqueezeBertLayer(nn.Layer):
 
 
 class SqueezeBertEncoder(nn.Layer):
-    def __init__(
-        self,
-        embedding_size,
-        hidden_size,
-        intermediate_size,
-        num_attention_heads,
-        attention_probs_dropout_prob,
-        q_groups,
-        k_groups,
-        v_groups,
-        output_groups,
-        intermediate_groups,
-        post_attention_groups,
-        hidden_dropout_prob,
-        hidden_act,
-        num_hidden_layers,
-    ):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        assert embedding_size == hidden_size, (
+        assert config.embedding_size == config.hidden_size, (
             "If you want embedding_size != intermediate hidden_size,"
             "please insert a Conv1D layer to adjust the number of channels "
             "before the first SqueezeBertLayer."
         )
-        self.layers = nn.LayerList(
-            SqueezeBertLayer(
-                hidden_size,
-                intermediate_size,
-                num_attention_heads,
-                attention_probs_dropout_prob,
-                q_groups,
-                k_groups,
-                v_groups,
-                output_groups,
-                intermediate_groups,
-                post_attention_groups,
-                hidden_dropout_prob,
-                hidden_act,
-            )
-            for _ in range(num_hidden_layers)
-        )
+        self.layers = nn.LayerList(SqueezeBertLayer(config) for _ in range(config.num_hidden_layers))
 
     def forward(self, hidden_states, attention_mask=None, output_attentions=False, output_hidden_states=False):
 
@@ -349,9 +304,9 @@ class SqueezeBertEncoder(nn.Layer):
 
 
 class SqueezeBertPooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -362,14 +317,14 @@ class SqueezeBertPooler(nn.Layer):
 
 
 class SqueezeBertPredictionHeadTransform(nn.Layer):
-    def __init__(self, hidden_size, hidden_act, layer_norm_eps):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        if isinstance(hidden_act, str):
-            self.transform_act_fn = ACT2FN[hidden_act]
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        if isinstance(config.hidden_act, str):
+            self.transform_act_fn = ACT2FN[config.hidden_act]
         else:
-            self.transform_act_fn = hidden_act
-        self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+            self.transform_act_fn = config.hidden_act
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -379,11 +334,13 @@ class SqueezeBertPredictionHeadTransform(nn.Layer):
 
 
 class SqueezeBertLMPredictionHead(nn.Layer):
-    def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        self.transform = SqueezeBertPredictionHeadTransform(hidden_size, hidden_act, layer_norm_eps)
-        self.decoder = nn.Linear(hidden_size, vocab_size, bias_attr=False)
-        self.bias = paddle.create_parameter([vocab_size], dtype="float32", is_bias=True)
+        self.transform = SqueezeBertPredictionHeadTransform(
+            config.hidden_size, config.hidden_act, config.layer_norm_eps
+        )
+        self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.bias = paddle.create_parameter([config.vocab_size], dtype="float32", is_bias=True)
         self.decoder.bias = self.bias
 
     def forward(self, hidden_states):
@@ -393,10 +350,12 @@ class SqueezeBertLMPredictionHead(nn.Layer):
 
 
 class SqueezeBertPreTrainingHeads(nn.Layer):
-    def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
+    def __init__(self, config: SqueezeBertConfig):
         super().__init__()
-        self.predictions = SqueezeBertLMPredictionHead(hidden_size, hidden_act, layer_norm_eps, vocab_size)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = SqueezeBertLMPredictionHead(
+            config.hidden_size, config.hidden_act, config.layer_norm_eps, config.vocab_size
+        )
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.predictions(sequence_output)
@@ -412,90 +371,14 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
     loading pretrained models. See `PretrainedModel` for more details.
     """
 
+    config_class = SqueezeBertConfig
     base_model_prefix = "squeezebert"
 
-    pretrained_init_configuration = {
-        "squeezebert-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "model_type": "squeezebert",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 30528,
-            "q_groups": 4,
-            "k_groups": 4,
-            "v_groups": 4,
-            "post_attention_groups": 1,
-            "intermediate_groups": 4,
-            "output_groups": 4,
-            "pad_token_id": 0,
-            "layer_norm_eps": 1e-12,
-        },
-        "squeezebert-mnli": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "model_type": "squeezebert",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 30528,
-            "q_groups": 4,
-            "k_groups": 4,
-            "v_groups": 4,
-            "post_attention_groups": 1,
-            "intermediate_groups": 4,
-            "output_groups": 4,
-            "num_labels": 3,
-            "pad_token_id": 0,
-            "layer_norm_eps": 1e-12,
-        },
-        "squeezebert-mnli-headless": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "model_type": "squeezebert",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 30528,
-            "q_groups": 4,
-            "k_groups": 4,
-            "v_groups": 4,
-            "post_attention_groups": 1,
-            "intermediate_groups": 4,
-            "output_groups": 4,
-            "pad_token_id": 0,
-            "layer_norm_eps": 1e-12,
-        },
-    }
+    pretrained_init_configuration = SQUEEZEBERT_PRETRAINED_INIT_CONFIGURATION
 
-    pretrained_resource_files_map = {
-        "model_state": {
-            "squeezebert-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
-            "squeezebert-mnli": "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
-            "squeezebert-mnli-headless": "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
-        }
-    }
+    pretrained_resource_files_map = SQUEEZEBERT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -516,109 +399,12 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
 
 @register_base_model
 class SqueezeBertModel(SqueezeBertPreTrainedModel):
-    """
-    Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `SqueezeBertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BertModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Output chans for intermediate layer.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `16`.
-        q_groups (int)
-            number of query groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        k_groups (int)
-            number of key groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        v_groups (int)
-            number of value groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        output_groups (int)
-            number of output groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        intermediate_groups (int)
-            number of intermediate groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        post_groups (int)
-            number of post groups for all layers in the BertModule. (eventually we could change the interface to
-            allow different groups for different layers)
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
-    """
-
-    def __init__(
-        self,
-        vocab_size,
-        embedding_size,
-        hidden_size,
-        num_hidden_layers,
-        num_attention_heads,
-        intermediate_size,
-        hidden_act,
-        hidden_dropout_prob,
-        attention_probs_dropout_prob,
-        max_position_embeddings,
-        type_vocab_size,
-        q_groups,
-        k_groups,
-        v_groups,
-        output_groups,
-        intermediate_groups,
-        post_attention_groups,
-        initializer_range=0.02,
-        layer_norm_eps=1e-12,
-        **kwargs
-    ):
-        super().__init__()
-        self.initializer_range = initializer_range
-        self.embeddings = SqueezeBertEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size, layer_norm_eps
-        )
-        self.encoder = SqueezeBertEncoder(
-            embedding_size,
-            hidden_size,
-            intermediate_size,
-            num_attention_heads,
-            attention_probs_dropout_prob,
-            q_groups,
-            k_groups,
-            v_groups,
-            output_groups,
-            intermediate_groups,
-            post_attention_groups,
-            hidden_dropout_prob,
-            hidden_act,
-            num_hidden_layers,
-        )
-        self.pooler = SqueezeBertPooler(hidden_size)
-
-        self.apply(self.init_weights)
+    def __init__(self, config: SqueezeBertConfig):
+        super().__init__(config)
+        self.initializer_range = config.initializer_range
+        self.embeddings = SqueezeBertEmbeddings(config)
+        self.encoder = SqueezeBertEncoder(config)
+        self.pooler = SqueezeBertPooler(config)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -714,23 +500,16 @@ class SqueezeBertForSequenceClassification(SqueezeBertPreTrainedModel):
     SqueezeBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
     for GLUE tasks.
     Args:
-        squeezebert (:class:`SqueezeBertModel`):
-            An instance of SqueezeBert.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of SqueezeBertModel.
-            If None, use the same value as `hidden_dropout_prob` of `SqueezeBertModel`
-            instance `squeezebert`. Defaults to None.
+        config (:class:`SqueezeBertConfig`):
+            An instance of SqueezeBertConfig.
     """
 
-    def __init__(self, squeezebert, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.squeezebert = squeezebert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.squeezebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.squeezebert.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
+    def __init__(self, config: SqueezeBertConfig):
+        super().__init__(config)
+        self.num_classes = config.num_labels
+        self.squeezebert = SqueezeBertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -764,19 +543,14 @@ class SqueezeBertForQuestionAnswering(SqueezeBertPreTrainedModel):
     SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
     `span end logits`).
     Args:
-        squeezebert (:class:`SqueezeBertModel`):
-            An instance of SqueezeBertModel.
-        dropout (float, optional):
-            The dropout probability for output of SqueezeBert.
-            If None, use the same value as `hidden_dropout_prob` of `SqueezeBertModel`
-            instance `squeezebert`. Defaults to `None`.
+        config (:class:`SqueezeBertConfig`):
+            An instance of SqueezeBertConfig.
     """
 
-    def __init__(self, squeezebert, dropout=None):
-        super().__init__()
-        self.squeezebert = squeezebert
-        self.classifier = nn.Linear(self.squeezebert.config["hidden_size"], 2)
-        self.apply(self.init_weights)
+    def __init__(self, config: SqueezeBertConfig):
+        super().__init__(config)
+        self.squeezebert = SqueezeBertModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
 
     def forward(self, input_ids, token_type_ids=None):
         r"""
@@ -810,23 +584,16 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
     SqueezeBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
     for Named-Entity-Recognition (NER) tasks.
     Args:
-        squeezebert (:class:`SqueezeBertModel`):
-            An instance of SqueezeBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of squeezebert.
-            If None, use the same value as `hidden_dropout_prob` of `SqueezeBert`
-            instance `squeezebert`. Defaults to None.
+        config (:class:`SqueezeBertConfig`):
+            An instance of SqueezeBertConfig.
     """
 
-    def __init__(self, squeezebert, num_classes=2, dropout=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.squeezebert = squeezebert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.squeezebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.squeezebert.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
+    def __init__(self, config: SqueezeBertConfig):
+        super().__init__(config)
+        self.num_classes = config.num_labels
+        self.squeezebert = SqueezeBertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""

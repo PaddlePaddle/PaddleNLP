@@ -1275,10 +1275,6 @@ ernie-1.0(){
     ernie
 }
 
-ernie-3.0(){
-    ernie
-}
-
 ernie_m(){
     ernie-m
 }

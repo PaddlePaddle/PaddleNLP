@@ -418,7 +418,6 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
         >>> pipeline = StableDiffusionUpscalePipeline.from_pretrained(
         ...     model_id, revision="fp16", paddle_dtype=paddle.float16
         ... )
-        >>> pipeline = pipeline.to("cuda")
 
         >>> # let's download an  image
         >>> url = "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/sd2-upscale/low_res_cat.png"

@@ -30,19 +30,19 @@ args = parser.parse_args()
 
 def offline_qa_generation():
     answer_extractor = AnswerExtractor(
-        model="uie-base-answer-extractor-v1",
+        model="uie-base-answer-extractor",
         device=args.device,
         schema=["答案"],
         position_prob=0.01,
     )
 
     question_generator = QuestionGenerator(
-        model="unimo-text-1.0-question-generator-v1",
+        model="unimo-text-1.0-question-generator",
         device=args.device,
     )
 
     qa_filter = QAFilter(
-        model="uie-base-qa-filter-v1",
+        model="uie-base-qa-filter",
         device=args.device,
         schema=["答案"],
         position_prob=0.1,

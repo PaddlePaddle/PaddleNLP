@@ -32,7 +32,8 @@ def run(func):
 
 def change_pwd():
     path = os.path.dirname(__file__)
-    os.chdir(path)
+    if path:
+        os.chdir(path)
 
 
 def setup_fast_ln():
