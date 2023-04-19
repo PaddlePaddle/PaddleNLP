@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import json
+import os
 
 import requests
 
@@ -24,37 +24,33 @@ class ErnieBot(BaseComponent):
     """
     The ErnieBot class is a subclass of the BaseComponent class, which is designed to interface with
     the Ernie Bot API for generating AI chatbot responses. It handles the interaction with the API using
-    the provided access token. It allows you to make a request with a given query and optional conversation
+    the provided api_key, secret_key . It allows you to make a request with a given query and optional conversation
     history, receiving a response from the chatbot and extending the conversation history accordingly.
     """
 
     outgoing_edges = 1
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
-    def __init__(self, ak=None, sk=None):
+    def __init__(self, api_key=None, secret_key=None):
         """
-        Initialize the ErnieBot instance with the provided access token or retrieve it from an
-        environment variable.
+        Initialize the ErnieBot instance with the provided api_key and secret_key.
 
-        :param ak: ak for applying token to request wenxin api.
-        :param sk: sk for applying token to request wenxin api.
+        :param api_key: api_key for applying token to request wenxin api.
+        :param secret_key: secret_key for applying token to request wenxin api.
         """
-        if ak is None or sk is None:
+        api_key = api_key or os.environ.get("ERNIE_BOT_API_KEY", None)
+        secret_key = secret_key or os.environ.get("ERNIE_BOT_SECRET_KEY", None)
+        if api_key is None or secret_key is None:
             raise Exception(
                 "Please apply api_key and secret_key from https://cloud.baidu.com/doc/WENXINWORKSHOP/s/flfmc9do2"
             )
-        self.ak = ak
-        self.sk = sk
-        self.token = self._apply_token(self.ak, self.sk)
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.token = self._apply_token(self.api_key, self.secret_key)
 
-    def _apply_token(self, ak, sk):
-        if ak is None or sk is None:
-            ak = self.ak
-            sk = self.sk
+    def _apply_token(self, api_key, secret_key):
         payload = ""
-        self.token_host = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={}&client_secret={}".format(
-            ak, sk
-        )
+        self.token_host = f"https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={api_key}&client_secret={secret_key}"
         response = requests.request("POST", self.token_host, headers=self.headers, data=payload)
         if response:
             res = response.json()
