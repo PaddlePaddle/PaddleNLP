@@ -35,6 +35,7 @@ def parse_args():
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     args = parser.parse_args()
     return args
@@ -44,6 +45,7 @@ def main():
     args = parse_args()
 
     paddle.seed(100)
+    paddle.set_default_dtype(args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -52,6 +54,7 @@ def main():
         low_cpu_mem_usage=True,
         use_recompute=False,
         use_cache=True,
+        dtype=args.dtype,
     )
     model.config.fp16_opt_level = None  # For dygraph to static only
     model.eval()
