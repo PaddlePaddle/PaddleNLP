@@ -43,6 +43,15 @@ class MLMPromptTokenizer(object):
             # Create input_ids.
             soft_token_ids = part.get("soft_tokens", None)
             if soft_token_ids is None or len(soft_token_ids) == 1 and soft_token_ids[0] == 0:
+                if "generator_labels" in part:
+                    # import pdb; pdb.set_trace()
+                    encoded_inputs["labels"].append(
+                        self.tokenizer.encode(
+                            part["generator_labels"], add_special_tokens=False, return_token_type_ids=False
+                        )["input_ids"]
+                    )
+                    inputs.remove(part)
+                    continue
                 orig_input_ids.append(
                     self.tokenizer.encode(part["text"], add_special_tokens=False, return_token_type_ids=False)[
                         "input_ids"
@@ -61,8 +70,6 @@ class MLMPromptTokenizer(object):
                 else:
                     input_ids = orig_input_ids[index][: max_lengths[index]]
                 encoded_inputs["soft_token_ids"].append([0] * len(input_ids))
-                if part["token_types"] == 1:
-                    encoded_inputs["labels"].append(input_ids)
             else:
                 input_ids = soft_token_ids
                 encoded_inputs["soft_token_ids"].append(soft_token_ids)

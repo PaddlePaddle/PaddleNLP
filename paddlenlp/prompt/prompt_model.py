@@ -263,13 +263,12 @@ class PromptModelForGeneration(paddle.nn.Layer):
             hidden_states=model_outputs.logits,
         )
 
-    def generate(self, model_kwargs):
+    def generate(self, model_kwargs, **kwargs):
         self.plm.prepare_inputs_for_generation = self.prepare_inputs_for_generation
-        generated_tokens = self.plm.generate(**model_kwargs)
+        generated_tokens = self.plm.generate(**model_kwargs, **kwargs)
         return generated_tokens
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
-
         model_kwargs = self.base_model_prepare_inputs_for_generation(input_ids, cache=None, **kwargs)
         model_kwargs["soft_token_ids"] = kwargs.get("soft_token_ids", None)
         model_kwargs["token_type_ids"] = kwargs.get("token_type_ids", None)
