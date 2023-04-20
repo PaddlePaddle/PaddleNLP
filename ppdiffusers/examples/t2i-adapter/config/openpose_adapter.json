@@ -1,0 +1,15 @@
+{
+    "channels_in": 3,
+    "block_out_channels": [
+      320,
+      640,
+      1280,
+      1280
+    ],
+    "num_res_blocks": 2,
+    "kerenl_size": 1,
+    "res_block_skip": true,
+    "use_conv": false,
+    "input_scale_factor": 8
+  }
+  
