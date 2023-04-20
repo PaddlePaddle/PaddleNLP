@@ -27,11 +27,15 @@ from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 from ppdiffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
-from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.training_utils import main_process_first
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 from .model_base import BenchmarkBase
+
+
+def freeze_params(params):
+    for param in params:
+        param.stop_gradient = True
 
 
 def url_or_path_join(*path_list):

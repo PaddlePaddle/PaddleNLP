@@ -17,7 +17,7 @@ python create_data.py \
 --output_dir wiki \
 --dataset_name wikipedia \
 --dataset_config_name 20200501.en \
----tokenizer_name roberta-base \
+--tokenizer_name roberta-base \
 --max_seq_length 512 \
 --line_by_line False \
 --preprocessing_num_workers 20

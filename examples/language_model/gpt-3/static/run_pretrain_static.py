@@ -433,11 +433,11 @@ def do_train(args):
                                 speed,
                                 speed * args.global_batch_size * args.max_seq_len,
                                 speed * args.global_batch_size * args.max_seq_len / worker_num,
-                                lr_return[0],
+                                lr_return,
                             )
                         )
                         log_writer.add_scalar("loss", loss_return[0], global_step)
-                        log_writer.add_scalar("learning_rate", lr_return[0], global_step)
+                        log_writer.add_scalar("learning_rate", lr_return, global_step)
                     tic_train = time.time()
                     train_reader_cost = 0.0
                     train_run_cost = 0.0
@@ -536,11 +536,11 @@ def do_train(args):
                                     speed,
                                     speed * args.global_batch_size * args.max_seq_len,
                                     speed * args.global_batch_size * args.max_seq_len / worker_num,
-                                    lr_return[0],
+                                    lr_return,
                                 )
                             )
                             log_writer.add_scalar("loss", loss_return[0], global_step)
-                            log_writer.add_scalar("learning_rate", lr_return[0], global_step)
+                            log_writer.add_scalar("learning_rate", lr_return, global_step)
                         tic_train = time.time()
                         train_reader_cost = 0.0
                         train_run_cost = 0.0

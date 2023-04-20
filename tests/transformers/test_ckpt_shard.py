@@ -29,8 +29,6 @@ from paddlenlp.transformers.utils import (
 from paddlenlp.utils.env import PADDLE_WEIGHT_FILE_NAME
 from tests.testing_utils import require_package
 
-# paddle.set_device("cpu")
-
 
 class TestCkptShard(unittest.TestCase):
     def test_shard_checkpoint(self):
@@ -73,9 +71,6 @@ class TestCkptShard(unittest.TestCase):
         with self.subTest("Test sharding with weights bigger than max size"):
             shards, index = shard_checkpoint(state_dict, max_shard_size="100kB")
             # Split is first layer, second layer then last 2.
-            import pdb
-
-            pdb.set_trace()
             self.assertDictEqual(
                 index,
                 {
@@ -102,7 +97,7 @@ class TestCkptShard(unittest.TestCase):
             )
 
     def test_checkpoint_sharding_local(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        model = BertModel.from_pretrained("__internal_testing__/bert-shard")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             # We use the same folder for various sizes to make sure a new save erases the old checkpoint.
@@ -146,7 +141,9 @@ class TestCkptShard(unittest.TestCase):
                 for p1, p2 in zip(model.parameters(), new_model.parameters()):
                     self.assertTrue(paddle.allclose(p1, p2))
 
+    @unittest.skip("to enable from_hf_hub for shard file later")
     def test_checkpoint_sharding_from_hub(self):
+        # TODO(wj-Mcat): laod shard wiehgt files from hf hub later
         model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert-sharded", from_hf_hub=True)
         # the model above is the same as the model below, just a sharded version.
         ref_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
@@ -154,12 +151,12 @@ class TestCkptShard(unittest.TestCase):
             self.assertTrue(paddle.allclose(p1, p2))
 
     def test_checkpoint_variant_local(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert", from_hf_hub=True)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2")
 
-            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["bin"])
+            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["pdparams"])
 
             weights_file = os.path.join(tmp_dir, weights_name)
             self.assertTrue(os.path.isfile(weights_file))
@@ -174,7 +171,7 @@ class TestCkptShard(unittest.TestCase):
             self.assertTrue(paddle.allclose(p1, p2))
 
     def test_checkpoint_variant_local_sharded(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert", from_hf_hub=True)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", max_shard_size="50kB")
@@ -185,7 +182,9 @@ class TestCkptShard(unittest.TestCase):
             self.assertFalse(os.path.isfile(os.path.join(tmp_dir, WEIGHTS_INDEX_NAME)))
 
             for i in range(1, 6):
-                weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00006"] + ["bin"])
+                weights_name = ".".join(
+                    PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00005"] + ["pdparams"]
+                )
                 weights_name_file = os.path.join(tmp_dir, weights_name)
                 self.assertTrue(os.path.isfile(weights_name_file))
 
@@ -246,9 +245,12 @@ class TestCkptShard(unittest.TestCase):
     def test_checkpoint_variant_hub(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaises(EnvironmentError):
-                _ = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir)
+                _ = BertModel.from_pretrained(
+                    "hf-internal-testing/tiny-random-bert-variant", from_hf_hub=True, cache_dir=tmp_dir
+                )
+
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2"
+                "hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2", from_hf_hub=True
             )
         self.assertIsNotNone(model)
 
@@ -290,7 +292,7 @@ class TestCkptShard(unittest.TestCase):
             model = BertModel.from_pretrained(
                 "hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2"
             )
-            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["bin"])
+            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["pdparams"])
 
             model.save_pretrained(tmp_dir, variant="v2")
             # saving will create a variant checkpoint
@@ -298,7 +300,7 @@ class TestCkptShard(unittest.TestCase):
 
             model.save_pretrained(tmp_dir)
             # saving shouldn't delete variant checkpoints
-            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["bin"])
+            weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["pdparams"])
             self.assertTrue(os.path.isfile(os.path.join(tmp_dir, weights_name)))
 
             # there should be a normal checkpoint

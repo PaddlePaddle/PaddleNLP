@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import copy
 import gc
 import inspect
 import io
@@ -30,8 +29,6 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 import six
-
-# import tqdm
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
@@ -77,7 +74,6 @@ from .utils import (
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
-    cached_file,
     convert_file_size_to_int,
     fn_args_to_dict,
     get_checkpoint_shard_files,
@@ -278,6 +274,17 @@ def no_init_weights(_enable=True):
         _init_weights = old_init_weights
 
 
+def set_initialized_submodules(layer: Layer, state_dict_keys: dict[str, Tensor]):
+    """
+    Sets the `_is_initialized` flag in all submodules of a given model when all its weights are in the loaded state
+    dict.
+    """
+    for layer_name, sub_layer in layer.named_sublayers():
+        loaded_keys = [k.replace(f"{sub_layer}.", "") for k in state_dict_keys if k.startswith(f"{layer_name}.")]
+        if len(set(layer.state_dict().keys()) - set(loaded_keys)) == 0:
+            layer._is_initialized = True
+
+
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     """get dtype of parameter which should be sub-class of nn.Layer
 
@@ -303,6 +310,7 @@ def _find_weight_file_path(
     model_class: Type[PretrainedModel],
     config: PretrainedConfig = None,
     resource_uri: Optional[str] = None,
+    variant: str | None = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
@@ -343,7 +351,7 @@ def _find_weight_file_path(
         return os.path.join(cache_dir, weight_file_names[0])
 
     # 4. try to find pytorch model weight file under cache_dir
-    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHT_FILE_NAME)
+    pytorch_model_weight_file = os.path.join(cache_dir, _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant))
     if os.path.isfile(pytorch_model_weight_file):
         return pytorch_model_weight_file
 
@@ -371,10 +379,12 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
             )
         return safe_load_file(checkpoint_file)
 
-    return paddlenlp_load(checkpoint_file, return_numpy=True)
+    return paddlenlp_load(checkpoint_file, "cpu")
 
 
-def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
+def resolve_weight_file_from_hf_hub(
+    repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None, variant=None
+):
     """find the suitable weight file name
 
     Args:
@@ -383,20 +393,20 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
         weight_file_name (str, optional) the weight file name
+        variant (str, optional) the variant of target file
     """
-    if hf_file_exists(repo_id, "model_state.pdparams", subfolder=subfolder):
-        file_name = "model_state.pdparams"
-    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME, subfolder=subfolder):
+    if hf_file_exists(repo_id, _add_variant("model_state.pdparams", variant=variant), subfolder=subfolder):
+        file_name = _add_variant("model_state.pdparams", variant=variant)
+    elif hf_file_exists(repo_id, _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant=variant), subfolder=subfolder):
         if not support_conversion:
-            raise EntryNotFoundError(
+            raise EnvironmentError(
                 f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
                 "and current model doesn't support conversion from pytorch weight file to paddle weight file"
             )
-        file_name = PYTORCH_WEIGHT_FILE_NAME
+        file_name = _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant=variant)
     else:
-        raise EntryNotFoundError(
-            message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
-            response=None,
+        raise EnvironmentError(
+            f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
         )
 
     download_check(repo_id, file_name, addition="from_hf_hub")
@@ -441,7 +451,6 @@ def register_base_model(cls):
 
 class BackboneMixin:
     def forward_with_filtered_kwargs(self, *args, **kwargs):
-
         signature = dict(inspect.signature(self.forward).parameters)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
@@ -681,7 +690,16 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     return error_msgs
 
 
-def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
+def _convert_state_dict_dtype(
+    dtype: str, state_dict: dict[str, Union[paddle.Tensor, np.ndarray]], model_to_load: PretrainedModel
+):
+    """convert state_dict by dtype and model_to_load object
+
+    Args:
+        dtype (str): the target dtype
+        state_dict (dict[str, Union[paddle.Tensor, np.ndarray]]): the state dict to be set
+        model_to_load (PretrainedModel): the target pretrained model
+    """
     # convert the dtype of state dict
     if dtype is not None:
         if isinstance(dtype, paddle.dtype):
@@ -890,31 +908,43 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-    def __getattr__(self, name):
+        # only execute when it's the base method
+        if (
+            original_init.__module__ != "paddlenlp.transformers.model_utils"
+            and self.__class__.init_weights is PretrainedModel.init_weights
+        ):
+            self.init_weights()
+
+    def _init_weights(self, layer):
         """
-        called when the attribute name is missed in the model
-
-        Args:
-            name: the name of attribute
-
-        Returns: the value of attribute
-
+        Initialize the weights. This method should be overridden by derived class.
         """
-        try:
-            return super(PretrainedModel, self).__getattr__(name)
-        except AttributeError:
-            result = getattr(self.config, name)
-            if getattr(self, "deprecated_warnings", None) is None:
-                self.deprecated_warnings = {}
+        pass
 
-            if not self.deprecated_warnings.get(name, False):
-                logger.warning(
-                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-                    f"Instead, do `model.config.{name}`"
-                )
-                self.deprecated_warnings[name] = True
+    def _initialize_weights(self, layer):
+        """
+        Initialize the weights if they are not already initialized.
+        """
+        if getattr(layer, "_is_initialized", False):
+            return
+        self._init_weights(layer)
+        layer._is_initialized = True
 
-            return result
+    def init_weights(self):
+        """
+        If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
+        initialization logic in `_init_weights`.
+        """
+        # call pure
+        if _init_weights:
+            # Initialize weights
+            self.apply(self._initialize_weights)
+
+            # Tie weights should be skipped when not initializing all weights
+            # since from_pretrained(...) calls tie weights anyways
+
+            # TODO(wj-Mcat): enable all tie-weights later
+            # self.tie_weights()
 
     @property
     def base_model(self):
@@ -985,6 +1015,46 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         return None
 
+    def tie_weights(self):
+        """
+        Tie the weights between the input embeddings and the output embeddings.
+        """
+        if self.config.tie_word_embeddings:
+            output_embeddings = self.get_output_embeddings()
+            input_embeddings = self.get_input_embeddings()
+            if output_embeddings is not None and input_embeddings is not None:
+                if input_embeddings.weight.shape != output_embeddings.weight.shape:
+                    logger.warning(
+                        f"The shape of input embeddings is {input_embeddings.weight.shape} and the shape of output embeddings is {output_embeddings.weight.shape}. "
+                        "This is only expected if you are calling the `resize_token_embeddings` method"
+                    )
+                output_embeddings.weight = input_embeddings.weight
+                if getattr(output_embeddings, "bias", None) is not None:
+                    # need to pad
+                    if output_embeddings.weight.shape[0] > output_embeddings.bias.shape[0]:
+                        old_bias = output_embeddings.bias
+                        pad_length = output_embeddings.weight.shape[0] - old_bias.shape[0]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
+                        )
+                        new_bias = paddle.concat(
+                            [old_bias, paddle.zeros([pad_length], dtype=output_embeddings.bias.dtype)]
+                        )
+                        output_embeddings.bias.set_value(new_bias)
+                    # need to trim
+                    elif output_embeddings.weight.shape[0] < output_embeddings.bias.shape[0]:
+                        new_bias = output_embeddings.bias[: output_embeddings.weight.shape[0]]
+                        output_embeddings.bias = output_embeddings.create_parameter(
+                            shape=[output_embeddings.weight.shape[0]],
+                            attr=output_embeddings._bias_attr,
+                            dtype=output_embeddings._dtype,
+                            is_bias=True,
+                        )
+                        output_embeddings.bias.set_value(new_bias)
+
     def resize_position_embeddings(self, new_num_position_embeddings: int):
         """resize position embedding, this method should be overrited overwrited by downstream models
 
@@ -1002,335 +1072,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     @classmethod
     def constructed_from_pretrained_config(cls, init_func=None) -> bool:
         """check if the model is constructed from `PretrainedConfig`
-
         Returns:
             bool: if the model is constructed from `PretrainedConfig`
         """
         return cls.config_class is not None and issubclass(cls.config_class, PretrainedConfig)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder="", **kwargs):
-        """
-        Creates an instance of `PretrainedModel`. Model weights are loaded
-        by specifying name of a built-in pretrained model, or a community contributed model,
-        or a local file directory path.
-
-        Args:
-            pretrained_model_name_or_path (str): Name of pretrained model or dir path
-                to load from. The string can be:
-
-                - Name of a built-in pretrained model
-                - Name of a pretrained model from HF hub
-                - Name of a community-contributed pretrained model.
-                - Local directory path which contains model weights file("model_state.pdparams")
-                  and model config file ("model_config.json").
-            from_hf_hub (bool, optional): whether to load from Huggingface Hub
-            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
-                Only works when loading from Huggingface Hub.
-            *args (tuple): Position arguments for model `__init__`. If provided,
-                use these as position argument values for model initialization.
-            **kwargs (dict): Keyword arguments for model `__init__`. If provided,
-                use these to update pre-defined keyword argument values for model
-                initialization. If the keyword is in `__init__` argument names of
-                base model, update argument values of the base model; else update
-                argument values of derived model.
-            load_state_as_np (bool, optional): The weights read in can be choosed
-                to place on CPU or GPU though the model is on the default device.
-                If `True`, load the model weights as `numpy.ndarray` on CPU.
-                Otherwise, weights would be loaded as tensors on the default
-                device. Note that if on GPU, the latter would creates extra
-                temporary tensors in addition to the model weights, which
-                doubles the memory usage . Thus it is suggested to use `True`
-                for big models on GPU. Default to `False`.
-
-        Returns:
-            PretrainedModel: An instance of `PretrainedModel`.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import BertForSequenceClassification
-
-                # Name of built-in pretrained model
-                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-
-                # Name of community-contributed pretrained model
-                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
-
-                # Load from local directory path
-                model = BertForSequenceClassification.from_pretrained('./my_bert/')
-        """
-        if cls.constructed_from_pretrained_config():
-            return cls.from_pretrained_v2(
-                pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
-            )
-
-        resource_files = {}
-        init_configuration = {}
-        load_state_as_np = kwargs.pop("load_state_as_np", False)
-        cache_dir = kwargs.get("cache_dir", None)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        track_download = True
-
-        # From HF Hub
-        if from_hf_hub:
-            resource_files = cls.resource_files_names
-            resource_files["model_config_file"] = cls.model_config_file
-
-        # From built-in pretrained models
-        elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            for file_id, map_list in cls.pretrained_resource_files_map.items():
-                if pretrained_model_name_or_path not in map_list:
-                    resource_files[file_id] = None
-                else:
-                    resource_files[file_id] = map_list[pretrained_model_name_or_path]
-            init_configuration = copy.deepcopy(cls.pretrained_init_configuration[pretrained_model_name_or_path])
-
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            track_download = False
-            for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
-                resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
-        else:
-            # Assuming from community-contributed pretrained models
-            for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name])
-                resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
-
-        resolved_resource_files = {}
-        for file_id, file_path in resource_files.items():
-            if file_path is None or os.path.isfile(file_path):
-                resolved_resource_files[file_id] = file_path
-                continue
-            # If from_hf_hub, let HF Hub takes care of the cache and the download process
-            if from_hf_hub:
-                resolved_resource_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            else:
-                path = os.path.join(cache_dir, file_path.split("/")[-1])
-                if os.path.exists(path):
-                    logger.info("Already cached %s" % path)
-                    resolved_resource_files[file_id] = path
-                else:
-                    logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
-                    try:
-                        resolved_resource_files[file_id] = get_path_from_url_with_filelock(file_path, cache_dir)
-                    except RuntimeError as err:
-                        logger.error(err)
-                        raise RuntimeError(
-                            f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                            "- a correct model-identifier of built-in pretrained models,\n"
-                            "- or a correct model-identifier of community-contributed pretrained models,\n"
-                            "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-                        )
-
-        # Prepare model initialization kwargs
-        # Did we saved some inputs and kwargs to reload ?
-        model_config_file = resolved_resource_files.pop("model_config_file", None)
-        if model_config_file is not None:
-            with io.open(model_config_file, encoding="utf-8") as f:
-                init_kwargs = json.load(f)
-        else:
-            init_kwargs = init_configuration
-
-        # position args are stored in kwargs, maybe better not include
-        init_args = init_kwargs.pop("init_args", ())
-        # class name corresponds to this configuration
-        init_class = init_kwargs.pop("init_class", cls.base_model_class.__name__)
-        # Check if the loaded config matches the current model class's __init__
-        # arguments. If not match, the loaded config is for the base model class.
-        if init_class == cls.base_model_class.__name__:
-            base_args = init_args
-            base_kwargs = init_kwargs
-            derived_args = ()
-            derived_kwargs = {}
-            base_arg_index = None
-        else:  # extract config for base model
-            derived_args = list(init_args)
-            derived_kwargs = init_kwargs
-            base_arg = None
-            for i, arg in enumerate(init_args):
-                if isinstance(arg, dict) and "init_class" in arg:
-                    assert arg.pop("init_class") == cls.base_model_class.__name__, (
-                        "pretrained base model should be {}"
-                    ).format(cls.base_model_class.__name__)
-                    base_arg_index = i
-                    base_arg = arg
-                    break
-            for arg_name, arg in init_kwargs.items():
-                if isinstance(arg, dict) and "init_class" in arg:
-                    assert arg.pop("init_class") == cls.base_model_class.__name__, (
-                        "pretrained base model should be {}"
-                    ).format(cls.base_model_class.__name__)
-                    base_arg_index = arg_name
-                    base_arg = arg
-                    break
-
-            base_args = base_arg.pop("init_args", ())
-            base_kwargs = base_arg
-
-        if cls == cls.base_model_class:
-            # Update with newly provided args and kwargs for base model
-            base_args = base_args if not args else args
-            base_kwargs.update(kwargs)
-            model = cls(*base_args, **base_kwargs)
-        else:
-            # Update with newly provided args and kwargs for derived model
-            base_parameters_dict = inspect.signature(cls.base_model_class.__init__).parameters
-            for k, v in kwargs.items():
-                if k in base_parameters_dict:
-                    base_kwargs[k] = v
-            base_model = cls.base_model_class(*base_args, **base_kwargs)
-            if base_arg_index is not None:
-                derived_args[base_arg_index] = base_model
-            else:
-                derived_args = (base_model,)  # assume at the first position
-            derived_args = derived_args if not args else args
-            derived_parameters_dict = inspect.signature(cls.__init__).parameters
-            for k, v in kwargs.items():
-                if k in derived_parameters_dict:
-                    derived_kwargs[k] = v
-            model = cls(*derived_args, **derived_kwargs)
-
-        # save the model config file into cache dir
-        model_config_file_path = os.path.join(cache_dir, cls.model_config_file)
-        # check if there is model config file in cache directory
-        if (
-            pretrained_model_name_or_path in cls.pretrained_init_configuration
-            and init_kwargs is not None
-            and not os.path.exists(model_config_file_path)
-        ):
-            model.save_model_config(cache_dir)
-
-        # Maybe need more ways to load resources.
-        weight_path = resolved_resource_files["model_state"]
-        if weight_path is None:
-            logger.warning(
-                "No model weight found for %s, return with random initialization !!!" % pretrained_model_name_or_path
-            )
-            return model
-
-        assert weight_path.endswith(".pdparams"), "suffix of weight must be .pdparams"
-
-        # NOTE: Allow to load partial model for model parallel.
-        # TODO(guosheng): To make model loading for the model parallel automatic,
-        # maybe we should make rank 0 worker load weights of the full model on
-        # CPU, then split weights into multiple parts and pickle separately.
-        # The other workers wait util pickle finish and then load the corresponding
-        # partial weights. Also we can directly use separate weight files for
-        # simplicity.
-        state_dict = paddlenlp_load(weight_path, return_numpy=load_state_as_np)
-
-        # Make sure we are able to load base models as well as derived models
-        # (with heads)
-        start_prefix = ""
-        model_to_load = model
-        state_to_load = state_dict
-        unexpected_keys = []
-        missing_keys = []
-        if not hasattr(model, cls.base_model_prefix) and any(
-            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
-        ):
-            # base model
-            state_to_load = {}
-            start_prefix = cls.base_model_prefix + "."
-            for k, v in state_dict.items():
-                if k.startswith(cls.base_model_prefix):
-                    state_to_load[k[len(start_prefix) :]] = v
-                else:
-                    unexpected_keys.append(k)
-        if hasattr(model, cls.base_model_prefix) and not any(
-            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
-        ):
-            # derived model (base model with heads)
-            model_to_load = getattr(model, cls.base_model_prefix)
-            for k in model.state_dict().keys():
-                if not k.startswith(cls.base_model_prefix):
-                    missing_keys.append(k)
-        if len(missing_keys) > 0:
-            logger.info(
-                "Weights of {} not initialized from pretrained model: {}".format(
-                    model.__class__.__name__, missing_keys
-                )
-            )
-        if len(unexpected_keys) > 0:
-            logger.info(
-                "Weights from pretrained model not used in {}: {}".format(model.__class__.__name__, unexpected_keys)
-            )
-        # Allow the float16 model to load float32 weights, which decreases memory
-        # usage in model loading stage and is useful to big models.
-        dtype_prefix_len = len("paddle.")  # paddle.float16
-
-        for k, v in model_to_load.state_dict().items():
-            if not isinstance(v, np.ndarray):
-                dtype = str(v.dtype)[dtype_prefix_len:]
-            # TODO(guosheng): add warnings for unmatched dtypes
-            if k in state_to_load:
-                if paddle.in_dynamic_mode():
-                    if isinstance(state_to_load[k], np.ndarray):
-                        state_to_load[k] = state_to_load[k].astype(dtype)
-                    else:
-                        state_to_load[k] = paddle.cast(state_to_load[k], dtype)
-                else:
-                    # there are some latent error when case dtype in static-mode, so let's:
-                    # 1. convert fluid.*.Tensor -> numpy.ndarray
-                    # 2. cast the dtype with numpy tools
-                    # 3. paddle works well with ndarray state-dict
-                    state_to_load[k] = np.array(state_to_load[k])
-                    state_to_load[k] = state_to_load[k].astype(dtype)
-
-        # For model parallel if FastGeneration
-        # To avoid recursive import temporarily.
-        import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
-
-        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_to_load)
-        if paddle.in_dynamic_mode():
-            model_to_load.set_state_dict(state_to_load)
-            if track_download:
-                download_check(pretrained_model_name_or_path, "from_pretrained")
-            return model
-        if track_download:
-            download_check(pretrained_model_name_or_path, "from_pretrained")
-        return model, state_to_load
-
-    # NOTE: backward support for old models. Models with PretrainedConfig should be able to use .config
-    def get_model_config(self):
-        """Get model configuration.
-
-        Returns:
-            config: The config of the model.
-        """
-
-        # If init_config contains a Layer, use the layer's init_config to save
-        def get_config(model):
-            if model.config is not None and isinstance(model.config, PretrainedConfig):
-                return model.config
-            model_config = model.init_config
-            for key, value in model_config.items():
-                if key == "init_args":
-                    args = []
-                    for arg in value:
-                        args.append(get_config(arg) if isinstance(arg, PretrainedModel) else arg)
-                    model_config[key] = tuple(args)
-                elif isinstance(value, PretrainedModel):
-                    model_config[key] = value.init_config
-            return model_config
-
-        model_config = get_config(self)
-        return model_config
 
     def save_model_config(self, save_dir: str):
         """
@@ -1495,8 +1240,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # update init_config
         self._update_init_config(self.init_config, "vocab_size", new_num_tokens)
 
-        # TODO(westfish@126.com): add tie_weight.
-        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+        # Tie the weights between the input embeddings and the output embeddings if needed.
+        self.tie_weights()
 
         return new_embeddings
 
@@ -1573,6 +1318,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config: PretrainedConfig = None,
         support_conversion: bool = False,
         variant=None,
+        is_shard: bool | None = None,
     ) -> str:
 
         """resolve model target file path from `` and `cache_dir`
@@ -1607,131 +1353,108 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 cache_dir=cache_dir,
                 support_conversion=support_conversion,
                 subfolder=subfolder,
+                variant=variant,
             )
             return resolved_archive_file, sharded_metadata, is_sharded
 
-        if pretrained_model_name_or_path is not None:
-            pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-            is_local = os.path.isdir(pretrained_model_name_or_path)
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        is_local = os.path.isdir(pretrained_model_name_or_path)
 
-            # pretrained_model_name_or_path is dir
-            if is_local:
+        # pretrained_model_name_or_path is dir
+        if is_local:
 
-                def local_weight_file_path(weight_file_name: str):
-                    return os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(weight_file_name, variant)
-                    )
+            def local_weight_file_path(weight_file_name: str):
+                return os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(weight_file_name, variant))
 
-                def local_weight_file_exist(weight_file_name: str):
-                    return os.path.isfile(local_weight_file_path(weight_file_name))
+            def local_weight_file_exist(weight_file_name: str):
+                return os.path.isfile(local_weight_file_path(weight_file_name))
 
-                if local_weight_file_exist(WEIGHTS_NAME):
-                    # Load from a paddle checkpoint
-                    archive_file = local_weight_file_path(WEIGHTS_NAME)
-                elif local_weight_file_exist(WEIGHTS_INDEX_NAME):
-                    # Load from a sharded paddle checkpoint
-                    archive_file = local_weight_file_path(WEIGHTS_INDEX_NAME)
-                    is_sharded = True
-                elif is_safetensors_available() and local_weight_file_exist(SAFE_WEIGHTS_NAME):
-                    # Load from a safetensors checkpoint
-                    archive_file = local_weight_file_path(SAFE_WEIGHTS_NAME)
-                elif is_safetensors_available() and local_weight_file_exist(SAFE_WEIGHTS_INDEX_NAME):
-                    # Load from a sharded safetensors checkpoint
-                    archive_file = local_weight_file_path(SAFE_WEIGHTS_INDEX_NAME)
-                    is_sharded = True
-                # At this stage we don't have a weight file so we will raise an error.
-                else:
-                    raise EnvironmentError(
-                        f"Error no file named {_add_variant(WEIGHTS_NAME, variant)}, found in directory"
-                        f" {pretrained_model_name_or_path}."
-                    )
-            # pretrained_model_name_or_path is file
-            elif os.path.isfile(os.path.join(subfolder, pretrained_model_name_or_path)):
-                archive_file = pretrained_model_name_or_path
-                is_local = True
-            elif is_url(pretrained_model_name_or_path):
-                filename = pretrained_model_name_or_path
-                resolved_archive_file = get_path_from_url_with_filelock(
-                    pretrained_model_name_or_path, cache_dir=cache_dir
+            if local_weight_file_exist(WEIGHTS_NAME):
+                # Load from a paddle checkpoint
+                resolved_archive_file = local_weight_file_path(WEIGHTS_NAME)
+            elif local_weight_file_exist(WEIGHTS_INDEX_NAME):
+                # Load from a sharded paddle checkpoint
+                resolved_archive_file = local_weight_file_path(WEIGHTS_INDEX_NAME)
+                is_sharded = True
+            elif is_safetensors_available() and local_weight_file_exist(SAFE_WEIGHTS_NAME):
+                # Load from a safetensors checkpoint
+                resolved_archive_file = local_weight_file_path(SAFE_WEIGHTS_NAME)
+            elif is_safetensors_available() and local_weight_file_exist(SAFE_WEIGHTS_INDEX_NAME):
+                # Load from a sharded safetensors checkpoint
+                resolved_archive_file = local_weight_file_path(SAFE_WEIGHTS_INDEX_NAME)
+                is_sharded = True
+            # At this stage we don't have a weight file so we will raise an error.
+            else:
+                raise EnvironmentError(
+                    f"Error no file named {_add_variant(WEIGHTS_NAME, variant)}, found in directory"
+                    f" {pretrained_model_name_or_path}."
                 )
-            else:
-                # set correct filename
-                if is_safetensors_available():
-                    filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
-                else:
-                    filename = _add_variant(WEIGHTS_NAME, variant)
-
-                try:
-                    # Load from URL or cache if already cached
-                    cached_file_kwargs = dict(
-                        cache_dir=cache_dir,
-                        subfolder=subfolder,
-                        _raise_exceptions_for_missing_entries=False,
-                    )
-                    resolved_archive_file = None
-                    if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-                        # fetch the weight url from the `pretrained_resource_files_map`
-                        resource_file_url = cls.pretrained_resource_files_map["model_state"][
-                            pretrained_model_name_or_path
-                        ]
-                        resolved_archive_file = cached_file(
-                            resource_file_url, _add_variant(WEIGHTS_NAME, variant), **cached_file_kwargs
-                        )
-
-                    if resolved_archive_file is None:
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path, filename, **cached_file_kwargs
-                        )
-                    else:
-                        # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
-                        filename = _add_variant(WEIGHTS_NAME, variant)
-
-                    # Since we set _raise_exceptions_for_missing_entries=False, we don't get an exception but a None
-                    # result when internet is up, the repo and revision exist, but the file does not.
-                    if resolved_archive_file is None and filename == _add_variant(SAFE_WEIGHTS_NAME, variant):
-                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path,
-                            _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
-                            **cached_file_kwargs,
-                        )
-                        if resolved_archive_file is not None:
-                            is_sharded = True
-                        else:
-                            # This repo has no safetensors file of any kind, we switch to PyTorch.
-                            filename = _add_variant(WEIGHTS_NAME, variant)
-                            resolved_archive_file = cached_file(
-                                pretrained_model_name_or_path, filename, **cached_file_kwargs
-                            )
-                    if resolved_archive_file is None and filename == _add_variant(WEIGHTS_NAME, variant):
-                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path,
-                            _add_variant(WEIGHTS_INDEX_NAME, variant),
-                            **cached_file_kwargs,
-                        )
-                        if resolved_archive_file is not None:
-                            is_sharded = True
-                    if resolved_archive_file is None:
-                        # Otherwise, maybe there is a TF or Flax model file.  We try those to give a helpful error
-                        # message.
-                        raise EnvironmentError(
-                            f"{pretrained_model_name_or_path} does not appear to have a file named"
-                            f" {_add_variant(WEIGHTS_NAME, variant)}."
-                        )
-                except Exception:
-                    # For any other exception, we throw a generic error.
-                    raise
-
-            if is_local:
-                logger.info(f"loading weights file {archive_file}")
-                resolved_archive_file = archive_file
-            else:
-                logger.info(f"loading weights file {filename} from cache at {resolved_archive_file}")
+        # pretrained_model_name_or_path is file
+        elif os.path.isfile(os.path.join(subfolder, pretrained_model_name_or_path)):
+            resolved_archive_file = pretrained_model_name_or_path
+            is_local = True
+        elif is_url(pretrained_model_name_or_path):
+            resolved_archive_file = get_path_from_url_with_filelock(pretrained_model_name_or_path, root_dir=cache_dir)
         else:
+            # Load from URL or cache if already cached
             resolved_archive_file = None
+            if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+                # fetch the weight url from the `pretrained_resource_files_map`
+                resolved_archive_file_url = cls.pretrained_resource_files_map["model_state"][
+                    pretrained_model_name_or_path
+                ]
+                assert is_url(
+                    resolved_archive_file_url
+                ), f"find the model<{pretrained_model_name_or_path}>, but the archive file<{resolved_archive_file_url}> is not url"
 
-        # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
+                return cls._resolve_model_file_path_v2(
+                    resolved_archive_file_url,
+                    from_hf_hub=from_hf_hub,
+                    cache_dir=cache_dir,
+                    subfolder=subfolder,
+                    config=config,
+                    support_conversion=support_conversion,
+                    variant=variant,
+                )
+
+            # check whether the safetensor file exist
+            def remote_weight_file_path(weight_file_name: str):
+                return os.path.join(
+                    COMMUNITY_MODEL_PREFIX,
+                    pretrained_model_name_or_path,
+                    subfolder,
+                    _add_variant(weight_file_name, variant),
+                )
+
+            def remote_weight_file_exist(weight_file_name: str):
+                return url_file_exists(remote_weight_file_path(weight_file_name))
+
+            if remote_weight_file_exist(WEIGHTS_NAME):
+                # Load from a paddle checkpoint
+                resolved_archive_file = remote_weight_file_path(WEIGHTS_NAME)
+            elif remote_weight_file_exist(WEIGHTS_INDEX_NAME):
+                # Load from a sharded paddle checkpoint
+                resolved_archive_file = remote_weight_file_path(WEIGHTS_INDEX_NAME)
+                is_sharded = True
+            elif is_safetensors_available() and remote_weight_file_exist(SAFE_WEIGHTS_NAME):
+                # Load from a safetensors checkpoint
+                resolved_archive_file = remote_weight_file_path(SAFE_WEIGHTS_NAME)
+            elif is_safetensors_available() and remote_weight_file_exist(SAFE_WEIGHTS_INDEX_NAME):
+                # Load from a sharded safetensors checkpoint
+                resolved_archive_file = remote_weight_file_path(SAFE_WEIGHTS_INDEX_NAME)
+                is_sharded = True
+            # At this stage we don't have a weight file so we will raise an error.
+            else:
+                raise EnvironmentError(
+                    f"Error no file named {_add_variant(WEIGHTS_NAME, variant)}, found in directory"
+                    f" {pretrained_model_name_or_path}."
+                )
+
+            assert is_url(
+                resolved_archive_file
+            ), f"resolved archive weight file<{resolved_archive_file}> must be the url"
+            resolved_archive_file = get_path_from_url_with_filelock(resolved_archive_file, root_dir=cache_dir)
+
         if is_sharded:
             # rsolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
             resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
@@ -1740,7 +1463,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 cache_dir=cache_dir,
                 subfolder=subfolder,
             )
-        # import pdb;pdb.set_trace()
 
         return resolved_archive_file, sharded_metadata, is_sharded
 
@@ -1823,7 +1545,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
                 if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
@@ -1864,9 +1585,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         )
 
         if ENABLE_TORCH_CHECKPOINT:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+            msg = f"weight file<{_add_variant(PADDLE_WEIGHT_FILE_NAME, variant)}> or <{_add_variant(PYTORCH_WEIGHT_FILE_NAME, variant)}> not found"
         else:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+            msg = f"weight file<{_add_variant(PADDLE_WEIGHT_FILE_NAME, variant)}> not found"
 
         raise FileNotFoundError(msg)
 
@@ -1897,8 +1618,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Tuple[List[str]]: _description_
         """
-        is_safetensors = False
-
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
@@ -1923,6 +1642,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         elif add_prefix_to_model:
             expected_keys = [".".join([prefix, s]) for s in expected_keys]
 
+        original_loaded_keys = loaded_keys
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
 
@@ -1979,17 +1699,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
-        # Whole checkpoint
-        mismatched_keys = _find_mismatched_keys(
-            state_dict,
-            model_state_dict,
-            loaded_keys,
-            add_prefix_to_model,
-            remove_prefix_from_model,
-            ignore_mismatched_sizes,
-        )
+        # convert the dtype of state dict
+        if dtype is not None:
+            if isinstance(dtype, paddle.dtype):
+                dtype = str(dtype)[7:]
+
+            if dtype not in ["float32", "float16", "bfloat16"]:
+                raise ValueError(
+                    f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
+                )
 
         if state_dict is not None:
+            # Whole checkpoint
+            mismatched_keys = _find_mismatched_keys(
+                state_dict,
+                model_state_dict,
+                loaded_keys,
+                add_prefix_to_model,
+                remove_prefix_from_model,
+                ignore_mismatched_sizes,
+            )
+
             # Whole checkpoint
             # For model parallel if FastGeneration
             # To avoid recursive import temporarily.
@@ -2011,18 +1741,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
-
             # This should always be a list but, just to be sure.
             if not isinstance(resolved_archive_file, list):
                 resolved_archive_file = [resolved_archive_file]
 
-            error_msgs = []
-            mismatched_keys = []
-
             if len(resolved_archive_file) > 1:
-                # resolved_archive_file = logging.tqdm(resolved_archive_file, desc="Loading checkpoint shards")
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
+            mismatched_keys, error_msgs = [], []
             for shard_file in resolved_archive_file:
                 state_dict = load_state_dict(shard_file)
 
@@ -2031,26 +1757,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 mismatched_keys += _find_mismatched_keys(
                     state_dict,
                     model_state_dict,
-                    loaded_keys,
+                    original_loaded_keys,
                     add_prefix_to_model,
                     remove_prefix_from_model,
                     ignore_mismatched_sizes,
                 )
 
-                if low_cpu_mem_usage:
-                    new_error_msgs = _load_state_dict_into_meta_model(
-                        model_to_load,
-                        state_dict,
-                        loaded_keys,
-                        start_prefix,
-                        expected_keys,
-                        dtype=dtype,
-                        is_safetensors=is_safetensors,
-                        keep_in_fp32_modules=keep_in_fp32_modules,
-                    )
-                    error_msgs += new_error_msgs
-                else:
-                    error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
 
                 # force memory release
                 del state_dict
@@ -2099,7 +1812,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained_v2(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -2162,17 +1877,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
+        cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-
-        init_contexts = []
-        if low_cpu_mem_usage:
-            load_state_as_np = True
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
+        dtype = kwargs.pop("dtype", None)
+        variant = kwargs.pop("variant", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -2189,9 +1897,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
         else:
             model_kwargs = kwargs
+        if dtype is None:
+            dtype = config.dtype
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
+
+        init_contexts = []
+        if low_cpu_mem_usage:
+            load_state_as_np = True
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
@@ -2203,6 +1924,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             from_hf_hub=from_hf_hub,
             config=config,
             support_conversion=support_conversion,
+            variant=variant,
         )
 
         if resolved_archive_file is None:
@@ -2213,23 +1935,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 config=config,
                 support_conversion=support_conversion,
+                variant=variant,
             )
 
         # load pt weights early so that we know which dtype to init the model under
+        import pdb
+
+        pdb.set_trace()
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
             # state_dict = load_state_dict(resolved_archive_file)
-            if resolved_archive_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
+            if resolved_archive_file.endswith(_add_variant(PYTORCH_WEIGHT_FILE_NAME, variant)):
                 if support_conversion:
                     # try to get the name-mapping info
                     logger.info(
                         f"start to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)}> ..."
+                        f"paddle weight file<{os.path.join(cache_dir, _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant))}> ..."
                     )
                     state_dict = cls.convert(resolved_archive_file, config, cache_dir)
                 else:
                     raise ValueError(
-                        f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
+                        f"download the {_add_variant(PYTORCH_WEIGHT_FILE_NAME, variant)} weight file, but model<{cls}> "
                         "don't support conversion from pytorch weight file to paddle weight file "
                         "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                     )
@@ -2238,7 +1964,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                     state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
                 else:
-                    state_dict = paddlenlp_load(resolved_archive_file, return_numpy=load_state_as_np)
+                    state_dict = paddlenlp_load(resolved_archive_file, "numpy" if load_state_as_np else "cpu")
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]

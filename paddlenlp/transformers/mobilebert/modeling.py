@@ -527,10 +527,6 @@ class MobileBertPretrainedModel(PretrainedModel):
     base_model_prefix = "mobilebert"
     config_class = MobileBertConfig
 
-    def init_weights(self):
-        # Initialize the weights.
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, nn.Linear):
@@ -594,7 +590,6 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
         super(MobileBertForPreTraining, self).__init__(config)
         self.mobilebert = MobileBertModel(config)
         self.cls = MobileBertPreTrainingHeads(config)
-        self.init_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
@@ -767,8 +762,6 @@ class MobileBertModel(MobileBertPretrainedModel):
         self.encoder = MobileBertEncoder(config)
         self.num_hidden_layers = config.num_hidden_layers
         self.pooler = MobileBertPooler(config) if config.add_pooling_layer else None
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -969,8 +962,6 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids,
@@ -1076,8 +1067,6 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
         self.num_labels = 2
         self.mobilebert = MobileBertModel(config)
         self.qa_outputs = nn.Linear(self.config.hidden_size, self.num_labels)
-
-        self.init_weights()
 
     def forward(
         self,
