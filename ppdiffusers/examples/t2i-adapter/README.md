@@ -111,7 +111,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_t2i_adapte
 ```
 
 ## 模型推理
-待模型训练完毕，会在`output_dir`保存训练好的模型权重，我们可以使用如下的代码进行推理
+### 简易推理
+待模型训练完毕，会在`output_dir`保存训练好的模型权重，我们可以使用如下的代码进行推理。
 ```python
 from ppdiffusers import StableDiffusionAdapterPipeline, Adapter
 from ppdiffusers.utils import load_image
@@ -121,3 +122,31 @@ pose_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/westfi
 img = pipe(prompt="a beautiful girl", image=pose_image, guidance_scale=9, num_inference_steps=50).images[0]
 img.save("demo.png")
 ```
+
+### 测试集推理
+我们可以使用如下命令针对相应的测试集（需符合`adapter/data_preprocess.py`的数据处理逻辑）进行测试。
+```
+num="10000"
+python generate.py \
+    --adapter_model_name_or_path sd15_openpose/checkpoint-$num/adapter \
+    --sd_model_name_or_path runwayml/stable-diffusion-v1-5 \
+    --file data/test.openpose.filelist \
+    --seed 42 \
+    --scheduler_type ddim \
+    --device gpu \
+    --batch_size 16 \
+    --num_inference_steps 50 \
+    --save_path output/adapter/openpose/$num
+```
+`generate.py`关键传入的参数解释如下：
+> * `--adapter_model_name_or_path`: 我们需要评估的Adapter的模型名称或地址
+> * `--file`: 需要测试的数据。
+> * `--batch_size`: 生成图片所使用的batch_size。
+> * `--save_path`: 生成的图片所要保存的路径。
+> * `--guidance_scales`: guidance_scales值，我们可以输入3 5 7。
+> * `--seed`: 随机种子。
+> * `--scheduler_type`: 采样器的类型，支持`ddim`, `pndm`, `euler-ancest` 和 `lms`。
+> * `--num_inference_steps`: 推理预测时候使用的步数。
+> * `--device`: 使用的设备，可以是`gpu`, `cpu`, `gpu:0`, `gpu:1`等。
+
+
