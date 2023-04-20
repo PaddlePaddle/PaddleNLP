@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
@@ -164,13 +164,13 @@ class ElectraPretrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: ElectraConfig) -> List[StateDictNameMapping]:
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["embeddings_project.weight", "embeddings_project.weight", "transpose"],
-            ["embeddings_project.bias", "embeddings_project.bias"],
+            ["embeddings_project.weight", None, "transpose"],
+            "embeddings_project.bias",
         ]
 
         for layer_index in range(config.num_hidden_layers):
@@ -236,6 +236,7 @@ class ElectraPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
         # base-model prefix "ElectraModel"
         if "ElectraModel" not in config.architectures:
             for mapping in model_mappings:
@@ -272,7 +273,7 @@ class ElectraPretrainedModel(PretrainedModel):
             model_mappings.extend(
                 [
                     ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    "classifier.bias",
                 ]
             )
 
@@ -282,20 +283,14 @@ class ElectraPretrainedModel(PretrainedModel):
                 [
                     ["generator_predictions.LayerNorm.weight", "generator_predictions.layer_norm.weight", "transpose"],
                     ["generator_predictions.LayerNorm.bias", "generator_predictions.layer_norm.bias"],
-                    ["generator_predictions.dense.weight", "generator_predictions.dense.weight", "transpose"],
-                    ["generator_predictions.dense.bias", "generator_predictions.dense.bias"],
+                    ["generator_predictions.dense.weight", None, "transpose"],
+                    "generator_predictions.dense.bias",
                     ["generator_lm_head.bias", "generator_lm_head_bias"],
                 ]
             )
 
+        init_name_mappings(model_mappings)
         return [StateDictNameMapping(*mapping) for mapping in model_mappings]
-
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
 
     def _init_weights(self, layer):
         """Initialize the weights"""
@@ -352,8 +347,6 @@ class ElectraModel(ElectraPretrainedModel):
             act_dropout=0,
         )
         self.encoder = TransformerEncoder(encoder_layer, config.num_hidden_layers)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -504,7 +497,6 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
         self.electra = ElectraModel(config)
         self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -581,7 +573,6 @@ class ElectraGenerator(ElectraPretrainedModel):
             self.generator_lm_head_bias = self.create_parameter(
                 shape=[config.vocab_size], dtype=paddle.get_default_dtype(), is_bias=True
             )
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.electra.embeddings.word_embeddings
@@ -743,8 +734,6 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         self.discriminator_csp = ElectraClassificationHead(config)
 
-        self.init_weights()
-
     def forward(self, input_ids, candidate_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
 
@@ -807,7 +796,6 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
         self.num_labels = config.num_labels
         self.electra = ElectraModel(config)
         self.classifier = ElectraClassificationHead(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -920,7 +908,6 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.init_weights()
 
     def forward(
         self,
@@ -1027,8 +1014,6 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         self.generator = ElectraGenerator(config)
         self.discriminator = ElectraDiscriminator(config)
         self.initializer_range = config.initializer_range
-        self.init_weights()
-        # Tie weights if needed
         self.tie_weights()
 
     def get_input_embeddings(self):
@@ -1200,7 +1185,6 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         self.generator = ElectraGenerator(config)
         self.discriminator = ErnieHealthDiscriminator(config)
         self.initializer_range = config.initializer_range
-        self.init_weights()
 
     def get_discriminator_inputs_ernie_health(
         self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample
@@ -1316,7 +1300,6 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         self.dropout = nn.Dropout(dropout_p)
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.init_weights()
 
     def forward(
         self,
@@ -1690,7 +1673,6 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
         super(ElectraForQuestionAnswering, self).__init__(config)
         self.electra = ElectraModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.init_weights()
 
     def forward(
         self,

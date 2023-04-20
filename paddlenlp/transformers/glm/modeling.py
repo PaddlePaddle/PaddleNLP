@@ -23,9 +23,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.initializer import normal_, ones_, zeros_
 from ...utils.log import logger
@@ -183,7 +184,12 @@ class GLMAttention(nn.Layer):
 
         attention_scores = attention_scores + (-65504.0) * (1.0 - ltor_mask)
         attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = self.attention_dropout(attention_probs)
+
+        if "local_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                attention_probs = self.attention_dropout(attention_probs)
+        else:
+            attention_probs = self.attention_dropout(attention_probs)
 
         # [bs,  num_head, seq_len, seq_len(+cache_len)] * [bs,  num_head, seq_len(+cache_len), head_dim]
         # [bs,  num_head, seq_len, head_dim]
@@ -194,7 +200,12 @@ class GLMAttention(nn.Layer):
         new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
         context_layer = context_layer.reshape(new_context_shape)
         output = self.dense(context_layer)
-        output = self.output_dropout(output)
+
+        if "global_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("global_seed"):
+                output = self.output_dropout(output)
+        else:
+            output = self.output_dropout(output)
 
         return output
 
@@ -257,7 +268,13 @@ class GPT2MLP(nn.Layer):
 
         # [batch_size, sequence_length, h]
         output = self.dense_4h_to_h(intermediate_parallel)
-        output = self.dropout(output)
+
+        if "global_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("global_seed"):
+                output = self.dropout(output)
+        else:
+            output = self.dropout(output)
+
         return output
 
 
@@ -359,7 +376,12 @@ class GLMStack(nn.Layer):
         if self.block_position_encoding:
             block_position_embeddings = self.block_position_embeddings(block_position_ids)
             hidden_states = hidden_states + block_position_embeddings
-        hidden_states = self.embedding_dropout(hidden_states)
+
+        if "local_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                hidden_states = self.embedding_dropout(hidden_states)
+        else:
+            hidden_states = self.embedding_dropout(hidden_states)
 
         all_hidden_states = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
@@ -461,11 +483,11 @@ class GLMPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["transformer.position_embeddings.weight", "transformer.position_embeddings.weight"],
-            ["transformer.block_position_embeddings.weight", "transformer.block_position_embeddings.weight"],
-            ["transformer.final_layernorm.weight", "transformer.final_layernorm.weight"],
-            ["transformer.final_layernorm.bias", "transformer.final_layernorm.bias"],
+            "word_embeddings.weight",
+            "transformer.position_embeddings.weight",
+            "transformer.block_position_embeddings.weight",
+            "transformer.final_layernorm.weight",
+            "transformer.final_layernorm.bias",
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = []
@@ -499,6 +521,7 @@ class GLMPretrainedModel(PretrainedModel):
                 )
 
             model_mappings.extend(layer_mappings)
+        init_name_mappings(model_mappings)
 
         import numpy as np
 

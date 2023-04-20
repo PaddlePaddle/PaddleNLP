@@ -344,9 +344,7 @@ class ChatGLMBlock(nn.Layer):
         cache: Tensor = None,
     ):
         # Layer norm before transformer layer
-        hidden_states = hidden_states.astype("float32")
         attention_input = self.input_layernorm(hidden_states)
-        attention_input.astype(self.dtype)
         # Self attention
         attention_output, cache, _ = self.attention(
             hidden_states=attention_input,
