@@ -160,7 +160,7 @@ class ErniePretrainedModel(PretrainedModel):
     pretrained_init_configuration = ERNIE_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -217,7 +217,6 @@ class ErnieModel(ErniePretrainedModel):
             encoder_layer, config.num_hidden_layers, enable_recompute=config.enable_recompute
         )
         self.pooler = ErniePooler(config, weight_attr)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -399,7 +398,6 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -514,7 +512,6 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         super(ErnieForQuestionAnswering, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -642,7 +639,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -828,7 +824,6 @@ class ErnieForPretraining(ErniePretrainedModel):
             weight_attr=weight_attr,
         )
 
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -995,8 +990,6 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         super(ErnieForMaskedLM, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.cls = ErnieOnlyMLMHead(config=config)
-
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -1120,7 +1113,6 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1232,7 +1224,6 @@ class UIE(ErniePretrainedModel):
         self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
         self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1293,7 +1284,6 @@ class UTC(ErniePretrainedModel):
         self.predict_size = 64
         self.linear_q = paddle.nn.Linear(config.hidden_size, self.predict_size)
         self.linear_k = paddle.nn.Linear(config.hidden_size, self.predict_size)
-        self.apply(self.init_weights)
 
     def forward(
         self,

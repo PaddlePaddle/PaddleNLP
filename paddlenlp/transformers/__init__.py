@@ -107,6 +107,7 @@ from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .funnel.configuration import *
 from .llama.configuration import *
 from .llama.modeling import *
 from .llama.tokenizer import *
@@ -240,6 +241,9 @@ from .clipseg.image_processing import *
 from .blip_2.modeling import *
 from .blip_2.configuration import *
 from .blip_2.processing import *
+from .chatglm.configuration import *
+from .chatglm.modeling import *
+from .chatglm.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
