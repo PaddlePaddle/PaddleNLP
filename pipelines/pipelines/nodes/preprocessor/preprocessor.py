@@ -47,7 +47,6 @@ iso639_to_nltk = {
     "no": "norwegian",
     "pl": "polish",
     "pt": "portuguese",
-    "ch": "chinese",
 }
 
 
@@ -62,7 +61,7 @@ class PreProcessor(BasePreProcessor):
         split_overlap: int = 0,
         split_answers: bool = False,
         split_respect_sentence_boundary: bool = True,
-        language: str = "ch",
+        language: str = "en",
     ):
         """
         :param clean_header_footer: Use heuristic to remove footers and headers across different pages by searching
@@ -116,7 +115,7 @@ class PreProcessor(BasePreProcessor):
         self.split_length = split_length
         self.split_overlap = split_overlap
         self.split_respect_sentence_boundary = split_respect_sentence_boundary
-        self.language = iso639_to_nltk.get(language, language)
+        self.language = language
         self.print_log: Set[str] = set()
         self.split_answers = split_answers
 
@@ -270,6 +269,7 @@ class PreProcessor(BasePreProcessor):
             if self.language == "chinese":
                 sentences = text
             else:
+                print(self.language)
                 language_name = iso639_to_nltk.get(self.language)
                 sentences = nltk.tokenize.sent_tokenize(text, language=language_name)
 
@@ -331,7 +331,8 @@ class PreProcessor(BasePreProcessor):
             elif split_by == "passage":
                 elements = text.split("\n\n")
             elif split_by == "sentence":
-                elements = nltk.tokenize.sent_tokenize(text, language=self.language)
+                language_name = iso639_to_nltk.get(self.language)
+                elements = nltk.tokenize.sent_tokenize(text, language=language_name)
             elif split_by == "word":
                 elements = text.split(" ")
             else:

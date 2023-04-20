@@ -37,6 +37,7 @@ class PDFToTextConverter(BaseConverter):
     def __init__(
         self,
         remove_numeric_tables: bool = False,
+        language: str = "en",
         valid_languages: Optional[List[str]] = None,
         merge_sentences: Optional[bool] = False,
     ):
@@ -51,12 +52,14 @@ class PDFToTextConverter(BaseConverter):
                                 This option can be used to add test for encoding errors. If the extracted text is
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
+        :param merge_sentences:  Merge all sentences split by \n in one page into a paragraph.
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
         super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
         self.merge_sentences = merge_sentences
+        self.language = language
 
     def convert(
         self,
@@ -64,7 +67,7 @@ class PDFToTextConverter(BaseConverter):
         meta: Optional[Dict[str, str]] = None,
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "Latin1",
+        language: Optional[str] = "en",
         merge_sentences: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -83,21 +86,18 @@ class PDFToTextConverter(BaseConverter):
                                 This option can be used to add test for encoding errors. If the extracted text is
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
-        :param encoding: Encoding that will be passed as -enc parameter to pdftotext. "Latin 1" is the default encoding
-                         of pdftotext. While this works well on many PDFs, it might be needed to switch to "UTF-8" or
-                         others if your doc contains special characters (e.g. German Umlauts, Cyrillic characters ...).
-                         Note: With "UTF-8" we experienced cases, where a simple "fi" gets wrongly parsed as
-                         "xef\xac\x81c" (see test cases). That's why we keep "Latin 1" as default here.
-                         (See list of available encodings by running `pdftotext -listenc` in the terminal)
+        :param merge_sentences:  Merge all sentences split by \n in one page into a paragraph.
         """
 
-        pages = self._read_pdf(file_path, layout=False, encoding=encoding)
+        pages = self._read_pdf(file_path, layout=False)
         if remove_numeric_tables is None:
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
             valid_languages = self.valid_languages
         if merge_sentences is None:
             merge_sentences = self.merge_sentences
+        if language is None:
+            language = self.language
         cleaned_pages = []
         for page in pages:
             # pdftotext tool provides an option to retain the original physical layout of a PDF page. This behaviour
@@ -114,7 +114,10 @@ class PDFToTextConverter(BaseConverter):
 
             cleaned_lines = []
             for line in lines:
-                words = list(line)
+                if self.language == "chinese":
+                    words = list(line)
+                else:
+                    words = line.split()
                 digits = [word for word in words if any(i.isdigit() for i in word)]
 
                 # remove lines having > 40% of words as digits AND not ending with a period(.)
@@ -141,7 +144,7 @@ class PDFToTextConverter(BaseConverter):
         document = {"content": text, "content_type": "text", "meta": meta}
         return [document]
 
-    def _read_pdf(self, file_path: Path, layout: bool, encoding: Optional[str] = "Latin1") -> List[str]:
+    def _read_pdf(self, file_path: Path, layout: bool) -> List[str]:
         """
         Extract pages from the pdf file at file_path.
 
