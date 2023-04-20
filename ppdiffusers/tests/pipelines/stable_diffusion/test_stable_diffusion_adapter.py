@@ -18,7 +18,7 @@ import unittest
 
 import numpy as np
 import paddle
-from transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
+from ppdiffusers.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 
 from ppdiffusers import (
     Adapter,
