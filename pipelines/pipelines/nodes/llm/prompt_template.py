@@ -12,6 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .ernie_bot import ErnieBot
-from .history import TruncatedConversationHistory
-from .prompt_template import PromptTemplate
+from pipelines.nodes.base import BaseComponent
+
+
+class PromptTemplate(BaseComponent):
+    outgoing_edges = 1
+
+    def __init__(self, template):
+        self.template = template
+
+    def run(self, query=None, documents=None):
+        documents = [i.content for i in documents]
+        context = "".join(documents)
+        result = {"documents": context, "query": query}
+        return {"query": self.template.format(**result)}, "output_1"
