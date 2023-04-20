@@ -11,17 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import argparse
 import os
 
 import paddle
-from configuration import BloomConfig
-from model_split_merge import merge_model_parallel
-from modeling import BloomForGeneration
-from transformers import AutoTokenizer
 
-MODEL_CLASSES = {"bigscience/bloom-560m": (BloomForGeneration)}
+from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
+
+MODEL_CLASSES = {"bloom": (BloomForCausalLM)}
 
 
 def parse_args():
@@ -29,64 +28,89 @@ def parse_args():
     # Required parameters
     parser.add_argument(
         "--model_type",
-        default="bigscience/bloom-560m",
+        default="bloom",
         type=str,
         # required=True,
         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
-        "--model_path",
-        default="output_generate/splits_mp_01_sharding_01_500/",
+        "--model_dtype",
+        default="float32",
+        type=str,
+        help="Model dtype selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+    )
+    parser.add_argument(
+        "--model_name_or_path",
+        default="bigscience/bloom-560m",
         type=str,
         required=False,
-        help="Path of the trained model to be exported.",
+        help="name or path of the trained model to be exported.",
     )
     parser.add_argument(
         "--output_path",
-        default="inference/bloom",
+        default="./pretrained/bloom-560m-generation/bloom",
         type=str,
         # required=True,
         help="The output file prefix used to save the exported inference model.",
+    )
+    parser.add_argument(
+        "--max_length",
+        default=20,
+        type=int,
+        help="max length of output sentence",
     )
     args = parser.parse_args()
     return args
 
 
 def main():
+    # most dtype of bloom model weights are float16, expect Bloom(176B) is bfloat16
     args = parse_args()
+    paddle.set_default_dtype(args.model_dtype)
 
     args.model_type = args.model_type.lower()
     model_class = MODEL_CLASSES[args.model_type]
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    config = BloomConfig.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    # Set the generaiton the hyperparameter
-    config.max_dec_len = 20
-    config.temperature = 0.5
-    config.decode_strateg = "sampling"
-    config.eos_token_id = tokenizer.eos_token_id
-    config.bos_token_id = tokenizer.bos_token_id
-    config.pad_token_id = tokenizer.pad_token_id
-    config.use_cache = True
-    config.top_k = 1
+    config = BloomConfig.from_pretrained(args.model_name_or_path)
     config.use_recompute = False
-    config.use_pure_fp16 = False
-
-    # Merge the model splits to a total model
-    merge_model_path = merge_model_parallel(args.model_path, config)
-
     # Load the model and parameter
-    config.mp_degree = 1
-    model = model_class.from_pretrained(merge_model_path, config=config)
+    model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
     model.eval()
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-        ],
-    )
+    input_spec = [
+        paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        None,
+        None,
+        # max_length
+        args.max_length,
+        # min_length
+        0,
+        # decode_strategy
+        "sampling",
+        # temperature
+        1.0,
+        # top_k
+        1,
+        # top_p
+        1.0,
+        1.0,
+        # repetition_penalty
+        1,
+        # num_beam_groups
+        1,
+        0.0,
+        # early_stopping
+        False,
+        # bos_token_id
+        tokenizer.bos_token_id,
+        # eos_token_id
+        tokenizer.eos_token_id,
+        # pad_token_id
+        tokenizer.pad_token_id,
+    ]
+    model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 
     # # Save converted static graph model
     paddle.jit.save(model, args.output_path)

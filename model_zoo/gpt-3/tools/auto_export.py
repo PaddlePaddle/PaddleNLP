@@ -14,13 +14,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-import copy
 import os
-import random
 import sys
-
-import numpy as np
-import paddle
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../")))

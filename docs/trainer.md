@@ -249,6 +249,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         Number of updates steps to accumulate before
                         performing a backward/update pass. (default: 1)
 
+  --eval_accumulation_steps
+                        在将结果移动到CPU之前，累积输出张量的预测步骤数。如果如果未设置，
+                        则在移动到CPU之前，整个预测都会在GPU上累积（速度更快需要更多的显存）。
+                        （`int`，可选，默认为 None 不设置）
+
+                        Number of predictions steps to accumulate the output tensors for,
+                        before moving the results to the CPU. If left unset, the whole predictions are
+                        accumulated on GPU before being moved to the CPU (faster butrequires more memory)
+                        (default: None)
+
   --learning_rate
                         优化器的初始学习率, （`float`，可选，默认为 5e-05）
 

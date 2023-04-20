@@ -275,7 +275,7 @@ class GLMModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     def test_model_from_pretrained(self):
         for model_name in GLM_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GLMModel.from_pretrained(model_name)
-            tokenizer = GLMTokenizer.from_pretrained("model_name")
+            tokenizer = GLMTokenizer.from_pretrained(model_name)
             tokens = tokenizer._encode("hello world [MASK]")
             input_ids, _, _, position_ids, attention_mask, _, _ = tokenizer.build_input_from_ids(
                 text_a_ids=tokens, tokenizer=tokenizer

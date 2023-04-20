@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -194,7 +195,7 @@ class AttentionControlEdit(AttentionStore, abc.ABC):
         self.cross_replace_alpha = ptp_utils.get_time_words_attention_alpha(
             prompts, num_steps, cross_replace_steps, tokenizer
         ).cast(paddle_dtype)
-        if type(self_replace_steps) is float:
+        if type(self_replace_steps) is float or type(self_replace_steps) is int:
             self_replace_steps = 0, self_replace_steps
         self.num_self_replace = int(num_steps * self_replace_steps[0]), int(num_steps * self_replace_steps[1])
         self.local_blend = local_blend
@@ -276,6 +277,12 @@ def inference(
 
     ratio = min(height / img.height, width / img.width)
     img = img.resize((int(img.width * ratio), int(img.height * ratio)))
+    # make sure dtype is float
+    source_guidance_scale = float(source_guidance_scale)
+    guidance_scale = float(guidance_scale)
+    strength = float(strength)
+    self_replace_steps = float(self_replace_steps)
+    cross_replace_steps = float(cross_replace_steps)
 
     # create the CAC controller.
     if cross_attention_control == "Replace":

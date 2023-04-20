@@ -226,15 +226,10 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         "THUDM/glm-10b-chinese": {"do_lower_case": True},
     }
     cog_model_link = "https://paddlenlp.bj.bcebos.com/models/community/THUDM/cog-pretrain.model"
-    added_tokens_link = "https://paddlenlp.bj.bcebos.com/models/community/THUDM/glm-chinese-added-tokens.json"
     pretrained_resource_files_map = {
         "model_file": {
             "THUDM/glm-large-chinese": cog_model_link,
             "THUDM/glm-10b-chinese": cog_model_link,
-        },
-        "added_tokens_file": {
-            "THUDM/glm-large-chinese": added_tokens_link,
-            "THUDM/glm-10b-chinese": added_tokens_link,
         },
     }
     max_model_input_sizes = {"THUDM/glm-10b-chinese": 1024, "THUDM/glm-large-chinese": 1024}
@@ -248,8 +243,18 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         mask_token="[MASK]",
         pad_token="<|endoftext|>",
         eos_token="<|endoftext|>",
+        additional_special_tokens=None,
         **kwargs
     ):
+        if additional_special_tokens is None:
+            additional_special_tokens = [
+                "[UNUSED1]",
+                "[UNUSED2]",
+                "<|startofpiece|>",
+                "<|endofpiece|>",
+                "[sMASK]",
+                "[gMASK]",
+            ]
         super().__init__(
             cls_token=cls_token,
             sep_token=sep_token,
@@ -257,6 +262,7 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
             mask_token=mask_token,
             pad_token=pad_token,
             eos_token=eos_token,
+            additional_special_tokens=additional_special_tokens,
             **kwargs,
         )
         self._model_file = model_file
@@ -325,12 +331,16 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         eos = [self.eos_token_id]
         return cls + token_ids_0 + eos
 
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
     def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens: bool = False):
         if already_has_special_tokens:
-            raise ValueError(
-                "You should not supply a second sequence if the provided sequence of "
-                "ids is already formatted with special tokens for the model."
-            )
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
             return list(map(lambda x: 1 if x in [self.eos_token_id, self.cls_token_id] else 0, token_ids_0))
         if token_ids_1 is not None:
             logger.warning("Support single input text and the second one is ignored.")
@@ -342,9 +352,6 @@ class GLMChineseTokenizer(PretrainedTokenizer, GLMTokenizerMixin):
         if token_ids_1 is not None:
             logger.warning("Support single input text and the second one is ignored.")
         return len([self.cls_token_id] + token_ids_0 + [self.eos_token_id]) * [0]
-
-    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
 
 class GLMGPT2Tokenizer(GPTTokenizer, GLMTokenizerMixin):

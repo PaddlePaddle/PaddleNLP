@@ -45,6 +45,7 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
+from ..layers.lora import LoRAModel
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -76,6 +77,7 @@ from .trainer_utils import (
     get_last_checkpoint,
     get_scheduler,
     has_length,
+    set_hyrbid_parallel_seed,
     set_seed,
     speed_metrics,
 )
@@ -211,6 +213,13 @@ class Trainer:
 
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
+        if self.args.use_hybrid_parallel:
+            set_hyrbid_parallel_seed(
+                basic_seed=self.args.seed,
+                dataset_rank=self.args.dataset_rank,
+                tp_rank=self.args.tensor_parallel_rank,
+            )
+
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
 
@@ -274,8 +283,10 @@ class Trainer:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
         self.do_grad_scaling = False
+        self.enable_autocast_context_manager = False
         if args.fp16 or args.bf16:
             logger.info("Using half precision")
+            self.enable_autocast_context_manager = True
             self.do_grad_scaling = True if args.fp16 else False
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
             # fix for load saved fp16 or bf16 ckpt, decorate model first.
@@ -526,8 +537,15 @@ class Trainer:
         logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
         logger.info(
-            f"  Number of trainable parameters = {sum(p.numel().item() for p in model.parameters() if not p.stop_gradient) }"
+            f"  Number of trainable parameters = {sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)} (per device)"
         )
+        if self.args.use_hybrid_parallel and self.args.tensor_parallel_degree > 1:
+            # todo fix for pipeline_parallel_degree
+            logger.info(
+                "  Number of trainable parameters = "
+                f"{sum(p.numel().item() for p in model.parameters() if not p.stop_gradient) * self.args.tensor_parallel_degree}"
+                " (all devices, roughly)"
+            )
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -699,6 +717,10 @@ class Trainer:
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
                         optimizer_was_run = scale_before <= scale_after
+                        if not optimizer_was_run:
+                            logger.warning(
+                                f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
+                            )
                     else:
                         self.optimizer.step()
 
@@ -1281,7 +1303,7 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.args.fp16 or self.args.bf16:
+        if self.enable_autocast_context_manager:
             ctx_manager = autocast(
                 True,
                 custom_black_list=[
@@ -1366,7 +1388,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None):
+    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1377,7 +1399,7 @@ class Trainer:
             output_dir = self.args.output_dir
 
         if self.args.should_save:
-            self._save(output_dir)
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -1454,7 +1476,21 @@ class Trainer:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
+        """
+        set optimizer grouped parameters:
+
+        you can set optimizer_grouped_parameters with whatever argments on whatever parameters to train.
+        """
         self.optimizer_grouped_parameters = optimizer_grouped_parameters
+
+    def disable_autocast_context_manager(self):
+        """
+        For pure fp16 or pure bf16 training, the paddle.amp.autocast is annoy for always cast fp32 to fp16.
+        if you networks cast fp16 to fp32 manually to get higher precision, autocast make it not work, since it cast fp32 to fp16 back.
+
+        """
+        assert self.args.fp16_opt_level == "O2", "disable_autocast_context_manager should only work for pure fp16/bf16"
+        self.enable_autocast_context_manager = False
 
     def _sorted_checkpoints(
         self, output_dir=None, checkpoint_prefix=PREFIX_CHECKPOINT_DIR, use_mtime=False
@@ -1505,32 +1541,31 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
-        if not isinstance(self.model, PretrainedModel):
-            if isinstance(unwrap_model(self.model), PretrainedModel):
 
-                # unwrap_model(self.model).save_pretrained(
-                #     output_dir, state_dict=state_dict)
-                if self.args.use_hybrid_parallel:
-                    unwrap_model(self.model).resource_files_names["model_state"] = _add_variant(
-                        WEIGHTS_NAME, self.args.weight_name_suffix
-                    )
-                unwrap_model(self.model).save_pretrained(output_dir)
+        merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+
+        if not isinstance(self.model, PretrainedModel) and not isinstance(self.model, LoRAModel):
+            if isinstance(unwrap_model(self.model), PretrainedModel):
+                unwrap_model(self.model).save_pretrained(output_dir, merge_tensor_parallel=merge_tensor_parallel)
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
+                if merge_tensor_parallel:
+                    logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 paddle.save(
                     state_dict, os.path.join(output_dir, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
                 )
         else:
-            self.model.save_pretrained(output_dir)
+            self.model.save_pretrained(output_dir, merge_tensor_parallel=merge_tensor_parallel)
+
         if self.tokenizer is not None:
             self.tokenizer.save_pretrained(output_dir)
 
@@ -1746,8 +1781,28 @@ class Trainer:
                     logits = self.preprocess_logits_for_metrics(logits, labels)
                 preds_host = logits if preds_host is None else nested_concat(preds_host, logits, padding_index=-100)
             self.control = self.callback_handler.on_prediction_step(args, self.state, self.control)
+
+            # Gather all tensors and put them back on the CPU if we have done enough accumulation steps.
+            if args.eval_accumulation_steps is not None and (step + 1) % args.eval_accumulation_steps == 0:
+                if losses_host is not None:
+                    losses = nested_numpify(losses_host)
+                    all_losses = losses if all_losses is None else np.concatenate((all_losses, losses), axis=0)
+                if preds_host is not None:
+                    logits = nested_numpify(preds_host)
+                    all_preds = logits if all_preds is None else nested_concat(all_preds, logits, padding_index=-100)
+
+                if labels_host is not None:
+                    labels = nested_numpify(labels_host)
+                    all_labels = (
+                        labels if all_labels is None else nested_concat(all_labels, labels, padding_index=-100)
+                    )
+
+                # Set back to None to begin a new accumulation
+                losses_host, preds_host, labels_host = None, None, None
+
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
                 break
+
         # Gather all remaining tensors and put them back on the CPU
         if losses_host is not None:
             losses = nested_numpify(losses_host)
