@@ -30,4 +30,4 @@ init_image.save("original-image.png")
 with paddle.amp.auto_cast(True):
     image = pipe(init_image, num_inference_steps=100, eta=1).images[0]
 
-image.save("super-resolution-image.png")
+image.save("super_resolution-latent_diffusion-result.png")

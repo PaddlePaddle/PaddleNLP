@@ -27,7 +27,7 @@ function _set_params(){
     run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
     device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
-    model_repo="PaddleFleetX"          # (必选) 模型套件的名字
+    model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="samples/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
@@ -80,14 +80,14 @@ function _train(){
     if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_attention_heads=4; fi #"gpt2-small-en"
     num_layers=24 #"gpt2-medium-en"
     if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_layers=4; fi #"gpt2-small-en"
-    use_pure_fp16="" # fp32
-    if [ "fp16" = ${fp_item} ]; then use_pure_fp16="o2"; fi
+    use_pure_fp16=False # fp32
+    if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
     train_cmd="-o Global.seed=1234 \
                -o Global.local_batch_size=${local_batch_size} \
                -o Global.micro_batch_size=${micro_batch_size} \
                -o Engine.max_steps=${max_iter} \
                -o Engine.eval_freq=100000 \
-               -o Engine.mix_precision.level=${use_pure_fp16} \
+               -o Engine.mix_precision.enable=${use_pure_fp16} \
                -o Engine.save_load.save_steps=100000 \
                -o Model.hidden_size=1024 \
                -o Model.num_layers=${num_layers} \

@@ -8,6 +8,7 @@
 |Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
+|AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
 
 
 ## Example usages
@@ -75,6 +76,92 @@ for i, img in enumerate(images):
 [clip_guided_sd_2]: https://user-images.githubusercontent.com/40912707/220514765-89e48c13-156f-4e61-b433-06f1283d2265.png
 [clip_guided_sd_3]: https://user-images.githubusercontent.com/40912707/220514751-82d63fd4-e35e-482b-a8e1-c5c956119b2e.png
 
+### Wildcard Stable Diffusion
+
+例如我们有下面的prompt:
+
+```python
+prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
+```
+然后，我们可以定义动物、物体和衣服的可能采样值。这些文件可以来自与类别同名的.txt文件。
+这些可能值也可以定义为字典，例如：`{"animal":["dog", "cat", mouse"]}`
+
+下面是一个完整的示例：
+创建一个`animal.txt`，包含的内容为：
+
+```
+dog
+cat
+mouse
+```
+创建一个`object.txt`，包含的内容为：
+```
+chair
+sofa
+bench
+```
+代码示例为：
+```python
+from wildcard_stable_diffusion import WildcardStableDiffusionPipeline
+
+pipe = WildcardStableDiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4"
+)
+prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
+image = pipe(
+    prompt,
+    wildcard_option_dict={
+        "clothing":["hat", "shirt", "scarf", "beret"]
+    },
+    wildcard_files=["object.txt", "animal.txt"],
+    num_prompt_samples=1
+).images[0]
+image.save("wildcard_img.png")
+```
+
+### Composable Stable diffusion
+
+以下代码需要9GB的显存。
+```python
+import os
+
+import paddle
+from composable_stable_diffusion import ComposableStableDiffusionPipeline
+
+prompt = "mystical trees | A magical pond | dark"
+scale = 7.5
+steps = 50
+weights = "7.5 | 7.5 | -7.5"
+pipe = ComposableStableDiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+)
+pipe.safety_checker = None
+
+images = []
+generator = paddle.Generator().manual_seed(2)
+for i in range(4):
+    image = pipe(prompt, guidance_scale=scale, num_inference_steps=steps,
+                 weights=weights, generator=generator).images[0]
+    images.append(image)
+
+# save images locally
+if not os.path.exists("composable_sd"):
+    os.mkdir("composable_sd")
+for i, img in enumerate(images):
+    img.save(f"./composable_sd/image_{i}.png")
+```
+
+### One Step Unet
+
+one-step-unet可以按照下面的方式运行：
+
+```python
+from one_step_unet import UnetSchedulerOneForwardPipeline
+
+pipe = UnetSchedulerOneForwardPipeline.from_pretrained("google/ddpm-cifar10-32")
+pipe()
+```
+这个pipeline不是作为feature使用的，它只是一个如何添加社区pipeline的示例
 
 ### Stable Diffusion Interpolation
 
@@ -197,7 +284,7 @@ images[0].save("inpainting.png")
 
 ### Long Prompt Weighting Stable Diffusion
 
-该自定义管线特征如下：
+该自定义Pipeline特征如下：
 * 输入提示没有77 token的长度限制
 * 包括文生图、图生图、图像修复三种管道
 * 给提示片段加上强调，例如 `a baby deer with (big eyes)`
@@ -240,3 +327,59 @@ images[0].save("lpw.png")
 上述代码生成结果如下
 
 <center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
+
+
+### AUTOMATIC1111 WebUI Stable Diffusion
+`WebUIStableDiffusionPipeline` 是与 [AUTOMATIC1111/stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 基本对齐的一个pipeline。
+
+该自定义Pipeline支持如下的功能：
+* 输入的 token 没有长度限制，可以超过77；
+* 支持clip_skip，即可以使用不同层text_encoder的输出；
+* 支持直接加载webui中的textual_inversion权重；
+
+
+```python
+import paddle
+from ppdiffusers.utils import image_grid
+from ppdiffusers import DiffusionPipeline
+from webui_stable_diffusion import WebUIStableDiffusionPipeline
+
+pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
+# 或者
+# pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
+
+# 加载Moxin_10lora权重，当前仅可加载单个lora权重
+pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
+
+# 添加 textual_inversion 权重目录，程序会自动扫描该目录是否存在ti的权重
+# pipe.add_ti_embedding_dir("./")
+
+# 我们需要安装develop版的paddle才可以使用xformers
+# pipe.enable_xformers_memory_efficient_attention()
+scheduler_name = ["ddim", "pndm", "euler", "dpm-multi"]
+for lora_enabled in [True, False]:
+    pipe.set_lora_enabled(lora_enabled)
+    images = []
+    for sc in scheduler_name:
+        # 切换scheduler
+        pipe.switch_scheduler(sc)
+        # 指定clip_skip
+        clip_skip = 0
+        # 指定seed
+        generator = paddle.Generator().manual_seed(0)
+        # guidance_scale
+        guidance_scale = 3.5
+        prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:Moxin_10:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
+        negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
+        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator).images[0]
+        images.append(img)
+    if lora_enabled:
+        image_grid(images, 2, 2).save(f"lora_enable.png")
+    else:
+        image_grid(images, 2, 2).save(f"lora_disable.png")
+```
+生成的图片如下所示：
+
+| lora_disable.png | lora_enable.png |
+|:----------:|:--------------:|
+|<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |

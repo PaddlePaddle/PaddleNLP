@@ -1,4 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,12 +21,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..modeling_utils import ModelMixin
-from ..utils import BaseOutput
+from ..utils import NEG_INF, BaseOutput
 from .attention import BasicTransformerBlock
 from .embeddings import TimestepEmbedding, Timesteps
-
-NEG_INF = -1e4
+from .modeling_utils import ModelMixin
 
 
 @dataclass
@@ -94,11 +93,9 @@ class PriorTransformer(ModelMixin, ConfigMixin):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(0.0),
         )
-
         self.prd_embedding = self.create_parameter(
             (1, 1, inner_dim), dtype=paddle.get_default_dtype(), default_initializer=nn.initializer.Constant(0.0)
         )
-
         self.transformer_blocks = nn.LayerList(
             [
                 BasicTransformerBlock(
@@ -159,6 +156,7 @@ class PriorTransformer(ModelMixin, ConfigMixin):
             [`~models.prior_transformer.PriorTransformerOutput`] if `return_dict` is True, otherwise a `tuple`. When
             returning a tuple, the first element is the sample tensor.
         """
+        hidden_states = hidden_states.cast(self.dtype)
         batch_size = hidden_states.shape[0]
 
         timesteps = timestep
@@ -166,6 +164,7 @@ class PriorTransformer(ModelMixin, ConfigMixin):
             timesteps = paddle.to_tensor([timesteps], dtype=paddle.int64)
         elif paddle.is_tensor(timesteps) and len(timesteps.shape) == 0:
             timesteps = timesteps[None]
+
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps * paddle.ones((batch_size,), dtype=timesteps.dtype)
 
@@ -173,7 +172,7 @@ class PriorTransformer(ModelMixin, ConfigMixin):
 
         # timesteps does not contain any weights and will always return f32 tensors
         # but time_embedding might be fp16, so we need to cast here.
-        timesteps_projected = timesteps_projected.cast(dtype=self.dtype)
+        timesteps_projected = timesteps_projected.cast(hidden_states.dtype)
         time_embeddings = self.time_embedding(timesteps_projected)
 
         proj_embeddings = self.embedding_proj(proj_embedding)
@@ -196,7 +195,7 @@ class PriorTransformer(ModelMixin, ConfigMixin):
         hidden_states = hidden_states + positional_embeddings
 
         if attention_mask is not None:
-            attention_mask = (1 - attention_mask.cast(hidden_states.dtype)) * -10000.0
+            attention_mask = (1 - attention_mask.cast(hidden_states.dtype)) * NEG_INF
             attention_mask = F.pad(
                 attention_mask.unsqueeze(0), (0, self.additional_embeddings), value=0.0, data_format="NCL"
             ).squeeze(0)

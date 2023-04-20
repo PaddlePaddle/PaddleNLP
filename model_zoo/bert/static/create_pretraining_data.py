@@ -17,19 +17,17 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
-import logging
+import collections
 import os
 import random
 from io import open
+
 import h5py
 import numpy as np
 from tqdm import tqdm
 
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers.tokenizer_utils import convert_to_unicode
-
-import random
-import collections
 
 
 class TrainingInstance(object):
@@ -402,8 +400,7 @@ def main():
         "and ignore vocab_file and do_lower_case.",
     )
 
-    ## Other parameters
-    # int
+    # Other parameters
     parser.add_argument(
         "--max_seq_length",
         default=128,
