@@ -269,7 +269,6 @@ class PreProcessor(BasePreProcessor):
             if self.language == "chinese":
                 sentences = text
             else:
-                print(self.language)
                 language_name = iso639_to_nltk.get(self.language)
                 sentences = nltk.tokenize.sent_tokenize(text, language=language_name)
 
