@@ -1065,7 +1065,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
                 sequence_parallel=sequence_parallel,
             )
         )
@@ -1118,7 +1118,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
             )
         )
 

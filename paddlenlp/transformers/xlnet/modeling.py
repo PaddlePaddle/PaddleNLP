@@ -407,10 +407,6 @@ class XLNetPretrainedModel(PretrainedModel):
     config_class = XLNetConfig
     base_model_prefix = "transformer"
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -758,8 +754,6 @@ class XLNetModel(XLNetPretrainedModel):
         self.word_embedding = nn.Embedding(config.vocab_size, config.d_model)
         self.mask_emb = self.create_parameter([1, 1, config.d_model])
         self.layer = nn.LayerList([XLNetLayer(config) for _ in range(config.n_layer)])
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.word_embedding
@@ -1223,7 +1217,6 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
         self.num_classes = config.num_classes
         self.transformer = XLNetModel(config)
         self.classifier = XLNetClassificationHead(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -1374,8 +1367,6 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
         self.transformer = XLNetModel(config)
         self.classifier = nn.Linear(self.transformer.d_model, config.num_classes)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids,
@@ -1511,7 +1502,6 @@ class XLNetLMHeadModel(XLNetPretrainedModel):
         self.decoder_bias = self.create_parameter(
             shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
         )
-        self.init_weights()
 
     def forward(
         self,
@@ -1643,7 +1633,6 @@ class XLNetForMultipleChoice(XLNetPretrainedModel):
         super(XLNetForMultipleChoice, self).__init__(config)
         self.transformer = XLNetModel(config)
         self.classifier = XLNetClassificationHead(config)
-        self.init_weights()
 
     def forward(
         self,
@@ -1821,8 +1810,6 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
         super(XLNetForQuestionAnswering, self).__init__(config)
         self.transformer = XLNetModel(config)
         self.qa_outputs = nn.Linear(config.d_model, 2)
-
-        self.init_weights()
 
     def forward(
         self,

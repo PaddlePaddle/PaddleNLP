@@ -199,9 +199,6 @@ class CTRLPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = CTRL_PRETRAINED_RESOURCE_FILES_MAP
     config_class = CTRLConfig
 
-    def init_weights(self):
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(
@@ -279,8 +276,6 @@ class CTRLModel(CTRLPreTrainedModel):
             ]
         )
         self.layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_epsilon)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.w
@@ -478,7 +473,6 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
         super().__init__(config)
         self.ctrl = CTRLModel(config)
         self.lm_head = TransposedLinear(config.hidden_size, config.vocab_size)
-        self.init_weights()
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -624,8 +618,6 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
         self.num_classes = config.num_classes
         self.ctrl = CTRLModel(config)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes, bias_attr=False)
-
-        self.init_weights()
 
     def forward(
         self,

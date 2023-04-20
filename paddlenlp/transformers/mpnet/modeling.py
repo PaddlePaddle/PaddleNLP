@@ -260,7 +260,7 @@ class MPNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = MPNET_PRETRAINED_INIT_CONFIGURATION
     config_class = MPNetConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -298,7 +298,6 @@ class MPNetModel(MPNetPretrainedModel):
         self.embeddings = MPNetEmbeddings(config)
         self.encoder = MPNetEncoder(config)
         self.pooler = MPNetPooler(config)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
@@ -427,8 +426,6 @@ class MPNetForMaskedLM(MPNetPretrainedModel):
         self.mpnet = MPNetModel(config)
         self.lm_head = MPNetLMHead(config, embedding_weights=self.mpnet.embeddings.word_embeddings.weight)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids,
@@ -500,7 +497,6 @@ class MPNetForSequenceClassification(MPNetPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
@@ -562,7 +558,6 @@ class MPNetForMultipleChoice(MPNetPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
@@ -630,7 +625,6 @@ class MPNetForTokenClassification(MPNetPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
@@ -684,7 +678,6 @@ class MPNetForQuestionAnswering(MPNetPretrainedModel):
         super(MPNetForQuestionAnswering, self).__init__(config)
         self.mpnet = MPNetModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""

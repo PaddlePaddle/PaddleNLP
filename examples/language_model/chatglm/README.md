@@ -31,15 +31,15 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --output_dir ./checkpoints/chatglm-6b \
 --src_length 64 \
 --tgt_length 64 \
---per_device_eval_batch_size 16 \
---per_device_train_batch_size 16 \
---gradient_accumulation_steps 8 \
+--per_device_eval_batch_size 4 \
+--per_device_train_batch_size 4 \
+--gradient_accumulation_steps 32 \
 --fp16 \
 --fp16_opt_level O2 \
 --recompute True \
 --do_train \
---do_eval
---tensor_parallel_degree 2
+--do_eval \
+--tensor_parallel_degree 4
 ```
 
 其中参数释义如下：

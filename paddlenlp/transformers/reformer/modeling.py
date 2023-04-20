@@ -1976,15 +1976,6 @@ class ReformerPretrainedModel(PretrainedModel):
     pretrained_init_configuration = REFORMER_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = REFORMER_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-        # Tie weights if needed
-        self.tie_weights()
-
     def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, AxialPositionEmbeddings):
@@ -2129,7 +2120,6 @@ class ReformerModel(ReformerPretrainedModel):
 
         self.embeddings = ReformerEmbeddings(config)
         self.encoder = ReformerEncoder(config)
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -2419,8 +2409,6 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
         )"""
         self.lm_head = ReformerOnlyLMHead(config)
 
-        self.init_weights()
-
     def get_output_embeddings(self):
         return self.lm_head.decoder
 
@@ -2574,7 +2562,6 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             "is_decoder"
         ], "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
         self.lm_head = ReformerOnlyLMHead(config)
-        self.init_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -2723,8 +2710,6 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for sequence classification")
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -2862,7 +2847,6 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
         self.qa_outputs = nn.Linear(2 * self.config.hidden_size, 2)
         if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for question answering task.")
-        self.init_weights()
 
     def forward(
         self,
