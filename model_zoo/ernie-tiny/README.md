@@ -1,24 +1,20 @@
 # ERNIE 3.0 Tiny: Frustratingly Simple Method to Improve Task-Agnostic Distillation Generalization
 
  **目录**
-- [ERNIE 3.0 Tiny: Frustratingly Simple Method to Improve Task-Agnostic Distillation Generalization](#ernie-30-tiny-frustratingly-simple-method-to-improve-task-agnostic-distillation-generalization)
-  - [ERNIE 3.0 Tiny 介绍](#ernie-30-tiny-介绍)
-    - [在线蒸馏技术](#在线蒸馏技术)
-    - [注入下游知识](#注入下游知识)
-    - [多任务学习提升泛化性](#多任务学习提升泛化性)
-  - [预训练模型效果](#预训练模型效果)
-  - [代码结构](#代码结构)
-  - [开始运行](#开始运行)
-    - [任务介绍](#任务介绍)
-    - [环境要求](#环境要求)
-    - [数据准备](#数据准备)
-  - [模型训练](#模型训练)
-  - [模型评估](#模型评估)
-  - [🔥端上模型压缩方案](#端上模型压缩方案)
-    - [压缩效果](#压缩效果)
-  - [⚡️FastDeplopy 部署](#️fastdeplopy-部署)
-    - [性能结论](#性能结论)
-  - [参考文献](#参考文献)
+   * [ERNIE 3.0 Tiny 介绍](#模型介绍)
+   * [预训练模型效果](#模型效果)
+   * [代码结构](#代码结构)
+   * [开始运行](#开始运行)
+       * [任务介绍](#任务介绍)
+       * [环境要求](#环境要求)
+       * [数据准备](#数据准备)
+   * [模型训练](#模型训练)
+   * [模型评估](#模型评估)
+   * [端上模型压缩方案🔥](#模型压缩)
+       * [压缩效果](#压缩效果)
+   * [⚡️ FastDeploy 部署](#FastDeploy部署)
+       * [性能结论](#压缩结论)
+   * [参考文献](#参考文献)
 
 本项目开源了 **ERNIE 3.0 Tiny** 预训练模型及 **端上语义理解压缩方案**。
 
