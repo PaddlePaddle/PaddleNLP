@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import json
 import os
@@ -25,30 +24,40 @@ class ErnieBot(BaseComponent):
     """
     The ErnieBot class is a subclass of the BaseComponent class, which is designed to interface with
     the Ernie Bot API for generating AI chatbot responses. It handles the interaction with the API using
-    the provided access token. It allows you to make a request with a given query and optional conversation
+    the provided api_key, secret_key . It allows you to make a request with a given query and optional conversation
     history, receiving a response from the chatbot and extending the conversation history accordingly.
     """
 
     outgoing_edges = 1
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
-    def __init__(self, ernie_bot_access_token=None):
+    def __init__(self, api_key=None, secret_key=None):
         """
-        Initialize the ErnieBot instance with the provided access token or retrieve it from an
-        environment variable.
+        Initialize the ErnieBot instance with the provided api_key and secret_key.
 
-        :param ernie_bot_access_token: The access token to authenticate with the Ernie Bot API. If not provided,
-            the method will attempt to retrieve it from the `ernie_bot_access_token` environment variable.
-            Defaults to None.
+        :param api_key: api_key for applying token to request wenxin api.
+        :param secret_key: secret_key for applying token to request wenxin api.
         """
-
-        access_token = ernie_bot_access_token or os.environ.get("ernie_bot_access_token", None)
-        if access_token is None:
-            raise ValueError(
-                "Did not find `ernie_bot_access_token`, please add an environment variable `ernie_bot_access_token` which contains it, or pass"
-                "  `ernie_bot_access_token` as a named parameter."
+        api_key = api_key or os.environ.get("ERNIE_BOT_API_KEY", None)
+        secret_key = secret_key or os.environ.get("ERNIE_BOT_SECRET_KEY", None)
+        if api_key is None or secret_key is None:
+            raise Exception(
+                "Please apply api_key and secret_key from https://cloud.baidu.com/doc/WENXINWORKSHOP/s/flfmc9do2"
             )
-        self.url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={access_token}"
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.token = self._apply_token(self.api_key, self.secret_key)
+
+    def _apply_token(self, api_key, secret_key):
+        payload = ""
+        self.token_host = f"https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={api_key}&client_secret={secret_key}"
+        response = requests.request("POST", self.token_host, headers=self.headers, data=payload)
+        if response:
+            res = response.json()
+        else:
+            raise RuntimeError("Request access token error.")
+
+        return res["access_token"]
 
     def run(self, query, history=None, stream=False):
         """
@@ -71,18 +80,26 @@ class ErnieBot(BaseComponent):
                 payload["messages"].extend(history)
             else:
                 raise ValueError("Invalid history: an even number of `messages` is expected!")
+
         payload["messages"].append({"role": "user", "content": f"{query}"})
         # Do not use stream for now
         if stream:
             payload["stream"] = True
-        response = requests.request("POST", self.url, headers=self.headers, data=json.dumps(payload))
+        chat_url = (
+            f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={self.token}"
+        )
+        response = requests.request("POST", chat_url, headers=self.headers, data=json.dumps(payload))
         response_json = json.loads(response.text)
         if history is None:
             return_history = []
         else:
             return_history = copy.deepcopy(history)
-        return_history.extend(
-            [{"role": "user", "content": query}, {"role": "assistant", "content": response_json["result"]}]
-        )
-        response_json["history"] = return_history
-        return response_json, "eb_output"
+        try:
+            return_history.extend(
+                [{"role": "user", "content": query}, {"role": "assistant", "content": response_json["result"]}]
+            )
+            response_json["history"] = return_history
+        except Exception as e:
+            print(e)
+            print(response_json)
+        return response_json, "output_1"
