@@ -684,13 +684,6 @@ class MT5PretrainedModel(PretrainedModel):
         }
         return dummy_inputs
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         """Initialize the weights"""
         # Used for testing weights initialization
@@ -1153,8 +1146,6 @@ class MT5Model(MT5PretrainedModel):
         decoder_config.num_layers = config.num_decoder_layers
         self.decoder = MT5Stack(decoder_config, self.shared)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.shared
 
@@ -1384,8 +1375,6 @@ class MT5ForConditionalGeneration(MT5PretrainedModel):
         self.mt5 = MT5Model(config)
         if not self.mt5.config["tie_word_embeddings"]:
             self.lm_head = nn.Linear(self.mt5.config["d_model"], self.mt5.config["vocab_size"], bias_attr=False)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.mt5.shared
@@ -1709,9 +1698,6 @@ class MT5EncoderModel(MT5PretrainedModel):
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = MT5Stack(encoder_config, embed_tokens=self.shared)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     @property
     def mt5(self):

@@ -139,7 +139,7 @@ class ProphetNetPretrainedModel(PretrainedModel):
     base_model_prefix = "prophetnet"
     config_class = ProphetNetConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         if isinstance(layer, nn.Linear):
             layer.weight.set_value(
                 paddle.tensor.normal(
@@ -844,8 +844,6 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
 
         self.layers = nn.LayerList([ProphetNetEncoderLayer(config) for _ in range(config.num_encoder_layers)])
 
-        self.apply(self.init_weights)
-
     def forward(self, input_ids=None, attention_mask=None):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
@@ -894,8 +892,6 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
         self.ngram_embeddings = nn.Embedding(self.ngram, config.hidden_size)
         self.layers = nn.LayerList([ProphetNetDecoderLayer(config) for _ in range(config.num_decoder_layers)])
         self.embeddings_layer_norm = nn.LayerNorm(config.hidden_size)
-
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1104,8 +1100,6 @@ class ProphetNetModel(ProphetNetPretrainedModel):
 
         self.decoder = ProphetNetDecoder(self.word_embeddings, config)
 
-        self.apply(self.init_weights)
-
     def get_encoder(self):
         return self.encoder
 
@@ -1180,9 +1174,6 @@ class ProphetNetForConditionalGeneration(ProphetNetPretrainedModel):
         self.padding_idx = self.prophetnet.word_embeddings._padding_idx
 
         self.lm_head = Linear_wo_bias(config.hidden_size, config.vocab_size)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(
         self,

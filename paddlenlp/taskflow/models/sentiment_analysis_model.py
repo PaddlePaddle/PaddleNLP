@@ -135,7 +135,6 @@ class SkepSequenceModel(SkepPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         outputs = self.skep(

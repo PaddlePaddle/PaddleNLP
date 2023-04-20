@@ -590,13 +590,6 @@ class CLIPPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mappings)]
         return mappings
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, nn.TransformerEncoder):
             module.enable_recompute = value
@@ -845,8 +838,6 @@ class CLIPTextModel(CLIPPretrainedModel):
         super().__init__(config)
         self.text_model = CLIPTextTransformer(config)
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.token_embedding
 
@@ -1062,8 +1053,6 @@ class CLIPVisionModel(CLIPPretrainedModel):
 
         self.vision_model = CLIPVisionTransformer(config)
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.conv1
 
@@ -1186,8 +1175,6 @@ class CLIPModel(CLIPPretrainedModel):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(config.logit_scale_init_value),
         )
-
-        self.init_weights()
 
     def get_text_features(
         self,
@@ -1479,8 +1466,6 @@ class CLIPTextModelWithProjection(CLIPPretrainedModel):
             (config.hidden_size, config.projection_dim), paddle.get_default_dtype()
         )
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.token_embedding
 
@@ -1601,8 +1586,6 @@ class CLIPVisionModelWithProjection(CLIPPretrainedModel):
             self.vision_projection = paddle.create_parameter(
                 (config.hidden_size, config.projection_dim), paddle.get_default_dtype()
             )
-
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         if isinstance(self.vision_model, CLIPVisionTransformer):
