@@ -38,6 +38,7 @@ class PDFToTextConverter(BaseConverter):
         self,
         remove_numeric_tables: bool = False,
         valid_languages: Optional[List[str]] = None,
+        merge_sentences: Optional[bool] = False,
     ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
@@ -55,6 +56,7 @@ class PDFToTextConverter(BaseConverter):
         self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
         super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.merge_sentences = merge_sentences
 
     def convert(
         self,
@@ -63,6 +65,7 @@ class PDFToTextConverter(BaseConverter):
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         encoding: Optional[str] = "Latin1",
+        merge_sentences: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
@@ -93,7 +96,8 @@ class PDFToTextConverter(BaseConverter):
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
             valid_languages = self.valid_languages
-
+        if merge_sentences is None:
+            merge_sentences = self.merge_sentences
         cleaned_pages = []
         for page in pages:
             # pdftotext tool provides an option to retain the original physical layout of a PDF page. This behaviour
@@ -107,9 +111,10 @@ class PDFToTextConverter(BaseConverter):
             #
             #  Here, as a "safe" default, layout is turned off.
             lines = page.splitlines()
+
             cleaned_lines = []
             for line in lines:
-                words = line.split()
+                words = list(line)
                 digits = [word for word in words if any(i.isdigit() for i in word)]
 
                 # remove lines having > 40% of words as digits AND not ending with a period(.)
@@ -118,7 +123,11 @@ class PDFToTextConverter(BaseConverter):
                         logger.debug(f"Removing line '{line}' from {file_path}")
                         continue
                 cleaned_lines.append(line)
-            cleaned_pages.extend(cleaned_lines)
+            if merge_sentences:
+                page = "".join(cleaned_lines)
+            else:
+                page = "\n".join(cleaned_lines)
+            cleaned_pages.append(page)
 
         if valid_languages:
             document_text = "".join(cleaned_pages)
@@ -128,11 +137,9 @@ class PDFToTextConverter(BaseConverter):
                     f"been decoded in the correct text format."
                 )
 
-        documents = []
-        for page in cleaned_pages:
-            document = {"content": page, "content_type": "text", "meta": meta}
-            documents.append(document)
-        return documents
+        text = "\f".join(cleaned_pages)
+        document = {"content": text, "content_type": "text", "meta": meta}
+        return [document]
 
     def _read_pdf(self, file_path: Path, layout: bool, encoding: Optional[str] = "Latin1") -> List[str]:
         """
