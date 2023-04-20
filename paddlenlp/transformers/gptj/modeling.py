@@ -311,9 +311,6 @@ class GPTJPretrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _no_split_modules = ["GPTJBlock"]
 
-    def __init__(self, *inputs, **kwargs):
-        super().__init__(*inputs, **kwargs)
-
     def _init_weights(self, layer):
         """Initialize the weights."""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -351,9 +348,6 @@ class GPTJModel(GPTJPretrainedModel):
         self.drop = nn.Dropout(config.embd_pdrop)
         self.h = nn.LayerList([GPTJBlock(config) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
-
-        # Initialize weights and apply final processing
-        self.apply(self._init_weights)
 
     def get_input_embeddings(self):
         return self.wte
@@ -483,9 +477,6 @@ class GPTJForCausalLM(GPTJPretrainedModel):
         super(GPTJForCausalLM, self).__init__(config)
         self.transformer = GPTJModel(config)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
-
-        # Initialize weights and apply final processing
-        self.apply(self._init_weights)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -640,8 +631,6 @@ class GPTJForSequenceClassification(GPTJPretrainedModel):
         self.transformer = GPTJModel(config)
         self.score = nn.Linear(config.n_embd, self.num_labels, bias_attr=False)
 
-        self.apply(self._init_weights)
-
     def forward(
         self,
         input_ids: Optional[paddle.Tensor] = None,
@@ -736,9 +725,6 @@ class GPTJForQuestionAnswering(GPTJPretrainedModel):
         self.num_labels = config.num_labels
         self.transformer = GPTJModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-
-        # Initialize weights and apply final processing
-        self.apply(self._init_weights)
 
     def forward(
         self,

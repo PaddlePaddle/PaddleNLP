@@ -40,6 +40,7 @@ Model:
   use_recompute: True
   recompute_granularity: 'full'
   no_recompute_layers:
+  use_fused_dropout_add: False
 
 
 Distributed:

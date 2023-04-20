@@ -100,6 +100,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
         ("BloomTokenizer", "bloom"),
+        ("ChatGLMTokenizer", "chatglm"),
     ]
 )
 
@@ -289,7 +290,7 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(
                     pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
                 )
@@ -325,9 +326,7 @@ class AutoTokenizer:
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
 
-                        logger.info(
-                            "We are using %s to load '%s'." % (actual_tokenizer_class, pretrained_model_name_or_path)
-                        )
+                        logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
@@ -338,8 +337,10 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join(
@@ -361,5 +362,5 @@ class AutoTokenizer:
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, resolved_vocab_file, use_fast
                 )
-                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

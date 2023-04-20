@@ -32,7 +32,7 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     # test_seq2seq = False
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
-        tokenizer = LlamaTokenizer.from_pretrained("facebookresearch/tiny-random-llama", **kwargs)
+        tokenizer = LlamaTokenizer.from_pretrained("facebook/tiny-random-llama", **kwargs)
         tokenizer.pad_token = tokenizer.unk_token
         return tokenizer
 
