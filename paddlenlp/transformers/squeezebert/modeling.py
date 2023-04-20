@@ -378,7 +378,7 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
 
     pretrained_resource_files_map = SQUEEZEBERT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -405,8 +405,6 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
         self.embeddings = SqueezeBertEmbeddings(config)
         self.encoder = SqueezeBertEncoder(config)
         self.pooler = SqueezeBertPooler(config)
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -512,7 +510,6 @@ class SqueezeBertForSequenceClassification(SqueezeBertPreTrainedModel):
         self.squeezebert = SqueezeBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -554,7 +551,6 @@ class SqueezeBertForQuestionAnswering(SqueezeBertPreTrainedModel):
         super().__init__(config)
         self.squeezebert = SqueezeBertModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None):
         r"""
@@ -598,7 +594,6 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
         self.squeezebert = SqueezeBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""

@@ -20,7 +20,7 @@ import paddle.nn as nn
 
 from paddlenlp.utils.env import CONFIG_NAME
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     DISTILBERT_PRETRAINED_INIT_CONFIGURATION,
@@ -86,8 +86,8 @@ class DistilBertPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: DistilBertConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
         ]
@@ -166,6 +166,7 @@ class DistilBertPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
         # base-model prefix "DistilBertModel"
         if "DistilBertModel" not in config.architectures:
             for mapping in model_mappings:
@@ -176,18 +177,18 @@ class DistilBertPretrainedModel(PretrainedModel):
         if "DistilBertForSequenceClassification" in config.architectures:
             model_mappings.extend(
                 [
-                    ["pre_classifier.weight", "pre_classifier.weight", "transpose"],
-                    ["pre_classifier.bias", "pre_classifier.bias"],
-                    ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    ["pre_classifier.weight", None, "transpose"],
+                    "pre_classifier.bias",
+                    ["classifier.weight", None, "transpose"],
+                    "classifier.bias",
                 ]
             )
 
         if "DistilBertForTokenClassification" in config.architectures:
             model_mappings.extend(
                 [
-                    ["classifier.weight", "classifier.weight", "transpose"],
-                    ["classifier.bias", "classifier.bias"],
+                    ["classifier.weight", None, "transpose"],
+                    "classifier.bias",
                 ]
             )
 
@@ -196,10 +197,11 @@ class DistilBertPretrainedModel(PretrainedModel):
                 [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
             )
 
+        init_name_mappings(model_mappings)
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -286,7 +288,6 @@ class DistilBertModel(DistilBertPretrainedModel):
             act_dropout=0,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -363,7 +364,6 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -425,7 +425,6 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -494,7 +493,6 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
         r"""
@@ -550,8 +548,6 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
         self.activation = nn.GELU()
         self.vocab_layer_norm = nn.LayerNorm(config.hidden_size)
         self.vocab_projector = nn.Linear(config.hidden_size, config.vocab_size)
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
         r"""

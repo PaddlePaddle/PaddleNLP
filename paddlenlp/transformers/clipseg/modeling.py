@@ -442,13 +442,6 @@ class CLIPSegPreTrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _init_weights(self, module):
         """Initialize the weights"""
         factor = self.config.initializer_factor
@@ -689,8 +682,6 @@ class CLIPSegTextModel(CLIPSegPreTrainedModel):
     def __init__(self, config: CLIPSegTextConfig):
         super().__init__(config)
         self.text_model = CLIPSegTextTransformer(config)
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.token_embedding
@@ -793,8 +784,6 @@ class CLIPSegVisionModel(CLIPSegPreTrainedModel):
     def __init__(self, config: CLIPSegVisionConfig):
         super().__init__(config)
         self.vision_model = CLIPSegVisionTransformer(config)
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -865,9 +854,6 @@ class CLIPSegModel(CLIPSegPreTrainedModel):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(self.config.logit_scale_init_value),
         )
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_text_features(
         self,
@@ -1210,9 +1196,6 @@ class CLIPSegForImageSegmentation(CLIPSegPreTrainedModel):
         self.extract_layers = config.extract_layers
 
         self.decoder = CLIPSegDecoder(config)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_conditional_embeddings(
         self,

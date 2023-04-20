@@ -507,7 +507,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             self.config = init_dict
 
         # only execute when it's the base method
-        if self.init_weights is PretrainedModel.init_weights:
+        if (
+            original_init.__module__ != "paddlenlp.transformers.model_utils"
+            and self.__class__.init_weights is PretrainedModel.init_weights
+        ):
             self.init_weights()
 
     def _init_weights(self, layer):
@@ -530,13 +533,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
         initialization logic in `_init_weights`.
         """
+        # call pure
         if _init_weights:
             # Initialize weights
             self.apply(self._initialize_weights)
 
             # Tie weights should be skipped when not initializing all weights
             # since from_pretrained(...) calls tie weights anyways
-            self.tie_weights()
+
+            # TODO(wj-Mcat): enable all tie-weights later
+            # self.tie_weights()
 
     @property
     def base_model(self):
@@ -1083,8 +1089,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if isinstance(dtype, paddle.dtype):
                 dtype = str(dtype)[7:]
 
-            if dtype not in ["float32", "float16"]:
-                raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
+            if dtype not in ["float32", "float16", "bfloat16"]:
+                raise ValueError(
+                    f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
+                )
             for key in state_dict.keys():
                 if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)

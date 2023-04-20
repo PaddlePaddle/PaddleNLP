@@ -327,10 +327,6 @@ class FNetPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "fnet"
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, nn.Linear):
@@ -443,7 +439,6 @@ class FNetModel(FNetPretrainedModel):
             hidden_size, intermediate_size, layer_norm_eps, hidden_dropout_prob, hidden_act, num_hidden_layers
         )
         self.pooler = FNetPooler(hidden_size) if add_pooling_layer else None
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -588,9 +583,6 @@ class FNetForSequenceClassification(FNetPretrainedModel):
         self.dropout = nn.Dropout(self.fnet.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.fnet.config["hidden_size"], num_classes)
 
-        # Initialize weights and apply final processing
-        self.init_weights()
-
     def forward(
         self,
         input_ids=None,
@@ -697,8 +689,6 @@ class FNetForPreTraining(FNetPretrainedModel):
             self.fnet.config["hidden_act"],
         )
 
-        self.init_weights()
-
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
 
@@ -788,8 +778,6 @@ class FNetForMaskedLM(FNetPretrainedModel):
             self.fnet.config["layer_norm_eps"],
             self.fnet.config["hidden_act"],
         )
-
-        self.init_weights()
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -878,8 +866,6 @@ class FNetForNextSentencePrediction(FNetPretrainedModel):
         self.fnet = fnet
         self.cls = FNetOnlyNSPHead(self.fnet.config["hidden_size"])
 
-        self.init_weights()
-
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
 
@@ -932,8 +918,6 @@ class FNetForMultipleChoice(FNetPretrainedModel):
         self.fnet = fnet
         self.dropout = nn.Dropout(self.fnet.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.fnet.config["hidden_size"], 1)
-
-        self.init_weights()
 
     def forward(
         self,
@@ -993,8 +977,6 @@ class FNetForTokenClassification(FNetPretrainedModel):
         self.dropout = nn.Dropout(self.fnet.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.fnet.config["hidden_size"], self.num_classes)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids=None,
@@ -1042,8 +1024,6 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
         self.num_labels = num_labels
         self.fnet = fnet
         self.qa_outputs = nn.Linear(self.fnet.config["hidden_size"], num_labels)
-
-        self.init_weights()
 
     def forward(
         self,
