@@ -96,7 +96,7 @@ class DalleBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = DALLEBART_PRETRAINED_RESOURCE_FILES_MAP
     config_class = DalleBartConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding, DalleBartLearnedPositionalEmbedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -234,7 +234,6 @@ class DalleBartEncoder(DalleBartPretrainedModel):
         self.final_ln = nn.LayerNorm(config.d_model)
         self.embedding_dropout = nn.Dropout(config.dropout)
         self.text_pad_token_id = config.text_pad_token_id
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None, **kwargs):
         """
@@ -374,7 +373,6 @@ class DalleBartDecoder(DalleBartPretrainedModel):
         self.layernorm_embedding = nn.LayerNorm(config.d_model)
         self.dropout = nn.Dropout(config.dropout)
         self.final_ln = nn.LayerNorm(config.d_model)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -463,7 +461,6 @@ class DalleBartModel(DalleBartPretrainedModel):
         self.encoder = DalleBartEncoder(config)
 
         self.decoder = DalleBartDecoder(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.encoder.embed_tokens
@@ -609,7 +606,6 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             self.register_buffer(
                 "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
             )
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.dallebart.get_encoder()

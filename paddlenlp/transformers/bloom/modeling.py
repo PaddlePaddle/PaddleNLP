@@ -34,7 +34,7 @@ from paddlenlp.transformers.model_outputs import (
     TokenClassifierOutput,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.converter import StateDictNameMapping
+from paddlenlp.utils.converter import StateDictNameMapping, init_name_mappings
 from paddlenlp.utils.log import logger
 
 from .configuration import BloomConfig
@@ -757,33 +757,35 @@ class BloomPreTrainedModel(PretrainedModel):
     @classmethod
     def _get_name_mappings(cls, config: BloomConfig) -> list[StateDictNameMapping]:
         hard_mapping = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["word_embeddings_layernorm.weight", "word_embeddings_layernorm.weight"],
-            ["word_embeddings_layernorm.bias", "word_embeddings_layernorm.bias"],
-            ["ln_f.weight", "ln_f.weight"],
-            ["ln_f.bias", "ln_f.bias"],
+            "word_embeddings.weight",
+            "word_embeddings_layernorm.weight",
+            "word_embeddings_layernorm.bias",
+            "ln_f.weight",
+            "ln_f.bias",
         ]
         for i in range(config.n_layer):
             hard_mapping.extend(
                 [
-                    [f"h.{i}.input_layernorm.weight", f"h.{i}.input_layernorm.weight"],
-                    [f"h.{i}.input_layernorm.bias", f"h.{i}.input_layernorm.bias"],
+                    f"h.{i}.input_layernorm.weight",
+                    f"h.{i}.input_layernorm.bias",
                     [
                         f"h.{i}.self_attention.query_key_value.weight",
-                        f"h.{i}.self_attention.query_key_value.weight",
+                        None,
                         "transpose",
                     ],
-                    [f"h.{i}.self_attention.query_key_value.bias", f"h.{i}.self_attention.query_key_value.bias"],
-                    [f"h.{i}.self_attention.dense.weight", f"h.{i}.self_attention.dense.weight", "transpose"],
-                    [f"h.{i}.self_attention.dense.bias", f"h.{i}.self_attention.dense.bias"],
-                    [f"h.{i}.post_attention_layernorm.weight", f"h.{i}.post_attention_layernorm.weight"],
-                    [f"h.{i}.post_attention_layernorm.bias", f"h.{i}.post_attention_layernorm.bias"],
-                    [f"h.{i}.mlp.dense_h_to_4h.weight", f"h.{i}.mlp.dense_h_to_4h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_h_to_4h.bias", f"h.{i}.mlp.dense_h_to_4h.bias"],
-                    [f"h.{i}.mlp.dense_4h_to_h.weight", f"h.{i}.mlp.dense_4h_to_h.weight", "transpose"],
-                    [f"h.{i}.mlp.dense_4h_to_h.bias", f"h.{i}.mlp.dense_4h_to_h.bias"],
+                    f"h.{i}.self_attention.query_key_value.bias",
+                    [f"h.{i}.self_attention.dense.weight", None, "transpose"],
+                    f"h.{i}.self_attention.dense.bias",
+                    f"h.{i}.post_attention_layernorm.weight",
+                    f"h.{i}.post_attention_layernorm.bias",
+                    [f"h.{i}.mlp.dense_h_to_4h.weight", None, "transpose"],
+                    [f"h.{i}.mlp.dense_4h_to_h.weight", None, "transpose"],
+                    f"h.{i}.mlp.dense_h_to_4h.bias",
+                    f"h.{i}.mlp.dense_4h_to_h.bias",
                 ]
             )
+
+        init_name_mappings(hard_mapping)
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
         model_class_name = config.architectures[0]
@@ -794,10 +796,10 @@ class BloomPreTrainedModel(PretrainedModel):
                 mapping.target_name = "bloom." + mapping.target_name
 
         if model_class_name == "BloomForSequenceClassification":
-            mappings.append(StateDictNameMapping("score.weight", "score.weight", "transpose"))
+            mappings.append(StateDictNameMapping("score.weight", None, "transpose"))
         if model_class_name == "BloomForTokenClassification":
-            mappings.append(StateDictNameMapping("classifier.weight", "classifier.weight", "transpose"))
-            mappings.append(StateDictNameMapping("classifier.bias", "classifier.bias"))
+            mappings.append(StateDictNameMapping("classifier.weight", None, "transpose"))
+            mappings.append(StateDictNameMapping("classifier.bias"))
 
         return mappings
 

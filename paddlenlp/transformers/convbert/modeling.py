@@ -412,15 +412,6 @@ class ConvBertPretrainedModel(PretrainedModel):
         }
     }
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-        # Tie weights if needed
-        self.tie_weights()
-
     def tie_weights(self):
         """
         Tie the weights between the input embeddings and the output embeddings.
@@ -616,8 +607,6 @@ class ConvBertModel(ConvBertPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -713,7 +702,6 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
         self.discriminator_predictions = ConvBertDiscriminatorPredictions(
             self.convbert.config["hidden_size"], self.convbert.config["hidden_act"]
         )
-        self.init_weights()
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -805,7 +793,6 @@ class ConvBertGenerator(ConvBertPretrainedModel):
                 dtype=dtype_float,
                 is_bias=True,
             )
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.convbert.embeddings.word_embeddings
@@ -936,8 +923,6 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
             num_classes=self.num_classes,
         )
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids=None,
@@ -1005,7 +990,6 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
         self.convbert = convbert
         self.dropout = nn.Dropout(dropout if dropout is not None else self.convbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.convbert.config["hidden_size"], self.num_classes)
-        self.init_weights()
 
     def forward(
         self,
@@ -1175,7 +1159,6 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         self.generator = generator
         self.discriminator = discriminator
         self.initializer_range = discriminator.convbert.initializer_range
-        self.init_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:
@@ -1395,7 +1378,6 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
         self.pooler = ConvBertPooler(self.convbert.config["hidden_size"])
         self.dropout = nn.Dropout(dropout if dropout is not None else self.convbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.convbert.config["hidden_size"], 1)
-        self.init_weights()
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -1461,7 +1443,6 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
         super(ConvBertForQuestionAnswering, self).__init__()
         self.convbert = convbert
         self.classifier = nn.Linear(self.convbert.config["hidden_size"], 2)
-        self.init_weights()
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
