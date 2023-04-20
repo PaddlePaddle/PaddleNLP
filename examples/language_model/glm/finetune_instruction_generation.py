@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
 from data import custom_instruction_convert_example
+from datasets import load_dataset
 from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
-from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
@@ -32,7 +31,8 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    data_path: str = field(default="./data_dir/school_math_0.25M", metadata={"help": "The path of train data."})
+    task_name: str = field(default="school_math_0.25M", metadata={"help": "The name of task."})
+    data_name: str = field(default="bellegroup", metadata={"help": "The name of data."})
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
@@ -60,13 +60,6 @@ class ModelArgument:
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-
-
-def read_instructon_data(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        for line in lines:
-            yield json.loads(line)
 
 
 def main():
@@ -135,8 +128,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds = load_dataset(read_instructon_data, data_path=data_args.data_path + ".train.json", lazy=False)
-    dev_ds = load_dataset(read_instructon_data, data_path=data_args.data_path + ".dev.json", lazy=False)
+    train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
 
     trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
