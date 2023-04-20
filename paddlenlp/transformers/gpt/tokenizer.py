@@ -246,6 +246,18 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
         """
         return len(self.sp)
+    
+    def get_vocab(self):
+        """
+        Returns the vocabulary as a dictionary of token to index.
+
+        `tokenizer.get_vocab()[token]` is equivalent to `tokenizer.convert_tokens_to_ids(token)` when `token` is in the
+        vocab.
+
+        Returns:
+            `Dict[str, int]`: The vocabulary.
+        """
+        return dict({self.sp.IdToPiece(i): i for i in range(self.sp.GetPieceSize())}, **self.added_tokens_encoder)
 
     def convert_ids_to_string(self, ids):
         """
