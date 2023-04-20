@@ -240,6 +240,21 @@ def install(
     install_package_from_bos(package_name=package_name, tag=tag)
 
 
+@app.command(help="upload the files of local directory to bos server")
+def upload(
+    local: str = typer.Argument(default="./", help="local path"),
+    bos: str = typer.Argument(default="models/community", help="the path of bucket path"),
+    bos_host: str = typer.Argument(default="paddlenlp.bj.bcebos.com", help="the address of bos host"),
+):
+    from .bos_community import bos_upload_handler
+
+    bos_upload_handler(
+        bos_path=bos,
+        local_path=local,
+        bos_host=bos_host,
+    )
+
+
 def main():
     """the PaddleNLPCLI entry"""
     app()

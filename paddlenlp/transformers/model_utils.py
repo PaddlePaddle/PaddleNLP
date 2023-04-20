@@ -69,6 +69,7 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
+    PT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
     WEIGHTS_INDEX_NAME,
@@ -1365,6 +1366,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     archive_file = local_weight_file_path(SAFE_WEIGHTS_INDEX_NAME)
                     is_sharded = True
                 # At this stage we don't have a weight file so we will raise an error.
+                elif local_weight_file_exist(PT_WEIGHTS_INDEX_NAME):
+                    # load from a sharded pytorch checkpoint
+                    archive_file = local_weight_file_path(PT_WEIGHTS_INDEX_NAME)
+                    is_sharded = True
+                elif local_weight_file_exist(PYTORCH_WEIGHT_FILE_NAME):
+                    # load from a pytorch checkpoint
+                    archive_file = local_weight_file_path(PYTORCH_WEIGHT_FILE_NAME)
                 else:
                     raise EnvironmentError(
                         f"Error no file named {_add_variant(WEIGHTS_NAME, variant)}, found in directory"
@@ -1902,9 +1910,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
-        cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-        dtype = kwargs.pop("dtype", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1919,8 +1925,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
-        else:
-            model_kwargs = kwargs
+
         if dtype is None:
             dtype = config.dtype
 

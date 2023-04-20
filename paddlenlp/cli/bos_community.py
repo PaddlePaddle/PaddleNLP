@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
+import multiprocessing
 import os
-import sys
+
+from tqdm import tqdm
 
 from paddlenlp.utils.log import logger
 
@@ -25,78 +28,86 @@ except ImportError:
     logger.info("can not import baidubce module, please install it before running this command")
 
 
-bos_config = {
-    "bucket": "models",
-    "bos_host": "paddlenlp.bj.bcebos.com",
-}
+def upload_file(file_path: str, bos_file_path: str, bucket_name: str, bos_client: BosClient):
+    """upload local file to bos
 
-
-bos_host = str(bos_config["bos_host"])
-bos_bucket = str(bos_config["bucket"])
-
-access_key_id = os.getenv("bos_access_key_id", None)
-secret_access_key = os.getenv("bos_secret_access_key", None)
-if access_key_id is None or secret_access_key is None:
-    raise ValueError(
-        "Please set environment variables of  bos_access_key_id, bos_secret_access_key, before uploading !!!"
+    Args:
+        file_path (str): the path of local file
+        bucket_name (str): the path of bos path
+    """
+    logger.info(f"start to upload file<{file_path}> to bos<{bucket_name}>")
+    result = bos_client.put_super_obejct_from_file(
+        bucket_name, bos_file_path, file_path, chunk_size=100, thread_num=multiprocessing.cpu_count()
     )
+    if result:
+        logger.info(f"Upload file <{file_path}> success!")
+    else:
+        logger.info(f"Upload file <{file_path}> fail!")
 
 
-def upload_to_bos_from_raw(raw, name, category="test"):
-    b_config = BceClientConfiguration(credentials=BceCredentials(access_key_id, secret_access_key), endpoint=bos_host)
-    bos_client = BosClient(b_config)
-    bos_client.put_object_from_string(bos_bucket, "%s/%s" % (category, name), raw)
-    url = "https://paddlenlp.bj.bcebos.com/%s/%s/%s" % (bos_bucket, category, name)
-    return url
+def get_files(local_path: str, origin_path: str | None = None) -> list[str]:
+    """get all file path under the local file
 
+    Args:
+        local_path (str): the path of local directory
 
-def multi_upload_to_bos(filename, name, category):
-    b_config = BceClientConfiguration(credentials=BceCredentials(access_key_id, secret_access_key), endpoint=bos_host)
-    bos_client = BosClient(b_config)
-    # init multi-upload
-    key = "%s/%s" % (category, name)
-    bucket_name = bos_bucket
-    upload_id = bos_client.initiate_multipart_upload(bucket_name, key).upload_id
-
-    left_size = os.path.getsize(filename)
-    offset = 0
-    part_number = 1
-    part_list = []
-    while left_size > 0:
-        part_size = 3 * 1024 * 1024 * 1024
-        if left_size < part_size:
-            part_size = left_size
-        response = bos_client.upload_part_from_file(
-            bucket_name, key, upload_id, part_number, part_size, filename, offset
-        )
-        left_size -= part_size
-        offset += part_size
-        # your should store every part number and etag to invoke complete multi-upload
-        part_list.append({"partNumber": part_number, "eTag": response.metadata.etag})
-        part_number += 1
-    bos_client.complete_multipart_upload(bucket_name, key, upload_id, part_list)
-    url = "https://paddlenlp.bj.bcebos.com/%s/%s/%s" % (bos_bucket, category, name)
-    return url
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python bos_community.py organization/model local_dir")
-        sys.exit(1)
-
-    organization = sys.argv[1]
-    local_dir = sys.argv[2]
-
-    for filename in os.listdir(local_dir):
-        name = os.path.split(filename)[-1]
-        if name == "bos.log":
-            continue
-        filename = os.path.join(local_dir, filename)
-        left_size = os.path.getsize(filename)
-        print(f"Uploading to {organization}/{name}, size: {left_size}")
-        if left_size >= 5 * 1024 * 1024 * 1024:
-            url = multi_upload_to_bos(filename, name, category=f"community/{organization}")
+    Returns:
+        list[str]: path of local file
+    """
+    origin_path = origin_path or local_path
+    all_files = []
+    for file in os.listdir(local_path):
+        file_path = os.path.join(local_path, file)
+        if os.path.isdir(file_path):
+            all_files.extend(get_files(file_path, origin_path))
         else:
-            with open(filename, "rb") as fp:
-                url = upload_to_bos_from_raw(raw=fp.read(), name=name, category=f"community/{organization}")
-        print(f"Done: {url}")
+            bos_file_path = file_path.replace(origin_path, "")
+            if bos_file_path.startswith("/"):
+                bos_file_path = bos_file_path[1:]
+
+            all_files.append((file_path, bos_file_path))
+
+    return all_files
+
+
+def bos_upload_handler(
+    bos_path: str | None = None,
+    local_path: str | None = None,
+    bos_host: str | None = None,
+):
+    if bos_path is None:
+        bos_path = "models/community"
+        logger.info(
+            f"can not detect src_path, so it will upload the content of current dir<{os.path.abspath(bos_path)}> to bos"
+        )
+
+    if local_path is None:
+        local_path = "./"
+        logger.info(
+            f"can not detect local_path, so it will upload the content of current dir<{os.path.abspath(local_path)}> to bos"
+        )
+
+    # only load ak/sk from env
+    access_key_id = os.getenv("bos_access_key_id", None)
+    secret_access_key = os.getenv("bos_secret_access_key", None)
+
+    if access_key_id is None or secret_access_key is None:
+        raise ValueError(
+            "Please set environment variables of `bos_access_key_id`, `bos_secret_access_key`, before uploading !!!"
+        )
+
+    if bos_host is None:
+        bos_host = os.getenv("bos_host", "paddlenlp.bj.bcebos.com")
+    logger.info(f"bos host: {bos_host}")
+
+    # 1. init bos_client
+    config = BceClientConfiguration(credentials=BceCredentials(access_key_id, secret_access_key), endpoint=bos_host)
+
+    bos_client = BosClient(config)
+
+    # 2. upload local file
+    if os.path.isfile(local_path):
+        raise ValueError(f"local_path<{local_path}> can not be file, it must be directory")
+
+    for file_path, bos_file_path in tqdm(get_files(local_path)):
+        upload_file(file_path=file_path, bos_file_path=bos_file_path, bucket_name=bos_path, bos_client=bos_client)
