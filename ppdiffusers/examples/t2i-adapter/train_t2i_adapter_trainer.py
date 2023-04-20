@@ -19,7 +19,7 @@ from adapter import (
     AdapterLDM,
     AdapterLDMTrainer,
     DataArguments,
-    Fill50kDataset,
+    TextImagePair,
     ModelArguments,
 )
 
@@ -62,10 +62,19 @@ def main():
             )
 
     model = AdapterLDM(model_args)
-    train_dataset = Fill50kDataset(model.tokenizer, data_args.file_path)
-
+    train_dataset = TextImagePair(
+        file_list=data_args.file_list,
+        size=data_args.resolution,
+        num_records=data_args.num_records,
+        buffer_size=data_args.buffer_size,
+        shuffle_every_n_samples=data_args.shuffle_every_n_samples,
+        interpolation="lanczos",
+        tokenizer=model.tokenizer,
+        control_image_processor=model.control_image_processor,
+        data_format=data_args.data_format,
+    )
     trainer = AdapterLDMTrainer(
-        model=model, args=training_args, train_dataset=train_dataset, tokenizer=model.tokenizer
+        model=model, args=training_args, train_dataset=train_dataset, tokenizer=model.tokenizer, 
     )
     # must set recompute after trainer init
     trainer.model.set_recompute(training_args.recompute)

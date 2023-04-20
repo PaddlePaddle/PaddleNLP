@@ -191,6 +191,7 @@ class Adapter(ModelMixin, ConfigMixin):
                 (batch, channel, height, width) input images for adapter model, `channel` should equal to
                 `channels_in`.
         """
+        # breakpoint()
         x = self.unshuffle(x)
         features = []
         x = self.conv_in(x)

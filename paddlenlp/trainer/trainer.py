@@ -612,6 +612,7 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                print(1)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -692,6 +693,7 @@ class Trainer:
 
                     elif args.recompute and dp_enabled:
                         fused_allreduce_gradients(list(model.parameters()), None)
+                    print(3)
                     # Optimizer step
                     optimizer_was_run = True
                     if self.do_grad_scaling:
@@ -702,11 +704,12 @@ class Trainer:
                         optimizer_was_run = scale_before <= scale_after
                     else:
                         self.optimizer.step()
-
+                    print(4)
                     if optimizer_was_run:
                         self.lr_scheduler.step()
-
+                    print(5)
                     self.optimizer.clear_grad()
+                    print(6)
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -718,6 +721,7 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+                print(7)
 
             if step < 0:
                 logger.warning(
