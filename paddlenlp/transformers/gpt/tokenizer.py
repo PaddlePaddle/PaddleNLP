@@ -13,16 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import shutil
 from functools import lru_cache
 
-import json
 import jieba
-import shutil
 import sentencepiece as spm
 from paddle.utils import try_import
 
-from .. import PretrainedTokenizer, AddedToken
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = [
     "GPTTokenizer",
