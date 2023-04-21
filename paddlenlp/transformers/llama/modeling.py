@@ -605,7 +605,7 @@ class LlamaModel(LlamaPretrainedModel):
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
         combined_attention_mask = paddle.maximum(
-            combined_attention_mask.astype(dtype), paddle.full(1, float(finfo(dtype).min), dtype=dtype)
+            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
         )
         return combined_attention_mask
 
