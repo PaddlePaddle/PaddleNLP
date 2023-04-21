@@ -23,7 +23,7 @@ from utils import ChatGLMTrainer
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.metrics import Rouge1, Rouge2, RougeL
+from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 from paddlenlp.utils.log import logger
@@ -115,6 +115,7 @@ def main():
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
+        bleu4 = BLEU(n_size=4)
         predictions = [x[x != -100] for x in eval_preds.predictions]
         references = [x[x != -100] for x in eval_preds.label_ids]
 
@@ -124,10 +125,12 @@ def main():
         rouge2_score = rouge2.score(predictions, references)
         for pred, ref in zip(predictions, references):
             rougel.add_inst(pred, [ref])
+            bleu4.add_inst(pred, [ref])
         return {
             "rouge1": rouge1_score,
             "rouge2": rouge2_score,
             "rougel": rougel.score(),
+            "bleu4": bleu4.score(),
         }
 
     trainer = ChatGLMTrainer(
