@@ -310,7 +310,7 @@ class OPTModelTester:
         )
 
         if self.parent.use_labels:
-            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertIsInstance(result[0].item(), float)
             self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
         else:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
