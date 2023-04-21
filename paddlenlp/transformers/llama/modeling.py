@@ -206,18 +206,20 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return hidden_states * self.weight
 
 
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), "float32") / dim))
         self.register_buffer("inv_freq", inv_freq)
 
         t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
