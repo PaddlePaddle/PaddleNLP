@@ -76,7 +76,6 @@ class ChatGLMTrainer(Trainer):
                 pred_tokens = pred_tokens[pred_tokens != self.tokenizer.pad_token_id]
                 pred_tokens = pred_tokens[pred_tokens != n_token_id].tolist()
                 all_preds.append(pred_tokens)
-                print(self.tokenizer.decode(all_preds[-1]))
             max_pred_length = max([len(x) for x in all_preds])
             for index, preds in enumerate(all_preds):
                 all_preds[index] = preds + [-100] * (max_pred_length - len(preds))
