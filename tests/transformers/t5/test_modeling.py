@@ -1202,7 +1202,7 @@ class TestAsymmetricT5(unittest.TestCase):
 
         if self.use_labels:
             assert outputs[1].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
-            assert outputs[0].shape == [1]
+            assert isinstance(outputs[0].item(), float)
         else:
             assert outputs[0].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
         return model
