@@ -13,9 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import inspect
-import io
-import json
 import os
 import re
 import shutil
@@ -666,19 +665,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
     def save_model_config(self, save_dir: str):
         """
+        Deprecated, please use `.config.save_pretrained()` instead.
         Saves model configuration to a file named "config.json" under `save_dir`.
 
         Args:
             save_dir (str): Directory to save model_config file into.
         """
-        # Save model config
-        model_config = self.get_model_config()
-        if isinstance(model_config, PretrainedConfig):
-            model_config.save_pretrained(save_dir)
-        else:
-            model_config_file = os.path.join(save_dir, self.model_config_file)
-            with io.open(model_config_file, "w", encoding="utf-8") as f:
-                f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
+        logger.warning("The `save_model_config` is deprecated! Please use `.config.save_pretrained()` instead.")
+        self.config.save_pretrained(save_dir)
 
     def save_to_hf_hub(
         self,
@@ -1356,7 +1350,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         state_dict_to_save = None
-        config_to_save = model_to_save.config
+        config_to_save = copy.deepcopy(model_to_save.config)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
             config_to_save.tensor_parallel_degree = 1

@@ -529,7 +529,7 @@ class ChatGLMStack(nn.Layer):
         for i, layer in enumerate(self.layers):
             cache_i = cache[i]
 
-            if self.enable_recompute:
+            if self.enable_recompute and not hidden_states.stop_gradient:
                 hidden_states, new_cache = self.recompute_training(
                     layer,
                     hidden_states=hidden_states,
