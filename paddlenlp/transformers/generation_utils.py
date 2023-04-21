@@ -27,6 +27,7 @@ except ImportError:
     from paddle.fluid.layers.utils import map_structure
 
 from paddle.fluid.dygraph.base import in_declarative_mode
+from paddle.nn import MultiHeadAttention
 
 from paddlenlp.utils.log import logger
 
@@ -34,7 +35,7 @@ from .model_outputs import CausalLMOutputWithPast, ModelOutput, Seq2SeqLMOutput
 
 __all__ = ["GenerationMixin"]
 
-from ..generation.logits_process import (
+from paddlenlp.generation.logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
@@ -46,7 +47,10 @@ from ..generation.logits_process import (
     TopKLogitsWarper,
     TopPLogitsWarper,
 )
-from ..generation.stopping_criteria import MaxLengthCriteria, StoppingCriteriaList
+from paddlenlp.generation.stopping_criteria import (
+    MaxLengthCriteria,
+    StoppingCriteriaList,
+)
 
 
 class BeamHypotheses:
@@ -441,33 +445,12 @@ class GenerationMixin(object):
         # may be different from expected. In this case, you need to rewrite the
         # method.
 
-        # 拴Q了
-        # def _convert_to_standard_cache(
-        #     past_key_value, batch_size
-        # ):
-        #     """
-        #     Standardizes the format of the cache so as to match most implementations, i.e. to tuple(tuple([batch_size,
-        #     num_heads, ...]))
-        #     """
-        #     batch_size_times_num_heads, head_dim, seq_length = past_key_value[0][0].shape
-        #     num_heads = batch_size_times_num_heads // batch_size
-        #     # key: [batch_size * num_heads, head_dim, seq_length] -> [batch_size, num_heads, head_dim, seq_length]
-        #     # value: [batch_size * num_heads, seq_length, head_dim] -> [batch_size, num_heads, seq_length, head_dim]
-        #     return tuple(
-        #         (
-        #             layer_past[0].reshape([batch_size, num_heads, head_dim, seq_length]),
-        #             layer_past[1].reshape([batch_size, num_heads, seq_length, head_dim]),
-        #         )
-        #         for layer_past in past_key_value
-        #     )
-
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
-            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -601,33 +584,33 @@ class GenerationMixin(object):
     @paddle.no_grad()
     def generate(
         self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        max_length=20,
-        min_length=0,
-        decode_strategy="greedy_search",
-        temperature=1.0,
-        top_k=0,
-        top_p=1.0,
-        repetition_penalty=1.0,
-        penalty_alpha=0.0,
-        num_beams=1,
-        num_beam_groups=1,
-        length_penalty=0.0,
-        early_stopping=False,
-        bos_token_id=None,
-        eos_token_id=None,
-        pad_token_id=None,
-        decoder_start_token_id=None,
-        forced_bos_token_id=None,
-        forced_eos_token_id=None,
-        no_repeat_ngram_size=None,
-        num_return_sequences=1,
-        diversity_rate=0.0,
-        use_cache=True,
-        use_fast=False,
-        use_fp16_decoding=False,
+        input_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        max_length: Optional[int] = 20,
+        min_length: Optional[int] = 0,
+        decode_strategy: Optional[str] = "greedy_search",
+        temperature: Optional[float] = None,
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None,
+        penalty_alpha: Optional[float] = None,
+        num_beams: Optional[int] = 1,
+        num_beam_groups: Optional[int] = 1,
+        length_penalty: Optional[int] = None,
+        early_stopping: Optional[bool] = False,
+        bos_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
+        pad_token_id: Optional[int] = None,
+        decoder_start_token_id: Optional[int] = None,
+        forced_bos_token_id: Optional[int] = None,
+        forced_eos_token_id: Optional[int] = None,
+        no_repeat_ngram_size: Optional[int] = None,
+        num_return_sequences: Optional[int] = 1,
+        diversity_rate: Optional[float] = 0.0,
+        use_cache: Optional[bool] = True,
+        use_fast: Optional[bool] = False,
+        use_fp16_decoding: Optional[bool] = False,
         **model_kwargs
     ):
         r"""
@@ -755,6 +738,50 @@ class GenerationMixin(object):
                 response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                 print(response)
                 # 是的
+
+            .. code-block::
+
+                # Generate the sequence by using "contrastive_search" strategy
+                ids, scores = model.generate(
+                    input_ids=inputs['input_ids'],
+                    token_type_ids=inputs['token_type_ids'],
+                    position_ids=inputs['position_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    decode_strategy="contrastive_search",
+                    top_k=5,
+                    penalty_alpha=0.85,
+                    max_length=30)
+                print(ids.shape, scores.shape)
+                # [1, 2] [1, 1]
+                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
+                response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
+                print(response)
+                # 谢谢
+
+            .. code-block::
+                # Directly use model.contrastive_search()
+
+                from paddlenlp.generation.stopping_criteria import StoppingCriteriaList, MaxLengthCriteria
+                stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=30)])
+
+                # Generate the sequence by using "greedy_search" strategy
+                ids, scores = model.contrastive_search(
+                    input_ids=inputs['input_ids'],
+                    token_type_ids=inputs['token_type_ids'],
+                    position_ids=inputs['position_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    penalty_alpha=0.85,
+                    top_k=5,
+                    stopping_criteria=stopping_criteria
+                    )
+                print(ids.shape, scores.shape)
+                # [1, 2] [1, 1]
+                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
+                response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
+                print(response)
+                # 谢谢
 
             .. code-block::
 
@@ -940,7 +967,7 @@ class GenerationMixin(object):
             logits_processors=model_kwargs["logits_processors"]
             if "logits_processors" in model_kwargs
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
-            else LogitsProcessorList(),
+            else None,
         )
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
@@ -951,21 +978,19 @@ class GenerationMixin(object):
             stopping_criteria=model_kwargs["stopping_criteria"]
             if "stopping_criteria" in model_kwargs
             and isinstance(model_kwargs["stopping_criteria"], StoppingCriteriaList)
-            else StoppingCriteriaList(),
+            else None,
         )
         if "stopping_criteria" in model_kwargs:
             model_kwargs.pop("stopping_criteria")
 
         # go into different generation modes
         if decode_strategy == "greedy_search":
-
-            logits_warper = self.get_logits_warper(temperature=temperature)
             if num_return_sequences > 1:
                 raise ValueError(
                     "`num_return_sequences` has to be 1, but is {} "
                     "when doing greedy search.".format(num_return_sequences)
                 )
-
+            logits_warper = self.get_logits_warper(temperature=temperature)
             return self.greedy_search(
                 input_ids,
                 logits_processors,
@@ -1000,7 +1025,6 @@ class GenerationMixin(object):
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
-
             # top_k and top_p can combine to use
             logits_warper = self.get_logits_warper(temperature=temperature, top_k=top_k, top_p=top_p)
 
@@ -1156,7 +1180,7 @@ class GenerationMixin(object):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )
 
         return input_ids[:, origin_len:], scores
@@ -1173,25 +1197,20 @@ class GenerationMixin(object):
         eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
-        # init values
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         batch_size, cur_len = input_ids.shape
-        # record average score
         origin_len = cur_len
-        # keep track of which sequences are already finished
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         # If the first step in the loop, encode all the prefix and obtain (1) past_key_values
         # (2) last_hidden_states (3) logit_for_next_step (4) update model kwargs for the next step
         while True:
-            if model_kwargs.get("past_key_values") is None:
-
+            if model_kwargs.get("cache") is None:
                 model_kwargs["use_cache"] = True
-
                 model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
                 outputs = self(**model_inputs, return_dict=True, output_hidden_states=True, output_attentions=True)
 
@@ -1221,23 +1240,25 @@ class GenerationMixin(object):
                     input_ids=input_ids, expand_size=top_k, **model_kwargs
                 )
 
-                past_key_values = model_kwargs.get("past_key_values")
+                past_key_values = model_kwargs.get("cache")
 
-                print(type(past_key_values))
                 if past_key_values is None:
                     raise ValueError(
                         f"{self.__class__.__name__} does not support caching and therefore **can't** be used "
                         "for contrastive search."
                     )
-                elif (
-                    not isinstance(past_key_values[0], (tuple, paddle.Tensor))
-                    or past_key_values[0][0].shape[0] != batch_size
-                ):
-                    raise ValueError(
-                        f"{self.__class__.__name__} does not have a standard cache format and therefore **can't** be "
-                        "used for contrastive search without further modifications."
-                    )
-
+                elif not isinstance(past_key_values[0], (tuple, paddle.Tensor)):
+                    if isinstance(past_key_values[0][0], tuple) and past_key_values[0][0][0].shape[0] != batch_size:
+                        # encoder-decoder arch like bart, cache is tuple (incremental_cache, static_cache)
+                        raise ValueError(
+                            f"{self.__class__.__name__} does not have a standard cache format and therefore **can't** be "
+                            "used for contrastive search without further modifications."
+                        )
+                    elif not isinstance(past_key_values[0][0], tuple) and past_key_values[0][0].shape[0] != batch_size:
+                        raise ValueError(
+                            f"{self.__class__.__name__} does not have a standard cache format and therefore **can't** be "
+                            "used for contrastive search without further modifications."
+                        )
             # contrastive search main logic starts:
             # contrastive search decoding consists of two steps: (1) candidate tokens recall (2) candidate rerank by degeneration penalty
             logit_for_next_step = self.adjust_logits_during_generation(logit_for_next_step)
@@ -1252,24 +1273,45 @@ class GenerationMixin(object):
 
             top_k_probs, top_k_ids = paddle.topk(next_probs, k=top_k, axis=-1)
 
-            # Replicates the new past_key_valuse to match the  `top_k` candidates
-            new_key_values = []
-            for layer in model_kwargs["past_key_values"]:
-                items = []
-                # item is either the key or the value matrix
-                for item in layer:
-                    items.append(item.repeat_interleave(top_k, axis=0))
-                new_key_values.append(items)
-            model_kwargs["past_key_values"] = new_key_values
+            if self.config.is_encoder_decoder:
+                new_key_values = ()
+                for layer in model_kwargs["cache"]:
+                    even = 0
+                    items = ()
+                    for item in layer:
+                        if even % 2 == 0:
+                            k = item[0].repeat_interleave(top_k, axis=0)
+                            v = item[1].repeat_interleave(top_k, axis=0)
+                        if even and even % 2:
+                            static_k = item[0].repeat_interleave(top_k, axis=0)
+                            static_v = item[1].repeat_interleave(top_k, axis=0)
+
+                            items += (
+                                (MultiHeadAttention.Cache(k, v), MultiHeadAttention.StaticCache(static_k, static_v)),
+                            )
+
+                        even += 1
+                    new_key_values += items
+                model_kwargs["cache"] = new_key_values
+            else:
+                new_key_values = ()
+                for layer in model_kwargs["cache"]:
+                    even = 0
+                    items = ()
+                    for item in layer:
+                        if even % 2 == 0:
+                            k = item.repeat_interleave(top_k, axis=0)
+                        if even and even % 2:
+                            v = item.repeat_interleave(top_k, axis=0)
+                            items += (MultiHeadAttention.Cache(k, v),)
+                        even += 1
+                    new_key_values += items
+                model_kwargs["cache"] = new_key_values
 
             # compute the candidate tokens by the langugae model and collects their hidden states
-
             tmp = paddle.reshape(top_k_ids, (-1, 1))
 
-            # need to clear cache
-            model_kwargs["cache"] = None
             next_model_inputs = self.prepare_inputs_for_generation(tmp, **model_kwargs)
-
             outputs = self(**next_model_inputs, return_dict=True, output_hidden_states=True)
 
             # NOTE: must be ModelOutput
@@ -1294,34 +1336,76 @@ class GenerationMixin(object):
             # the degeneration penalty (4) logits for selecting next top-k candidates (5) selected tokens socres
             # (model confidence minus degeneration penalty) (6) decoder hidden state
 
-            next_tokens = top_k_ids[0 : len(top_k_ids), selected_idx.item()].unsqueeze(1)
+            # BUG: selected_idx may contain more than one index.
+
+            index = selected_idx.reshape((len(top_k_ids),) + (1,) * (len(top_k_ids.shape) - 1))
+            next_tokens = paddle.take_along_axis(top_k_ids, index, axis=1)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             next_hidden = paddle.stack(paddle.split(next_hidden.squeeze(axis=1), top_k), axis=1)
-            next_hidden = next_hidden[0:batch_size, selected_idx.item(), :]
+
+            index = selected_idx.reshape((len(next_hidden),) + (1,) * (len(next_hidden.shape) - 1))
+            next_hidden = paddle.take_along_axis(next_hidden, index, axis=1).squeeze(1)
+
             last_hidden_states = paddle.concat([last_hidden_states, next_hidden.unsqueeze(1)], axis=1)
 
             next_decoder_hidden_states = ()
             for layer in full_hidden_states:
-                layer = paddle.stack(paddle.split(layer, top_k), axis=1)[0:batch_size, selected_idx.item(), :]
+                tmp = paddle.stack(paddle.split(layer, top_k), axis=1)
+                index = selected_idx.reshape((len(tmp),) + (1,) * (len(tmp.shape) - 1))
+                layer = paddle.take_along_axis(tmp, index, axis=1).squeeze(1)
                 next_decoder_hidden_states += (layer,)
 
             # select the past_key_value
-            new_key_values = ()
-            for layer in next_past_key_values:
-                items = ()
-                # itemi is either the key or the value matrix
-                for item in layer:
-                    item = paddle.stack(paddle.split(item, top_k, axis=0), axis=1)
-                    item = item[0:batch_size, selected_idx.item(), ...]
-                    items += (item,)
-                new_key_values += (items,)
-            next_past_key_values = new_key_values
+            if self.config.is_encoder_decoder:
+                new_key_values = ()
+                for layer in next_past_key_values:
+                    items = ()
+                    even = 0
+                    # item is either the key or the value matrix
+                    for item in layer:
+                        if even % 2 == 0:
+                            k = paddle.stack(paddle.split(item[0], top_k, axis=0), axis=1)
+                            index = selected_idx.reshape((len(k),) + (1,) * (len(k.shape) - 1))
+                            k = paddle.take_along_axis(k, index, axis=1).squeeze(1)
+                            v = paddle.stack(paddle.split(item[1], top_k, axis=0), axis=1)
+                            index = selected_idx.reshape((len(v),) + (1,) * (len(v.shape) - 1))
+                            v = paddle.take_along_axis(v, index, axis=1).squeeze(1)
 
-            logit_for_next_step = paddle.stack(paddle.split(logits, top_k), axis=1)[
-                0:batch_size, selected_idx.item(), :
-            ]
+                        if even and even % 2:
+                            static_k = paddle.stack(paddle.split(item[0], top_k, axis=0), axis=1)
+                            index = selected_idx.reshape((len(static_k),) + (1,) * (len(static_k.shape) - 1))
+                            static_k = paddle.take_along_axis(static_k, index, axis=1).squeeze(1)
+                            static_v = paddle.stack(paddle.split(item[1], top_k, axis=0), axis=1)
+                            index = selected_idx.reshape((len(static_v),) + (1,) * (len(static_v.shape) - 1))
+                            static_v = paddle.take_along_axis(static_v, index, axis=1).squeeze(1)
+
+                            items += (
+                                MultiHeadAttention.Cache(k, v),
+                                MultiHeadAttention.StaticCache(static_k, static_v),
+                            )
+
+                        even += 1
+                    new_key_values += (items,)
+                next_past_key_values = new_key_values
+
+            else:
+                new_key_values = ()
+                for layer in next_past_key_values:
+                    items = ()
+                    # item is either the key or the value matrix
+                    for item in layer:
+                        item = paddle.stack(paddle.split(item, top_k, axis=0), axis=1)
+                        index = selected_idx.reshape((len(item),) + (1,) * (len(item.shape) - 1))
+                        item = paddle.take_along_axis(item, index, axis=1).squeeze(1)
+                        items += (item,)
+                    new_key_values += (items,)
+                next_past_key_values = new_key_values
+
+            tmp = paddle.stack(paddle.split(logits, top_k), axis=1)
+            index = selected_idx.reshape((len(tmp),) + (1,) * (len(tmp.shape) - 1))
+            logit_for_next_step = paddle.take_along_axis(tmp, index, axis=1).squeeze(1)
 
             # Rebuilds the relevant parts of the model output for the selected token, for use in the next iteration.
             if self.config.is_encoder_decoder:
@@ -1373,9 +1457,7 @@ class GenerationMixin(object):
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         batch_size, cur_len = input_ids.shape
-        # record average score
         origin_len = cur_len
-        # keep track of which sequences are already finished
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
@@ -1510,7 +1592,7 @@ class GenerationMixin(object):
                 unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )
             return input_ids, scores, unfinished_flag, model_kwargs
 

@@ -36,8 +36,6 @@ from paddlenlp.transformers import (
     BartForConditionalGeneration,
     BartTokenizer,
     PretrainedConfig,
-    UnifiedTransformerLMHeadModel,
-    UnifiedTransformerTokenizer,
 )
 from paddlenlp.transformers.generation_utils import BeamSearchScorer
 from tests.testing_utils import slow
@@ -895,27 +893,49 @@ class GenerationIntegrationTests(unittest.TestCase):
 
     def test_max_length_backward_compat_contrastive(self):
 
-        paddle.seed(2)
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
-        # Initialize the model and tokenizer
-        model_name_or_path = "unified_transformer-12L-cn-luge"
-        model = UnifiedTransformerLMHeadModel.from_pretrained(model_name_or_path)
-        tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name_or_path)
+        bart_tokenizer = BartTokenizer.from_pretrained("bart-base")
+        bart_model = BartForConditionalGeneration.from_pretrained("bart-base")
+        input_ids = paddle.to_tensor(bart_tokenizer(article)["input_ids"]).unsqueeze([0])
 
-        # Prepare the model inputs.
-        history = "早上好，今天空气质量不错。"
-        inputs = tokenizer.dialogue_encode(
-            history, task_type="chitchat", add_start_token_as_response=True, return_tensors=True
+        bart_model.eval()
+
+        max_length = 5
+        input_ids = paddle.tile(input_ids, [2, 1])
+
+        bos_token_id = getattr(bart_model, "bos_token_id", None)
+        eos_token_id = getattr(bart_model, "eos_token_id", None)
+        pad_token_id = getattr(bart_model, "pad_token_id", None)
+        decoder_start_token_id = getattr(bart_model, "decoder_start_token_id", None)
+
+        model_kwargs = {}
+
+        model_kwargs["attention_mask"] = bart_model.prepare_attention_mask_for_generation(
+            input_ids, pad_token_id, eos_token_id
         )
 
-        ids, scores = model.generate(
-            input_ids=inputs["input_ids"],
-            token_type_ids=inputs["token_type_ids"],
-            position_ids=inputs["position_ids"],
-            attention_mask=inputs["attention_mask"],
-            decode_strategy="contrastive_search",
-            top_k=5,
-            penalty_alpha=0.86,
+        bart_model.is_encoder_decoder = hasattr(bart_model, "encoder") and hasattr(bart_model, "decoder")
+
+        model_kwargs = bart_model.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
+
+        if "decoder_input_ids" in model_kwargs:
+            input_ids = model_kwargs.pop("decoder_input_ids")
+        else:
+            input_ids = bart_model.prepare_decoder_input_ids_for_generation(
+                input_ids, decoder_start_token_id, bos_token_id
+            )
+
+        model_kwargs["use_cache"] = True
+        max_length += input_ids.shape[-1]
+
+        bart_model.greedy_search(
+            input_ids,
+            max_length=max_length,
+            pad_token_id=bart_model.bart.config["pad_token_id"],
+            eos_token_id=bart_model.bart.config["eos_token_id"],
+            logits_processors=None,
+            **model_kwargs,
         )
 
     def test_max_length_backward_compat_sample(self):
