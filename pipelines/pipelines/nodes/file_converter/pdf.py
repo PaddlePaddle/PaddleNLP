@@ -39,7 +39,6 @@ class PDFToTextConverter(BaseConverter):
         remove_numeric_tables: bool = False,
         language: str = "en",
         valid_languages: Optional[List[str]] = None,
-        merge_sentences: Optional[bool] = False,
     ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
@@ -52,13 +51,11 @@ class PDFToTextConverter(BaseConverter):
                                 This option can be used to add test for encoding errors. If the extracted text is
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
-        :param merge_sentences:  Merge all sentences split by \n in one page into a paragraph.
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
         super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
-        self.merge_sentences = merge_sentences
         self.language = language
 
     def convert(
@@ -68,7 +65,6 @@ class PDFToTextConverter(BaseConverter):
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         language: Optional[str] = "en",
-        merge_sentences: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
@@ -86,7 +82,6 @@ class PDFToTextConverter(BaseConverter):
                                 This option can be used to add test for encoding errors. If the extracted text is
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
-        :param merge_sentences:  Merge all sentences split by \n in one page into a paragraph.
         """
 
         pages = self._read_pdf(file_path, layout=False)
@@ -94,8 +89,6 @@ class PDFToTextConverter(BaseConverter):
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
             valid_languages = self.valid_languages
-        if merge_sentences is None:
-            merge_sentences = self.merge_sentences
         if language is None:
             language = self.language
         cleaned_pages = []
@@ -126,10 +119,8 @@ class PDFToTextConverter(BaseConverter):
                         logger.debug(f"Removing line '{line}' from {file_path}")
                         continue
                 cleaned_lines.append(line)
-            if merge_sentences:
-                page = "".join(cleaned_lines)
-            else:
-                page = "\n".join(cleaned_lines)
+
+            page = "\n".join(cleaned_lines)
             cleaned_pages.append(page)
 
         if valid_languages:
