@@ -22,6 +22,7 @@ from utils import ChatGLMTrainer
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
@@ -41,6 +42,7 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -84,7 +86,18 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
-
+    if model_args.lora:
+        lora_config = LoRAConfig(
+            target_modules=[".*query_key_value.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+            enable_lora_list=[[True, False, True]],
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+        )
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
