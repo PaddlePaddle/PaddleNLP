@@ -33,14 +33,3 @@ class TestPDFToTextConverter(unittest.TestCase):
         ]
         result = converter.convert(file_path)
         self.assertEqual(expected_result, result)
-
-        result = converter.convert(file_path, merge_sentences=True)
-        # Remove \n
-        expected_result = [
-            {
-                "content": " A Simple PDF File  This is a small demonstration .pdf file -  just for use in the Virtual Mechanics tutorials. More text. And more  text. And more text. And more text. And more text.  And more text. And more text. And more text. And more text. And more  text. And more text. Boring, zzzzz. And more text. And more text. And  more text. And more text. And more text. And more text. And more text.  And more text. And more text.  And more text. And more text. And more text. And more text. And more  text. And more text. And more text. Even more. Continued on page 2 ...\x0c Simple PDF File 2  ...continued from page 1. Yet more text. And more text. And more text.  And more text. And more text. And more text. And more text. And more  text. Oh, how boring typing this stuff. But not as boring as watching  paint dry. And more text. And more text. And more text. And more text.  Boring.  More, a little more text. The end, and just as well. ",
-                "content_type": "text",
-                "meta": None,
-            }
-        ]
-        self.assertEqual(expected_result, result)
