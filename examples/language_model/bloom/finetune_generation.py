@@ -230,7 +230,7 @@ def main():
         data_args=data_args,
     )
 
-    if training_args.fp16_opt_level == "O2":
+    if training_args.fp16_opt_level == "O2" and not training_args.bf16:
         trainer.disable_autocast_context_manager()
 
     if training_args.do_train:

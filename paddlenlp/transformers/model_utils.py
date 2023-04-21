@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import inspect
 import os
 import re
@@ -1349,7 +1350,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         state_dict_to_save = None
-        config_to_save = model_to_save.config
+        config_to_save = copy.deepcopy(model_to_save.config)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
             config_to_save.tensor_parallel_degree = 1
