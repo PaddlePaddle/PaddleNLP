@@ -137,7 +137,6 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         eol_token="\u2583",
         **kwargs  # The token of newline.
     ):
-
         self._model_file = model_file
         self.eol_token = eol_token
         if not os.path.isfile(model_file):
@@ -246,7 +245,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
         """
         return len(self.sp)
-    
+
     def get_vocab(self):
         """
         Returns the vocabulary as a dictionary of token to index.
@@ -387,7 +386,6 @@ class GPTTokenizer(PretrainedTokenizer):
         add_bos_token=False,
         **kwargs  # The token of newline.
     ):
-
         pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
         eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
         unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
@@ -499,7 +497,6 @@ class GPTTokenizer(PretrainedTokenizer):
         return self.encoder.get(token, self.encoder.get(self.unk_token))
 
     def _convert_id_to_token(self, index):
-
         return self.decoder[index]
 
     def convert_ids_to_string(self, ids):
