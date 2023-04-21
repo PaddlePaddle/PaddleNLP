@@ -22,68 +22,14 @@ class TestPDFToTextConverter(unittest.TestCase):
     def test_conversion(self):
         fixtures_path = "tests/fixtures"
         file_path = os.path.join(fixtures_path, "example_pdf.pdf")
-        converter = PDFToTextConverter()
+        converter = PDFToTextConverter(language="en")
+
         expected_result = [
-            {"content": "A Simple PDF File", "content_type": "text", "meta": None},
-            {"content": "This is a small demonstration .pdf file -", "content_type": "text", "meta": None},
             {
-                "content": "just for use in the Virtual Mechanics tutorials. More text. And more",
+                "content": " A Simple PDF File \n This is a small demonstration .pdf file - \n just for use in the Virtual Mechanics tutorials. More text. And more \n text. And more text. And more text. And more text. \n And more text. And more text. And more text. And more text. And more \n text. And more text. Boring, zzzzz. And more text. And more text. And \n more text. And more text. And more text. And more text. And more text. \n And more text. And more text. \n And more text. And more text. And more text. And more text. And more \n text. And more text. And more text. Even more. Continued on page 2 ...\x0c Simple PDF File 2 \n ...continued from page 1. Yet more text. And more text. And more text. \n And more text. And more text. And more text. And more text. And more \n text. Oh, how boring typing this stuff. But not as boring as watching \n paint dry. And more text. And more text. And more text. And more text. \n Boring.  More, a little more text. The end, and just as well. ",
                 "content_type": "text",
                 "meta": None,
-            },
-            {"content": "text. And more text. And more text. And more text.", "content_type": "text", "meta": None},
-            {
-                "content": "And more text. And more text. And more text. And more text. And more",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "text. And more text. Boring, zzzzz. And more text. And more text. And",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "more text. And more text. And more text. And more text. And more text.",
-                "content_type": "text",
-                "meta": None,
-            },
-            {"content": "And more text. And more text.", "content_type": "text", "meta": None},
-            {
-                "content": "And more text. And more text. And more text. And more text. And more",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "text. And more text. And more text. Even more. Continued on page 2 ...",
-                "content_type": "text",
-                "meta": None,
-            },
-            {"content": "Simple PDF File 2", "content_type": "text", "meta": None},
-            {
-                "content": "...continued from page 1. Yet more text. And more text. And more text.",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "And more text. And more text. And more text. And more text. And more",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "text. Oh, how boring typing this stuff. But not as boring as watching",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "paint dry. And more text. And more text. And more text. And more text.",
-                "content_type": "text",
-                "meta": None,
-            },
-            {
-                "content": "Boring. More, a little more text. The end, and just as well.",
-                "content_type": "text",
-                "meta": None,
-            },
+            }
         ]
         result = converter.convert(file_path)
         self.assertEqual(expected_result, result)
