@@ -250,6 +250,59 @@ class GenerationTesterMixin:
             )
         return output_greedy, output_generate
 
+    def _contrastive_generate(
+            self,
+            model,
+            input_ids,
+            attention_mask,
+            max_length,
+            num_return_sequences,
+            logits_processors,
+            logits_warper,
+            process_kwargs,
+    ):
+        with paddle.no_grad():
+            output_generate = model.generate(
+                input_ids,
+                max_length=max_length,
+                decode_strategy="contrastive_search",
+                num_return_sequences=num_return_sequences,
+                attention_mask=attention_mask,
+                penalty_alpha=0.6,
+                top_k=1,
+                **process_kwargs,
+            )
+
+        kwargs = {}
+        if self.is_encoder_decoder:
+            encoder_outputs, input_ids_clone, attention_mask_clone = self._get_encoder_outputs(
+                model,
+                input_ids,
+                attention_mask,
+                num_interleave=num_return_sequences,
+            )
+            kwargs["encoder_output"] = encoder_outputs
+            input_ids_clone = input_ids_clone.repeat_interleave(num_return_sequences, axis=0)
+            attention_mask_clone = attention_mask_clone.repeat_interleave(num_return_sequences, axis=0)
+        else:
+            attention_mask_clone = attention_mask.repeat_interleave(num_return_sequences, axis=0)
+            input_ids_clone = input_ids.repeat_interleave(num_return_sequences, axis=0)
+
+        with paddle.no_grad():
+            output_sample = model.contrastive_search(
+                input_ids_clone,
+                attention_mask=attention_mask_clone,
+                max_length=max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1],
+                logits_processors=logits_processors,
+                pad_token_id=getattr(model, model.base_model_prefix).config["pad_token_id"],
+                eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
+                penalty_alpha=0.6,
+                top_k=1,
+                **process_kwargs,
+                **kwargs,
+            )
+        return output_sample, output_generate
+
     def _sample_generate(
         self,
         model,
@@ -423,6 +476,43 @@ class GenerationTesterMixin:
             )
 
             self.assertListEqual(output_greedy[0].tolist(), output_generate[0].tolist())
+
+    def test_contrastive_generate(self):
+
+        for model_class in self.all_generative_model_classes.keys():
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            paddle.seed(124)
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            if self.is_encoder_decoder:
+                max_length = 4
+
+            process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
+                getattr(model, model.base_model_prefix).config["eos_token_id"],
+                forced_bos_token_id=getattr(
+                    getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None
+                ),
+                forced_eos_token_id=getattr(
+                    getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None
+                ),
+                max_length=max_length,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+            )
+            logits_warper = self._get_warper_and_kwargs()
+
+            # check `generate()` and `sample()` are equal
+            output_sample, output_generate = self._contrastive_generate(
+                model=model,
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                max_length=max_length,
+                num_return_sequences=1,
+                logits_processors=logits_processor,
+                logits_warper=logits_warper,
+                process_kwargs=process_kwargs,
+            )
+            self.assertListEqual(output_sample[0].tolist(), output_generate[0].tolist())
 
     def test_sample_generate(self):
 
