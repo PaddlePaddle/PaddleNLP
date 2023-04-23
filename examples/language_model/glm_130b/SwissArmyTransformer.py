@@ -17,9 +17,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import List, Union
 
-import icetk.sentencepiece_model_pb2 as sp_model
-from icetk.text_tokenizer import TextTokenizer
-from icetk.utils import auto_create
+import sentencepiece_model_pb2 as sp_model
+from icetk import TextTokenizer, auto_create
 
 logger = logging.getLogger(__name__)
 
