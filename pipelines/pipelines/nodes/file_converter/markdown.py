@@ -55,6 +55,7 @@ class MarkdownConverter(BaseConverter):
             markdown_text = f.read()
         text = self.markdown_to_text(markdown_text)
         document = {"content": text, "content_type": "text", "meta": meta}
+        # breakpoint()
         return [document]
 
     # Following code snippet is copied from https://gist.github.com/lorey/eb15a7f3338f959a78cc3661fbc255fe

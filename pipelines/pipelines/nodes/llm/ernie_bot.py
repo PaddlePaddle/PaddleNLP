@@ -68,7 +68,7 @@ class ErnieBot(BaseComponent):
         :param history: A list of dictionaries representing the conversation history,
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
-
+        print(query)
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:
