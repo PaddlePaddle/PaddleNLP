@@ -23,6 +23,11 @@ from utils import ChatGLMTrainer
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Rouge1, Rouge2, RougeL
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import (
+    chatglm_pad_attention_mask,
+    chatglm_postprocess_past_key_value,
+)
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 from paddlenlp.utils.log import logger
@@ -41,6 +46,7 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -84,7 +90,23 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
-
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=10,
+            num_attention_heads=model.config.num_attention_heads,
+            num_hidden_layers=model.config.num_hidden_layers,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=True,
+            prefix_projection_hidden_size=model.config.hidden_size,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=chatglm_postprocess_past_key_value,
+            pad_attention_mask=chatglm_pad_attention_mask,
+        )
+        model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
