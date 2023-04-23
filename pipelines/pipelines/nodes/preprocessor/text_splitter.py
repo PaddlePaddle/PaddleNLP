@@ -142,11 +142,8 @@ class TextSplitter(BaseComponent):
 
                     doc["meta"]["_split_id"] = i
                     ret.append(doc)
-                # breakpoint()
-                # ret.extend(res)
         if self._filter is not None and len(self._filter) > 0:
             ret = self.clean(ret)
-            # breakpoint()
         result = {"documents": ret}
         return result, "output_1"
 

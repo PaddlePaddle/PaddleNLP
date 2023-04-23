@@ -70,29 +70,31 @@ def chat_markdown_tutorial():
         embed_title=args.embed_title,
     )
 
+    # Indexing Markdowns
     markdown_converter = MarkdownConverter()
 
     text_splitter = CharacterTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
-    p = Pipeline()
-    p.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
-    p.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
-    p.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
-    p.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
+    indexing_pipeline = Pipeline()
+    indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
+    indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
+    indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
+    indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
     files = glob.glob(args.file_paths + "/*.md")
-    p.run(file_paths=files)
+    indexing_pipeline.run(file_paths=files)
 
+    # Query Markdowns
     ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
-    query_pipe = Pipeline()
-    query_pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    query_pipe.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    query_pipe.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
-    query_pipe.add_node(
+    query_pipeline = Pipeline()
+    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
+    query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
+    query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
+    query_pipeline.add_node(
         component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
     )
-    query_pipe.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
+    query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
-    prediction = query_pipe.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
+    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 
