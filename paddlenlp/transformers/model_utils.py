@@ -1244,6 +1244,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     "don't support conversion from pytorch weight file to paddle weight file "
                     "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                 )
+
         else:
             # 4. loading the state dict
             if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):

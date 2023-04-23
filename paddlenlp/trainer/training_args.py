@@ -439,6 +439,17 @@ class TrainingArguments:
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
     pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
+    pipeline_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it."
+                "following config is support:\n"
+                "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape."
+                "disable_partial_send_recv, partial_send_recv optmize for send speed."
+            )
+        },
+    )
     recompute: bool = field(
         default=False,
         metadata={
@@ -669,12 +680,33 @@ class TrainingArguments:
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                 strategy = fleet.DistributedStrategy()
+                if pipeline_parallel_degree > 1:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    for x in pipeline_parallel_config:
+                        if len(x) > 0:
+                            if x not in ["disable_p2p_cache_shape", "disable_partial_send_recv"]:
+                                raise ValueError(
+                                    f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                )
+
+                    strategy.pipeline_configs = {
+                        "accumulate_steps": self.gradient_accumulation_steps,
+                        "micro_batch_size": self.per_device_train_batch_size,
+                        "enable_partial_send_recv": False
+                        if "disable_partial_send_recv" in pipeline_parallel_config
+                        else True,
+                        "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
+                    }
+                if tensor_parallel_degree > 1:
+                    strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
+
                 strategy.hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
                 }
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 

@@ -234,7 +234,7 @@ class Trainer:
 
         # init parallel env
         if paddle.distributed.get_world_size() > 1:
-            if self.sharding or self.args.tensor_parallel_degree > 1:
+            if self.args.use_hybrid_parallel:
                 self.hcg = fleet.get_hybrid_communicate_group()
                 self.dp_group = self.hcg.get_data_parallel_group()
                 self.sharding_group = self.hcg.get_sharding_parallel_group()
@@ -268,6 +268,12 @@ class Trainer:
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
+        if self.args.pipeline_parallel_degree > 1:
+            from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
+            assert isinstance(
+                model, PipelineLayer
+            ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
         default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
@@ -297,7 +303,10 @@ class Trainer:
                 else:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
 
-            if self.sharding is not None:
+            if self.args.pipeline_parallel_degree > 1:
+                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+                self.scaler = fleet.distributed_scaler(self.scaler)
+            elif self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
@@ -466,13 +475,19 @@ class Trainer:
             # release memory
             del state_dict
 
+        in_pipeline_parallel_mode = self.args.use_hybrid_parallel and self.args.pipeline_parallel_degree > 1
+        gradient_accumulation_steps_in_control = args.gradient_accumulation_steps
+        if in_pipeline_parallel_mode:
+            # For pipeline parallel mode, paddle.distributed can accumulate gradients
+            gradient_accumulation_steps_in_control = 1
+
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if has_length(train_dataloader):
             len_dataloader = len(train_dataloader)
-            num_update_steps_per_epoch = len(train_dataloader) // args.gradient_accumulation_steps
+            num_update_steps_per_epoch = len(train_dataloader) // gradient_accumulation_steps_in_control
             num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
             num_examples = len(self.train_dataset)
 
@@ -483,9 +498,9 @@ class Trainer:
                 )
                 num_train_samples = args.max_steps * total_train_batch_size
             else:
-                max_steps = num_update_steps_per_epoch * args.num_train_epochs
+                max_steps = int(num_update_steps_per_epoch * args.num_train_epochs)
                 num_train_epochs = math.ceil(args.num_train_epochs)
-                num_train_samples = len(self.train_dataset) * args.num_train_epochs
+                num_train_samples = int(len(self.train_dataset) * args.num_train_epochs)
 
             if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
                 if max_steps // args.eval_steps < args.minimum_eval_times:
@@ -536,16 +551,18 @@ class Trainer:
         logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
         logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
-        logger.info(
-            f"  Number of trainable parameters = {sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)} (per device)"
-        )
-        if self.args.use_hybrid_parallel and self.args.tensor_parallel_degree > 1:
+        per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
+        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel} (per device)")
+        if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
-            logger.info(
-                "  Number of trainable parameters = "
-                f"{sum(p.numel().item() for p in model.parameters() if not p.stop_gradient) * self.args.tensor_parallel_degree}"
-                " (all devices, roughly)"
-            )
+            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
+            if parts_num > 1:
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
+                paddle.distributed.all_reduce(trainable_numel_tensor)
+                trainable_numel = trainable_numel_tensor.item() // max(self.args.data_parallel_degree, 1)
+                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+                # so, the trainable numel is a little bigger than real.
+                logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -562,7 +579,7 @@ class Trainer:
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
+                steps_trained_in_current_epoch *= gradient_accumulation_steps_in_control
             else:
                 steps_trained_in_current_epoch = 0
 
@@ -594,7 +611,9 @@ class Trainer:
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
         steps_in_epoch = (
-            len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
+            len(epoch_iterator)
+            if len_dataloader is not None
+            else args.max_steps * gradient_accumulation_steps_in_control
         )
 
         self.callback_handler.model = self.model
@@ -653,23 +672,26 @@ class Trainer:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
 
-                if step % args.gradient_accumulation_steps == 0:
+                if step % gradient_accumulation_steps_in_control == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
                 dp_enabled = (
                     self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
                 )
                 forbidden_no_sync = False
+                # stage2 and stage3 should not no_sync, because the is no DDP wrapper and  no_sync API
                 if self.sharding and (ShardingOption.SHARD_OP not in self.args.sharding):
-                    # stage2 and stage3 should not no_sync, because the is no DDP wrapper and  no_sync API
                     forbidden_no_sync = True
-                if self.args.use_hybrid_parallel and self.args.tensor_parallel_degree > 1:
+                # hybrid_parallel (tp or pp) should not no_sync
+                if self.args.use_hybrid_parallel and (
+                    self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
+                ):
                     forbidden_no_sync = True
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
-                    ((step + 1) % args.gradient_accumulation_steps != 0)
+                    ((step + 1) % gradient_accumulation_steps_in_control != 0)
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
                 ) or (args.recompute and availiable_no_sync)
@@ -686,9 +708,9 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
-                if (step + 1) % args.gradient_accumulation_steps == 0 or (
+                if (step + 1) % gradient_accumulation_steps_in_control == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
-                    steps_in_epoch <= args.gradient_accumulation_steps
+                    steps_in_epoch <= gradient_accumulation_steps_in_control
                     and (step + 1) == steps_in_epoch
                 ):
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
@@ -735,6 +757,10 @@ class Trainer:
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                 else:
+                    if in_pipeline_parallel_mode:
+                        raise ValueError(
+                            "Pipeline parallelism holds accumulation, training should never come to here!!!"
+                        )
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
@@ -809,10 +835,14 @@ class Trainer:
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
+        batch_size = self.args.per_device_train_batch_size
+        if self.args.pipeline_parallel_degree > 1:
+            # gradient accumulation is maintained by paddle.distributed
+            batch_size = batch_size * self.args.gradient_accumulation_steps
 
         return DistributedBatchSampler(
             self.train_dataset,
-            batch_size=self.args.per_device_train_batch_size,
+            batch_size=batch_size,
             shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
@@ -927,6 +957,7 @@ class Trainer:
                 drop_last=False,
             )
         else:
+            # todo, suport pipeline mode accumulate ?
             return DistributedBatchSampler(
                 eval_dataset,
                 num_replicas=self.args.dataset_world_size,
@@ -1093,12 +1124,13 @@ class Trainer:
         if checkpoint is None:
             return
 
-        local_rank = self.args.local_rank
-        if local_rank != -1:
-            rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
+        # if use distributed training
+        if self.args.world_size > 1:
+            process_index = self.args.process_index
+            rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
             if not os.path.isfile(rng_file):
                 logger.info(
-                    f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
+                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
                     "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
                 )
                 return
@@ -1217,7 +1249,15 @@ class Trainer:
         if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
-        if self.sharding is not None:
+
+        # Pipeline mode
+        if self.args.pipeline_parallel_degree > 1:
+            model = fleet.distributed_model(model)
+            assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
+            self.optimizer = fleet.distributed_optimizer(self.optimizer)
+
+        # None pipeline mode (may be handle pure tensor parallel model ?)
+        if self.sharding is not None and self.args.pipeline_parallel_degree <= 1:
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -1373,6 +1413,9 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
+        if self.args.pipeline_parallel_degree > 1:
+            return self.training_pipeline_step(model, inputs)
+
         model.train()
         inputs = self._prepare_inputs(inputs)
 
@@ -1386,6 +1429,52 @@ class Trainer:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
+
+        return loss.detach()
+
+    def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+        """
+        Perform a training step on a batch of inputs.
+
+        Subclass and override to inject custom behavior.
+
+        Args:
+            model (`nn.Layer`):
+                The model to train.
+            inputs (`Dict[str, Union[paddle.Tensor, Any]]`):
+                The inputs and targets of the model.
+
+                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+                argument `labels`. Check your model's documentation for all accepted arguments.
+
+        Return:
+            `paddle.Tensor`: The tensor with training loss on this batch.
+        """
+
+        inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
+
+        def _prepare_training(self, data):
+            from paddle import framework
+
+            # reset the virtual pp rank for each run
+            self.set_virtual_pipeline_rank(0)
+
+            assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
+
+            if self.is_pipeline_first_stage(ignore_virtual=True) or self.is_pipeline_last_stage(ignore_virtual=True):
+                assert data is not None, "For the first and the last stage, the data must be set."
+            else:
+                data = None
+
+            self._layers.train()
+
+            return data
+
+        model.train()
+        inputs = _prepare_training(model, inputs)
+
+        with self.autocast_smart_context_manager():
+            loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         return loss.detach()
 
@@ -1465,12 +1554,13 @@ class Trainer:
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
         # not yet exist.
         os.makedirs(output_dir, exist_ok=True)
-        local_rank = self.args.local_rank
 
-        if local_rank == -1:
-            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+        if self.args.world_size > 1:
+            # use global process_index to saev
+            process_index = self.args.process_index
+            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
-            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{local_rank}.pth"))
+            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
@@ -2115,12 +2205,12 @@ class Trainer:
             key = "Training"
 
         logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}:{}".format("paddle commit id", paddle.version.commit))
+        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}:{}".format(a, v))
+                    logger.info("{:30}: {}".format(a, v))
 
         logger.info("")

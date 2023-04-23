@@ -18,6 +18,7 @@ from functools import partial
 
 import paddle
 from data import DataCollatorForSupervisedDataset, convert_example
+from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
@@ -62,6 +63,9 @@ class ModelArgument:
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    data_args.always_pad_to_max_length = False
+    # data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
@@ -98,8 +102,12 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
+    model_class = AutoModelForCausalLM
+    if training_args.pipeline_parallel_degree > 1:
+        model_class = LlamaForCausalLMPipe
+
     # Load the pretrained language model.
-    model = AutoModelForCausalLM.from_pretrained(
+    model = model_class.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -110,6 +118,7 @@ def main():
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
     )
+
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(

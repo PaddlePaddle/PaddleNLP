@@ -140,7 +140,7 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(head_dim)
+        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -315,7 +315,9 @@ class LlamaAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.head_dim = self.hidden_size // self.num_heads
         if config.tensor_parallel_degree > 1:
-            assert self.num_heads % config.tensor_parallel_degree == 0
+            assert (
+                self.num_heads % config.tensor_parallel_degree == 0
+            ), "num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
@@ -541,12 +543,15 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
-                "lm_head.weight": partial(fn, is_column=True),
+                # "lm_head.weight": partial(fn, is_column=True), # need config.tensor_parallel_output, since llama is not sharding weight.
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+            if config.tensor_parallel_output:
+                base_actions["lm_head.weight"] = partial(fn, is_column=True)
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
@@ -783,7 +788,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
-        vocab_size = config.vocab_size // max(config.tensor_parallel_degree, 1)
+        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
