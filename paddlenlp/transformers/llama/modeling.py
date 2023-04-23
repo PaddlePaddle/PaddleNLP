@@ -239,16 +239,18 @@ class LlamaRMSNorm(nn.Layer):
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), "float32") / dim))
+        dtype = paddle.get_default_dtype()
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype=dtype) / dim))
         self.register_buffer("inv_freq", inv_freq)
 
-        t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # higher acc using float32
+        t = paddle.arange(max_position_embeddings, dtype="float32")
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]
-        self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_cached = (emb.cos()[None, :, None, :]).astype(dtype)
+        self.sin_cached = (emb.sin()[None, :, None, :]).astype(dtype)
 
     def forward(self, x, seq_len=None):
         return (
@@ -769,15 +771,21 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, config):
         super(LlamaPretrainingCriterion, self).__init__()
         ignore_index = getattr(config, "ignore_index", -100)
+        self.lm_shift_labels = config.lm_shift_labels
         if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        if self.lm_shift_labels:
+            # Shift so that tokens < n predict n
+            prediction_scores = prediction_scores[..., :-1, :]
+            masked_lm_labels = masked_lm_labels[..., 1:]
+            # Flatten the tokens
 
         with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
@@ -810,7 +818,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.lm_shift_labels = config.lm_shift_labels
         self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
@@ -924,14 +931,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = logits[..., :-1, :]
-                shift_labels = labels[..., 1:]
-                # Flatten the tokens
-                loss = self.criterion(shift_logits, shift_labels)
-            else:
-                loss = self.criterion(logits, labels)
+            loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

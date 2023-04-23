@@ -960,7 +960,9 @@ class Trainer:
             drop_last = False
             if self.args.pipeline_parallel_degree > 1:
                 drop_last = True
-                logger.warning("In parallel mode, the bacth_size is strictly checked. so, set drop_last=True.")
+                logger.warning(
+                    "In parallel mode, the bacth_size is strictly checked. set DistributedBatchSampler drop_last=True."
+                )
 
             return DistributedBatchSampler(
                 eval_dataset,

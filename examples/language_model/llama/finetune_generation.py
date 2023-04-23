@@ -152,7 +152,7 @@ def main():
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
         # pipeline_parallel eval is the some as training.
-        is_eval = not training_args.pipeline_parallel_degree > 1
+        is_eval = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_eval=is_eval))
 
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
