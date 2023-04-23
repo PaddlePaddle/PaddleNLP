@@ -1314,7 +1314,6 @@ class GenerationMixin(object):
             next_model_inputs = self.prepare_inputs_for_generation(tmp, **model_kwargs)
             outputs = self(**next_model_inputs, return_dict=True, output_hidden_states=True)
 
-            # NOTE: must be ModelOutput
             next_past_key_values = outputs.past_key_values
             logits = outputs.logits[:, -1, :]
 
@@ -1335,8 +1334,6 @@ class GenerationMixin(object):
             # prepare for the next step: (1) next_token_id (2) past_key_values (3) last_hidden_states for computing
             # the degeneration penalty (4) logits for selecting next top-k candidates (5) selected tokens socres
             # (model confidence minus degeneration penalty) (6) decoder hidden state
-
-            # BUG: selected_idx may contain more than one index.
 
             index = selected_idx.reshape((len(top_k_ids),) + (1,) * (len(top_k_ids.shape) - 1))
             next_tokens = paddle.take_along_axis(top_k_ids, index, axis=1)
