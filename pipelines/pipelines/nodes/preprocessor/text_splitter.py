@@ -106,11 +106,11 @@ class TextSplitter(BaseComponent):
             docs.append(doc)
         return docs
 
-    def clean(self, docuemnts: List[dict]):
+    def clean(self, documents: List[dict]):
         for special_character in self._filter:
-            for doc in docuemnts:
+            for doc in documents:
                 doc["content"] = doc["content"].replace(special_character, "")
-        return docuemnts
+        return documents
 
     def run(  # type: ignore
         self,
@@ -130,7 +130,7 @@ class TextSplitter(BaseComponent):
                 doc["meta"]["_split_id"] = i
                 ret.append(doc)
 
-        elif type(documents) == list:  # list docuemnts
+        elif type(documents) == list:  # list document
             for document in documents:
                 text_splits = self.split_text(document["content"])
                 for i, txt in enumerate(text_splits):

@@ -87,7 +87,9 @@ def chat_pdf_tutorial():
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
+    query_pipeline.add_node(
+        component=PromptTemplate("请根据以下背景资料回答问题：\n 背景资料：{documents} \n问题：{query}"), name="Template", inputs=["Ranker"]
+    )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["Template"])
     query = "Tensorflow和Pytorch有哪些区别？"
     prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 10}, "Ranker": {"top_k": 2}})
