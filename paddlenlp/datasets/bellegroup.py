@@ -32,7 +32,7 @@ class BelleGroup(DatasetBuilder):
 
     BUILDER_CONFIGS = {
         "generated_chat_0.4M": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/generated_chat_0.4M.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/generated_chat_0.4M.zip",
             "md5": "9bb71d4f2aa99acede2a0c3a8e761905",
             "splits": {
                 "train": [os.path.join("generated_chat_0.4M", "train.json"), "47ea511025fbda9ffd6e5178677bb027"],
@@ -40,7 +40,7 @@ class BelleGroup(DatasetBuilder):
             },
         },
         "school_math_0.25M": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/school_math_0.25M.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/school_math_0.25M.zip",
             "md5": "10076cbdc0a7436d55481f0234db8609",
             "splits": {
                 "train": [os.path.join("school_math_0.25M", "train.json"), "e5a36fc9deb015254686c51e21528683"],
@@ -48,7 +48,7 @@ class BelleGroup(DatasetBuilder):
             },
         },
         "train_2M_CN": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/train_2M_CN.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/train_2M_CN.zip",
             "md5": "da88aca71eb9f454fab39db6a7e851e6",
             "splits": {
                 "train": [os.path.join("train_2M_CN", "train.json"), "83e2917701a31ecf5152e4e9f234fcd0"],
@@ -56,7 +56,7 @@ class BelleGroup(DatasetBuilder):
             },
         },
         "train_1M_CN": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/train_1M_CN.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/train_1M_CN.zip",
             "md5": "65380b542e8ddb4db8f8d2be0f28795c",
             "splits": {
                 "train": [os.path.join("train_1M_CN.zip", "train.json"), "489886aba320c74a1fdfad43c652635b"],
@@ -64,7 +64,7 @@ class BelleGroup(DatasetBuilder):
             },
         },
         "train_0.5M_CN": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/train_0.5M_CN.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/train_0.5M_CN.zip",
             "md5": "45be55109ca9595efa36eaaed7c475d3",
             "splits": {
                 "train": [os.path.join("train_0.5M_CN.zip", "train.json"), "61dc155956622c8389265de33b439757"],
@@ -72,7 +72,7 @@ class BelleGroup(DatasetBuilder):
             },
         },
         "multiturn_chat_0.8M": {
-            "url": "https://bj.bcebos.com/dataset/BelleGroup/multiturn_chat_0.8M.zip",
+            "url": "https://paddlenlp.bj.bcebos.com/datasets/BelleGroup/multiturn_chat_0.8M.zip",
             "md5": "974bc42c5920e5722146a89dce2b10cc",
             "splits": {
                 "train": [os.path.join("multiturn_chat_0.8M", "train.json"), "27e3a7ecff0f4a199f6e7119909988e9"],

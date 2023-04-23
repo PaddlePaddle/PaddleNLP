@@ -23,7 +23,6 @@ from utils import GLMTrainer
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.metrics import Perplexity
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -135,29 +134,12 @@ def main():
     test_ds = dev_ds.map(partial(trans_func, is_do_generation=False))
     collate_fn = DefaultDataCollator()
 
-    def compute_metrics(eval_preds):
-        perplexity = Perplexity()
-        predictions = eval_preds.predictions
-        references = eval_preds.label_ids
-        predictions = [x for x in eval_preds.predictions]
-        references = [x for x in eval_preds.label_ids]
-
-        predictions = paddle.to_tensor(predictions[0])
-        references = paddle.to_tensor(references)
-        correct = perplexity.compute(predictions, references)
-        perplexity.update(correct.numpy())
-        res = perplexity.accumulate()
-        return {
-            "perplexity": res,
-        }
-
     trainer = GLMTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
         do_generation=False,
         data_collator=collate_fn,
     )
