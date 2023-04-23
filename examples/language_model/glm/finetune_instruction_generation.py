@@ -18,12 +18,12 @@ from functools import partial
 
 import paddle
 from data import custom_instruction_convert_example
-from datasets import load_dataset
 from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
+from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
+from paddlenlp.metrics import Perplexity
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -131,30 +131,24 @@ def main():
     train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
 
     trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    test_ds = dev_ds.map(trans_func)
+    train_ds = train_ds.map(partial(trans_func, is_test=False, is_do_generation=False))
+    test_ds = dev_ds.map(partial(trans_func, is_do_generation=False))
     collate_fn = DefaultDataCollator()
 
     def compute_metrics(eval_preds):
-        rouge1 = Rouge1()
-        rouge2 = Rouge2()
-        rougel = RougeL()
-        bleu4 = BLEU(n_size=4)
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
+        perplexity = Perplexity()
+        predictions = eval_preds.predictions
+        references = eval_preds.label_ids
+        predictions = [x for x in eval_preds.predictions]
+        references = [x for x in eval_preds.label_ids]
 
-        # for pred in predictions:
-
-        rouge1_score = rouge1.score(predictions, references)
-        rouge2_score = rouge2.score(predictions, references)
-        for pred, ref in zip(predictions, references):
-            rougel.add_inst(pred, [ref])
-            bleu4.add_inst(pred, [ref])
+        predictions = paddle.to_tensor(predictions[0])
+        references = paddle.to_tensor(references)
+        correct = perplexity.compute(predictions, references)
+        perplexity.update(correct.numpy())
+        res = perplexity.accumulate()
         return {
-            "rouge1": rouge1_score,
-            "rouge2": rouge2_score,
-            "rougel": rougel.score(),
-            "bleu4": bleu4.score(),
+            "perplexity": res,
         }
 
     trainer = GLMTrainer(
@@ -164,7 +158,7 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
-        do_generation=True,
+        do_generation=False,
         data_collator=collate_fn,
     )
     if training_args.fp16_opt_level == "O2":

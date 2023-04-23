@@ -15,7 +15,7 @@
 import numpy as np
 
 
-def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True):
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True, is_do_generation=False):
     instruction = ""
     input = ""
     output = ""
@@ -23,10 +23,14 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
         instruction = example["instruction"]
         output = example["output"]
     else:
-        assert False, "Source and title are not in the input dictionary, nor are context and answer."
+        assert False, "instruction and output are not in the input dictionary."
     if "input" in example["input"]:
         input = example["input"]
-    example["text_a"] = "Human: " + instruction + input + "\n Assistant: "
+
+    if "chat" in data_args.task_name:
+        example["text_a"] = instruction + input
+    else:
+        example["text_a"] = "Human: " + instruction + input + "\n Assistant: "
     example["text_b"] = output
     inputs = tokenizer.encode(example["text_a"], max_length=data_args.src_length - 1, truncation=True)
     inputs["input_ids"] = inputs["input_ids"][:-1] + [tokenizer.gmask_token_id] + inputs["input_ids"][-1:]
@@ -34,13 +38,13 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
     inputs["input_ids"] = np.array([inputs["input_ids"] + [tokenizer.pad_token_id] * pad_length])
     inputs["attention_mask"] = np.array([inputs["attention_mask"] + [1] + [0] * pad_length])
     sep = inputs["input_ids"].shape[1]
+
     inputs = tokenizer.build_inputs_for_generation(
         inputs,
         max_gen_length=data_args.tgt_length,
-        targets=" " + example["text_b"] if not is_test else None,
+        targets=" " + example["text_b"] if not is_test or not is_do_generation else None,
         padding="max_length",
     )
-
     for input_name in inputs.keys():
         inputs[input_name] = inputs[input_name].squeeze(0)
     if is_test:
