@@ -716,7 +716,7 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
-                        optimizer_was_run = scale_before <= scale_after
+                        optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
