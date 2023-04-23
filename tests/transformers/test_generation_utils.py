@@ -845,6 +845,7 @@ class GenerationIntegrationTests(unittest.TestCase):
         # assigned but never used
         bart_tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
+    @slow
     def test_max_length_backward_compat_greedy(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -891,6 +892,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_contrastive(self):
 
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
@@ -938,6 +940,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_sample(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -985,6 +988,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -1038,6 +1042,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_group_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -1090,6 +1095,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             **model_kwargs,
         )
 
+    @slow
     def test_custom_logits_processor(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -1125,7 +1131,7 @@ class GenerationIntegrationTests(unittest.TestCase):
     #     output_sequences = bart_model.generate(inputs_embeds=inputs_embeds)
 
     #     self.assertEqual(output_sequences.shape, (1, 5))
-
+    @slow
     def test_encoder_decoder_generate_attention_mask(self):
         articles = ["Timberlake", "Jessica Biel, welcome to parenthood among other things"]
         bart_tokenizer = BartTokenizer.from_pretrained("bart-base")
