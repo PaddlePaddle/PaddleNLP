@@ -23,9 +23,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.initializer import normal_, ones_, zeros_
 from ...utils.log import logger
@@ -170,13 +171,25 @@ class GLMAttention(nn.Layer):
         # [bs,  num_head, seq_len, seq_len(+cache_len)]
         attention_scores = paddle.multiply(attention_scores, ltor_mask)
         if self.attention_scale > 1.0:
-            max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+            # Fixme for max op not support fp16 https://github.com/PaddlePaddle/Paddle/issues/52601
+            if attention_scores.dtype != paddle.float32:
+                old_type = attention_scores.dtype
+                max_attention_scores = attention_scores.astype("float32").max(axis=-1, keepdim=True)[0]
+                max_attention_scores = max_attention_scores.astype(old_type)
+            else:
+                max_attention_scores = attention_scores.max(axis=-1, keepdim=True)[0]
+
             attention_scores -= max_attention_scores
             attention_scores *= self.attention_scale
 
         attention_scores = attention_scores + (-65504.0) * (1.0 - ltor_mask)
         attention_probs = F.softmax(attention_scores, axis=-1)
-        attention_probs = self.attention_dropout(attention_probs)
+
+        if "local_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                attention_probs = self.attention_dropout(attention_probs)
+        else:
+            attention_probs = self.attention_dropout(attention_probs)
 
         # [bs,  num_head, seq_len, seq_len(+cache_len)] * [bs,  num_head, seq_len(+cache_len), head_dim]
         # [bs,  num_head, seq_len, head_dim]
@@ -187,7 +200,12 @@ class GLMAttention(nn.Layer):
         new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
         context_layer = context_layer.reshape(new_context_shape)
         output = self.dense(context_layer)
-        output = self.output_dropout(output)
+
+        if "global_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("global_seed"):
+                output = self.output_dropout(output)
+        else:
+            output = self.output_dropout(output)
 
         return output
 
@@ -250,7 +268,13 @@ class GPT2MLP(nn.Layer):
 
         # [batch_size, sequence_length, h]
         output = self.dense_4h_to_h(intermediate_parallel)
-        output = self.dropout(output)
+
+        if "global_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("global_seed"):
+                output = self.dropout(output)
+        else:
+            output = self.dropout(output)
+
         return output
 
 
@@ -352,7 +376,12 @@ class GLMStack(nn.Layer):
         if self.block_position_encoding:
             block_position_embeddings = self.block_position_embeddings(block_position_ids)
             hidden_states = hidden_states + block_position_embeddings
-        hidden_states = self.embedding_dropout(hidden_states)
+
+        if "local_seed" in get_rng_state_tracker().states_:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                hidden_states = self.embedding_dropout(hidden_states)
+        else:
+            hidden_states = self.embedding_dropout(hidden_states)
 
         all_hidden_states = [hidden_states.detach()]
         for i, layer in enumerate(self.layers):
@@ -454,11 +483,11 @@ class GLMPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config):
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["word_embeddings.weight", "word_embeddings.weight"],
-            ["transformer.position_embeddings.weight", "transformer.position_embeddings.weight"],
-            ["transformer.block_position_embeddings.weight", "transformer.block_position_embeddings.weight"],
-            ["transformer.final_layernorm.weight", "transformer.final_layernorm.weight"],
-            ["transformer.final_layernorm.bias", "transformer.final_layernorm.bias"],
+            "word_embeddings.weight",
+            "transformer.position_embeddings.weight",
+            "transformer.block_position_embeddings.weight",
+            "transformer.final_layernorm.weight",
+            "transformer.final_layernorm.bias",
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = []
@@ -492,6 +521,7 @@ class GLMPretrainedModel(PretrainedModel):
                 )
 
             model_mappings.extend(layer_mappings)
+        init_name_mappings(model_mappings)
 
         import numpy as np
 
@@ -564,7 +594,7 @@ class GLMPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Linear):
             std = self.config.initializer_range
@@ -635,7 +665,6 @@ class GLMModel(GLMPretrainedModel):
             )
 
         self.transformer = GLMStack(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -706,7 +735,6 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -762,7 +790,6 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
             config.output_predict = True
 
         self.glm = GLMModel(config)
-        self.apply(self.init_weights)
 
     def _reorder_cache(self, cache, beam_index):
         # Speedy decoding is disabled and no reorder is needed if decoder cache is not given.

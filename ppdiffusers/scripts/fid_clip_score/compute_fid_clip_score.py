@@ -28,15 +28,12 @@ from fid_score import (
     calculate_frechet_distance,
     compute_statistics_of_path,
 )
+from paddle.utils.download import get_path_from_url
 from PIL import Image
 from tqdm.auto import tqdm
 
 from paddlenlp.transformers import CLIPModel, CLIPProcessor
-from ppdiffusers.download_utils import (
-    DOWNLOAD_SERVER,
-    PPDIFFUSERS_CACHE,
-    get_path_from_url,
-)
+from ppdiffusers.utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE
 
 base_url = DOWNLOAD_SERVER + "/CompVis/data/"
 cache_path = os.path.join(PPDIFFUSERS_CACHE, "data")

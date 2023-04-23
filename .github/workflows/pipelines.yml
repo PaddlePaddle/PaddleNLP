@@ -1,0 +1,30 @@
+name: Pipelines-Test
+
+on:
+  push:
+    paths:
+      - 'pipelines/*'
+  pull_request:
+    paths:
+      - 'pipelines/*'
+
+
+jobs:
+  Pipelines-Test:
+    name: Pipelines-Test
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+          cache: 'pip' # caching pip dependencies
+      - name: Install dependencies
+        working-directory: ./pipelines
+        run: |
+          python -m pip install --upgrade pip
+          make install
+          pip install -r tests/requirements.txt
+      - name: run the command
+        working-directory: ./pipelines
+        run: make test

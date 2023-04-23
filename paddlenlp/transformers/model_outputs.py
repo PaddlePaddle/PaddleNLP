@@ -71,6 +71,7 @@ def layer_init_wrapper(func):
     return _impl
 
 
+@paddle.jit.not_to_static
 def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_attentions=False):
     self.self_attn.need_weights = output_attentions
     src_mask = _convert_attention_mask(src_mask, src.dtype)
@@ -102,6 +103,7 @@ def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_
     return src if outputs is None else ((src,) + outputs[::-1])  # hidden_states, cache, attentions
 
 
+@paddle.jit.not_to_static
 def _transformer_decoder_layer_fwd(
     self,
     tgt,
@@ -179,6 +181,7 @@ def _transformer_decoder_layer_fwd(
         return outputs
 
 
+@paddle.jit.not_to_static
 def _transformer_decoder_fwd(
     self,
     tgt,
@@ -263,6 +266,7 @@ def _transformer_decoder_fwd(
     )
 
 
+@paddle.jit.not_to_static
 def _transformer_encoder_fwd(
     self, src, src_mask=None, cache=None, output_attentions=False, output_hidden_states=False, return_dict=False
 ):
