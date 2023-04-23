@@ -25,7 +25,7 @@ from paddlenlp.transformers.llama.modeling import (
     LlamaLMHead,
     LlamaPretrainedModel,
     LlamaPretrainingCriterion,
-    RMSNorm,
+    LlamaRMSNorm,
 )
 
 
@@ -157,7 +157,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(LayerDesc(LlamaDecoderLayer, config=config), f"llama.layers.{i}")
 
-        self.add_sequential_layer(LayerDesc(RMSNorm, config=config), "llama.norm")
+        self.add_sequential_layer(LayerDesc(LlamaRMSNorm, config=config), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0

@@ -98,4 +98,4 @@ if __name__ == "__main__":
 #
 #
 # CUDA_VISIBLE_DEVICES=2 PYTHONPATH=./ pytest -s -v tests/test_pipeline_parallel.py
-# CUDA_VISIBLE_DEVICES=2,3 PYTHONPATH=./ python   -m paddle.distributed.launch --gpus 2,3  tests/test_pipeline_parallel.py
+# PYTHONPATH=/ssd2/zhonghui03/Datasets/PaddleNLP:$PYTHONPATH  CUDA_VISIBLE_DEVICES=2,3 PYTHONPATH=$PYTHONPATH:./ python   -m paddle.distributed.launch --gpus 2,3  tests/test_pipeline_parallel.py

@@ -321,7 +321,6 @@ class LlamaAttention(nn.Layer):
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.num_heads = self.num_heads // config.tensor_parallel_degree
             self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
@@ -775,11 +774,12 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=ignore_index)
 
-    def forward(self, prediction_scores, masked_lm_labels, ignore_index=-100):
+    def forward(self, prediction_scores, masked_lm_labels):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index].astype("float32")
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
@@ -800,7 +800,7 @@ class LlamaLMHead(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states, tensor_parallel_output=False):
-        logits = parallel_matmul(hidden_states, self.weight, parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
 
         return logits
 
