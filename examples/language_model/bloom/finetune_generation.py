@@ -23,6 +23,8 @@ from utils import BloomTrainer, compute_metrics
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import bloom_postprocess_past_key_value
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
 from paddlenlp.utils.log import logger
@@ -58,6 +60,7 @@ class ModelArgument:
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def convert_example(
@@ -178,6 +181,23 @@ def main():
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
+
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=10,
+            num_attention_heads=model.config.n_head,
+            num_hidden_layers=model.config.n_layer,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=True,
+            prefix_projection_hidden_size=model.config.hidden_size,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=bloom_postprocess_past_key_value,
+        )
+        model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
 
     # Load the Tokenzier
