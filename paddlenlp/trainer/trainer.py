@@ -957,14 +957,18 @@ class Trainer:
                 drop_last=False,
             )
         else:
-            # todo, suport pipeline mode accumulate ?
+            drop_last = False
+            if self.args.pipeline_parallel_degree > 1:
+                drop_last = True
+                logger.warning("In parallel mode, the bacth_size is strictly checked. so, set drop_last=True.")
+
             return DistributedBatchSampler(
                 eval_dataset,
                 num_replicas=self.args.dataset_world_size,
                 rank=self.args.dataset_rank,
                 batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
-                drop_last=False,
+                drop_last=drop_last,
             )
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
@@ -1779,7 +1783,11 @@ class Trainer:
 
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
 
-        model = self.model
+        if self.args.pipeline_parallel_degree > 1:
+            # Only accept wrapped model for pipeline_parallel mode
+            model = self.model_wrapped
+        else:
+            model = self.model
 
         if isinstance(dataloader, paddle.io.DataLoader):
             batch_size = dataloader.batch_sampler.batch_size
@@ -1999,6 +2007,39 @@ class Trainer:
 
         return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
 
+    def prediction_pipeline_step(
+        self,
+        model: nn.Layer,
+        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        prediction_loss_only: bool,
+        ignore_keys: Optional[List[str]] = None,
+    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
+        """
+        prediction_step function for pipeline parallel mode.
+        """
+        has_labels = all(inputs.get(k) is not None for k in self.label_names)
+        inputs = self._prepare_inputs(inputs)
+
+        # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
+        if has_labels:
+            labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
+            if len(labels) == 1:
+                labels = labels[0]
+        else:
+            labels = None
+
+        input_ids = inputs.pop("input_ids")
+        with paddle.no_grad():
+            if has_labels:
+                with self.autocast_smart_context_manager():
+                    loss = model.eval_batch([input_ids, labels], compute_loss=True)
+                    # loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+                loss = loss.mean().detach()
+            else:
+                raise ValueError("pipeline mode eval need label!")
+
+        return (loss, None, None)
+
     def prediction_step(
         self,
         model: nn.Layer,
@@ -2029,6 +2070,10 @@ class Trainer:
             Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]: A tuple with the loss,
             logits and labels (each being optional).
         """
+        if self.args.pipeline_parallel_degree > 1:
+            # hack for pipeline mode
+            return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
+
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
         inputs = self._prepare_inputs(inputs)
         if ignore_keys is None:

@@ -697,6 +697,14 @@ class TrainingArguments:
                         else True,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                     }
+                    if self.do_eval:
+                        assert (
+                            self.gradient_accumulation_steps * self.per_device_train_batch_size
+                        ) == self.per_device_eval_batch_size, (
+                            "In pipeline model, the evaluation also shares the gradient_accumulation_steps setting. "
+                            "Please set per_device_eval_batch_size=per_device_train_batch_size*gradient_accumulation_steps."
+                        )
+
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
