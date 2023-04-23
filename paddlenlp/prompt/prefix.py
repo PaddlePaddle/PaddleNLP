@@ -177,18 +177,6 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
     def generate(self, **kwargs):
         if "input_ids" not in kwargs:
             raise ValueError("input_ids must be provided for Peft model generation")
-        if kwargs.get("attention_mask", None) is not None:
-            attention_mask = kwargs["attention_mask"]
-            if self.pad_attention_mask is not None:
-                attention_mask = self.pad_attention_mask(
-                    kwargs["input_ids"].shape, self.prefix_config.num_prefix_tokens, attention_mask
-                )
-            else:
-                prefix_attention_mask = paddle.ones(
-                    [kwargs["input_ids"].shape[0], self.prefix_config.num_prefix_tokens]
-                )
-                attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
-            kwargs["attention_mask"] = attention_mask
 
         self.model.prepare_inputs_for_generation = self._prepare_inputs_for_generation
         outputs = self.model.generate(**kwargs)

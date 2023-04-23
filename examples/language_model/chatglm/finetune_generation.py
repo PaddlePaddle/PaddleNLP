@@ -47,7 +47,7 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
@@ -108,6 +108,7 @@ def main():
             pad_attention_mask=chatglm_pad_attention_mask,
         )
         model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
     if model_args.lora:
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
