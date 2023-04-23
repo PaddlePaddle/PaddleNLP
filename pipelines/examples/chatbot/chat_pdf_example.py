@@ -34,11 +34,11 @@ parser.add_argument("--file_paths", default='./data/pdf_files', type=str, help="
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
-parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path")
-parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The passage_embedding_model path")
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The query_embedding_model path")
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The passage_embedding_model path")
 parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
-parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
-parser.add_argument("--chunk_size", default=500, type=int, help="The length of data for indexing by retriever")
+parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
+parser.add_argument("--chunk_size", default=384, type=int, help="The length of data for indexing by retriever")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
@@ -89,8 +89,8 @@ def chat_pdf_tutorial():
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
     query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["Template"])
-    query = "什么是深度学习框架？"
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 5}, "Ranker": {"top_k": 1}})
+    query = "Tensorflow和Pytorch有哪些区别？"
+    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 10}, "Ranker": {"top_k": 2}})
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 
