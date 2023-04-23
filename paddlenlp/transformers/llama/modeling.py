@@ -139,6 +139,9 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
         attn_weights = attention_mask + attn_weights
+        attn_weights = paddle.maximum(
+            attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
+        )
 
         if config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
@@ -169,7 +172,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
 
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros(target_length, past_key_values_length), mask], axis=-1)
+        mask = paddle.concat([paddle.zeros([target_length, past_key_values_length]), mask], axis=-1)
 
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
@@ -203,18 +206,20 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
+            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return hidden_states * self.weight
 
 
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), "float32") / dim))
         self.register_buffer("inv_freq", inv_freq)
 
         t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
@@ -260,6 +265,12 @@ class LlamaMLP(nn.Layer):
                 gather_output=False,
                 has_bias=False,
             )
+            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
             self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -268,17 +279,8 @@ class LlamaMLP(nn.Layer):
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-
-        if config.tensor_parallel_degree > 1:
-            self.down_proj = fleet.meta_parallel.RowParallelLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                input_is_parallel=True,
-                has_bias=False,
-            )
-        else:
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -540,17 +542,15 @@ class LlamaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                # TODO(linjieccc): enable after normal support fp16
-                if paddle.get_default_dtype() not in ["float16"]:
-                    layer.weight.set_value(
-                        paddle.tensor.normal(
-                            mean=0.0,
-                            std=self.config.initializer_range
-                            if hasattr(self.config, "initializer_range")
-                            else self.llama.config.initializer_range,
-                            shape=layer.weight.shape,
-                        )
+                layer.weight.set_value(
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.config.initializer_range
+                        if hasattr(self.config, "initializer_range")
+                        else self.llama.config.initializer_range,
+                        shape=layer.weight.shape,
                     )
+                )
 
 
 @register_base_model
@@ -744,8 +744,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
-    def forward(self, prediction_scores, masked_lm_labels):
+    def forward(self, prediction_scores, masked_lm_labels, ignore_index=-100):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index]
         loss = paddle.mean(masked_lm_loss)
         return loss
 
