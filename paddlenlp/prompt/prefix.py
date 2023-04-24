@@ -223,6 +223,9 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             weight.stop_gradient = False
 
     def _create_prefix_encoder(self):
+        assert (
+            self.prefix_config.hidden_size
+        ) % self.config.tensor_parallel_degree == 0, f"The length of enable_lora must divide out_features: {(self.prefix_config.hidden_size)} % {self.config.tensor_parallel_degree} != 0"
         prefix_dropout = nn.Dropout(p=self.prefix_config.prefix_dropout)
         if self.prefix_config.prefix_projection:
             activation = nn.Tanh()
@@ -239,7 +242,10 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 )
                 prefix_proj_1 = fleet.meta_parallel.RowParallelLinear(
                     self.prefix_config.prefix_projection_hidden_size,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    self.prefix_config.hidden_size
+                    * self.prefix_config.num_hidden_layers
+                    * 2
+                    // self.config.tensor_parallel_degree,
                     has_bias=True,
                     input_is_parallel=True,
                 )
@@ -261,14 +267,15 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             if self.config.tensor_parallel_degree > 1:
                 prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                    weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+                    self.prefix_config.hidden_size
+                    * self.prefix_config.num_hidden_layers
+                    * 2
+                    // self.config.tensor_parallel_degree,
                 )
             else:
                 prefix_embedding = nn.Embedding(
                     self.prefix_config.num_prefix_tokens,
                     self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                    weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
                 )
             prefix_encoder = nn.Sequential(prefix_embedding, prefix_dropout)
         return prefix_encoder
@@ -286,7 +293,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                     batch_size,
                     self.prefix_config.num_prefix_tokens,
                     self.prefix_config.num_hidden_layers * 2,
-                    self.prefix_config.num_attention_heads,
+                    self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree,
                     self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
                 ]
             )
