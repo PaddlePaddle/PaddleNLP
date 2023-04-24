@@ -652,7 +652,6 @@ class LoRAModel(nn.Layer):
             # convert parameters to tensor parallel for mp model
             if lora_config_tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
-                print("ok")
 
             # set lora state dict
             lora_model.model.set_state_dict(lora_state_dict)
