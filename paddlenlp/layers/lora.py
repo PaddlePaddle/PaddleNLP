@@ -47,6 +47,7 @@ class LoRALinear(nn.Linear):
         self,
         in_features: int,
         out_features: int,
+        dtype: Optional[str] = None,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -56,6 +57,7 @@ class LoRALinear(nn.Linear):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         self.r = r
         self.lora_alpha = lora_alpha
+        self.dtype = dtype if dtype is not None else self._dtype
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
@@ -69,7 +71,7 @@ class LoRALinear(nn.Linear):
         if r > 0:
             self.lora_A = self.create_parameter(
                 shape=[in_features, r],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -77,7 +79,7 @@ class LoRALinear(nn.Linear):
             )
             self.lora_B = self.create_parameter(
                 shape=[r, out_features],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -124,11 +126,13 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        dtype: Optional[str] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
         self.r = r
         self.lora_alpha = lora_alpha
+        self.dtype = dtype if dtype is not None else self._dtype
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
@@ -145,7 +149,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         if r > 0:
             self.lora_A = self.create_parameter(
                 shape=[in_features, r],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -153,7 +157,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             )
             self.lora_B = self.create_parameter(
                 shape=[r, self.output_size_per_partition],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -211,6 +215,7 @@ class LoRAMergedLinear(nn.Linear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         enable_lora: List[bool] = [False],
+        dtype: Optional[str] = None,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -219,6 +224,7 @@ class LoRAMergedLinear(nn.Linear):
         ), f"The length of enable_lora must divide out_features: {out_features} % {len(enable_lora)} != 0"
         self.r = r
         self.lora_alpha = lora_alpha
+        self.dtype = dtype if dtype is not None else self._dtype
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
             self.enable_lora = enable_lora
         else:
@@ -241,7 +247,7 @@ class LoRAMergedLinear(nn.Linear):
         if r > 0 and any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -249,7 +255,7 @@ class LoRAMergedLinear(nn.Linear):
             )
             self.lora_B = self.create_parameter(
                 shape=[out_features // len(enable_lora) * sum(enable_lora), r],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -344,6 +350,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         enable_lora: List[bool] = [False],
+        dtype: Optional[str] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
@@ -352,6 +359,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         ), f"The length of enable_lora must divide out_features: {self.output_size_per_partition} % {len(enable_lora)} != 0"
         self.r = r
         self.lora_alpha = lora_alpha
+        self.dtype = dtype if dtype is not None else self._dtype
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
             self.enable_lora = enable_lora
         else:
@@ -377,7 +385,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         if r > 0 and any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -385,9 +393,9 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             )
             self.lora_B = self.create_parameter(
                 shape=[self.output_size_per_partition // len(enable_lora) * sum(enable_lora), r],
-                dtype=self._dtype,
+                dtype=self.dtype,
                 is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
+                # default_initializer=nn.initializer.Constant(value=0.0),
             )
             self.scaling = self.lora_alpha / self.r
 
@@ -526,7 +534,8 @@ class LoRAConfig:
             "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
         },
     )
-    tensor_parallel_degree: int = field(default=1, metadata={"help": ("1 for not use tensor parallel")})
+    tensor_parallel_degree: int = field(default=1, metadata={"help": "1 for not use tensor parallel"})
+    dtype: Optional[str] = field(default=None, metadata={"help": "The data type of tensor"})
 
     @property
     def __dict__(self):
@@ -614,26 +623,32 @@ class LoRAModel(nn.Layer):
 
     @classmethod
     def from_pretrained(cls, model, lora_path):
+        # init lora config & lora model
         lora_config = LoRAConfig.from_pretrained(lora_path)
-        if lora_config.tensor_parallel_degree > 1:
-            if lora_config.tensor_parallel_degree != model.config.tensor_parallel_degree:
+        lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
+        lora_model = cls(model, lora_config)
+
+        # define lora weight name
+        if lora_config_tensor_parallel_degree > 1:
+            if lora_config_tensor_parallel_degree != model.config.tensor_parallel_degree:
                 raise ValueError(
-                    f"{lora_config.tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please save LoRA parameters as onepiece model."
+                    f"{lora_config_tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please merge LoRA parameters first."
                 )
             lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
-        elif lora_config.tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
-            # TODO[lugimzzz] will support in next PR
-            raise NotImplementedError("Onepiece LoRA parameters does not support MP loading.")
         else:
             lora_weight_name = LORA_WEIGHT_FILE_NAME
-        lora_model = cls(model, lora_config)
+
+        # load and set lora weight parameter
         lora_weight_path = os.path.join(lora_path, lora_weight_name)
         if os.path.exists(lora_weight_path):
+            lora_state_dict = paddle.load(lora_weight_path, return_numpy=True)
             logger.info(f"Loading the LoRA weights from {lora_weight_path}")
-            lora_state_dict = paddle.load(lora_weight_path)
+            if lora_config_tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
+                lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
             lora_model.model.set_state_dict(lora_state_dict)
         else:
             logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+
         return lora_model
 
     def _merge_trainable_tensor_parallel(self):
@@ -678,6 +693,33 @@ class LoRAModel(nn.Layer):
         self.lora_config.tensor_parallel_degree = 1
         return trainable_state_dict
 
+    def _convert_tensor_parallel(self, lora_state_dict):
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=True,
+            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
+            num_attention_heads=self.model.config.num_attention_heads,
+        )
+
+        lora_name_action_mappings = {}
+        for k in lora_state_dict.keys():
+            if "lora_B" in k:
+                lora_name_action_mappings[k] = partial(fn, is_column=False)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+        state_keys_map = ConversionMixin._resolve_prefix_keys(
+            name_action_mappings.keys(), self.model.state_dict().keys()
+        )
+        for k, v in state_keys_map.items():
+            if v in lora_state_dict.keys():
+                lora_name_action_mappings[v] = name_action_mappings[k]
+
+        for name, action in lora_name_action_mappings.items():
+            tensor = lora_state_dict.pop(name)
+            lora_state_dict[name] = action(tensor)
+        return lora_state_dict
+
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False):
         assert not os.path.isfile(
             save_directory
@@ -713,6 +755,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    dtype=self.lora_config.dtype,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -726,6 +769,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    dtype=self.lora_config.dtype,
                 )
         else:
             if isinstance(module, nn.Linear):
@@ -737,6 +781,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    dtype=self.lora_config.dtype,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -750,6 +795,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    dtype=self.lora_config.dtype,
                 )
 
         lora_module.weight = module.weight
