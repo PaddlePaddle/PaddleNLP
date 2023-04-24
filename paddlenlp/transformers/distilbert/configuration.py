@@ -122,7 +122,14 @@ class DistilBertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "distilbert"
-    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
+    attribute_map: Dict[str, str] = {
+        "dropout": "classifier_dropout",
+        "num_classes": "num_labels",
+        "n_layers": "num_hidden_layers",  # for `transformers`
+        "n_heads": "num_attention_heads",  # for `transformers`
+        "dim": "hidden_size",  # for `transformers`
+        "hidden_dim": "intermediate_size",  # for `transformers`
+    }
     pretrained_init_configuration = DISTILBERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

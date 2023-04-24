@@ -78,7 +78,7 @@ class LukePretrainedModel(PretrainedModel):
     base_model_prefix = "luke"
     config_class = LukeConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -439,7 +439,6 @@ class LukeModel(LukePretrainedModel):
         self.embeddings = LukeEmbeddings(config)
         self.entity_embeddings = EntityEmbeddings(config)
         self.pooler = LukePooler(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -674,8 +673,6 @@ class LukeForMaskedLM(LukePretrainedModel):
         )
         self.entity_predictions = EntityPredictionHead(config)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids,
@@ -772,7 +769,6 @@ class LukeForEntityClassification(LukePretrainedModel):
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.classifier = nn.Linear(self.config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -863,7 +859,6 @@ class LukeForEntityPairClassification(LukePretrainedModel):
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.classifier = nn.Linear(self.config.hidden_size * 2, config.num_labels, bias_attr=False)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -953,7 +948,6 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.classifier = nn.Linear(self.config.hidden_size * 3, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1051,7 +1045,6 @@ class LukeForQuestionAnswering(LukePretrainedModel):
         super(LukeForQuestionAnswering, self).__init__(config)
         self.luke = LukeModel(config)
         self.qa_outputs = nn.Linear(self.config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,

@@ -31,3 +31,7 @@ python_files = [
     "test.py",
     "test_*.py"
 ]
+filterwarnings = [
+    "ignore::UserWarning",
+    'ignore::DeprecationWarning',
+]

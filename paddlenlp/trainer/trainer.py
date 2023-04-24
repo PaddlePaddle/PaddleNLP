@@ -716,7 +716,7 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
-                        optimizer_was_run = scale_before <= scale_after
+                        optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
@@ -1096,7 +1096,7 @@ class Trainer:
         local_rank = self.args.local_rank
         if local_rank != -1:
             rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
-            if not os.path.isfile(os.path.join(checkpoint, rng_file)):
+            if not os.path.isfile(rng_file):
                 logger.info(
                     f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
                     "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
@@ -1304,12 +1304,13 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
+            black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            if self.args.bf16 and self.args.fp16_opt_level == "O2":
+                black_list.append("c_embedding")
+
             ctx_manager = autocast(
                 True,
-                custom_black_list=[
-                    "reduce_sum",
-                    "c_softmax_with_cross_entropy",
-                ],
+                custom_black_list=black_list,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )

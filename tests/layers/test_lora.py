@@ -23,7 +23,7 @@ import paddle
 from parameterized import parameterized
 
 from paddlenlp.layers import LoRAConfig, LoRALinear, LoRAMergedLinear, LoRAModel
-from paddlenlp.transformers import AutoModel
+from paddlenlp.transformers import AutoModel, BertModel
 
 
 class TestLoraLayer(unittest.TestCase):
@@ -131,6 +131,28 @@ class TestLoRAMergedLayer(unittest.TestCase):
 
 
 class TestLoraModel(unittest.TestCase):
+    def test_lora_model_restore(self):
+        lora_config = LoRAConfig(
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+            enable_lora_list=[None, [True, False]],
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
+        model.eval()
+        original_results_1 = model(input_ids)
+        lora_model = LoRAModel(model, lora_config)
+        restored_model = lora_model.restore_original_model()
+        restored_model.eval()
+        original_results_2 = restored_model(input_ids)
+        self.assertIsNotNone(original_results_1)
+        self.assertIsNotNone(original_results_2)
+        self.assertIsInstance(restored_model, BertModel)
+        for i, j in zip(original_results_1, original_results_2):
+            self.assertTrue(paddle.allclose(i, j))
+
     @parameterized.expand([(None,), ("all",), ("lora",)])
     def test_lora_model_constructor(self, bias):
         lora_config = LoRAConfig(

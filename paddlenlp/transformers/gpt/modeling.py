@@ -25,6 +25,7 @@ from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
+from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -535,12 +536,12 @@ class GPTPretrainedModel(PretrainedModel):
         if "GPT2ForSequenceClassification" in config.architectures:
             model_mappings.extend([["score.weight", "score.weight", "transpose"]])
         if "GPT2LMHeadModel" in config.architectures:
-            model_mappings.append(["lm_head.weight", "lm_head.decoder_weight"])
+            model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
 
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -651,7 +652,6 @@ class GPTModel(GPTPretrainedModel):
             hidden_size=config.hidden_size,
         )
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def get_input_embeddings(self):
@@ -822,8 +822,11 @@ class GPTForPretraining(GPTPretrainedModel):
     def __init__(self, config: GPTConfig):
         super(GPTForPretraining, self).__init__(config)
         self.gpt = GPTModel(config)
+        self.lm_head = GPTLMHead(config)
+        self.tie_weights()
 
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -873,7 +876,7 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(encoder_outputs, self.gpt.embeddings.word_embeddings.weight, transpose_y=True)
+        logits = self.lm_head(encoder_outputs)
 
         if use_cache:
             return logits, cached_kvs
@@ -935,7 +938,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         self.gpt = GPTModel(config)
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
         self.eol_token_id = config.eol_token_id
-        self.apply(self.init_weights)
 
     def model(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -1004,16 +1006,12 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
 
 class GPTLMHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+    def __init__(self, config: GPTConfig):
         super(GPTLMHead, self).__init__()
-        self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
-            if embedding_weights is None
-            else embedding_weights
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size, bias_attr=False)
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = self.decoder(hidden_states)
         return logits
 
 
@@ -1030,11 +1028,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
     def __init__(self, config: GPTConfig):
         super(GPTLMHeadModel, self).__init__(config)
         self.gpt = GPTModel(config)
+        self.lm_head = GPTLMHead(config)
+        self.tie_weights()
 
-        self.lm_head = GPTLMHead(
-            self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
-        )
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,
@@ -1217,8 +1215,6 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.dropout = nn.Dropout(dropout_p)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -1332,7 +1328,6 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         self.num_labels = config.num_labels
         self.gpt = GPTModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
-        self.apply(self.init_weights)
 
     def forward(
         self,
