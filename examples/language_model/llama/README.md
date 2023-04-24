@@ -1,25 +1,12 @@
 # LLaMA inplementation
 
 **目录**
-- [1. 模型下载及权重转换](#1)
-- [2. 微调](#2)
-- [3. 动转静](#3)
-- [4. 模型预测](#4)
-- [5. 模型推理](#5)
+- [1. 微调](#1)
+- [2. 动转静](#2)
+- [3. 模型预测](#3)
+- [4. 模型推理](#4)
 
 <a name="1"></a>
-
-## 模型加载：
-
-```python
-from tokenizer import LLaMATokenizer
-from modeling import LLaMAForCausalLM
-
-tokenizer = LLaMATokenizer.from_pretrained("facebook/llama-7b")
-model = LLaMAForCausalLM.from_pretrained("facebook/llama-7b", load_state_as_np=True)
-```
-
-<a name="2"></a>
 
 ## 微调
 
@@ -46,7 +33,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --warmup_steps 20
 ```
 
-<a name="3"></a>
+<a name="2"></a>
 
 ## 模型预测
 
@@ -73,7 +60,7 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
     --merge_tensor_parallel_path  ./checkpoints/llama-merged
 ```
 
-<a name="4"></a>
+<a name="3"></a>
 
 ## 模型导出
 
@@ -83,7 +70,7 @@ python export_generation_model.py \
     --output_path inference/llama
 ```
 
-<a name="5"></a>
+<a name="4"></a>
 
 ## 模型推理
 
