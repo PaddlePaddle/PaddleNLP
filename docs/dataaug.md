@@ -509,7 +509,7 @@ s = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信�
 
 ``` python
 import paddle
-# 建议在在GPU环境下运行
+# 建议在GPU环境下运行
 paddle.set_device("gpu")
 # 在CPU下环境运行
 # paddle.set_device("cpu")
@@ -608,7 +608,7 @@ s = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信�
 
 ``` python
 import paddle
-# 建议在在GPU环境下运行
+# 建议在GPU环境下运行
 paddle.set_device("gpu")
 # 在CPU下环境运行
 # paddle.set_device("cpu")
@@ -663,7 +663,7 @@ s = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信�
 
 ``` python
 import paddle
-# 建议在在GPU环境下运行
+# 建议在GPU环境下运行
 paddle.set_device("gpu")
 # 在CPU下环境运行
 # paddle.set_device("cpu")
@@ -722,7 +722,7 @@ s = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信�
 
 ``` python
 import paddle
-# 建议在在GPU环境下运行
+# 建议在GPU环境下运行
 paddle.set_device("gpu")
 # 在CPU下环境运行
 # paddle.set_device("cpu")
