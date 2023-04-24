@@ -395,7 +395,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                 shape=[self.output_size_per_partition // len(enable_lora) * sum(enable_lora), r],
                 dtype=self.dtype,
                 is_bias=False,
-                # default_initializer=nn.initializer.Constant(value=0.0),
+                default_initializer=nn.initializer.Constant(value=0.0),
             )
             self.scaling = self.lora_alpha / self.r
 
@@ -630,10 +630,6 @@ class LoRAModel(nn.Layer):
 
         # define lora weight name
         if lora_config_tensor_parallel_degree > 1:
-            if lora_config_tensor_parallel_degree != model.config.tensor_parallel_degree:
-                raise ValueError(
-                    f"{lora_config_tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please merge LoRA parameters first."
-                )
             lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
         else:
             lora_weight_name = LORA_WEIGHT_FILE_NAME
@@ -641,17 +637,31 @@ class LoRAModel(nn.Layer):
         # load and set lora weight parameter
         lora_weight_path = os.path.join(lora_path, lora_weight_name)
         if os.path.exists(lora_weight_path):
+            # load lora weight parameter
             lora_state_dict = paddle.load(lora_weight_path, return_numpy=True)
             logger.info(f"Loading the LoRA weights from {lora_weight_path}")
+
+            if (
+                lora_config_tensor_parallel_degree > 1
+                and lora_config_tensor_parallel_degree != model.config.tensor_parallel_degree
+            ):
+                raise NotImplementedError(
+                    f"{lora_config_tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please merge LoRA weights first."
+                )
+
+            # convert parameters to tensor parallel for mp model
             if lora_config_tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
+                print("ok")
+
+            # set lora state dict
             lora_model.model.set_state_dict(lora_state_dict)
         else:
             logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
 
         return lora_model
 
-    def _merge_trainable_tensor_parallel(self):
+    def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -660,7 +670,6 @@ class LoRAModel(nn.Layer):
             tensor_parallel_rank=self.model.config.tensor_parallel_rank,
             num_attention_heads=self.model.config.num_attention_heads,
         )
-        trainable_state_dict = self.get_trainable_state_dict()
         trainable_name_action_mappings = {}
         for k in trainable_state_dict:
             if "lora_B" in k:
@@ -727,7 +736,8 @@ class LoRAModel(nn.Layer):
         os.makedirs(save_directory, exist_ok=True)
         lora_weight_name = LORA_WEIGHT_FILE_NAME
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
-            trainable_state_dict = self._merge_trainable_tensor_parallel()
+            trainable_state_dict = self.get_trainable_state_dict()
+            trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
         else:
             trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
