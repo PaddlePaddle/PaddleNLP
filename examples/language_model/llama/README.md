@@ -55,10 +55,12 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --num_train_epochs 1 \
     --dataloader_num_workers 1 \
-    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 1 \
+    --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 16 \
     --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
+    --pipeline_parallel_mirco_batch_size 1 \
     --pipeline_parallel_config "disable_p2p_cache_shape" \
     --overwrite_output_dir \
     --output_dir ./checkpoints/ \
@@ -68,7 +70,6 @@ python -u  -m paddle.distributed.launch \
     --eval_with_do_generation 0 \
     --fp16 0\
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 4 \
     --recompute \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
