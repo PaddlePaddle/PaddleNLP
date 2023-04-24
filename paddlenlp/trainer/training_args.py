@@ -439,6 +439,9 @@ class TrainingArguments:
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
     pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
+    pipeline_parallel_mirco_batch_size: int = field(
+        default=-1, metadata={"help": ("mirco_batch_size in pipeline parallel mode")}
+    )
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -688,21 +691,23 @@ class TrainingArguments:
                                 raise ValueError(
                                     f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
+                    assert (
+                        self.per_device_train_batch_size % self.pipeline_parallel_mirco_batch_size == 0
+                    ), "train_batch_size should be multiple of mirco_batch_size."
+                    pp_accumulate_steps = self.per_device_train_batch_size // self.pipeline_parallel_mirco_batch_size
 
                     strategy.pipeline_configs = {
-                        "accumulate_steps": self.gradient_accumulation_steps,
-                        "micro_batch_size": self.per_device_train_batch_size,
+                        "accumulate_steps": pp_accumulate_steps,
+                        "micro_batch_size": self.pipeline_parallel_mirco_batch_size,
                         "enable_partial_send_recv": False
                         if "disable_partial_send_recv" in pipeline_parallel_config
                         else True,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                     }
                     if self.do_eval:
-                        assert (
-                            self.gradient_accumulation_steps * self.per_device_train_batch_size
-                        ) == self.per_device_eval_batch_size, (
-                            "In pipeline model, the evaluation also shares the gradient_accumulation_steps setting. "
-                            "Please set per_device_eval_batch_size=per_device_train_batch_size*gradient_accumulation_steps."
+                        assert self.per_device_train_batch_size == self.per_device_eval_batch_size, (
+                            "In pipeline model, the evaluation also shares same setting with training. "
+                            "Please set per_device_eval_batch_size=per_device_train_batch_size."
                         )
 
                 if tensor_parallel_degree > 1:

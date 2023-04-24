@@ -475,19 +475,13 @@ class Trainer:
             # release memory
             del state_dict
 
-        in_pipeline_parallel_mode = self.args.use_hybrid_parallel and self.args.pipeline_parallel_degree > 1
-        gradient_accumulation_steps_in_control = args.gradient_accumulation_steps
-        if in_pipeline_parallel_mode:
-            # For pipeline parallel mode, paddle.distributed can accumulate gradients
-            gradient_accumulation_steps_in_control = 1
-
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if has_length(train_dataloader):
             len_dataloader = len(train_dataloader)
-            num_update_steps_per_epoch = len(train_dataloader) // gradient_accumulation_steps_in_control
+            num_update_steps_per_epoch = len(train_dataloader) // args.gradient_accumulation_steps
             num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
             num_examples = len(self.train_dataset)
 
@@ -579,7 +573,7 @@ class Trainer:
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-                steps_trained_in_current_epoch *= gradient_accumulation_steps_in_control
+                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
 
@@ -611,9 +605,7 @@ class Trainer:
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
         steps_in_epoch = (
-            len(epoch_iterator)
-            if len_dataloader is not None
-            else args.max_steps * gradient_accumulation_steps_in_control
+            len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
         )
 
         self.callback_handler.model = self.model
@@ -672,7 +664,7 @@ class Trainer:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
 
-                if step % gradient_accumulation_steps_in_control == 0:
+                if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
                 dp_enabled = (
@@ -691,7 +683,7 @@ class Trainer:
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
-                    ((step + 1) % gradient_accumulation_steps_in_control != 0)
+                    ((step + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
                 ) or (args.recompute and availiable_no_sync)
@@ -708,9 +700,9 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
-                if (step + 1) % gradient_accumulation_steps_in_control == 0 or (
+                if (step + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
-                    steps_in_epoch <= gradient_accumulation_steps_in_control
+                    steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
@@ -757,10 +749,6 @@ class Trainer:
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                 else:
-                    if in_pipeline_parallel_mode:
-                        raise ValueError(
-                            "Pipeline parallelism holds accumulation, training should never come to here!!!"
-                        )
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
@@ -835,14 +823,10 @@ class Trainer:
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
-        batch_size = self.args.per_device_train_batch_size
-        if self.args.pipeline_parallel_degree > 1:
-            # gradient accumulation is maintained by paddle.distributed
-            batch_size = batch_size * self.args.gradient_accumulation_steps
 
         return DistributedBatchSampler(
             self.train_dataset,
-            batch_size=batch_size,
+            batch_size=self.args.per_device_train_batch_size,
             shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
@@ -1650,7 +1634,9 @@ class Trainer:
 
         if not isinstance(self.model, PretrainedModel) and not isinstance(self.model, LoRAModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
-                unwrap_model(self.model).save_pretrained(output_dir, merge_tensor_parallel=merge_tensor_parallel)
+                unwrap_model(self.model).save_pretrained(
+                    output_dir, merge_tensor_parallel=merge_tensor_parallel, variant=self.args.weight_name_suffix
+                )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
@@ -1661,7 +1647,9 @@ class Trainer:
                     state_dict, os.path.join(output_dir, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
                 )
         else:
-            self.model.save_pretrained(output_dir, merge_tensor_parallel=merge_tensor_parallel)
+            self.model.save_pretrained(
+                output_dir, merge_tensor_parallel=merge_tensor_parallel, variant=self.args.weight_name_suffix
+            )
 
         if self.tokenizer is not None:
             self.tokenizer.save_pretrained(output_dir)
