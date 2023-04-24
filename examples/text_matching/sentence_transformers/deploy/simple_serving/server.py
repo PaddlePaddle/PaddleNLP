@@ -58,7 +58,7 @@ class TextMatchingModelHandler(BaseModelHandler):
 
             examples.append((text_a["input_ids"], text_b["input_ids"]))
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
         def batchify_fn(samples):
