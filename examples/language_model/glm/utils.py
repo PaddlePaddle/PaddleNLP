@@ -40,7 +40,7 @@ class GLMTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
-        prediction_loss_only = True
+
         if not self.do_generation:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
 
