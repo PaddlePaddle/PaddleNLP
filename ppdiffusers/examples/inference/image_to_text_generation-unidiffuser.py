@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,14 +10,14 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-
 # limitations under the License.
 
-# NOTE: This file is deprecated and will be removed in a future version.
-# It only exists so that temporarely `from diffusers.pipelines import DiffusionPipeline` works
+from ppdiffusers import UniDiffuserPipeline
+from ppdiffusers.utils import load_image
 
-from .pipelines import (  # noqa: F401
-    DiffusionPipeline,
-    ImagePipelineOutput,
-    TextPipelineOutput,
-)
+pipe = UniDiffuserPipeline.from_pretrained("thu-ml/unidiffuser")
+image = load_image("https://bj.bcebos.com/v1/paddlenlp/models/community/thu-ml/data/space.jpg")
+result = pipe(mode="i2t", image=image, prompt=None)
+text = result.texts[0]
+with open("image_to_text_generation-unidiffuser-result.txt", "w") as f:
+    print("{}\n".format(text), file=f)
