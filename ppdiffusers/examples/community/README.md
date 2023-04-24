@@ -342,17 +342,21 @@ images[0].save("lpw.png")
 import paddle
 from ppdiffusers.utils import image_grid
 from ppdiffusers import DiffusionPipeline
+from ppdiffusers.utils import ppdiffusers_url_download
 from webui_stable_diffusion import WebUIStableDiffusionPipeline
 
 pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
 # 或者
 # pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
 
-# 加载Moxin_10lora权重，当前仅可加载单个lora权重
-pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
-
-# 添加 textual_inversion 权重目录，程序会自动扫描该目录是否存在ti的权重
-# pipe.add_ti_embedding_dir("./")
+# 自动下载civitai的lora及ti文件（请注意自己的网络。）
+# 介绍网页，程序将自动搜索介绍网页的下载链接
+pipe.download_civitai_lora_file('https://civitai.com/models/15365/hanfu')
+pipe.download_civitai_lora_file('https://civitai.com/models/12597/moxin')
+pipe.download_civitai_ti_file('https://civitai.com/models/1998/autumn-style')
+pipe.download_civitai_ti_file('https://civitai.com/models/21131/daisy-ridley-embedding')
+# 纯下载链接
+pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
 
 # 我们需要安装develop版的paddle才可以使用xformers
 # pipe.enable_xformers_memory_efficient_attention()
