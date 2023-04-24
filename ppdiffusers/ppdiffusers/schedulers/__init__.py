@@ -35,6 +35,7 @@ else:
     from .scheduling_deis_multistep import DEISMultistepScheduler
     from .scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
     from .scheduling_dpmsolver_singlestep import DPMSolverSinglestepScheduler
+    from .scheduling_dpmsolver_unidiffuser import DPMSolverUniDiffuserScheduler
     from .scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
     from .scheduling_euler_discrete import EulerDiscreteScheduler
     from .scheduling_heun_discrete import HeunDiscreteScheduler
