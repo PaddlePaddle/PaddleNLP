@@ -14,8 +14,6 @@
 # limitations under the License.
 
 
-import unittest
-
 import paddle
 
 from paddlenlp.generation.logits_process import (
@@ -718,7 +716,7 @@ class GenerationTesterMixin:
         self.assertTrue(flag)
 
 
-class UtilsFunctionsTest(unittest.TestCase):
+class UtilsFunctionsTest:
 
     # tests whether the top_k_top_p function behaves as expected
     def test_top_k_top_p_filtering(self):
@@ -819,7 +817,7 @@ class UtilsFunctionsTest(unittest.TestCase):
         self.assertTrue(paddle.all(paddle.equal(non_inf_expected_idx, non_inf_idx)))
 
 
-class GenerationIntegrationTests(unittest.TestCase):
+class GenerationIntegrationTests:
     @slow
     def test_diverse_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood.
