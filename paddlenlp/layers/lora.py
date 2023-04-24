@@ -47,7 +47,6 @@ class LoRALinear(nn.Linear):
         self,
         in_features: int,
         out_features: int,
-        dtype: Optional[str] = None,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -57,7 +56,6 @@ class LoRALinear(nn.Linear):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         self.r = r
         self.lora_alpha = lora_alpha
-        self.dtype = dtype if dtype is not None else self._dtype
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
@@ -71,7 +69,7 @@ class LoRALinear(nn.Linear):
         if r > 0:
             self.lora_A = self.create_parameter(
                 shape=[in_features, r],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -79,7 +77,7 @@ class LoRALinear(nn.Linear):
             )
             self.lora_B = self.create_parameter(
                 shape=[r, out_features],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -126,13 +124,11 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
-        dtype: Optional[str] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
         self.r = r
         self.lora_alpha = lora_alpha
-        self.dtype = dtype if dtype is not None else self._dtype
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
@@ -149,7 +145,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         if r > 0:
             self.lora_A = self.create_parameter(
                 shape=[in_features, r],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -157,7 +153,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             )
             self.lora_B = self.create_parameter(
                 shape=[r, self.output_size_per_partition],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -215,7 +211,6 @@ class LoRAMergedLinear(nn.Linear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         enable_lora: List[bool] = [False],
-        dtype: Optional[str] = None,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -224,7 +219,6 @@ class LoRAMergedLinear(nn.Linear):
         ), f"The length of enable_lora must divide out_features: {out_features} % {len(enable_lora)} != 0"
         self.r = r
         self.lora_alpha = lora_alpha
-        self.dtype = dtype if dtype is not None else self._dtype
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
             self.enable_lora = enable_lora
         else:
@@ -247,7 +241,7 @@ class LoRAMergedLinear(nn.Linear):
         if r > 0 and any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -255,7 +249,7 @@ class LoRAMergedLinear(nn.Linear):
             )
             self.lora_B = self.create_parameter(
                 shape=[out_features // len(enable_lora) * sum(enable_lora), r],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -350,7 +344,6 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         enable_lora: List[bool] = [False],
-        dtype: Optional[str] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
@@ -359,7 +352,6 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         ), f"The length of enable_lora must divide out_features: {self.output_size_per_partition} % {len(enable_lora)} != 0"
         self.r = r
         self.lora_alpha = lora_alpha
-        self.dtype = dtype if dtype is not None else self._dtype
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
             self.enable_lora = enable_lora
         else:
@@ -385,7 +377,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         if r > 0 and any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.KaimingUniform(
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
@@ -393,7 +385,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             )
             self.lora_B = self.create_parameter(
                 shape=[self.output_size_per_partition // len(enable_lora) * sum(enable_lora), r],
-                dtype=self.dtype,
+                dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
@@ -764,7 +756,6 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
-                    dtype=self.lora_config.dtype,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -778,7 +769,6 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
-                    dtype=self.lora_config.dtype,
                 )
         else:
             if isinstance(module, nn.Linear):
@@ -790,7 +780,6 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
-                    dtype=self.lora_config.dtype,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -804,7 +793,6 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
-                    dtype=self.lora_config.dtype,
                 )
 
         lora_module.weight = module.weight
