@@ -343,6 +343,7 @@ import paddle
 from ppdiffusers.utils import image_grid
 from ppdiffusers import DiffusionPipeline
 from webui_stable_diffusion import WebUIStableDiffusionPipeline
+from pathlib import Path
 
 pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
 # 或者
@@ -356,6 +357,8 @@ pipe.download_civitai_ti_file('https://civitai.com/models/1998/autumn-style')
 pipe.download_civitai_ti_file('https://civitai.com/models/21131/daisy-ridley-embedding')
 # 纯下载链接
 pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
+
+print("Supported Lora: " + "、 ".join([p.stem for p in Path(pipe.LORA_DIR).glob("*.safetensors")]))
 
 # 我们需要安装develop版的paddle才可以使用xformers
 # pipe.enable_xformers_memory_efficient_attention()
