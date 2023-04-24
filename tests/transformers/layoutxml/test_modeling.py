@@ -265,7 +265,7 @@ class LayoutXLMModelTester:
             end_positions=end_positions,
         )
         if len(result) > 3:
-            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertIsInstance(result[0].item(), float)
             self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length])
             self.parent.assertEqual(result[2].shape, [self.batch_size, self.seq_length])
         else:

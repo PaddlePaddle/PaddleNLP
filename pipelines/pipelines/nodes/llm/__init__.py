@@ -14,3 +14,4 @@
 
 from .ernie_bot import ErnieBot
 from .history import TruncatedConversationHistory
+from .prompt_template import PromptTemplate

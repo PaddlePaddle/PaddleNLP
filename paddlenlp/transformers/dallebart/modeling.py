@@ -171,13 +171,13 @@ class DalleBartEncoderLayer(nn.Layer):
 
     def __init__(self, config: DalleBartConfig):
         super().__init__()
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.encoder_attention_heads > 0
-        ), "Expected encoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected encoder_attention_heads to be greater than 0, " "but received {}".format(
             config.encoder_attention_heads
         )
-        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.encoder_ffn_dim
         )
 
@@ -281,13 +281,13 @@ class DalleBartDecoderLayer(nn.Layer):
     def __init__(self, config: DalleBartConfig):
         super().__init__()
 
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.decoder_attention_heads > 0
-        ), "Expected decoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected decoder_attention_heads to be greater than 0, " "but received {}".format(
             config.decoder_attention_heads
         )
-        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.decoder_ffn_dim
         )
 

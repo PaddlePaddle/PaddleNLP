@@ -135,7 +135,7 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size, max_encode
 
 
 def do_train(args):
-    # Initialization for the parallel enviroment
+    # Initialization for the parallel environment
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()

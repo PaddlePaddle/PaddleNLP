@@ -1081,9 +1081,12 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if paddle.get_default_dtype() not in ["float32", "float64"]:
+            if probs.dtype == paddle.bfloat16 and top_k == 1:
                 probs = probs.astype("float32")
-            next_tokens = paddle.multinomial(probs)
+                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
+            else:
+                next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1667,7 +1670,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         forced_bos_token_id (:obj:`int`):
-            The id of the token to to be generated as the first token.
+            The id of the token to be generated as the first token.
     """
 
     def __init__(self, forced_bos_token_id):
@@ -1688,7 +1691,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
     def __init__(self, max_length, forced_eos_token_id):
@@ -1709,7 +1712,14 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 def TopKProcess(probs, top_k, min_tokens_to_keep):
     top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
     # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
+    # cast to float16 to support generation & d2s
+    if probs.dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+        topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
+    else:
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+
     probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
     return probs
 

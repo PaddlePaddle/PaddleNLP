@@ -17,9 +17,9 @@ python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_
     --warmup_ratio 0.06 \
     --weight_decay 0.1 \
     --label_smoothing 0.1 \
-    --save_steps 20 \
+    --save_steps 100 \
     --logging_steps 1 \
-    --eval_steps 20 \
+    --eval_steps 100 \
     --output_dir ./checkpoints/bloom-560m \
     --src_length 500 \
     --tgt_length 100 \

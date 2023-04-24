@@ -47,7 +47,7 @@ def convert_encoder_output(encoder_output):
     Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.BaseModelOutput`.
 
     Args:
-        encoder_output (tuple or ModleOutput):
+        encoder_output (tuple or ModelOutput):
             The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
             The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
     """
