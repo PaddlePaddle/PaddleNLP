@@ -21,6 +21,7 @@ from typing import Callable, List, Optional
 
 import paddle
 import paddle.nn as nn
+from paddle.distributed import fleet
 
 from ..utils.env import PREFIX_CONFIG_NAME
 from ..utils.log import logger
@@ -222,25 +223,54 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             weight.stop_gradient = False
 
     def _create_prefix_encoder(self):
+        prefix_dropout = nn.Dropout(p=self.prefix_config.prefix_dropout)
         if self.prefix_config.prefix_projection:
-            prefix_encoder = nn.Sequential(
-                nn.Embedding(self.prefix_config.num_prefix_tokens, self.prefix_config.hidden_size),
-                nn.Linear(self.prefix_config.hidden_size, self.prefix_config.prefix_projection_hidden_size),
-                nn.Tanh(),
-                nn.Linear(
+            activation = nn.Tanh()
+            if self.config.tensor_parallel_degree > 1:
+                prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size,
+                )
+                prefix_proj_0 = fleet.meta_parallel.ColumnParallelLinear(
+                    self.prefix_config.hidden_size,
+                    self.prefix_config.prefix_projection_hidden_size,
+                    has_bias=True,
+                    gather_output=False,
+                )
+                prefix_proj_1 = fleet.meta_parallel.RowParallelLinear(
                     self.prefix_config.prefix_projection_hidden_size,
                     self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                ),
-                nn.Dropout(p=self.prefix_config.prefix_dropout),
-            )
+                    has_bias=True,
+                    input_is_parallel=True,
+                )
+            else:
+                prefix_embedding = nn.Embedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size,
+                )
+                prefix_proj_0 = nn.Linear(
+                    self.prefix_config.hidden_size,
+                    self.prefix_config.prefix_projection_hidden_size,
+                )
+                prefix_proj_1 = nn.Linear(
+                    self.prefix_config.prefix_projection_hidden_size,
+                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                )
+            prefix_encoder = nn.Sequential(prefix_embedding, prefix_proj_0, activation, prefix_proj_1, prefix_dropout)
         else:
-            prefix_encoder = nn.Sequential(
-                nn.Embedding(
+            if self.config.tensor_parallel_degree > 1:
+                prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
                     self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                ),
-                nn.Dropout(p=self.prefix_config.prefix_dropout),
-            )
+                    weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+                )
+            else:
+                prefix_embedding = nn.Embedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+                )
+            prefix_encoder = nn.Sequential(prefix_embedding, prefix_dropout)
         return prefix_encoder
 
     def _get_past_key_values(self, batch_size):
