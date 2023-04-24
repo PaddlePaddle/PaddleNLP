@@ -25,7 +25,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.log import logger
 from ..activations import ACT2FN
 from ..model_outputs import (
@@ -577,19 +577,13 @@ class MT5PretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: MT5Config) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["shared.weight", "shared.weight"],
-            ["encoder.embed_tokens.weight", "encoder.embed_tokens.weight"],
-            ["encoder.final_layer_norm.weight", "encoder.final_layer_norm.weight"],
-            ["decoder.embed_tokens.weight", "decoder.embed_tokens.weight"],
-            ["decoder.final_layer_norm.weight", "decoder.final_layer_norm.weight"],
-            [
-                "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
-                "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
-            ],
-            [
-                "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
-                "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
-            ],
+            "shared.weight",
+            "encoder.embed_tokens.weight",
+            "encoder.final_layer_norm.weight",
+            "decoder.embed_tokens.weight",
+            "decoder.final_layer_norm.weight",
+            "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+            "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
         ]
         for layer_index in range(config.num_hidden_layers):
             for att_head in ["q", "k", "v", "o"]:
@@ -597,17 +591,17 @@ class MT5PretrainedModel(PretrainedModel):
                     [
                         [
                             f"encoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
-                            f"encoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            None,
                             "transpose",
                         ],
                         [
                             f"decoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
-                            f"decoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            None,
                             "transpose",
                         ],
                         [
                             f"decoder.block.{layer_index}.layer.1.EncDecAttention.{att_head}.weight",
-                            f"decoder.block.{layer_index}.layer.1.EncDecAttention.{att_head}.weight",
+                            None,
                             "transpose",
                         ],
                     ]
@@ -616,34 +610,19 @@ class MT5PretrainedModel(PretrainedModel):
             layer_mappings = [
                 [
                     f"encoder.block.{layer_index}.layer.1.DenseReluDense.wo.weight",
-                    f"encoder.block.{layer_index}.layer.1.DenseReluDense.wo.weight",
+                    None,
                     "transpose",
                 ],
                 [
                     f"decoder.block.{layer_index}.layer.2.DenseReluDense.wo.weight",
-                    f"decoder.block.{layer_index}.layer.2.DenseReluDense.wo.weight",
+                    None,
                     "transpose",
                 ],
-                [
-                    f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
-                    f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
-                ],
-                [
-                    f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
-                    f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
-                ],
-                [
-                    f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
-                    f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
-                ],
-                [
-                    f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
-                    f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
-                ],
-                [
-                    f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
-                    f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
-                ],
+                f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
+                f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
             ]
 
             if config.feed_forward_proj == "relu":
@@ -651,12 +630,12 @@ class MT5PretrainedModel(PretrainedModel):
                     [
                         [
                             f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi.weight",
-                            f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi.weight",
+                            None,
                             "transpose",
                         ],
                         [
                             f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi.weight",
-                            f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi.weight",
+                            None,
                             "transpose",
                         ],
                     ]
@@ -667,18 +646,20 @@ class MT5PretrainedModel(PretrainedModel):
                         [
                             [
                                 f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi_{i}.weight",
-                                f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi_{i}.weight",
+                                None,
                                 "transpose",
                             ],
                             [
                                 f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi_{i}.weight",
-                                f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi_{i}.weight",
+                                None,
                                 "transpose",
                             ],
                         ]
                     )
 
             model_mappings.extend(layer_mappings)
+
+        init_name_mappings(model_mappings)
 
         if cls.__name__ != "MT5Model":
             for mapping in model_mappings:
@@ -702,13 +683,6 @@ class MT5PretrainedModel(PretrainedModel):
             "decoder_attention_mask": input_mask,
         }
         return dummy_inputs
-
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
 
     def _init_weights(self, layer):
         """Initialize the weights"""
@@ -1172,8 +1146,6 @@ class MT5Model(MT5PretrainedModel):
         decoder_config.num_layers = config.num_decoder_layers
         self.decoder = MT5Stack(decoder_config, self.shared)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.shared
 
@@ -1403,8 +1375,6 @@ class MT5ForConditionalGeneration(MT5PretrainedModel):
         self.mt5 = MT5Model(config)
         if not self.mt5.config["tie_word_embeddings"]:
             self.lm_head = nn.Linear(self.mt5.config["d_model"], self.mt5.config["vocab_size"], bias_attr=False)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.mt5.shared
@@ -1728,9 +1698,6 @@ class MT5EncoderModel(MT5PretrainedModel):
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = MT5Stack(encoder_config, embed_tokens=self.shared)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     @property
     def mt5(self):

@@ -100,6 +100,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
         ("BloomTokenizer", "bloom"),
+        ("ChatGLMTokenizer", "chatglm"),
     ]
 )
 
