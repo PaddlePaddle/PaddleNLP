@@ -21,8 +21,16 @@ class PromptTemplate(BaseComponent):
     def __init__(self, template):
         self.template = template
 
-    def run(self, query=None, documents=None):
-        documents = [i.content for i in documents]
-        context = "".join(documents)
-        result = {"documents": context, "query": query}
+    def run(self, query=None, documents=None, history=None):
+        if documents is not None:
+            documents = [i.content for i in documents]
+            context = "".join(documents)
+            result = {"documents": context, "query": query}
+        elif history is not None:
+            chat_history = "\n".join(history)
+            question = query
+            result = {"chat_history": chat_history, "question": question}
+        else:
+            raise NotImplementedError("This prompt template is not implemented!")
+
         return {"query": self.template.format(**result)}, "output_1"
