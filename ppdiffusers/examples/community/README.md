@@ -361,23 +361,22 @@ pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
 # 我们需要安装develop版的paddle才可以使用xformers
 # pipe.enable_xformers_memory_efficient_attention()
 scheduler_name = ["ddim", "pndm", "euler", "dpm-multi"]
-for lora_enabled in [True, False]:
-    pipe.set_lora_enabled(lora_enabled)
+for enable_lora in [True, False]:
     images = []
     for sc in scheduler_name:
         # 切换scheduler
         pipe.switch_scheduler(sc)
         # 指定clip_skip
-        clip_skip = 0
+        clip_skip = 1
         # 指定seed
         generator = paddle.Generator().manual_seed(0)
         # guidance_scale
         guidance_scale = 3.5
         prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:Moxin_10:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
         negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
-        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator).images[0]
+        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator, enable_lora=enable_lora).images[0]
         images.append(img)
-    if lora_enabled:
+    if enable_lora:
         image_grid(images, 2, 2).save(f"lora_enable.png")
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")

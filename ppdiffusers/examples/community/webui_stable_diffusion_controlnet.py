@@ -600,6 +600,7 @@ class WebUIStableDiffusionControlNetPipeline(DiffusionPipeline):
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         clip_skip: int = 1,
         controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
+        enable_lora: bool = True,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -705,7 +706,7 @@ class WebUIStableDiffusionControlNetPipeline(DiffusionPipeline):
 
             prompts, extra_network_data = parse_prompts([prompt])
 
-            if self.LORA_DIR is not None:
+            if enable_lora and self.LORA_DIR is not None:
                 if os.path.exists(self.LORA_DIR):
                     lora_mapping = {p.stem: p.absolute() for p in Path(self.LORA_DIR).glob("*.safetensors")}
                     for params in extra_network_data["lora"]:
@@ -864,7 +865,7 @@ class WebUIStableDiffusionControlNetPipeline(DiffusionPipeline):
         except Exception as e:
             raise ValueError(e)
         finally:
-            if self.weights_has_changed:
+            if enable_lora and self.weights_has_changed:
                 for sub_layer in self.text_encoder.sublayers(include_self=True):
                     if hasattr(sub_layer, "backup_weights"):
                         sub_layer.weight.copy_(sub_layer.backup_weights, True)
