@@ -17,6 +17,8 @@
 # Here is the AGPL-3.0 license https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/LICENSE.txt
 
 import inspect
+import shutil
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import paddle
@@ -30,9 +32,166 @@ from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
 from ppdiffusers.schedulers import KarrasDiffusionSchedulers
-from ppdiffusers.utils import logging, randn_tensor, safetensors_load, torch_load
+from ppdiffusers.utils import (
+    PPDIFFUSERS_CACHE,
+    logging,
+    ppdiffusers_url_download,
+    randn_tensor,
+    safetensors_load,
+    smart_load,
+    torch_load,
+)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+import copy
+import os
+import os.path
+
+from huggingface_hub.file_download import _request_wrapper, hf_raise_for_status
+
+# lark omegaconf
+
+
+def get_civitai_download_url(display_url, url_prefix="https://civitai.com"):
+    if "api/download" in display_url:
+        return display_url
+    import bs4
+    import requests
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36 QIHU 360SE"
+    }
+    r = requests.get(display_url, headers=headers)
+    soup = bs4.BeautifulSoup(r.text, "lxml")
+    download_url = None
+    for a in soup.find_all("a", href=True):
+        if "Download" in str(a):
+            download_url = url_prefix + a["href"].split("?")[0]
+            break
+    return download_url
+
+
+def http_file_name(
+    url: str,
+    *,
+    proxies=None,
+    headers: Optional[Dict[str, str]] = None,
+    timeout=10.0,
+    max_retries=0,
+):
+    """
+    Get a remote file name.
+    """
+    headers = copy.deepcopy(headers) or {}
+    r = _request_wrapper(
+        method="GET",
+        url=url,
+        stream=True,
+        proxies=proxies,
+        headers=headers,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
+    hf_raise_for_status(r)
+    displayed_name = url.split("/")[-1]
+    content_disposition = r.headers.get("Content-Disposition")
+    if content_disposition is not None and "filename=" in content_disposition:
+        # Means file is on CDN
+        displayed_name = content_disposition.split("filename=")[-1]
+    return displayed_name
+
+
+@paddle.no_grad()
+def load_lora(
+    pipeline,
+    state_dict: dict,
+    LORA_PREFIX_UNET: str = "lora_unet",
+    LORA_PREFIX_TEXT_ENCODER: str = "lora_te",
+    ratio: float = 1.0,
+):
+    ratio = float(ratio)
+    visited = []
+    for key in state_dict:
+        if ".alpha" in key or ".lora_up" in key or key in visited:
+            continue
+
+        if "text" in key:
+            tmp_layer_infos = key.split(".")[0].split(LORA_PREFIX_TEXT_ENCODER + "_")[-1].split("_")
+            hf_to_ppnlp = {
+                "encoder": "transformer",
+                "fc1": "linear1",
+                "fc2": "linear2",
+            }
+            layer_infos = []
+            for layer_info in tmp_layer_infos:
+                if layer_info == "mlp":
+                    continue
+                layer_infos.append(hf_to_ppnlp.get(layer_info, layer_info))
+            curr_layer: paddle.nn.Linear = pipeline.text_encoder
+        else:
+            layer_infos = key.split(".")[0].split(LORA_PREFIX_UNET + "_")[-1].split("_")
+            curr_layer: paddle.nn.Linear = pipeline.unet
+
+        temp_name = layer_infos.pop(0)
+        while len(layer_infos) > -1:
+            try:
+                if temp_name == "to":
+                    raise ValueError()
+                curr_layer = curr_layer.__getattr__(temp_name)
+                if len(layer_infos) > 0:
+                    temp_name = layer_infos.pop(0)
+                elif len(layer_infos) == 0:
+                    break
+            except Exception:
+                if len(temp_name) > 0:
+                    temp_name += "_" + layer_infos.pop(0)
+                else:
+                    temp_name = layer_infos.pop(0)
+
+        triplet_keys = [key, key.replace("lora_down", "lora_up"), key.replace("lora_down.weight", "alpha")]
+        dtype: paddle.dtype = curr_layer.weight.dtype
+        weight_down: paddle.Tensor = state_dict[triplet_keys[0]].cast(dtype)
+        weight_up: paddle.Tensor = state_dict[triplet_keys[1]].cast(dtype)
+        rank: float = float(weight_down.shape[0])
+        if triplet_keys[2] in state_dict:
+            alpha: float = state_dict[triplet_keys[2]].cast(dtype).item()
+            scale: float = alpha / rank
+        else:
+            scale = 1.0
+
+        if not hasattr(curr_layer, "backup_weights"):
+            curr_layer.backup_weights = curr_layer.weight.clone()
+
+        if len(weight_down.shape) == 4:
+            if weight_down.shape[2:4] == [1, 1]:
+                # conv2d 1x1
+                curr_layer.weight.copy_(
+                    curr_layer.weight
+                    + ratio
+                    * paddle.matmul(weight_up.squeeze([-1, -2]), weight_down.squeeze([-1, -2])).unsqueeze([-1, -2])
+                    * scale,
+                    True,
+                )
+            else:
+                # conv2d 3x3
+                curr_layer.weight.copy_(
+                    curr_layer.weight
+                    + ratio
+                    * paddle.nn.functional.conv2d(weight_down.transpose([1, 0, 2, 3]), weight_up).transpose(
+                        [1, 0, 2, 3]
+                    )
+                    * scale,
+                    True,
+                )
+        else:
+            # linear
+            curr_layer.weight.copy_(curr_layer.weight + ratio * paddle.matmul(weight_up, weight_down).T * scale, True)
+
+        # update visited list
+        visited.extend(triplet_keys)
+    return pipeline
 
 
 class WebUIStableDiffusionPipeline(DiffusionPipeline):
@@ -66,6 +225,8 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
     _optional_components = ["safety_checker", "feature_extractor"]
     enable_emphasis = True
     comma_padding_backtrack = 20
+    LORA_DIR = os.path.join(PPDIFFUSERS_CACHE, "lora")
+    TI_DIR = os.path.join(PPDIFFUSERS_CACHE, "textual_inversion")
 
     def __init__(
         self,
@@ -127,14 +288,52 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             "kdpm2-ancestral",
             "kdpm2",
         ]
+        self.weights_has_changed = False
 
-    def add_ti_embedding_dir(self, embeddings_dir):
+        # register_state_dict_hook to fix text_encoder, when we save_pretrained text model.
+        def map_to(state_dict, *args, **kwargs):
+            if "text_model.token_embedding.wrapped.weight" in state_dict:
+                state_dict["text_model.token_embedding.weight"] = state_dict.pop(
+                    "text_model.token_embedding.wrapped.weight"
+                )
+            return state_dict
+
+        self.text_encoder.register_state_dict_hook(map_to)
+
+    def add_ti_embedding_dir(self, embeddings_dir=None):
         self.sj.embedding_db.add_embedding_dir(embeddings_dir)
         self.sj.embedding_db.load_textual_inversion_embeddings()
 
     def clear_ti_embedding(self):
         self.sj.embedding_db.clear_embedding_dirs()
         self.sj.embedding_db.load_textual_inversion_embeddings(True)
+
+    def download_civitai_lora_file(self, url):
+        if os.path.isfile(url):
+            dst = os.path.join(self.LORA_DIR, os.path.basename(url))
+            shutil.copyfile(url, dst)
+            return dst
+
+        download_url = get_civitai_download_url(url) or url
+        file_path = ppdiffusers_url_download(
+            download_url, cache_dir=self.LORA_DIR, filename=http_file_name(download_url).strip('"')
+        )
+        return file_path
+
+    def download_civitai_ti_file(self, url):
+        if os.path.isfile(url):
+            dst = os.path.join(self.TI_DIR, os.path.basename(url))
+            shutil.copyfile(url, dst)
+            return dst
+
+        download_url = get_civitai_download_url(url) or url
+        file_path = ppdiffusers_url_download(
+            download_url, cache_dir=self.TI_DIR, filename=http_file_name(download_url).strip('"')
+        )
+        return file_path
+
+    def change_scheduler(self, scheduler_type="ddim"):
+        self.switch_scheduler(scheduler_type)
 
     def switch_scheduler(self, scheduler_type="ddim"):
         scheduler_type = scheduler_type.lower()
@@ -305,8 +504,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        clip_skip: int = 0,
-        # lora_dir: str = None,
+        clip_skip: int = 1,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -357,8 +555,8 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
                 [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
-            clip_skip (`int`, *optional*, defaults to 0):
-                CLIP_stop_at_last_layers, if clip_skip < 1, we will use the last_hidden_state from text_encoder.
+            clip_skip (`int`, *optional*, defaults to 1):
+                CLIP_stop_at_last_layers, if clip_skip <= 1, we will use the last_hidden_state from text_encoder.
         Examples:
 
         Returns:
@@ -368,163 +566,167 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        # 0. Default height and width to unet
-        height = height or self.unet.config.sample_size * self.vae_scale_factor
-        width = width or self.unet.config.sample_size * self.vae_scale_factor
+        self.add_ti_embedding_dir(self.TI_DIR)
 
-        # 1. Check inputs. Raise error if not correct
-        self.check_inputs(
-            prompt,
-            height,
-            width,
-            callback_steps,
-            negative_prompt,
-        )
+        try:
+            # 0. Default height and width to unet
+            height = height or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
+            width = width or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
 
-        batch_size = 1
+            # 1. Check inputs. Raise error if not correct
+            self.check_inputs(
+                prompt,
+                height,
+                width,
+                callback_steps,
+                negative_prompt,
+            )
 
-        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
-        # corresponds to doing no classifier free guidance.
-        do_classifier_free_guidance = guidance_scale > 1.0
+            batch_size = 1
 
-        prompts, extra_network_data = parse_prompts([prompt])
+            # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+            # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+            # corresponds to doing no classifier free guidance.
+            do_classifier_free_guidance = guidance_scale > 1.0
 
-        # if lora_dir is not None and os.path.exists(lora_dir):
-        #     lora_mapping = {p.stem: p.absolute() for p in Path(lora_dir).glob("*")}
+            prompts, extra_network_data = parse_prompts([prompt])
 
-        #     lora_weights_tmp = {}
-        #     for params in extra_network_data["lora"]:
-        #         assert len(params.items) > 0
-        #         name = params.items[0]
-        #         if name in lora_mapping:
-        #             multiplier = float(params.items[1]) if len(params.items) > 1 else 1.0
-        #             lora_weight_or_path = smart_load(lora_mapping[name])
-        #             if len(lora_weights_tmp) == 0:
-        #                 for lk, lv in lora_weight_or_path.items():
-        #                     lora_weights_tmp[lk] = lv.astype("float16").numpy() * multiplier
-        #             else:
-        #                 keys = list(lora_weight_or_path.keys())
-        #                 try:
-        #                     for each_key in keys:
-        #                         if ".alpha" in each_key: continue
-        #                         lora_weights_tmp[each_key] = lora_weights_tmp[each_key] + lora_weight_or_path.pop(each_key, 0.).astype("float16").numpy() * multiplier
-        #                 except:
-        #                     pass
-        #             print(f"Loading lora {name} successfully !")
-        #         else:
-        #             print(f"We cant find lora weight {name} !")
-
-        #     if len(lora_weights_tmp) > 0:
-        #         with tempfile.TemporaryDirectory() as tempdir:
-        #             paddle.save(lora_weights_tmp, os.path.join(tempdir, "lora_merge.pdparams"))
-        #             self.apply_lora(os.path.join(tempdir, "lora_merge.pdparams"))
-
-        self.sj.clip.CLIP_stop_at_last_layers = clip_skip
-        # 3. Encode input prompt
-        prompt_embeds, negative_prompt_embeds = self._encode_prompt(
-            prompts,
-            do_classifier_free_guidance,
-            negative_prompt,
-            num_inference_steps=num_inference_steps,
-        )
-
-        # 4. Prepare timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
-
-        # 5. Prepare latent variables
-        num_channels_latents = self.unet.in_channels
-        latents = self.prepare_latents(
-            batch_size,
-            num_channels_latents,
-            height,
-            width,
-            self.unet.dtype,
-            generator,
-            latents,
-        )
-
-        # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
-        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-
-        # 7. Denoising loop
-        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
-        with self.progress_bar(total=num_inference_steps) as progress_bar:
-            for i, t in enumerate(timesteps):
-                step = i // self.scheduler.order
-                do_batch = False
-                conds_list, cond_tensor = reconstruct_multicond_batch(prompt_embeds, step)
-                try:
-                    weight = conds_list[0][0][1]
-                except Exception:
-                    weight = 1.0
-                if do_classifier_free_guidance:
-                    uncond_tensor = reconstruct_cond_batch(negative_prompt_embeds, step)
-                    do_batch = cond_tensor.shape[1] == uncond_tensor.shape[1]
-
-                # expand the latents if we are doing classifier free guidance
-                latent_model_input = paddle.concat([latents] * 2) if do_batch else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-
-                if do_batch:
-                    noise_pred = self.unet(
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=paddle.concat([uncond_tensor, cond_tensor]),
-                        cross_attention_kwargs=cross_attention_kwargs,
-                    ).sample
-                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + weight * guidance_scale * (noise_pred_text - noise_pred_uncond)
+            if self.LORA_DIR is not None:
+                if os.path.exists(self.LORA_DIR):
+                    lora_mapping = {p.stem: p.absolute() for p in Path(self.LORA_DIR).glob("*.safetensors")}
+                    for params in extra_network_data["lora"]:
+                        assert len(params.items) > 0
+                        name = params.items[0]
+                        if name in lora_mapping:
+                            ratio = float(params.items[1]) if len(params.items) > 1 else 1.0
+                            lora_state_dict = smart_load(lora_mapping[name], map_location=paddle.get_device())
+                            self.weights_has_changed = True
+                            load_lora(self, state_dict=lora_state_dict, ratio=ratio)
+                            del lora_state_dict
+                        else:
+                            print(f"We can't find lora weight: {name}! Please make sure that exists!")
                 else:
-                    noise_pred = self.unet(
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=cond_tensor,
-                        cross_attention_kwargs=cross_attention_kwargs,
-                    ).sample
+                    if len(extra_network_data["lora"]) > 0:
+                        print(f"{self.LORA_DIR} not exists, so we cant load loras!")
 
+            self.sj.clip.CLIP_stop_at_last_layers = clip_skip
+            # 3. Encode input prompt
+            prompt_embeds, negative_prompt_embeds = self._encode_prompt(
+                prompts,
+                do_classifier_free_guidance,
+                negative_prompt,
+                num_inference_steps=num_inference_steps,
+            )
+
+            # 4. Prepare timesteps
+            self.scheduler.set_timesteps(num_inference_steps)
+            timesteps = self.scheduler.timesteps
+
+            # 5. Prepare latent variables
+            num_channels_latents = self.unet.in_channels
+            latents = self.prepare_latents(
+                batch_size,
+                num_channels_latents,
+                height,
+                width,
+                self.unet.dtype,
+                generator,
+                latents,
+            )
+
+            # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+            extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+
+            # 7. Denoising loop
+            num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+            with self.progress_bar(total=num_inference_steps) as progress_bar:
+                for i, t in enumerate(timesteps):
+                    step = i // self.scheduler.order
+                    do_batch = False
+                    conds_list, cond_tensor = reconstruct_multicond_batch(prompt_embeds, step)
+                    try:
+                        weight = conds_list[0][0][1]
+                    except Exception:
+                        weight = 1.0
                     if do_classifier_free_guidance:
-                        noise_pred_uncond = self.unet(
+                        uncond_tensor = reconstruct_cond_batch(negative_prompt_embeds, step)
+                        do_batch = cond_tensor.shape[1] == uncond_tensor.shape[1]
+
+                    # expand the latents if we are doing classifier free guidance
+                    latent_model_input = paddle.concat([latents] * 2) if do_batch else latents
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
+                    if do_batch:
+                        noise_pred = self.unet(
                             latent_model_input,
                             t,
-                            encoder_hidden_states=uncond_tensor,
+                            encoder_hidden_states=paddle.concat([uncond_tensor, cond_tensor]),
                             cross_attention_kwargs=cross_attention_kwargs,
                         ).sample
-                        noise_pred = noise_pred_uncond + weight * guidance_scale * (noise_pred - noise_pred_uncond)
+                        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                        noise_pred = noise_pred_uncond + weight * guidance_scale * (
+                            noise_pred_text - noise_pred_uncond
+                        )
+                    else:
+                        noise_pred = self.unet(
+                            latent_model_input,
+                            t,
+                            encoder_hidden_states=cond_tensor,
+                            cross_attention_kwargs=cross_attention_kwargs,
+                        ).sample
 
-                # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                        if do_classifier_free_guidance:
+                            noise_pred_uncond = self.unet(
+                                latent_model_input,
+                                t,
+                                encoder_hidden_states=uncond_tensor,
+                                cross_attention_kwargs=cross_attention_kwargs,
+                            ).sample
+                            noise_pred = noise_pred_uncond + weight * guidance_scale * (noise_pred - noise_pred_uncond)
 
-                # call the callback, if provided
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
-                    progress_bar.update()
-                    if callback is not None and i % callback_steps == 0:
-                        callback(i, t, latents)
+                    # compute the previous noisy sample x_t -> x_t-1
+                    latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
-        if output_type == "latent":
-            image = latents
-            has_nsfw_concept = None
-        elif output_type == "pil":
-            # 8. Post-processing
-            image = self.decode_latents(latents)
+                    # call the callback, if provided
+                    if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                        progress_bar.update()
+                        if callback is not None and i % callback_steps == 0:
+                            callback(i, t, latents)
 
-            # 9. Run safety checker
-            image, has_nsfw_concept = self.run_safety_checker(image, self.unet.dtype)
+            if output_type == "latent":
+                image = latents
+                has_nsfw_concept = None
+            elif output_type == "pil":
+                # 8. Post-processing
+                image = self.decode_latents(latents)
 
-            # 10. Convert to PIL
-            image = self.numpy_to_pil(image)
-        else:
-            # 8. Post-processing
-            image = self.decode_latents(latents)
+                # 9. Run safety checker
+                image, has_nsfw_concept = self.run_safety_checker(image, self.unet.dtype)
 
-            # 9. Run safety checker
-            image, has_nsfw_concept = self.run_safety_checker(image, self.unet.dtype)
+                # 10. Convert to PIL
+                image = self.numpy_to_pil(image)
+            else:
+                # 8. Post-processing
+                image = self.decode_latents(latents)
 
-        if not return_dict:
-            return (image, has_nsfw_concept)
+                # 9. Run safety checker
+                image, has_nsfw_concept = self.run_safety_checker(image, self.unet.dtype)
 
-        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
+            if not return_dict:
+                return (image, has_nsfw_concept)
+
+            return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
+        except Exception as e:
+            raise ValueError(e)
+        finally:
+            if self.weights_has_changed:
+                for sub_layer in self.text_encoder.sublayers(include_self=True):
+                    if hasattr(sub_layer, "backup_weights"):
+                        sub_layer.weight.copy_(sub_layer.backup_weights, True)
+                for sub_layer in self.unet.sublayers(include_self=True):
+                    if hasattr(sub_layer, "backup_weights"):
+                        sub_layer.weight.copy_(sub_layer.backup_weights, True)
+                self.weights_has_changed = False
 
 
 # clip.py
@@ -1556,7 +1758,7 @@ class EmbeddingDatabase:
         self.previously_displayed_embeddings = ()
 
     def add_embedding_dir(self, path):
-        if path is not None:
+        if path is not None and path not in self.embedding_dirs:
             self.embedding_dirs[path] = DirWithTextualInversionEmbeddings(path)
 
     def clear_embedding_dirs(self):
