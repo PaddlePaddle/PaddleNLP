@@ -23,7 +23,12 @@ from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    TrainingArguments,
+    get_last_checkpoint,
+    set_seed,
+)
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
@@ -75,6 +80,8 @@ def main():
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     paddle.set_device(training_args.device)
+
+    set_seed(args=training_args)
 
     # Log on each process the small summary:
     logger.warning(

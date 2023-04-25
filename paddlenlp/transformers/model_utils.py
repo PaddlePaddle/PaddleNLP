@@ -1339,6 +1339,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", True)
 
         # 1. retrieve the model related config
 
@@ -1369,9 +1370,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             state_dict_to_save = self.state_dict()
 
-        # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
-        config_to_save.save_pretrained(save_dir)
+        if is_main_process:
+            # Attach architecture to the config
+            config_to_save.architectures = [model_to_save.__class__.__name__]
+            config_to_save.save_pretrained(save_dir)
 
         # Save model
         if paddle.in_dynamic_mode():

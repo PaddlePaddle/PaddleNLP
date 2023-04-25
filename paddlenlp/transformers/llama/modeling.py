@@ -805,11 +805,13 @@ class LlamaLMHead(nn.Layer):
             shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
-        self.config = config
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
 
-    def forward(self, hidden_states, tensor_parallel_output=False):
+    def forward(self, hidden_states, tensor_parallel_output=True):
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
-
         return logits
 
 

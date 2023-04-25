@@ -62,7 +62,7 @@ from .trainer_callback import (
     TrainerControl,
     TrainerState,
 )
-from .trainer_utils import (
+from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
     EvalLoopOutput,
     EvalPrediction,
@@ -77,7 +77,6 @@ from .trainer_utils import (
     get_last_checkpoint,
     get_scheduler,
     has_length,
-    set_hyrbid_parallel_seed,
     set_seed,
     speed_metrics,
 )
@@ -212,18 +211,12 @@ class Trainer:
         self._memory_tracker.start()
 
         # Seed must be set before instantiating the model when using model
-        set_seed(self.args.seed)
-        if self.args.use_hybrid_parallel:
-            set_hyrbid_parallel_seed(
-                basic_seed=self.args.seed,
-                dataset_rank=self.args.dataset_rank,
-                tp_rank=self.args.tensor_parallel_rank,
-            )
+        set_seed(args=self.args)
 
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
 
-        if self.args.should_save:
+        if self.args.should_save or self.args.should_save_model_state:
             os.makedirs(self.args.output_dir, exist_ok=True)
 
         self.sharding = None
@@ -553,7 +546,7 @@ class Trainer:
             if parts_num > 1:
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = trainable_numel_tensor.item() // max(self.args.data_parallel_degree, 1)
+                trainable_numel = trainable_numel_tensor.item() // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
@@ -723,6 +716,21 @@ class Trainer:
 
                     elif args.recompute and dp_enabled:
                         fused_allreduce_gradients(list(model.parameters()), None)
+
+                    # pipeline parallel mode,  handle gradient merge here
+                    if args.pipeline_parallel_degree > 1:
+                        real_accumulate_steps = args.gradient_accumulation_steps
+                        if hasattr(model, "_delay_scale_loss"):
+                            if model._delay_scale_loss:
+                                real_accumulate_steps *= model.accumulate_steps
+
+                        for p in model._layers.parameters():
+                            if hasattr(p, "main_grad") and p.main_grad is not None:
+                                assert p.grad is None
+                                p.main_grad = p.main_grad.scale(1.0 / real_accumulate_steps)
+                            elif p.grad is not None:
+                                p.grad = p.grad.scale(1.0 / real_accumulate_steps)
+
                     # Optimizer step
                     optimizer_was_run = True
                     if self.do_grad_scaling:
@@ -730,7 +738,7 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
-                        optimizer_was_run = scale_before <= scale_after
+                        optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
@@ -1138,11 +1146,18 @@ class Trainer:
         np.random.set_state(checkpoint_rng_state["numpy"])
 
         core = paddle.framework.core
-        if core.is_compiled_with_cuda():
-            for i in range(core.get_cuda_device_count()):
-                core.default_cuda_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
-        core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
+        core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
+        if core.is_compiled_with_cuda():
+            if not len(checkpoint_rng_state["cuda"]) == core.get_cuda_device_count():
+                raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
+            for i in range(core.get_cuda_device_count()):
+                core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+
+        if self.args.use_hybrid_parallel:
+            fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+            )
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Tuple[Any, Any]:
@@ -1440,7 +1455,6 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-
         inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
 
         def _prepare_training(self, data):
@@ -1466,6 +1480,9 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
+        if self.args.gradient_accumulation_steps > 1:
+            loss = loss / self.args.gradient_accumulation_steps
+
         return loss.detach()
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
@@ -1478,7 +1495,7 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if self.args.should_save:
+        if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
@@ -1537,9 +1554,13 @@ class Trainer:
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
-            "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
-            "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
+            "cuda": paddle.get_cuda_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
         }
+        if self.args.use_hybrid_parallel:
+            rng_states[
+                "hybrid_parallel_rng_state_tracker"
+            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
         # not yet exist.
@@ -1635,7 +1656,10 @@ class Trainer:
         if not isinstance(self.model, PretrainedModel) and not isinstance(self.model, LoRAModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 unwrap_model(self.model).save_pretrained(
-                    output_dir, merge_tensor_parallel=merge_tensor_parallel, variant=self.args.weight_name_suffix
+                    output_dir,
+                    merge_tensor_parallel=merge_tensor_parallel,
+                    variant=self.args.weight_name_suffix,
+                    is_main_process=self.args.should_save,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1648,14 +1672,18 @@ class Trainer:
                 )
         else:
             self.model.save_pretrained(
-                output_dir, merge_tensor_parallel=merge_tensor_parallel, variant=self.args.weight_name_suffix
+                output_dir,
+                merge_tensor_parallel=merge_tensor_parallel,
+                variant=self.args.weight_name_suffix,
+                is_main_process=self.args.should_save,
             )
 
-        if self.tokenizer is not None:
-            self.tokenizer.save_pretrained(output_dir)
+        if self.args.should_save:
+            if self.tokenizer is not None:
+                self.tokenizer.save_pretrained(output_dir)
 
-        # Good practice: save your training arguments together with the trained model
-        paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+            # Good practice: save your training arguments together with the trained model
+            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""

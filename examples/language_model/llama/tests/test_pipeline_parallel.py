@@ -25,42 +25,71 @@ from paddlenlp.transformers import LlamaForCausalLM
 
 class TestLlama(unittest.TestCase):
     def test_pipeline_model(self):
-        pp_degree = paddle.distributed.get_world_size()
+        world_size = paddle.distributed.get_world_size()
+        pp_degree = world_size
+        tp_degree = 1
+        if world_size > 2:
+            pp_degree = 2
+            assert world_size % pp_degree == 0
+            tp_degree = world_size // pp_degree
+
+        # pp_degree = -1
+        if pp_degree == -1:
+            tp_degree = world_size
+            pp_degree = 1
 
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
-            "mp_degree": 1,
+            "mp_degree": tp_degree,
             "pp_degree": pp_degree,
             "sharding_degree": 1,
         }
         fleet.init(is_collective=True, strategy=strategy)
         hcg = fleet.get_hybrid_communicate_group()
 
-        model = LlamaForCausalLMPipe.from_pretrained("facebook/tiny-random-llama")
+        if pp_degree > 1:
+            model_class = LlamaForCausalLMPipe
+        else:
+            model_class = LlamaForCausalLM
+
+        model = model_class.from_pretrained(
+            "facebook/tiny-random-llama",
+            tensor_parallel_degree=tp_degree,
+            tensor_parallel_rank=hcg.get_model_parallel_rank(),
+            lm_shift_labels=False,
+            # use_flash_attention=True,
+        )
+
         model.eval()
 
-        # for k, v in model.state_dict().items():
-        #     print(k, v.shape, v.dtype)
+        for k, v in model.state_dict().items():
+            print(k, v.shape, v.dtype, v.abs().sum().item())
+            if k == "lm_head.weight":
+                print(v)
 
         input_ids = paddle.to_tensor([[x for x in range(100, 110)]], dtype="int64")
         labels = paddle.to_tensor([[x for x in range(101, 111)]], dtype="int64")
 
-        pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
         if pp_degree > 1:
+            pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
             ret = pp_model.eval_batch(data=[input_ids, labels], compute_loss=True)
         else:
-            pp_model.data = [input_ids, labels]
-            ret = pp_model._forward_step(None)
+            # pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
+            # pp_model.data = [input_ids, labels]
+            # ret = pp_model._forward_step(None)
+            ret = model(input_ids=input_ids, labels=labels)
+            ret = ret[0]
 
         np.testing.assert_allclose(ret.item(), 10.49988270, atol=1e-7)
         print("ret", ret.item())
 
-        single_model = LlamaForCausalLM.from_pretrained("facebook/tiny-random-llama", lm_shift_labels=False)
-        single_model.eval()
-        ret = single_model(input_ids=input_ids, labels=labels)
-        np.testing.assert_allclose(ret[0].item(), 10.49988270, atol=1e-7)
-        print("ret", ret[0].item())
+        # single_model = LlamaForCausalLM.from_pretrained("facebook/tiny-random-llama", lm_shift_labels=False)
+        # single_model.eval()
+        # ret = single_model(input_ids=input_ids, labels=labels)
+        # np.testing.assert_allclose(ret[0].item(), 10.49988270, atol=1e-7)
+
+        # print("ret", ret[0].item())
 
 
 if __name__ == "__main__":
@@ -98,4 +127,4 @@ if __name__ == "__main__":
 #
 #
 # CUDA_VISIBLE_DEVICES=2 PYTHONPATH=./ pytest -s -v tests/test_pipeline_parallel.py
-# PYTHONPATH=/ssd2/zhonghui03/Datasets/PaddleNLP:$PYTHONPATH  CUDA_VISIBLE_DEVICES=2,3 PYTHONPATH=$PYTHONPATH:./ python   -m paddle.distributed.launch --gpus 2,3  tests/test_pipeline_parallel.py
+# PYTHONPATH=/ssd2/zhonghui03/Datasets/PaddleNLP:$PYTHONPATH  PYTHONPATH=$PYTHONPATH:./ python   -m paddle.distributed.launch --gpus 0,1,2,3  tests/test_pipeline_parallel.py
