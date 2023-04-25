@@ -79,7 +79,7 @@ class PegasusPretrainedModel(PretrainedModel):
     base_model_prefix = "pegasus"
     config_class = PegasusConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -164,7 +164,6 @@ class PegasusEncoder(PegasusPretrainedModel):
             normalize_before=True,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.encoder_layers)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids: Optional[Tensor] = None, attention_mask: Optional[Tensor] = None, **kwargs):
         """
@@ -234,7 +233,6 @@ class PegasusDecoder(PegasusPretrainedModel):
             normalize_before=True,
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, config.decoder_layers)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -336,7 +334,6 @@ class PegasusModel(PegasusPretrainedModel):
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         self.encoder = PegasusEncoder(config, self.shared)
         self.decoder = PegasusDecoder(config, self.shared)
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.encoder
@@ -490,8 +487,6 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             self.register_buffer("final_logits_bias", paddle.zeros((1, config.vocab_size)))
         self.use_SSTIA = False
         self.mix_ratio = 0
-
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.pegasus.get_encoder()

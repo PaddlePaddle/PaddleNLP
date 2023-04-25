@@ -160,6 +160,8 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
 
     @apply_forward_hook
     def encode(self, x: paddle.Tensor, return_dict: bool = True) -> AutoencoderKLOutput:
+        # TODO junnyu, support float16
+        x = x.cast(self.dtype)
         if self.use_tiling and (x.shape[-1] > self.tile_sample_min_size or x.shape[-2] > self.tile_sample_min_size):
             return self.tiled_encode(x, return_dict=return_dict)
 

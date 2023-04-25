@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--target_file_path', type=str, default=None, help='the target json file path')
     parser.add_argument('--batch_size', type=int, default=1, help='the batch size when using taskflow')
     parser.add_argument("--do_debug", action='store_true', help="Whether to do debug")
-    parser.add_argument('--a_prompt', type=str, default='答案', help='the prompt when using taskflow, seperate by ,')
+    parser.add_argument('--a_prompt', type=str, default='答案', help='the prompt when using taskflow, separate by ,')
     parser.add_argument('--a_position_prob', type=float, default=0.01, help='confidence threshold for answer extraction')
     parser.add_argument('--a_max_answer_candidates', type=int, default=5, help='the max number of return answer candidate for each input')
     parser.add_argument('--q_num_return_sequences', type=int, default=3, help='the number of return sequences for each input sample, it should be less than num_beams')

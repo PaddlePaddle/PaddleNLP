@@ -78,7 +78,7 @@ class AccuracyAndF1(Metric):
                 Predicted tensor, and its dtype is float32 or float64, and
                 has a shape of [batch_size, num_classes].
             label (Tensor):
-                The ground truth tensor, and its dtype is is int64, and has a
+                The ground truth tensor, and its dtype is int64, and has a
                 shape of [batch_size, 1] or [batch_size, num_classes] in one
                 hot representation.
 
@@ -615,7 +615,7 @@ class MultiLabelsMetric(Metric):
                 Predicted tensor, and its dtype is float32 or float64, and
                 has a shape of [batch_size, *, num_labels].
             label (Tensor):
-                The ground truth tensor, and its dtype is is int64, and has a
+                The ground truth tensor, and its dtype is int64, and has a
                 shape of [batch_size, *] or [batch_size, *, num_labels] in one
                 hot representation.
 

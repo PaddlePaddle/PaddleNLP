@@ -59,6 +59,7 @@ from .import_utils import (
     ENV_VARS_TRUE_VALUES,
     DummyObject,
     OptionalDependencyNotAvailable,
+    is_einops_available,
     is_fastdeploy_available,
     is_inflect_available,
     is_k_diffusion_available,
