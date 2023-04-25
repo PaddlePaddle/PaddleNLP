@@ -94,7 +94,7 @@ def main():
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=10,
+            num_prefix_tokens=64,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,

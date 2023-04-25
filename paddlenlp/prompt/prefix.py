@@ -21,6 +21,7 @@ from typing import Callable, List, Optional
 
 import paddle
 import paddle.nn as nn
+from paddle.distributed import fleet
 
 from ..utils.env import PREFIX_CONFIG_NAME
 from ..utils.log import logger
@@ -223,25 +224,52 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             weight.stop_gradient = False
 
     def _create_prefix_encoder(self):
+        prefix_dropout = nn.Dropout(p=self.prefix_config.prefix_dropout)
         if self.prefix_config.prefix_projection:
-            prefix_encoder = nn.Sequential(
-                nn.Embedding(self.prefix_config.num_prefix_tokens, self.prefix_config.hidden_size),
-                nn.Linear(self.prefix_config.hidden_size, self.prefix_config.prefix_projection_hidden_size),
-                nn.Tanh(),
-                nn.Linear(
+            activation = nn.Tanh()
+            if self.config.tensor_parallel_degree > 1:
+                prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size,
+                )
+                prefix_proj_0 = fleet.meta_parallel.ColumnParallelLinear(
+                    self.prefix_config.hidden_size,
+                    self.prefix_config.prefix_projection_hidden_size,
+                    has_bias=True,
+                    gather_output=False,
+                )
+                prefix_proj_1 = fleet.meta_parallel.RowParallelLinear(
                     self.prefix_config.prefix_projection_hidden_size,
                     self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                ),
-                nn.Dropout(p=self.prefix_config.prefix_dropout),
-            )
+                    has_bias=True,
+                    input_is_parallel=True,
+                )
+            else:
+                prefix_embedding = nn.Embedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size,
+                )
+                prefix_proj_0 = nn.Linear(
+                    self.prefix_config.hidden_size,
+                    self.prefix_config.prefix_projection_hidden_size,
+                )
+                prefix_proj_1 = nn.Linear(
+                    self.prefix_config.prefix_projection_hidden_size,
+                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                )
+            prefix_encoder = nn.Sequential(prefix_embedding, prefix_proj_0, activation, prefix_proj_1, prefix_dropout)
         else:
-            prefix_encoder = nn.Sequential(
-                nn.Embedding(
+            if self.config.tensor_parallel_degree > 1:
+                prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
                     self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
-                ),
-                nn.Dropout(p=self.prefix_config.prefix_dropout),
-            )
+                )
+            else:
+                prefix_embedding = nn.Embedding(
+                    self.prefix_config.num_prefix_tokens,
+                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                )
+            prefix_encoder = nn.Sequential(prefix_embedding, prefix_dropout)
         return prefix_encoder
 
     def _get_past_key_values(self, batch_size):
@@ -251,13 +279,18 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             # (bs, prefixlen, hidden_dim*layer_num*2)
             past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([batch_size, -1]))
 
-            # (bs, prefixlen, layer_num*2, head_num,  head_dim)
+            # (bs, prefixlen, hidden_dim*layer_num*2/tensor_parallel_degree)
+            if self.config.tensor_parallel_degree > 1:
+                split_past_key_values = past_key_values.split(axis=2)
+                past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
+
+            # (bs, prefixlen, layer_num*2, head_num/tensor_parallel_degree,  head_dim)
             past_key_values = past_key_values.reshape(
                 [
                     batch_size,
                     self.prefix_config.num_prefix_tokens,
                     self.prefix_config.num_hidden_layers * 2,
-                    self.prefix_config.num_attention_heads,
+                    self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree,
                     self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
                 ]
             )
@@ -285,16 +318,18 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
     def print_trainable_parameters(self) -> None:
         freeze_numel = 0
         trainable_numel = 0
-        for _, weight in self.model.state_dict().items():
+        for name, weight in self.model.state_dict().items():
             if weight.stop_gradient:
                 freeze_numel += weight.numel().item()
             else:
                 trainable_numel += weight.numel().item()
-        for _, weight in self.prefix_encoder.state_dict().items():
+                print(name, weight.shape)
+        for name, weight in self.prefix_encoder.state_dict().items():
             if weight.stop_gradient:
                 freeze_numel += weight.numel().item()
             else:
                 trainable_numel += weight.numel().item()
+                print(name, weight.shape)
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
@@ -320,29 +355,29 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
 
 def bloom_postprocess_past_key_value(past_key_values):
-    # (layer_num, bs, head_num, prefixlen, head_dim)*2
+    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)*2
     past_key_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
-    # (layer_num, bs, head_num, prefixlen, head_dim)
+    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)
     num_hidden_layers, batch_size, num_attention_heads, num_prefix_tokens, head_hidden_size = past_key_values[0].shape
-    # (layer_num, bs, prefixlen, head_num, head_dim)
+    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)
     keys, values = past_key_values[0].transpose([0, 1, 3, 2, 4]), past_key_values[1].transpose([0, 1, 3, 2, 4])
-    # (layer_num, bs*head_num, head_dim, prefixlen)
+    # (layer_num, bs*head_num/tensor_parallel_degree, head_dim, prefixlen)
     keys = keys.reshape([num_hidden_layers, batch_size * num_attention_heads, head_hidden_size, num_prefix_tokens])
-    # (layer_num, bs*head_num, prefixlen, head_dim)
+    # (layer_num, bs*head_num/tensor_parallel_degree, prefixlen, head_dim)
     values = values.reshape([num_hidden_layers, batch_size * num_attention_heads, num_prefix_tokens, head_hidden_size])
 
     return tuple(zip(keys, values))
 
 
 def chatglm_postprocess_past_key_value(past_key_values):
-    # (layer_num, prefixlen, bs, head_num, head_dim)*2
+    # (layer_num, prefixlen, bs, head_num/tensor_parallel_degree, head_dim)*2
     keys, values = paddle.transpose(past_key_values, perm=[2, 1, 0, 3, 4]).split(2)
 
     return tuple(zip(keys, values))
 
 
 def llama_postprocess_past_key_value(past_key_values):
-    # (layer_num, bs, prefixlen, head_num, head_dim)*2
+    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)*2
     keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
 
     return tuple(zip(keys, values))
