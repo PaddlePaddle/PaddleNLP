@@ -196,6 +196,19 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _visualdl_available = False
 
+_einops_available = importlib.util.find_spec("einops")
+try:
+    try:
+        import einops
+        import einops.layers.paddle
+
+        einops.layers.paddle
+        logger.debug(f"Successfully imported einops version {einops.__version__}")
+    except ImportError:
+        _einops_available = False
+except importlib_metadata.PackageNotFoundError:
+    _einops_available = False
+
 
 def is_paddle_available():
     return _paddle_available
@@ -263,6 +276,10 @@ def is_omegaconf_available():
 
 def is_tensorboard_available():
     return _tensorboard_available
+
+
+def is_einops_available():
+    return _einops_available
 
 
 # docstyle-ignore
@@ -362,6 +379,12 @@ TENSORBOARD_IMPORT_ERROR = """
 install tensorboard`
 """
 
+# docstyle-ignore
+EINOPS_IMPORT_ERROR = """
+{0} requires the einops[paddle] library but it was not found in your environment. You can update it with pip: `pip
+install -U einops or pip install git+https://github.com/arogozhnikov/einops.git `
+"""
+
 BACKENDS_MAPPING = OrderedDict(
     [
         ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
@@ -377,7 +400,8 @@ BACKENDS_MAPPING = OrderedDict(
         ("k_diffusion", (is_k_diffusion_available, K_DIFFUSION_IMPORT_ERROR)),
         ("wandb", (is_wandb_available, WANDB_IMPORT_ERROR)),
         ("omegaconf", (is_omegaconf_available, OMEGACONF_IMPORT_ERROR)),
-        ("tensorboard", (_tensorboard_available, TENSORBOARD_IMPORT_ERROR)),
+        ("tensorboard", (is_tensorboard_available, TENSORBOARD_IMPORT_ERROR)),
+        ("einops", (is_einops_available, EINOPS_IMPORT_ERROR)),
     ]
 )
 

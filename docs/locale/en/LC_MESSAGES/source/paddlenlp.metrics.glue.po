@@ -84,7 +84,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.glue.AccuracyAndF1.compute:7
 msgid ""
-"The ground truth tensor, and its dtype is is int64, and has a shape of "
+"The ground truth tensor, and its dtype is int64, and has a shape of "
 "[batch_size, 1] or [batch_size, num_classes] in one hot representation."
 msgstr ""
 
@@ -443,7 +443,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.glue.MultiLabelsMetric.compute:7
 msgid ""
-"The ground truth tensor, and its dtype is is int64, and has a shape of "
+"The ground truth tensor, and its dtype is int64, and has a shape of "
 "[batch_size, *] or [batch_size, *, num_labels] in one hot representation."
 msgstr ""
 
