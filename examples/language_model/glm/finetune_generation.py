@@ -119,6 +119,7 @@ def main():
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
