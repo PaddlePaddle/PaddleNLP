@@ -20,10 +20,6 @@ import numpy as np
 import paddle
 
 """
-modified by  lihaoweicv
-pytorch version
-"""
-"""
 M-LSD
 Copyright 2021-present NAVER Corp.
 Apache License v2.0
@@ -161,7 +157,6 @@ def deccode_output_score_and_ptss(tpMap, topk_n=200, ksize=5):
     ).squeeze(0)
     keep = (hmax == heat).astype(dtype="float32")
     heat = heat * keep
-    """Class Method: *.reshape, not convert, please check whether it is torch.Tensor.*/Optimizer.*/nn.Module.*, and convert manually"""
     heat = heat.reshape([-1])
     scores, indices = paddle.topk(x=heat, k=topk_n, axis=-1, largest=True)
     w_t = paddle.to_tensor(w)

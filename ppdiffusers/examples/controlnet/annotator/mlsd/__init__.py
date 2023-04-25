@@ -18,7 +18,6 @@ import cv2
 import numpy as np
 import paddle
 from annotator.util import annotator_ckpts_path
-from einops import rearrange
 
 from .models.mbv2_mlsd_large import MobileV2_MLSD_Large
 from .utils import pred_lines
@@ -34,9 +33,6 @@ class MLSDdetector:
 
             load_file_from_url(remote_model_path, model_dir=annotator_ckpts_path)
         self.model = MobileV2_MLSD_Large()
-        # model.set_state_dict(state_dict=paddle.load(path=model_path),
-        #    strict=True)
-        # param_state_dict = paddle.load('convert_mlsd_large_512_fp32.pdparams')
         self.model.eval()
         self.model.set_dict(paddle.load(model_path))
 
