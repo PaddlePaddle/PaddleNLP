@@ -30,7 +30,8 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
-from ...utils.converter import StateDictNameMapping
+from ...layers import Linear as TransposedLinear
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -152,13 +153,13 @@ class BertPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
-            ["pooler.dense.bias", "pooler.dense.bias"],
+            ["pooler.dense.weight", None, "transpose"],
+            "pooler.dense.bias",
             # for TokenClassification
         ]
         for layer_index in range(config.num_hidden_layers):
@@ -224,6 +225,8 @@ class BertPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
+
         # base-model prefix "BertModel"
         if "BertModel" not in config.architectures:
             for mapping in model_mappings:
@@ -245,7 +248,7 @@ class BertPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -319,7 +322,6 @@ class BertModel(BertPretrainedModel):
             )
             self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = BertPooler(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -506,7 +508,6 @@ class BertForQuestionAnswering(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -638,7 +639,6 @@ class BertForSequenceClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -760,7 +760,6 @@ class BertForTokenClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -863,10 +862,9 @@ class BertLMPredictionHead(Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder.weight.dtype, is_bias=True
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -876,7 +874,7 @@ class BertLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
@@ -979,8 +977,6 @@ class BertForPretraining(BertPretrainedModel):
         super(BertForPretraining, self).__init__(config)
         self.bert = BertModel(config)
         self.cls = BertPretrainingHeads(config)
-
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -1152,7 +1148,6 @@ class BertForMultipleChoice(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1316,8 +1311,6 @@ class BertForMaskedLM(BertPretrainedModel):
         self.bert = BertModel(config)
 
         self.cls = BertOnlyMLMHead(config=config)
-
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):

@@ -713,7 +713,7 @@ def _build_train_valid_test_datasets(
     def build_dataset(index, name):
         # from megatron.data.bert_dataset import BertDataset
         # from megatron.data.t5_dataset import T5Dataset
-        from .ernie_dataset import ErnieDataset
+        # from .ernie_dataset import ErnieDataset
 
         dataset = None
         if splits[index + 1] > splits[index]:
@@ -736,15 +736,17 @@ def _build_train_valid_test_datasets(
                 share_folder=args.share_folder,
                 args=args,
             )
-            # if dataset_type == DSET_TYPE_T5:
-            #     dataset = T5Dataset(
-            #         indexed_dataset=indexed_dataset,
-            #         tokenizer=tokenizer,
-            #         masked_lm_prob=masked_lm_prob,
-            #         max_seq_length_dec=max_seq_length_dec,
-            #         short_seq_prob=short_seq_prob,
-            #         **kwargs,
-            #     )
+            if dataset_type == DSET_TYPE_T5:
+                from t5_dataset import T5Dataset
+
+                dataset = T5Dataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    max_seq_length_dec=max_seq_length_dec,
+                    short_seq_prob=short_seq_prob,
+                    **kwargs,
+                )
             # elif dataset_type == DSET_TYPE_BERT:
             #     dataset = BertDataset(
             #         indexed_dataset=indexed_dataset,
@@ -755,6 +757,8 @@ def _build_train_valid_test_datasets(
             #         **kwargs,
             #     )
             if dataset_type == DSET_TYPE_ERNIE:
+                from .ernie_dataset import ErnieDataset
+
                 dataset = ErnieDataset(
                     indexed_dataset=indexed_dataset,
                     tokenizer=tokenizer,
