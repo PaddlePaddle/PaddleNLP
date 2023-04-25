@@ -43,7 +43,6 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
         self.dropout = nn.Dropout(dropout if dropout is not None else self.electra.config["hidden_dropout_prob"])
         self.classifier_oth = nn.Linear(self.electra.config["hidden_size"], self.num_classes_oth)
         self.classifier_sym = nn.Linear(self.electra.config["hidden_size"], self.num_classes_sym)
-        self.init_weights()
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
@@ -104,7 +103,6 @@ class ElectraForSPO(ElectraPretrainedModel):
         self.dropout = nn.Dropout(dropout if dropout is not None else self.electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"], 2)
         self.span_attention = MultiHeadAttentionForSPO(self.electra.config["hidden_size"], num_classes)
-        self.init_weights()
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         outputs = self.electra(
