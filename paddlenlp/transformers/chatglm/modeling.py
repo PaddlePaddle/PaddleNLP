@@ -690,6 +690,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         use_cache: bool = None,
         return_dict: bool = None,
     ):
+        if input_ids is None:
+            assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
+            assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
+
         if attention_mask is None:
             attention_mask = self.get_masks(input_ids)
 
