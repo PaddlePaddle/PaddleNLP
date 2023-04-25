@@ -13,16 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import shutil
 from functools import lru_cache
 
-import json
 import jieba
-import shutil
 import sentencepiece as spm
 from paddle.utils import try_import
 
-from .. import PretrainedTokenizer, AddedToken
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = [
     "GPTTokenizer",
@@ -137,7 +137,6 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         eol_token="\u2583",
         **kwargs  # The token of newline.
     ):
-
         self._model_file = model_file
         self.eol_token = eol_token
         if not os.path.isfile(model_file):
@@ -246,6 +245,18 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
         """
         return len(self.sp)
+
+    def get_vocab(self):
+        """
+        Returns the vocabulary as a dictionary of token to index.
+
+        `tokenizer.get_vocab()[token]` is equivalent to `tokenizer.convert_tokens_to_ids(token)` when `token` is in the
+        vocab.
+
+        Returns:
+            `Dict[str, int]`: The vocabulary.
+        """
+        return dict({self.sp.IdToPiece(i): i for i in range(self.sp.GetPieceSize())}, **self.added_tokens_encoder)
 
     def convert_ids_to_string(self, ids):
         """
@@ -375,7 +386,6 @@ class GPTTokenizer(PretrainedTokenizer):
         add_bos_token=False,
         **kwargs  # The token of newline.
     ):
-
         pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
         eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
         unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
@@ -487,7 +497,6 @@ class GPTTokenizer(PretrainedTokenizer):
         return self.encoder.get(token, self.encoder.get(self.unk_token))
 
     def _convert_id_to_token(self, index):
-
         return self.decoder[index]
 
     def convert_ids_to_string(self, ids):

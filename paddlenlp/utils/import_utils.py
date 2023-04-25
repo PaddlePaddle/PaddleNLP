@@ -87,6 +87,14 @@ def is_transformers_available() -> bool:
     return is_package_available("transformers")
 
 
+def is_safetensors_available() -> bool:
+    """check if `safetensors` package is installed
+    Returns:
+        bool: if `safetensors` is available
+    """
+    return is_package_available("safetensors")
+
+
 def install_package(
     package_name: str,
     version: Optional[str] = None,

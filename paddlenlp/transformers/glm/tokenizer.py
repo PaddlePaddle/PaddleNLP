@@ -157,7 +157,14 @@ class GLMTokenizerMixin:
         loss_mask = None
         if targets is not None:
             is_batched = isinstance(targets, (list, tuple))
-            targets = self(targets, add_special_tokens=False, padding=False).input_ids
+            targets = self(
+                targets,
+                add_special_tokens=False,
+                padding=False,
+                max_length=max_gen_length - 2,
+                truncation=True,
+                truncation_side="right",
+            ).input_ids
             if not is_batched:
                 targets = [targets]
             assert len(targets) == len(input_ids)

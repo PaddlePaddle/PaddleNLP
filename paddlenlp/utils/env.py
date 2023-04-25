@@ -68,10 +68,19 @@ SUCCESS_STATUS = 0
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
-PYTORCH_WEIGHT_FILE_NAME = "pytorch_model.bin"
-PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
+
 LORA_CONFIG_NAME = "lora_config.json"
+PREFIX_CONFIG_NAME = "prefix_config.json"
 LORA_WEIGHT_FILE_NAME = "lora_model_state.pdparams"
+
+PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
+PADDLE_WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"
+
+PYTORCH_WEIGHT_FILE_NAME = "pytorch_model.bin"
+PYTORCH_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
+
+SAFE_WEIGHT_FILE_NAME = "model.safetensors"
+SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
 
 # for conversion
 ENABLE_TORCH_CHECKPOINT = _get_bool_env("ENABLE_TORCH_CHECKPOINT", "true")

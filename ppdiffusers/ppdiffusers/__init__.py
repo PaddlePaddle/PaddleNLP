@@ -19,6 +19,7 @@ from . import patches
 from .configuration_utils import ConfigMixin
 from .utils import (
     OptionalDependencyNotAvailable,
+    is_einops_available,
     is_fastdeploy_available,
     is_inflect_available,
     is_k_diffusion_available,
@@ -88,6 +89,7 @@ else:
         PNDMPipeline,
         RePaintPipeline,
         ScoreSdeVePipeline,
+        TextPipelineOutput,
     )
     from .schedulers import (
         DDIMInverseScheduler,
@@ -96,6 +98,7 @@ else:
         DEISMultistepScheduler,
         DPMSolverMultistepScheduler,
         DPMSolverSinglestepScheduler,
+        DPMSolverUniDiffuserScheduler,
         EulerAncestralDiscreteScheduler,
         EulerDiscreteScheduler,
         HeunDiscreteScheduler,
@@ -161,6 +164,7 @@ else:
         TextToVideoSDPipeline,
         UnCLIPImageVariationPipeline,
         UnCLIPPipeline,
+        UniDiffuserPipeline,
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
         VersatileDiffusionPipeline,
@@ -168,6 +172,7 @@ else:
         VQDiffusionPipeline,
     )
     from .pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
+    from .pipelines.unidiffuser.caption_decoder import CaptionDecoder
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
@@ -200,3 +205,19 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_librosa_objects import *  # noqa F403
 else:
     from .pipelines import AudioDiffusionPipeline, Mel
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
+else:
+    from .pipelines import UniDiffuserPipeline
+
+try:
+    if not (is_paddle_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_einops_objects import *  # noqa F403
+else:
+    from .models import UViTModel

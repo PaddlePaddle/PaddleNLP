@@ -39,7 +39,7 @@
     
     像上例中的自定义数据集需要在自定义的convert to feature方法中添加label转id的功能。
 
-    自定义数据读取function中的参数可以直接以关键字参数的的方式传入 :func:`load_dataset` 中。而且对于自定义数据集，:attr:`lazy` 参数是 **必须** 传入的。
+    自定义数据读取function中的参数可以直接以关键字参数的方式传入 :func:`load_dataset` 中。而且对于自定义数据集，:attr:`lazy` 参数是 **必须** 传入的。
 
 从 :class:`paddle.io.Dataset/IterableDataset` 创建数据集 
 -------------------
