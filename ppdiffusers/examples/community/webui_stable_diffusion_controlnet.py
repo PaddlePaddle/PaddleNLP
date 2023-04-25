@@ -91,7 +91,7 @@ def http_file_name(
         max_retries=max_retries,
     )
     hf_raise_for_status(r)
-    displayed_name = url
+    displayed_name = url.split("/")[-1]
     content_disposition = r.headers.get("Content-Disposition")
     if content_disposition is not None and "filename=" in content_disposition:
         # Means file is on CDN
