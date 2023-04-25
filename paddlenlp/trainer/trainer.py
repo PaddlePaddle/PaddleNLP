@@ -1457,6 +1457,8 @@ class Trainer:
         """
         inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
 
+        # hack _prepare_training, remove additional optimizer or scheduler check
+        # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
         def _prepare_training(self, data):
             from paddle import framework
 
@@ -1567,7 +1569,7 @@ class Trainer:
         os.makedirs(output_dir, exist_ok=True)
 
         if self.args.world_size > 1:
-            # use global process_index to saev
+            # use global process_index to save
             process_index = self.args.process_index
             paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
