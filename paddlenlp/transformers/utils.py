@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import importlib
 import inspect
 import os
 import warnings
@@ -43,14 +42,14 @@ from requests.exceptions import HTTPError
 from tqdm import tqdm
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
-from paddlenlp.utils.import_utils import import_module
+from paddlenlp.utils.import_utils import import_module, is_safetensors_available
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.serialization import load_torch
 
-WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"
-PT_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
-SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
-SAFE_WEIGHTS_NAME = "model.safetensors"
-WEIGHTS_NAME = "model_state.pdparams"
+if is_safetensors_available():
+
+    from safetensors import safe_open
+    from safetensors.paddle import load_file as safe_load_file
 
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
@@ -445,10 +444,6 @@ def get_checkpoint_shard_files(
     return cached_filenames, sharded_metadata
 
 
-def is_safetensors_available():
-    return importlib.util.find_spec("safetensors") is not None
-
-
 @contextlib.contextmanager
 def device_guard(device="cpu", dev_id=0):
     origin_device = paddle.device.get_device()
@@ -500,9 +495,6 @@ def get_state_dict_dtype(state_dict: dict[str, Union[paddle.Tensor, np.ndarray]]
     """
     Returns the first found floating dtype in `state_dict` if there is one, otherwise returns the first dtype.
     """
-    import pdb
-
-    pdb.set_trace()
     first_key = next(iter(state_dict))
     dtype = state_dict[first_key].dtype
     if isinstance(dtype, paddle.dtype):
@@ -510,6 +502,37 @@ def get_state_dict_dtype(state_dict: dict[str, Union[paddle.Tensor, np.ndarray]]
     name = dtype.name
     name = "bfloat16" if name == "uint16" else name
     return name
+
+
+def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
+    """
+    Reads a PyTorch checkpoint file, returning properly formatted errors if they arise.
+    """
+    if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
+        # Check format of the archive
+        with safe_open(checkpoint_file, framework="pt") as f:
+            metadata = f.metadata()
+        if metadata.get("format") not in ["pt", "pd", "np"]:
+            raise OSError(
+                f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
+                "you save your model with the `save_pretrained` method."
+            )
+        elif metadata["format"] != "pd":
+            raise NotImplementedError(
+                f"Conversion from a {metadata['format']} safetensors archive to PaddlePaddle is not implemented yet."
+            )
+        return safe_load_file(checkpoint_file)
+
+    # if the checkpoint file is pytorch file, then
+    if checkpoint_file.endswith(".bin"):
+        return load_torch(checkpoint_file)
+
+    if checkpoint_file.endswith(".pdparams"):
+        return paddlenlp_load(checkpoint_file, "cpu")
+
+    raise EnvironmentError(
+        f"unspported checkpoint file<{checkpoint_file}>, the type of it should be one of [`safetensor`, `pytroch`, `paddle`]"
+    )
 
 
 class ContextManagers:

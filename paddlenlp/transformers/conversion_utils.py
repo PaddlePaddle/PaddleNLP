@@ -43,6 +43,7 @@ from paddlenlp.utils.env import (
     CONFIG_NAME,
     PADDLE_WEIGHT_FILE_NAME,
     PYTORCH_WEIGHT_FILE_NAME,
+    SAFE_WEIGHT_FILE_NAME,
 )
 from paddlenlp.utils.import_utils import (
     is_package_available,
@@ -50,7 +51,8 @@ from paddlenlp.utils.import_utils import (
     is_transformers_available,
 )
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.serialization import load_torch
+
+from .utils import load_state_dict
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
@@ -887,17 +889,17 @@ class ConversionMixin:
         return cls._get_name_mappings(config)
 
     @classmethod
-    def convert(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+    def convert_state_dict(
+        cls, state_dict: dict[str, Union[paddle.Tensors, np.ndarray]], config: PretrainedConfig, cache_dir: str
+    ) -> None:
         """the entry of converting config and converting model file
 
         Args:
-            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            state_dict (dict[str, Union[paddle.Tensors, np.ndarray]]): the state dict of weight
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls.get_name_mappings(config)
-
-        state_dict = load_torch(weight_file)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())
@@ -915,7 +917,30 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)
+    @classmethod
+    def convert(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+        """the entry of converting config and converting model file
+
+        Args:
+            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            config (PretrainedConfig): the PretrainedConfig instance of model
+        """
+        state_dict = load_state_dict(weight_file)
+
+        cls.convert_state_dict(state_dict, config, cache_dir=cache_dir)
+
+        file_name = PADDLE_WEIGHT_FILE_NAME
+        # 1. if it's single weight file
+        if not weight_file.endswith(".pdparams"):
+            file_name = os.path.basename(weight_file)
+            if weight_file.endswith("bin") and not weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
+                file_name = file_name.replace(".bin", ".pdparams")
+            elif weight_file.endswith(".safetensors") and not weight_file.endswith(SAFE_WEIGHT_FILE_NAME):
+                file_name = file_name.replace(".safetensors", ".pdparams")
+            else:
+                file_name = PADDLE_WEIGHT_FILE_NAME
+
+        model_weight_file = os.path.join(cache_dir, file_name)
         paddle.save(state_dict, model_weight_file)
         return state_dict
 
@@ -1088,7 +1113,7 @@ class Converter(ConversionMixin, LogitComparer):
         with open(config_file, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        state_dict = load_torch(weight_file)
+        state_dict = load_state_dict(weight_file)
 
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = self.get_name_mapping(config)

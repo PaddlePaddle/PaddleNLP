@@ -21,12 +21,12 @@ import paddle
 
 from paddlenlp.transformers import BertModel
 from paddlenlp.transformers.model_utils import shard_checkpoint
-from paddlenlp.transformers.utils import (
+from paddlenlp.utils.env import (
+    PADDLE_WEIGHT_FILE_NAME,
+    PADDLE_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHT_FILE_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
-    SAFE_WEIGHTS_NAME,
-    WEIGHTS_INDEX_NAME,
 )
-from paddlenlp.utils.env import PADDLE_WEIGHT_FILE_NAME
 from tests.testing_utils import require_package
 
 
@@ -111,7 +111,7 @@ class TestCkptShard(unittest.TestCase):
                         shard_file = os.path.join(tmp_dir, shard)
                         shard_to_size[shard_file] = os.path.getsize(shard_file)
 
-                index_file = os.path.join(tmp_dir, WEIGHTS_INDEX_NAME)
+                index_file = os.path.join(tmp_dir, PADDLE_WEIGHTS_INDEX_NAME)
                 # Check there is an index but no regular weight file
                 self.assertTrue(os.path.isfile(index_file))
                 self.assertFalse(os.path.isfile(os.path.join(tmp_dir, PADDLE_WEIGHT_FILE_NAME)))
@@ -176,10 +176,10 @@ class TestCkptShard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", max_shard_size="50kB")
 
-            weights_index_name = ".".join(WEIGHTS_INDEX_NAME.split(".")[:-1] + ["v2"] + ["json"])
+            weights_index_name = ".".join(PADDLE_WEIGHTS_INDEX_NAME.split(".")[:-1] + ["v2"] + ["json"])
             weights_index_file = os.path.join(tmp_dir, weights_index_name)
             self.assertTrue(os.path.isfile(weights_index_file))
-            self.assertFalse(os.path.isfile(os.path.join(tmp_dir, WEIGHTS_INDEX_NAME)))
+            self.assertFalse(os.path.isfile(os.path.join(tmp_dir, PADDLE_WEIGHTS_INDEX_NAME)))
 
             for i in range(1, 6):
                 weights_name = ".".join(
@@ -203,11 +203,11 @@ class TestCkptShard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", safe_serialization=True)
 
-            weights_name = ".".join(SAFE_WEIGHTS_NAME.split(".")[:-1] + ["v2"] + ["safetensors"])
+            weights_name = ".".join(SAFE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["safetensors"])
 
             weights_file = os.path.join(tmp_dir, weights_name)
             self.assertTrue(os.path.isfile(weights_file))
-            self.assertFalse(os.path.isfile(os.path.join(tmp_dir, SAFE_WEIGHTS_NAME)))
+            self.assertFalse(os.path.isfile(os.path.join(tmp_dir, SAFE_WEIGHT_FILE_NAME)))
 
             with self.assertRaises(EnvironmentError):
                 _ = BertModel.from_pretrained(tmp_dir)
@@ -230,7 +230,9 @@ class TestCkptShard(unittest.TestCase):
             self.assertFalse(os.path.isfile(os.path.join(tmp_dir, SAFE_WEIGHTS_INDEX_NAME)))
 
             for i in range(1, 6):
-                weights_name = ".".join(SAFE_WEIGHTS_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00006"] + ["safetensors"])
+                weights_name = ".".join(
+                    SAFE_WEIGHT_FILE_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00006"] + ["safetensors"]
+                )
                 weights_name_file = os.path.join(tmp_dir, weights_name)
                 self.assertTrue(os.path.isfile(weights_name_file))
 
@@ -258,10 +260,13 @@ class TestCkptShard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaises(EnvironmentError):
                 _ = BertModel.from_pretrained(
-                    "hf-internal-testing/tiny-random-bert-variant-sharded", cache_dir=tmp_dir
+                    "hf-internal-testing/tiny-random-bert-variant-sharded", cache_dir=tmp_dir, from_hf_hub=True
                 )
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant-sharded", cache_dir=tmp_dir, variant="v2"
+                "hf-internal-testing/tiny-random-bert-variant-sharded",
+                cache_dir=tmp_dir,
+                variant="v2",
+                from_hf_hub=True,
             )
         self.assertIsNotNone(model)
 
@@ -269,9 +274,15 @@ class TestCkptShard(unittest.TestCase):
     def test_checkpoint_variant_hub_safe(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaises(EnvironmentError):
-                _ = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert-variant-safe", cache_dir=tmp_dir)
+                _ = BertModel.from_pretrained(
+                    "hf-internal-testing/tiny-random-bert-variant-safe", from_hf_hub=True, cache_dir=tmp_dir
+                )
+
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant-safe", cache_dir=tmp_dir, variant="v2"
+                "hf-internal-testing/tiny-random-bert-variant-safe",
+                cache_dir=tmp_dir,
+                variant="v2",
+                from_hf_hub=True,
             )
         self.assertIsNotNone(model)
 
