@@ -617,6 +617,7 @@ class LoRAModel(nn.Layer):
     def from_pretrained(cls, model, lora_path):
         # init lora config & lora model
         lora_config = LoRAConfig.from_pretrained(lora_path)
+        # define a new variable to conserve original lora_config.tensor_parallel_degree value which will update while initializing lora model
         lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
         lora_model = cls(model, lora_config)
 
