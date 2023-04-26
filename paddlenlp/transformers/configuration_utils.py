@@ -511,7 +511,7 @@ class PretrainedConfig:
         )  # Whether input and output word embeddings should be tied for all MLM, LM and Seq2Seq models.
 
         # Parameters for tensor parallel
-        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
         self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.

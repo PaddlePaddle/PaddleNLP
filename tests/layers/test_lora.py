@@ -150,7 +150,7 @@ class TestLoraModel(unittest.TestCase):
         self.assertIsNotNone(original_results_1)
         self.assertIsNotNone(original_results_2)
         self.assertIsInstance(restored_model, BertModel)
-        for i, j in zip(original_results_1, original_results_2):
+        for i, j in zip(original_results_1[0], original_results_2[0]):
             self.assertTrue(paddle.allclose(i, j))
 
     @parameterized.expand([(None,), ("all",), ("lora",)])
@@ -189,7 +189,7 @@ class TestLoraModel(unittest.TestCase):
         lora_model.eval()
         eval_forward_results = lora_model(input_ids)
         self.assertIsNotNone(eval_forward_results)
-        for i, j in zip(train_forward_results, eval_forward_results):
+        for i, j in zip(train_forward_results[0], eval_forward_results[0]):
             self.assertTrue(paddle.allclose(i, j))
 
     @parameterized.expand([(None,), ("all",), ("lora",)])
@@ -213,7 +213,7 @@ class TestLoraModel(unittest.TestCase):
             loaded_lora_model = LoRAModel.from_pretrained(new_model, tempdir)
             loaded_lora_model.eval()
             loaded_results = loaded_lora_model(input_ids)
-            for i, j in zip(original_results, loaded_results):
+            for i, j in zip(original_results[0], loaded_results[0]):
                 self.assertTrue(paddle.allclose(i, j))
 
 
