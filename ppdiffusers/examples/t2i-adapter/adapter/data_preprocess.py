@@ -52,26 +52,6 @@ def vic_watermark(score_json, height, width):
 def process_data(line, filename, data_format):
     try:
         data = line.strip().split("\t")
-        # canny
-        # if data_format == "img2img":
-        #     text_id = data[0]
-        #     text_json = json.loads(data[2])
-        #     image_num = int(data[3]) # 2
-        #     image_b64str = data[4 + image_num] # data[6]
-        #     control_image_b64str = data[4 + image_num + 1] # data[7]
-        #     resolution = data[4 + image_num + image_num] # data[8]
-        #     control_resolution = data[4 + image_num + image_num + 1] # data[9]
-        #     score_json = {} # TO ADD.
-        # else:
-        #     text_id = data[0]
-        #     text_json = json.loads(data[2])
-        #     image_b64str = data[5]
-        #     score_json = json.loads(data[6])
-        #     resolution = data[7]
-        #     control_image_b64str = None
-
-        # openpose
-        data = line.strip().split("\t")
         if data_format == "img2img":
             text_id = data[0]
             text_json = json.loads(data[2])
@@ -82,13 +62,11 @@ def process_data(line, filename, data_format):
                 score_str = ""
                 score_json = {}
                 resolution = data[4 + image_num + image_num]  # data[8]
-                # control_resolution = data[4 + image_num + image_num + 1]  # data[9]
             elif len(data) == 11:
                 score_json_idx = 4 + image_num + image_num  # 8
                 score_str = data[score_json_idx]
                 score_json = json.loads(score_str)
                 resolution = data[score_json_idx + 1]  # data[9]
-                # control_resolution = data[score_json_idx + 2]  # data[10]
             else:
                 assert False, "invalid img2img data"
         else:
@@ -113,7 +91,6 @@ def process_data(line, filename, data_format):
             width, height = tmp.size[0], tmp.size[1]
         min_resolution = min(height, width)
         max_resolution = max(height, width)
-        # vic_watermark_info = vic_watermark(score_json, height, width)
 
         # laion5B精选 laion-aes-v2
         if "laion_aes" in text_id:
@@ -133,15 +110,6 @@ def process_data(line, filename, data_format):
                 return None
 
             caption = ""
-            # if "caption_zh" in text_json:
-            #     # 如果翻译成功，则用翻译数据
-            #     if text_json["caption_zh"] != text_json["caption_en"]:
-            #         caption += text_json["caption_zh"].strip("\"")
-            #     # 否则用图生文
-            #     elif 'blip_caption_zh' in text_json:
-            #         caption += text_json['blip_caption_zh']
-            #     else:
-            #         caption += text_json['caption_zh'].strip("\"")
             caption += text_json.get("caption_en", text_json.get("blip_caption_en", ""))
             if caption != "":
                 image_base64 = image_b64str
