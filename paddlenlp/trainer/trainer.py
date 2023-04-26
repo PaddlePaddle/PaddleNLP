@@ -1267,8 +1267,8 @@ class Trainer:
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
                 assert (
-                    ShardingOption.SHARD_GRAD_OP in self.args.sharding
-                ), "Only support tensor parallel + sharding stage2 hybrid parallel now."
+                    ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.SHARD_OP in self.args.sharding
+                ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
                 model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
 
             if ShardingOption.SHARD_OP in self.args.sharding:

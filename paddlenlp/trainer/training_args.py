@@ -448,8 +448,9 @@ class TrainingArguments:
             "help": (
                 "Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it."
                 "following config is support:\n"
-                "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape."
-                "disable_partial_send_recv, partial_send_recv optmize for send speed."
+                "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
+                "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -690,7 +691,11 @@ class TrainingArguments:
                     pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
-                            if x not in ["disable_p2p_cache_shape", "disable_partial_send_recv"]:
+                            if x not in [
+                                "disable_p2p_cache_shape",
+                                "disable_partial_send_recv",
+                                "enable_delay_scale_loss",
+                            ]:
                                 raise ValueError(
                                     f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
@@ -708,6 +713,10 @@ class TrainingArguments:
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
+                    dygraph_pp_configs = {
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False
+                    }
+
                     if self.do_eval:
                         assert self.per_device_train_batch_size == self.per_device_eval_batch_size, (
                             "In pipeline model, the evaluation also shares same setting with training. "
@@ -722,9 +731,7 @@ class TrainingArguments:
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
-                    "pp_configs": {
-                        "delay_scale_loss": True,
-                    },
+                    "pp_configs": dygraph_pp_configs if pipeline_parallel_degree > 1 else {},
                 }
 
                 fleet.init(is_collective=True, strategy=strategy)
