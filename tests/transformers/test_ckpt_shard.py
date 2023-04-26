@@ -141,17 +141,16 @@ class TestCkptShard(unittest.TestCase):
                 for p1, p2 in zip(model.parameters(), new_model.parameters()):
                     self.assertTrue(paddle.allclose(p1, p2))
 
-    @unittest.skip("to enable from_hf_hub for shard file later")
     def test_checkpoint_sharding_from_hub(self):
-        # TODO(wj-Mcat): laod shard wiehgt files from hf hub later
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert-sharded", from_hf_hub=True)
+        model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert-sharded")
+
         # the model above is the same as the model below, just a sharded version.
-        ref_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        ref_model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert-no-sharded")
         for p1, p2 in zip(model.parameters(), ref_model.parameters()):
             self.assertTrue(paddle.allclose(p1, p2))
 
     def test_checkpoint_variant_local(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert", from_hf_hub=True)
+        model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2")
@@ -171,7 +170,7 @@ class TestCkptShard(unittest.TestCase):
             self.assertTrue(paddle.allclose(p1, p2))
 
     def test_checkpoint_variant_local_sharded(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert", from_hf_hub=True)
+        model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", max_shard_size="50kB")
@@ -198,7 +197,7 @@ class TestCkptShard(unittest.TestCase):
 
     @require_package("safetensors")
     def test_checkpoint_variant_local_safe(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", safe_serialization=True)
@@ -219,7 +218,7 @@ class TestCkptShard(unittest.TestCase):
 
     @require_package("safetensors")
     def test_checkpoint_variant_local_sharded_safe(self):
-        model = BertModel.from_pretrained("hf-internal-testing/tiny-random-bert")
+        model = BertModel.from_pretrained("__internal_testing__/tiny-random-bert")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, variant="v2", max_shard_size="50kB", safe_serialization=True)
@@ -231,7 +230,7 @@ class TestCkptShard(unittest.TestCase):
 
             for i in range(1, 6):
                 weights_name = ".".join(
-                    SAFE_WEIGHT_FILE_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00006"] + ["safetensors"]
+                    SAFE_WEIGHT_FILE_NAME.split(".")[:-1] + [f"v2-0000{i}-of-00005"] + ["safetensors"]
                 )
                 weights_name_file = os.path.join(tmp_dir, weights_name)
                 self.assertTrue(os.path.isfile(weights_name_file))
@@ -247,12 +246,10 @@ class TestCkptShard(unittest.TestCase):
     def test_checkpoint_variant_hub(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaises(EnvironmentError):
-                _ = BertModel.from_pretrained(
-                    "hf-internal-testing/tiny-random-bert-variant", from_hf_hub=True, cache_dir=tmp_dir
-                )
+                _ = BertModel.from_pretrained("__internal_testing__/tiny-random-bert-variant", cache_dir=tmp_dir)
 
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2", from_hf_hub=True
+                "__internal_testing__/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2"
             )
         self.assertIsNotNone(model)
 
@@ -260,48 +257,17 @@ class TestCkptShard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaises(EnvironmentError):
                 _ = BertModel.from_pretrained(
-                    "hf-internal-testing/tiny-random-bert-variant-sharded", cache_dir=tmp_dir, from_hf_hub=True
+                    "__internal_testing__/tiny-random-bert-variant-sharded", cache_dir=tmp_dir
                 )
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant-sharded",
-                cache_dir=tmp_dir,
-                variant="v2",
-                from_hf_hub=True,
-            )
-        self.assertIsNotNone(model)
-
-    @require_package("safetensors")
-    def test_checkpoint_variant_hub_safe(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            with self.assertRaises(EnvironmentError):
-                _ = BertModel.from_pretrained(
-                    "hf-internal-testing/tiny-random-bert-variant-safe", from_hf_hub=True, cache_dir=tmp_dir
-                )
-
-            model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant-safe",
-                cache_dir=tmp_dir,
-                variant="v2",
-                from_hf_hub=True,
-            )
-        self.assertIsNotNone(model)
-
-    @require_package("safetensors")
-    def test_checkpoint_variant_hub_sharded_safe(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            with self.assertRaises(EnvironmentError):
-                _ = BertModel.from_pretrained(
-                    "hf-internal-testing/tiny-random-bert-variant-sharded-safe", cache_dir=tmp_dir
-                )
-            model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant-sharded-safe", cache_dir=tmp_dir, variant="v2"
+                "__internal_testing__/tiny-random-bert-variant-sharded", cache_dir=tmp_dir, variant="v2"
             )
         self.assertIsNotNone(model)
 
     def test_checkpoint_variant_save_load(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             model = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2"
+                "__internal_testing__/tiny-random-bert-variant", cache_dir=tmp_dir, variant="v2"
             )
             weights_name = ".".join(PADDLE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["pdparams"])
 

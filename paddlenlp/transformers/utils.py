@@ -52,6 +52,54 @@ if is_safetensors_available():
     from safetensors.paddle import load_file as safe_load_file
 
 
+def map_numpy_dtype(dtype: np.dtype) -> paddle.dtype:
+    """map the numpy dtype to paddle dtype, eg: np.float32 -> paddle.float32
+
+    Args:
+        dtype (np.dtype): the dtype of numpy
+
+    Returns:
+        paddle.dtype: the dtype of paddle tensor
+    """
+    if not isinstance(dtype, np.dtype):
+        raise ValueError(f"the dtype should be numpy.dtype, but get {type(dtype)}")
+
+    mappings = {
+        # floating point
+        "float64": paddle.float64,
+        "float32": paddle.float32,
+        "float16": paddle.float16,
+        "uint16": paddle.bfloat16,
+        # int point
+        "int64": paddle.int64,
+        "int32": paddle.int32,
+        "int16": paddle.int16,
+    }
+
+    if dtype.name not in mappings:
+        raise ValueError(f"dtype must be in list of dict types<{','.join(list(mappings.keys()))}>, but got {dtype}")
+
+    return mappings[dtype.name]
+
+
+def get_tensor_dtype(tensor: Union[paddle.Tensor, np.ndarray], return_string: bool = True) -> Union[str, paddle.dtype]:
+    """get the dtype of
+
+    Args:
+        tensor (dict[str, Union[paddle.Tensor, np.ndarray]]): get the dtype
+        return_string (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        Union[str, paddle.dtype]: the target dtpe object
+    """
+    if paddle.is_tensor(tensor):
+        dtype = tensor.dtype
+    else:
+        assert isinstance(tensor, np.ndarray), f"tensor must be paddle tensor or numpy ndarray, got {type(tensor)}!"
+        dtype = map_numpy_dtype(tensor.dtype)
+    return dtype
+
+
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
@@ -457,15 +505,14 @@ def device_guard(device="cpu", dev_id=0):
         paddle.set_device(origin_device)
 
 
-def paddlenlp_load(path: str, map_location: str = "cpu") -> dict[str, paddle.Tensor]:
-    """load weight as state dict as tensor to the target device
+def check_map_location(map_location: str) -> tuple[str, int]:
+    """check whether the map_location is valid
 
     Args:
-        path (str): the path of weight file
-        map_location(str): the location of target weight file
+        location (str): the location of device
 
     Returns:
-        Dict[str, paddle.Tensor]: the state dict from weight file
+        tuple[str, int]: [device name, device_id]
     """
     dev_id = 0
     if map_location.startswith("gpu"):
@@ -481,7 +528,20 @@ def paddlenlp_load(path: str, map_location: str = "cpu") -> dict[str, paddle.Ten
         "npu",
         "numpy",
     ], "the value of map_location should be one of [`cpu`, `gpu`, `gpu:id`, `xpu`, `npu`, `numpy`]"
+    return map_location, dev_id
 
+
+def paddlenlp_load(path: str, map_location: str = "cpu") -> dict[str, paddle.Tensor]:
+    """load weight as state dict as tensor to the target device
+
+    Args:
+        path (str): the path of weight file
+        map_location(str): the location of target weight file
+
+    Returns:
+        Dict[str, paddle.Tensor]: the state dict from weight file
+    """
+    map_location, dev_id = check_map_location(map_location)
     with device_guard(map_location, dev_id=dev_id):
         state_dict = paddle.load(path)
     return state_dict
@@ -504,19 +564,34 @@ def get_state_dict_dtype(state_dict: dict[str, Union[paddle.Tensor, np.ndarray]]
     return name
 
 
-def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
-    """
-    Reads a PyTorch checkpoint file, returning properly formatted errors if they arise.
+def load_state_dict(
+    checkpoint_file: Union[str, os.PathLike], map_location: str = "cpu"
+) -> dict[str, Union[np.ndarray, paddle.Tensor]]:
+    """load paddle/pytorch/safetensor weight file as numpy/cpu/gpu or other device
+
+        when map_location is 'numpy', the loaded state dict value is np.ndarray
+        when map_location is 'cpu', the loaded state dict value is np.ndarray
+
+    Args:
+        checkpoint_file (Union[str, os.PathLike]): the path of weight file
+        map_location (str, optional): the target device location of state dict. Defaults to "gpu".
+
+    Returns:
+        dict[str, Union[np.ndarray, paddle.Tensor]]: the state dict of weight file
     """
     if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
         # Check format of the archive
         with safe_open(checkpoint_file, framework="pt") as f:
             metadata = f.metadata()
-        if metadata.get("format") not in ["pt", "pd", "np"]:
+
+        # safetensor support load pytorch/paddle/numpy state_dict
+        if metadata.get("format", None) not in ["pt", "pd", "np"]:
             raise OSError(
                 f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
                 "you save your model with the `save_pretrained` method."
             )
+
+        # TODO(wj-Mcat): current it only support load paddle safetensor
         elif metadata["format"] != "pd":
             raise NotImplementedError(
                 f"Conversion from a {metadata['format']} safetensors archive to PaddlePaddle is not implemented yet."
@@ -525,10 +600,18 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
 
     # if the checkpoint file is pytorch file, then
     if checkpoint_file.endswith(".bin"):
-        return load_torch(checkpoint_file)
+        state_dict = load_torch(checkpoint_file)
+        if map_location != "numpy":
+            device, device_id = check_map_location(map_location)
 
-    if checkpoint_file.endswith(".pdparams"):
-        return paddlenlp_load(checkpoint_file, "cpu")
+            with device_guard(device, device_id):
+                for key in state_dict.keys():
+                    state_dict[key] = paddle.to_tensor(state_dict[key], get_tensor_dtype(state_dict[key]))
+
+        return state_dict
+
+    elif checkpoint_file.endswith(".pdparams"):
+        return paddlenlp_load(checkpoint_file, map_location)
 
     raise EnvironmentError(
         f"unspported checkpoint file<{checkpoint_file}>, the type of it should be one of [`safetensor`, `pytroch`, `paddle`]"

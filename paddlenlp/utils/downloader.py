@@ -251,6 +251,12 @@ def _decompress(fname):
     # successed, move decompress files to fpath and delete
     # fpath_tmp and remove download compress file.
 
+    # disable pytorch_model.bin file decompress
+    filename = os.path.basename(fname)
+    # support: pytorch_model-00001.bin, pytorch_model.bin
+    if "pytorch_model" in filename and filename.endswith(".bin"):
+        return fname
+
     if tarfile.is_tarfile(fname):
         uncompressed_path = _uncompress_file_tar(fname)
     elif zipfile.is_zipfile(fname):

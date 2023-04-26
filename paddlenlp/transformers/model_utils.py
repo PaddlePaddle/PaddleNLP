@@ -34,6 +34,7 @@ from huggingface_hub import (
     get_hf_file_metadata,
     hf_hub_download,
     hf_hub_url,
+    list_repo_files,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
@@ -50,7 +51,6 @@ from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     download_check,
     get_path_from_url_with_filelock,
-    hf_file_exists,
     url_file_exists,
 )
 from paddlenlp.utils.env import (
@@ -373,25 +373,31 @@ def resolve_weight_file_from_hf_hub(
         variant (str, optional) the variant of target file
     """
     sharded_metadata, is_sharded = {}, False
-    # check paddle related files
-    if hf_file_exists(repo_id, _add_variant(PADDLE_WEIGHT_FILE_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(PADDLE_WEIGHT_FILE_NAME, variant=variant)
-    elif hf_file_exists(repo_id, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(PADDLE_WEIGHT_FILE_NAME, variant=variant)
-        is_sharded = True
+    # use one-request to check all different files
+    files = list_repo_files(repo_id)
 
-    # check safetensor weight related files
-    elif hf_file_exists(repo_id, _add_variant(SAFE_WEIGHT_FILE_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(SAFE_WEIGHT_FILE_NAME, variant=variant)
-    elif hf_file_exists(repo_id, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant=variant)
+    def hf_file_path(file_name: str) -> str:
+        return os.path.join(subfolder, _add_variant(file_name, variant))
+
+    # check paddle related files
+    if hf_file_path(PADDLE_WEIGHT_FILE_NAME) in files:
+        resolved_archive_file = hf_file_path(PADDLE_WEIGHT_FILE_NAME)
+    elif hf_file_path(PADDLE_WEIGHTS_INDEX_NAME) in files:
+        resolved_archive_file = hf_file_path(PADDLE_WEIGHTS_INDEX_NAME)
         is_sharded = True
 
     # check pytorch weight related files
-    elif hf_file_exists(repo_id, _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(PYTORCH_WEIGHT_FILE_NAME, variant=variant)
-    elif hf_file_exists(repo_id, _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant=variant), subfolder=subfolder):
-        file_name = _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant=variant)
+    elif hf_file_path(PYTORCH_WEIGHT_FILE_NAME) in files:
+        resolved_archive_file = hf_file_path(PYTORCH_WEIGHT_FILE_NAME)
+    elif hf_file_path(PYTORCH_WEIGHTS_INDEX_NAME) in files:
+        resolved_archive_file = hf_file_path(PYTORCH_WEIGHTS_INDEX_NAME)
+        is_sharded = True
+
+    # check safetensor weight related files
+    elif hf_file_path(SAFE_WEIGHT_FILE_NAME) in files:
+        resolved_archive_file = hf_file_path(SAFE_WEIGHT_FILE_NAME)
+    elif hf_file_path(SAFE_WEIGHTS_INDEX_NAME) in files:
+        resolved_archive_file = hf_file_path(SAFE_WEIGHTS_INDEX_NAME)
         is_sharded = True
 
     else:
@@ -399,10 +405,11 @@ def resolve_weight_file_from_hf_hub(
             f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
         )
 
-    download_check(repo_id, file_name, addition="from_hf_hub")
+    download_check(repo_id, resolved_archive_file, addition="from_hf_hub")
     resolved_archive_file = hf_hub_download(
         repo_id=repo_id,
-        filename=file_name,
+        # resolved_archive_file may contains the subfolder value
+        filename=os.path.basename(resolved_archive_file),
         cache_dir=cache_dir,
         subfolder=subfolder,
         library_name="PaddleNLP",
@@ -416,8 +423,22 @@ def resolve_weight_file_from_hf_hub(
         sharded_metadata = index["metadata"]
         sharded_metadata["all_checkpoint_keys"] = list(index["weight_map"].keys())
         sharded_metadata["weight_map"] = index["weight_map"].copy()
-        resolved_archive_file = list(set(list(index["weight_map"].values())))
-        resolved_archive_file.sort()
+        files = list(set(list(index["weight_map"].values())))
+        files.sort()
+
+        resolved_archive_file = []
+        # download sharded files
+        for file in tqdm(files, desc="Downloading Sharded Model File", unit="shard"):
+            file_path = hf_hub_download(
+                repo_id=repo_id,
+                # resolved_archive_file may contains the subfolder value
+                filename=os.path.basename(file),
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PaddleNLP",
+                library_version=__version__,
+            )
+            resolved_archive_file.append(file_path)
 
     return resolved_archive_file, sharded_metadata, is_sharded
 
@@ -1761,10 +1782,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
             mismatched_keys, error_msgs = [], []
+
             for shard_file in resolved_archive_file:
+
                 state_dict = load_state_dict(shard_file)
 
-                # if it's not paddle tensor, should convert it to paddle
+                # TODO(wj-Mcat): support auto-converter for sharded checkpoints
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
@@ -1975,7 +1998,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                     state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
                 else:
-                    state_dict = paddlenlp_load(resolved_archive_file, "numpy" if load_state_as_np else "cpu")
+                    state_dict = load_state_dict(
+                        resolved_archive_file, map_location="numpy" if load_state_as_np else "cpu"
+                    )
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
