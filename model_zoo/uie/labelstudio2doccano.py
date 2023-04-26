@@ -41,9 +41,7 @@ def append_attrs(data, item, label_id, relation_id, default_relation_type):
                     "id": relation_id,
                     "from_id": mapp[anno["from_id"]],
                     "to_id": mapp[anno["to_id"]],
-                    "type": anno["labels"][0]
-                    if len(anno["labels"])
-                    else default_relation_type,
+                    "type": anno["labels"][0] if len(anno["labels"]) else default_relation_type,
                 }
             )
 
