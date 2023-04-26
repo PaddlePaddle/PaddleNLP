@@ -248,7 +248,7 @@ class LoRAMergedLinear(nn.Linear):
                 ),
             )
             self.lora_B = self.create_parameter(
-                shape=[out_features // len(enable_lora) * sum(enable_lora), r],
+                shape=[r, out_features // len(enable_lora) * sum(enable_lora)],
                 dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
@@ -278,7 +278,7 @@ class LoRAMergedLinear(nn.Linear):
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.unsqueeze(-1),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
@@ -296,7 +296,7 @@ class LoRAMergedLinear(nn.Linear):
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.unsqueeze(-1),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
@@ -313,14 +313,20 @@ class LoRAMergedLinear(nn.Linear):
             if len(input_a.shape) == 2:
                 delta = (
                     F.conv1d(
-                        input_a.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                        input_a.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .transpose([1, 0])
                 )
             elif len(input_a.shape) == 3:
                 delta = (
-                    F.conv1d(input_a.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
+                    F.conv1d(
+                        input_a.transpose([0, 2, 1]),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
@@ -384,7 +390,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                 ),
             )
             self.lora_B = self.create_parameter(
-                shape=[self.output_size_per_partition // len(enable_lora) * sum(enable_lora), r],
+                shape=[r, self.output_size_per_partition // len(enable_lora) * sum(enable_lora)],
                 dtype=self._dtype,
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
@@ -414,7 +420,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.unsqueeze(-1),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
@@ -432,7 +438,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.unsqueeze(-1),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
@@ -452,14 +458,20 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             if len(input_a.shape) == 2:
                 delta_mp = (
                     F.conv1d(
-                        input_a.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                        input_a.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .transpose([1, 0])
                 )
             elif len(input_a.shape) == 3:
                 delta_mp = (
-                    F.conv1d(input_a.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
+                    F.conv1d(
+                        input_a.transpose([0, 2, 1]),
+                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
@@ -665,7 +677,7 @@ class LoRAModel(nn.Layer):
         trainable_name_action_mappings = {}
         for k in trainable_state_dict:
             if "lora_B" in k:
-                trainable_name_action_mappings[k] = partial(fn, is_column=False)
+                trainable_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -707,7 +719,7 @@ class LoRAModel(nn.Layer):
         lora_name_action_mappings = {}
         for k in lora_state_dict.keys():
             if "lora_B" in k:
-                lora_name_action_mappings[k] = partial(fn, is_column=False)
+                lora_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
