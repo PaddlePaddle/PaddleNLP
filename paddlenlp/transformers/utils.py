@@ -74,6 +74,7 @@ def map_numpy_dtype(dtype: np.dtype) -> paddle.dtype:
         "int64": paddle.int64,
         "int32": paddle.int32,
         "int16": paddle.int16,
+        "bool": paddle.bool,
     }
 
     if dtype.name not in mappings:
