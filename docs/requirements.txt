@@ -1,13 +1,16 @@
 # Defining the exact version will make sure things don't break
 
-jinja2==3.0.3
-sphinx==3.5.2
-sphinx_rtd_theme==0.5.2
-readthedocs-sphinx-search==0.1.0
+aiohttp==3.8.4
+numpy<1.27.0,>=1.19.5
+h11<0.13,>=0.11
+jinja2
+sphinx
+sphinx_rtd_theme
+readthedocs-sphinx-search
 
-Markdown < 3.4
-sphinx-copybutton==0.3.1
-sphinx-markdown-tables==0.0.15
+Markdown
+sphinx-copybutton
+sphinx-markdown-tables
 
 # use paddlepaddle == 2.3.* according to: https://github.com/PaddlePaddle/Paddle/issues/48243
-paddlepaddle>=2.2.2,<2.4.0
+paddlepaddle>=2.4.2
