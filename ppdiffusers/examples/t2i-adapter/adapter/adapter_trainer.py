@@ -134,7 +134,7 @@ class AdapterLDMTrainer(Trainer):
         else:
             return super().get_train_dataloader()
 
-    def _save(self, output_dir=None, state_dict=None):
-        super()._save(output_dir=output_dir, state_dict=state_dict)
+    def _save(self, output_dir=None, state_dict=None, merge_tensor_parallel=False):
+        super()._save(output_dir=output_dir, state_dict=state_dict, merge_tensor_parallel=merge_tensor_parallel)
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         unwrap_model(self.model).adapter.save_pretrained(os.path.join(output_dir, "adapter"))
