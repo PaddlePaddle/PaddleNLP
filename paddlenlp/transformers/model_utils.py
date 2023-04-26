@@ -1165,7 +1165,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     dtype = str(v.dtype)[dtype_prefix_len:]
                 if k in state_dict:
                     if paddle.in_dynamic_mode():
-                        state_dict[key] = caster(key, state_dict[key], dtype)
+                        state_dict[k] = caster(k, state_dict[k], dtype)
                     else:
                         # there are some latent error when case dtype in static-mode, so let's:
                         # 1. convert fluid.*.Tensor -> numpy.ndarray
