@@ -2145,8 +2145,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
-            if self.can_generate():
-                model_to_save.generation_config.save_pretrained(save_directory)
+
+            # there is not `generation_config` in paddlenlp for CasualLM class
+            # if self.can_generate():
+            #     model_to_save.generation_config.save_pretrained(save_directory)
 
         # Shard the model if it is too big.
         weights_name = SAFE_WEIGHT_FILE_NAME if safe_serialization else WEIGHTS_NAME
