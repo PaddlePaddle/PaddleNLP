@@ -12,7 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
+import unittest
 
 import paddle
 
@@ -31,6 +33,7 @@ from paddlenlp.transformers.generation_utils import (
     RepetitionPenaltyLogitsProcessor,
     TopKProcess,
     TopPProcess,
+    get_unfinished_flag,
 )
 from tests.testing_utils import slow
 
@@ -1010,3 +1013,46 @@ class GenerationIntegrationTests:
         diff = (batched_out - out).abs()
 
         self.assertTrue(diff.numpy() < 1e-6)
+
+
+class GenerationUtilsTestCase(unittest.TestCase):
+    def test_get_unfinished_flag(self):
+        input_ids = paddle.to_tensor([[1, 2, 3, 4, 5, 6, 7], [5, 6, 7, 8, 9, 10, 11]], dtype=paddle.int64)
+
+        # 1. test single eos_token_id
+        eos_token_id = 6
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [True, True])
+
+        eos_token_id = 7
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [False, True])
+
+        # 2. get tokens
+        eos_token_id = [6, 7]
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [False, True])
+
+        eos_token_id = [10, 11]
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [True, False])
+
+        # 3. get multi tokens
+        eos_token_id = [[6, 7], [9, 10]]
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [False, True])
+
+        eos_token_id = [[6, 7], [10, 11]]
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [False, False])
+
+        eos_token_id = [[7], [11]]
+        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.tolist(), [False, False])
