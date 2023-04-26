@@ -126,6 +126,18 @@ class ImagePipelineOutput(BaseOutput):
 
 
 @dataclass
+class TextPipelineOutput(BaseOutput):
+    """
+    Output class for text pipelines.
+    Args:
+        prompt (`List[str]` or `str`)
+            List of denoised texts.
+    """
+
+    texts: Union[List[str], str]
+
+
+@dataclass
 class AudioPipelineOutput(BaseOutput):
     """
     Output class for audio pipelines.
@@ -632,8 +644,16 @@ class DiffusionPipeline(ConfigMixin):
                 from_hf_hub=from_hf_hub,
             )
 
-            # retrieve all folder_names that contain relevant files
-            folder_names = [k for k, v in config_dict.items() if isinstance(v, list)]
+            # retrieve all folder_names that contain relevant files (we will ignore `None`` data)
+            folder_names = []
+            for k, v in config_dict.items():
+                # if we pass specifc module, we won't donwload this
+                if k in kwargs:
+                    continue
+                if isinstance(v, list):
+                    if None in v:
+                        continue
+                    folder_names.append(k)
 
             if from_hf_hub:
                 if not local_files_only:
@@ -753,6 +773,7 @@ class DiffusionPipeline(ConfigMixin):
                     variant=variant,
                     max_workers=max_workers,
                     is_fastdeploy_model=is_fastdeploy_model,
+                    local_files_only=local_files_only,
                 )
         else:
             is_local_dir = True
@@ -944,15 +965,17 @@ class DiffusionPipeline(ConfigMixin):
                     else:
                         # else load from the root directory
                         loaded_sub_model = load_method(cached_folder, **loading_kwargs)
-                except Exception:
+                except Exception as e:
                     # (TODO, junnyu)
                     # if we cant find this file, we will try to download this
-                    if not is_local_dir and not from_hf_hub:
+                    if not local_files_only and not is_local_dir and not from_hf_hub:
                         loaded_sub_model = load_method(
                             pretrained_model_name_or_path + "/" + name, cache_dir=cache_dir, **loading_kwargs
                         )
-                if loaded_sub_model is None:
-                    raise ValueError(f"We cant load '{name}' from {pretrained_model_name_or_path} or {cached_folder}!")
+                    if loaded_sub_model is None:
+                        raise ValueError(
+                            f"We cant load '{name}' from {pretrained_model_name_or_path} or {cached_folder}! \n {e} "
+                        )
             # paddlenlp's model is in training mode not eval mode
             # if isinstance(loaded_sub_model, PretrainedModel):
             # if paddle_dtype is not None and next(loaded_sub_model.named_parameters())[1].dtype != paddle_dtype:

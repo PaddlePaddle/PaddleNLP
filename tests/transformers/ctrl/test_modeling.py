@@ -151,7 +151,7 @@ class CTRLModelTester:
         model.eval()
 
         result = model(input_ids, token_type_ids=token_type_ids, labels=input_ids)
-        self.parent.assertEqual(result[0].shape, [1])
+        self.parent.assertIsInstance(result[0].item(), float)
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def prepare_config_and_inputs_for_common(self):

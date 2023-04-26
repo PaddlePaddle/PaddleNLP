@@ -18,7 +18,8 @@ import os
 import re
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional, Union
+from functools import partial
+from typing import Dict, List, Optional, Union
 
 import paddle
 import paddle.nn as nn
@@ -26,7 +27,9 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
-from ..transformers.model_utils import PretrainedModel
+from ..transformers.conversion_utils import ConversionMixin
+from ..transformers.model_utils import PretrainedModel, _add_variant
+from ..utils.distributed import distributed_gather
 from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
 
@@ -255,29 +258,17 @@ class LoRAMergedLinear(nn.Linear):
             # Freezing the pre-trained weight matrix
             self.weight.stop_gradient = True
 
-            # Compute lora indices
-            self.enable_lora_indices = paddle.full(
-                shape=[len(enable_lora), out_features // len(enable_lora)], fill_value=False, dtype="bool"
-            )
-            self.enable_lora_indices[enable_lora, :] = True
-            self.enable_lora_indices = paddle.reshape(self.enable_lora_indices, [-1])
-
     def zero_pad(self, x):
-        # implementation 1: faster, close to LoRALinear
-        # split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
-        # assert len(split_output) == sum(self.enable_lora)
-        # for index in range(len(self.enable_lora)):
-        #     if self.enable_lora[index] is False:
-        #         split_output.insert(index, paddle.zeros_like(split_output[0]))
-        # concat_output = paddle.concat(split_output, axis=-1)
-        # return concat_output
-        # implementation 2: slower
-        output_shape = x.shape
-        output_shape[-1] = self.out_features
-        result = paddle.zeros(output_shape, dtype=x.dtype).reshape([output_shape[-1], -1])
-        result[self.enable_lora_indices, :] = x.reshape([-1, x.shape[-1]]).transpose([1, 0])  # cost most of time
-        result = result.transpose([1, 0]).reshape(output_shape)
-        return result
+        # if enable_lora is all true, then there is no need to zero pad
+        if all(self.enable_lora):
+            return x
+        else:
+            split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
+            for index in range(len(self.enable_lora)):
+                if self.enable_lora[index] is False:
+                    split_output.insert(index, paddle.zeros_like(split_output[0]))
+            concat_output = paddle.concat(split_output, axis=-1)
+            return concat_output
 
     def train(self):
         super().train()
@@ -318,23 +309,173 @@ class LoRAMergedLinear(nn.Linear):
     def forward(self, input: paddle.Tensor):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            after_A = self.lora_dropout(input) @ self.lora_A
-            if len(after_A.shape) == 2:
-                after_B = (
+            input_a = self.lora_dropout(input) @ self.lora_A
+            if len(input_a.shape) == 2:
+                delta = (
                     F.conv1d(
-                        after_A.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                        input_a.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
                     )
                     .squeeze(0)
                     .transpose([1, 0])
                 )
-            elif len(after_A.shape) == 3:
-                after_B = (
-                    F.conv1d(after_A.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
+            elif len(input_a.shape) == 3:
+                delta = (
+                    F.conv1d(input_a.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
 
-            result += self.zero_pad(after_B * self.scaling)
+            result += self.zero_pad(delta * self.scaling)
+        return result
+
+    def extra_repr(self):
+        name = f", name={self.name}" if self.name else ""
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
+
+
+class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
+    # LoRA implemented in a dense layer  with merged linear weights for q, k, v
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
+        enable_lora: List[bool] = [False],
+        **kwargs
+    ):
+        ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        assert (
+            self.output_size_per_partition % len(enable_lora) == 0
+        ), f"The length of enable_lora must divide out_features: {self.output_size_per_partition} % {len(enable_lora)} != 0"
+        self.r = r
+        self.lora_alpha = lora_alpha
+        if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
+            self.enable_lora = enable_lora
+        else:
+            raise TypeError("enable_lora must be a list of bools")
+
+        self.out_features = out_features
+        self.in_features = in_features
+
+        # Optional dropout
+        if lora_dropout > 0.0 and any:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+        # compatible
+        self.name = self._name
+
+        # Actual trainable parameters
+        if r > 0 and any(enable_lora):
+            self.lora_A = self.create_parameter(
+                shape=[in_features, r * sum(enable_lora)],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.KaimingUniform(
+                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                ),
+            )
+            self.lora_B = self.create_parameter(
+                shape=[self.output_size_per_partition // len(enable_lora) * sum(enable_lora), r],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
+            self.scaling = self.lora_alpha / self.r
+
+            # Freezing the pre-trained weight matrix
+            self.weight.stop_gradient = True
+
+    def zero_pad(self, x):
+        # if enable_lora is all true, then there is no need to zero pad
+        if all(self.enable_lora):
+            return x
+        else:
+            split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
+            for index in range(len(self.enable_lora)):
+                if self.enable_lora[index] is False:
+                    split_output.insert(index, paddle.zeros_like(split_output[0]))
+            concat_output = paddle.concat(split_output, axis=-1)
+            return concat_output
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            if self.r > 0 and any(self.enable_lora):
+                delta_weight = (
+                    F.conv1d(
+                        self.lora_A.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
+                )
+                new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
+                self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            if self.r > 0 and any(self.enable_lora):
+                delta_weight = (
+                    F.conv1d(
+                        self.lora_A.transpose([1, 0]).unsqueeze(0),
+                        self.lora_B.unsqueeze(-1),
+                        groups=sum(self.enable_lora),
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
+                )
+                new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
+                self.weight.set_value(new_weight)
+            self.merged = True
+
+    def forward(self, input: paddle.Tensor):
+        # [batch_size, *, in_features]
+        input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
+        # [batch_size, *, out_features_per_partition]
+        result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+        if self.r > 0 and any(self.enable_lora) and not self.merged:
+            input_a = self.lora_dropout(input_mp) @ self.lora_A
+            if len(input_a.shape) == 2:
+                delta_mp = (
+                    F.conv1d(
+                        input_a.transpose([1, 0]).unsqueeze(0), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora)
+                    )
+                    .squeeze(0)
+                    .transpose([1, 0])
+                )
+            elif len(input_a.shape) == 3:
+                delta_mp = (
+                    F.conv1d(input_a.transpose([0, 2, 1]), self.lora_B.unsqueeze(-1), groups=sum(self.enable_lora))
+                ).transpose([0, 2, 1])
+            else:
+                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+            # [batch_size, *, out_features_per_partition]
+            result_mp += self.zero_pad(delta_mp * self.scaling)
+
+        if self.gather_output and self.is_mp:
+            result_mp_list = paddle.split(result_mp, len(self.enable_lora), axis=-1)
+            result_list = []
+            for result_mp in result_mp_list:
+                result_list.append(mp_ops._c_concat(result_mp, group=self.model_parallel_group))
+            # [batch_size, *, out_features]
+            result = paddle.concat(result_list, axis=-1)
+        else:
+            result = result_mp
+
         return result
 
     def extra_repr(self):
@@ -349,6 +490,7 @@ class LoRAConfig:
     Args:
         r (`int`): Lora attention dimension
         target_modules (`Union[List[str],str]`): The names of the modules to apply Lora to.
+        trainable_modules (`List[str]`): The names of the modules to train when applying Lora.
         lora_alpha (`float`): The alpha parameter for Lora scaling.
         lora_dropout (`float`): The dropout probability for Lora layers.
         merge_weights (`bool`):
@@ -360,6 +502,13 @@ class LoRAConfig:
         default=None,
         metadata={
             "help": "List of module names or regex expression of the module names to replace with Lora."
+            "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
+        },
+    )
+    trainable_modules: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "List of module names or regex expression of the module names to train when applying with Lora."
             "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
         },
     )
@@ -377,6 +526,8 @@ class LoRAConfig:
             "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
         },
     )
+    tensor_parallel_degree: int = field(default=1, metadata={"help": "1 for not use tensor parallel"})
+    dtype: Optional[str] = field(default=None, metadata={"help": "The data type of tensor"})
 
     @property
     def __dict__(self):
@@ -444,35 +595,152 @@ class LoRAConfig:
 
 
 class LoRAModel(nn.Layer):
+    restore_layer_map: Dict[nn.Layer, nn.Layer] = {
+        LoRALinear: nn.Linear,
+        LoRAMergedLinear: nn.Linear,
+        ColumnParallelLoRALinear: ColumnParallelLinear,
+        ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+    }
+
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
         self.model = self.get_lora_model(model, lora_config)
+        if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
+            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+            logger.warning(
+                f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
+            )
         self.forward = self.model.forward
 
     @classmethod
     def from_pretrained(cls, model, lora_path):
+        # init lora config & lora model
         lora_config = LoRAConfig.from_pretrained(lora_path)
+        # define a new variable to conserve original lora_config.tensor_parallel_degree value which will update while initializing lora model
+        lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
         lora_model = cls(model, lora_config)
-        lora_weight_path = os.path.join(lora_path, LORA_WEIGHT_FILE_NAME)
+
+        # define lora weight name
+        if lora_config_tensor_parallel_degree > 1:
+            lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+        else:
+            lora_weight_name = LORA_WEIGHT_FILE_NAME
+
+        # load and set lora weight parameter
+        lora_weight_path = os.path.join(lora_path, lora_weight_name)
         if os.path.exists(lora_weight_path):
+            # load lora weight parameter
+            lora_state_dict = paddle.load(lora_weight_path, return_numpy=True)
             logger.info(f"Loading the LoRA weights from {lora_weight_path}")
-            lora_state_dict = paddle.load(lora_weight_path)
+
+            if (
+                lora_config_tensor_parallel_degree > 1
+                and lora_config_tensor_parallel_degree != model.config.tensor_parallel_degree
+            ):
+                raise NotImplementedError(
+                    f"{lora_config_tensor_parallel_degree} is not equal to {model.config.tensor_parallel_degree}. Please merge LoRA weights first."
+                )
+
+            # convert parameters to tensor parallel for mp model
+            if lora_config_tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
+                lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
+
+            # set lora state dict
             lora_model.model.set_state_dict(lora_state_dict)
         else:
-            logger.info(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+            logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
+
         return lora_model
 
-    def save_pretrained(self, save_directory: str, **kwargs):
+    def _merge_trainable_tensor_parallel(self, trainable_state_dict):
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=False,
+            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
+            num_attention_heads=self.model.config.num_attention_heads,
+        )
+        trainable_name_action_mappings = {}
+        for k in trainable_state_dict:
+            if "lora_B" in k:
+                trainable_name_action_mappings[k] = partial(fn, is_column=False)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+        state_keys_map = ConversionMixin._resolve_prefix_keys(
+            name_action_mappings.keys(), self.model.state_dict().keys()
+        )
+        for k, v in state_keys_map.items():
+            if v in trainable_state_dict:
+                trainable_name_action_mappings[v] = name_action_mappings[k]
+
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        is_dst = paddle.distributed.get_rank(mp_group) == 0
+
+        for key in trainable_state_dict:
+            tensor = trainable_state_dict[key]
+            if key in trainable_name_action_mappings:
+                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                action = trainable_name_action_mappings[key]
+                tensor = action(ret) if is_dst else None
+                trainable_state_dict[key] = tensor
+            else:
+                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+
+        if self.model.config.tensor_parallel_rank != 0:
+            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+            return
+        self.lora_config.tensor_parallel_degree = 1
+        return trainable_state_dict
+
+    def _convert_tensor_parallel(self, lora_state_dict):
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=True,
+            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
+            num_attention_heads=self.model.config.num_attention_heads,
+        )
+
+        lora_name_action_mappings = {}
+        for k in lora_state_dict.keys():
+            if "lora_B" in k:
+                lora_name_action_mappings[k] = partial(fn, is_column=False)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+        state_keys_map = ConversionMixin._resolve_prefix_keys(
+            name_action_mappings.keys(), self.model.state_dict().keys()
+        )
+        for k, v in state_keys_map.items():
+            if v in lora_state_dict.keys():
+                lora_name_action_mappings[v] = name_action_mappings[k]
+
+        for name, action in lora_name_action_mappings.items():
+            tensor = lora_state_dict.pop(name)
+            lora_state_dict[name] = action(tensor)
+        return lora_state_dict
+
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False):
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
-
-        self.lora_config.save_pretrained(save_directory)
-        weight_filename = os.path.join(save_directory, LORA_WEIGHT_FILE_NAME)
-        trainable_state_dict = self.get_trainable_state_dict()
+        lora_weight_name = LORA_WEIGHT_FILE_NAME
+        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+            trainable_state_dict = self.get_trainable_state_dict()
+            trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
+        else:
+            trainable_state_dict = self.get_trainable_state_dict()
+            if self.model.config.tensor_parallel_degree > 1:
+                lora_weight_name = _add_variant(
+                    LORA_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+                )
+        weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
+        if self.model.config.tensor_parallel_rank == 0:
+            self.lora_config.save_pretrained(save_directory)
+            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -492,10 +760,10 @@ class LoRAModel(nn.Layer):
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
-                output_features_mp = module.weight.shape[1] * module.world_size
+                output_features = module.weight.shape[1] * module.world_size
                 lora_module = ColumnParallelLoRALinear(
                     in_features=module.weight.shape[0],
-                    out_features=output_features_mp,
+                    out_features=output_features,
                     gather_output=module.gather_output,
                     has_bias=module.bias is not None,
                     r=lora_config.r,
@@ -514,11 +782,37 @@ class LoRAModel(nn.Layer):
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
                 )
+            elif isinstance(module, ColumnParallelLinear):
+                # recover the original output_features
+                lora_module = ColumnParallelLoRAMergedLinear(
+                    in_features=module.weight.shape[0],
+                    out_features=module.weight.shape[1] * module.world_size,
+                    gather_output=module.gather_output,
+                    has_bias=module.bias is not None,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                    enable_lora=enable_lora,
+                )
 
         lora_module.weight = module.weight
         if module.bias is not None:
             lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)
+
+    def _find_and_restore_module(self, module_name):
+        parent_module = self.model
+        attribute_chain = module_name.split(".")
+        for name in attribute_chain[:-1]:
+            parent_module = getattr(parent_module, name)
+        module = getattr(parent_module, attribute_chain[-1])
+        original_model_class = self.restore_layer_map[module.__class__]
+        original_module = original_model_class(in_features=module.weight.shape[0], out_features=module.weight.shape[1])
+        original_module.weight = module.weight
+        if module.bias is not None:
+            original_module.bias = module.bias
+        setattr(parent_module, attribute_chain[-1], original_module)
 
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
@@ -532,9 +826,9 @@ class LoRAModel(nn.Layer):
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().numpy()[0]
+                freeze_numel += weight.numel().item()
             else:
-                trainable_numel += weight.numel().numpy()[0]
+                trainable_numel += weight.numel().item()
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
@@ -545,6 +839,7 @@ class LoRAModel(nn.Layer):
                 isinstance(layer, LoRALinear)
                 or isinstance(layer, ColumnParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
+                or isinstance(layer, ColumnParallelLoRAMergedLinear)
             ):
                 for name, weight in layer.state_dict().items():
                     if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
@@ -559,6 +854,12 @@ class LoRAModel(nn.Layer):
                         weight.stop_gradient = False
                     else:
                         weight.stop_gradient = True
+        if self.lora_config.trainable_modules is not None:
+            for name, weight in self.model.state_dict().items():
+                if any(
+                    re.fullmatch(trainable_module, name) for trainable_module in self.lora_config.trainable_modules
+                ):
+                    weight.stop_gradient = False
 
     def get_lora_model(self, model: Union[PretrainedModel, nn.Layer], lora_config: LoRAConfig):
 
@@ -604,3 +905,37 @@ class LoRAModel(nn.Layer):
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
         return model
+
+    def restore_original_model(self):
+        # make sure W and lora weights are not merged before we restore the original model
+        if self.lora_config.merge_weights:
+            self.train()
+
+        for layer_name, layer in self.model.named_sublayers():
+            if (
+                isinstance(layer, LoRALinear)
+                or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAMergedLinear)
+                or isinstance(layer, ColumnParallelLoRAMergedLinear)
+            ):
+                self._find_and_restore_module(layer_name)
+        return self.model
+
+    def __getattr__(self, name: str):
+        """Forward missing attributes to the wrapped module."""
+        try:
+            return super().__getattr__(name)  # defer to nn.Layer's logic
+        except AttributeError:
+            return getattr(self.model, name)
+
+    def train(self):
+        self.model.training = True
+        for layer in self.model.sublayers():
+            layer.training = True
+            layer.train()
+
+    def eval(self):
+        self.model.training = False
+        for layer in self.model.sublayers():
+            layer.training = False
+            layer.eval()

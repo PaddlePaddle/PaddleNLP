@@ -41,7 +41,7 @@ schema = ['出发地', '目的地', '费用', '时间']
 uie1 = Taskflow("information_extraction", schema=schema, device_id=0)
 uie2 = Taskflow("information_extraction", schema=schema, device_id=1)
 app = SimpleServer()
-app.register_taskflow('uie', [uie1, uie2])
+app.register_taskflow('taskflow/uie', [uie1, uie2])
 ```
 ### 启动服务化
 执行代码的即可启动服务

@@ -471,9 +471,7 @@ class GenerationMixin(object):
 
     def prepare_decoder_input_ids_for_generation(self, input_ids, decoder_start_token_id=None, bos_token_id=None):
         decoder_start_token_id = (
-            decoder_start_token_id
-            if decoder_start_token_id is not None
-            else getattr(self, "decoder_start_token_id", None)
+            decoder_start_token_id if decoder_start_token_id is not None else self.config.decoder_start_token_id
         )
         decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else bos_token_id
 
@@ -483,22 +481,18 @@ class GenerationMixin(object):
 
     def get_decoder_start_token_id(self, decoder_start_token_id=None, bos_token_id=None):
         decoder_start_token_id = (
-            decoder_start_token_id
-            if decoder_start_token_id is not None
-            else getattr(self, self.base_model_prefix).config.get("decoder_start_token_id", None)
+            decoder_start_token_id if decoder_start_token_id is not None else self.config.decoder_start_token_id
         )
-        bos_token_id = (
-            bos_token_id if bos_token_id is not None else getattr(self, self.base_model_prefix).config["bos_token_id"]
-        )
+        bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
 
         if decoder_start_token_id is not None:
             return decoder_start_token_id
-        elif getattr(self, self.base_model_prefix).config.get("decoder_start_token_id", None) is not None:
-            return getattr(self, self.base_model_prefix).config["decoder_start_token_id"]
+        elif self.config.decoder_start_token_id is not None:
+            return self.config.decoder_start_token_id
         elif bos_token_id is not None:
             return bos_token_id
-        elif getattr(self, self.base_model_prefix).config["bos_token_id"] is not None:
-            return getattr(self, self.base_model_prefix).config["bos_token_id"]
+        elif self.config.bos_token_id is not None:
+            return self.config.bos_token_id
         raise ValueError(
             "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
         )
@@ -761,23 +755,20 @@ class GenerationMixin(object):
                 logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
                 self.deprecated_warnings["use_faster"] = True
 
-        # TODO: change from model.attribute to model.config.attribute when all models are integrated with PretrainedConfig
-        bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
-        eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
-        pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
+        bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
+        eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
+        pad_token_id = pad_token_id if pad_token_id is not None else self.config.pad_token_id
         forced_bos_token_id = (
-            forced_bos_token_id if forced_bos_token_id is not None else getattr(self, "forced_bos_token_id", None)
+            forced_bos_token_id if forced_bos_token_id is not None else self.config.forced_bos_token_id
         )
         forced_eos_token_id = (
-            forced_eos_token_id if forced_eos_token_id is not None else getattr(self, "forced_eos_token_id", None)
+            forced_eos_token_id if forced_eos_token_id is not None else self.config.forced_eos_token_id
         )
         decoder_start_token_id = (
-            decoder_start_token_id
-            if decoder_start_token_id is not None
-            else getattr(self, "decoder_start_token_id", None)
+            decoder_start_token_id if decoder_start_token_id is not None else self.config.decoder_start_token_id
         )
         no_repeat_ngram_size = (
-            no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
+            no_repeat_ngram_size if no_repeat_ngram_size is not None else self.config.no_repeat_ngram_size
         )
 
         if is_tracing:
@@ -998,10 +989,13 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
-            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
 
-            # To hundle the logits is a ModelOutput
-            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
 
             # [batch_size, vocab_size]
             next_token_logits = logits[:, -1, :]
@@ -1061,10 +1055,13 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
-            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
 
-            # To hundle the logits is a ModelOutput
-            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1084,9 +1081,12 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if paddle.get_default_dtype() not in ["float32", "float64"]:
+            if probs.dtype == paddle.bfloat16 and top_k == 1:
                 probs = probs.astype("float32")
-            next_tokens = paddle.multinomial(probs)
+                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
+            else:
+                next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1147,7 +1147,12 @@ class GenerationMixin(object):
             return self(**model_inputs, **immutable)
 
         def _post_process_(outputs, input_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
@@ -1255,10 +1260,14 @@ class GenerationMixin(object):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
-            outputs = outputs[0] if isinstance(outputs, tuple) else outputs
 
-            # To hundle the logits is a ModelOutput
-            logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
+
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
 
@@ -1395,11 +1404,13 @@ class GenerationMixin(object):
                     )
 
                 group_input_ids = input_ids[batch_group_indices]
-                outputs = outputs[0] if isinstance(outputs, tuple) else outputs
-                # select outputs of beams of current group only
 
-                # To hundle the logits is a ModelOutput
-                logits = outputs.logits if isinstance(outputs, ModelOutput) else outputs
+                if isinstance(outputs, tuple):
+                    logits = outputs[0]
+                elif isinstance(outputs, ModelOutput):
+                    logits = outputs.logits
+                else:
+                    logits = outputs
 
                 logits = logits[:, -1, :]
                 logits = paddle.index_select(logits, paddle.to_tensor(batch_group_indices))
@@ -1659,7 +1670,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         forced_bos_token_id (:obj:`int`):
-            The id of the token to to be generated as the first token.
+            The id of the token to be generated as the first token.
     """
 
     def __init__(self, forced_bos_token_id):
@@ -1680,7 +1691,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
     def __init__(self, max_length, forced_eos_token_id):
@@ -1701,7 +1712,14 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 def TopKProcess(probs, top_k, min_tokens_to_keep):
     top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
     # Remove all tokens with a probability less than the last token of the top-k
-    topk_probs, _ = paddle.topk(probs, k=top_k)
+    # cast to float16 to support generation & d2s
+    if probs.dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+        topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
+    else:
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+
     probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
     return probs
 

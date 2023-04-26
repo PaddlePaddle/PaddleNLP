@@ -28,7 +28,6 @@ from urllib import request
 
 from huggingface_hub import HfFolder, cached_download, hf_hub_download, model_info
 
-from ..version import VERSION as __version__
 from . import PPDIFFUSERS_DYNAMIC_MODULE_NAME, PPDIFFUSERS_MODULES_CACHE, logging
 
 COMMUNITY_PIPELINES_URL = (
@@ -264,23 +263,10 @@ def get_cached_module_file(
         resolved_module_file = module_file_or_url
         submodule = "local"
     elif pretrained_model_name_or_path.count("/") == 0:
-        available_versions = get_ppdiffusers_versions()
-        # cut ".dev0"
-        latest_version = "v" + ".".join(__version__.split(".")[:3])
-
         # retrieve github version that matches
         if revision is None:
-            revision = latest_version if latest_version in available_versions else "main"
-            logger.info(f"Defaulting to latest_version: {revision}.")
-        elif revision in available_versions:
-            revision = f"v{revision}"
-        elif revision == "main":
-            revision = revision
-        else:
-            raise ValueError(
-                f"`custom_revision`: {revision} does not exist. Please make sure to choose one of"
-                f" {', '.join(available_versions + ['main'])}."
-            )
+            revision = "main"
+            logger.info(f"Defaulting to main: {revision}.")
 
         # community pipeline on GitHub
         github_url = COMMUNITY_PIPELINES_URL.format(revision=revision, pipeline=pretrained_model_name_or_path)

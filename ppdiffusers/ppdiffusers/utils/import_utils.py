@@ -138,6 +138,15 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _paddlenlp_available = False
 
+# (sayakpaul): importlib.util.find_spec("opencv-python") returns None even when it's installed.
+# _opencv_available = importlib.util.find_spec("opencv-python") is not None
+try:
+    _opencv_version = importlib_metadata.version("opencv-python")
+    _opencv_available = True
+    logger.debug(f"Successfully imported cv2 version {_opencv_version}")
+except importlib_metadata.PackageNotFoundError:
+    _opencv_available = False
+
 _scipy_available = importlib.util.find_spec("scipy") is not None
 try:
     _scipy_version = importlib_metadata.version("scipy")
@@ -187,6 +196,19 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _visualdl_available = False
 
+_einops_available = importlib.util.find_spec("einops")
+try:
+    try:
+        import einops
+        import einops.layers.paddle
+
+        einops.layers.paddle
+        logger.debug(f"Successfully imported einops version {einops.__version__}")
+    except ImportError:
+        _einops_available = False
+except importlib_metadata.PackageNotFoundError:
+    _einops_available = False
+
 
 def is_paddle_available():
     return _paddle_available
@@ -228,6 +250,10 @@ def is_unidecode_available():
     return _unidecode_available
 
 
+def is_opencv_available():
+    return _opencv_available
+
+
 def is_scipy_available():
     return _scipy_available
 
@@ -250,6 +276,10 @@ def is_omegaconf_available():
 
 def is_tensorboard_available():
     return _tensorboard_available
+
+
+def is_einops_available():
+    return _einops_available
 
 
 # docstyle-ignore
@@ -300,6 +330,11 @@ PYTORCH_IMPORT_ERROR = """
 installation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.
 """
 
+# docstyle-ignore
+OPENCV_IMPORT_ERROR = """
+{0} requires the OpenCV library but it was not found in your environment. You can install it with pip: `pip
+install opencv-python`
+"""
 
 # docstyle-ignore
 SCIPY_IMPORT_ERROR = """
@@ -344,6 +379,12 @@ TENSORBOARD_IMPORT_ERROR = """
 install tensorboard`
 """
 
+# docstyle-ignore
+EINOPS_IMPORT_ERROR = """
+{0} requires the einops[paddle] library but it was not found in your environment. You can update it with pip: `pip
+install -U einops or pip install git+https://github.com/arogozhnikov/einops.git `
+"""
+
 BACKENDS_MAPPING = OrderedDict(
     [
         ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
@@ -351,6 +392,7 @@ BACKENDS_MAPPING = OrderedDict(
         ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
         ("visualdl", (is_visualdl_available, VISUALDL_IMPORT_ERROR)),
         ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
+        ("opencv", (is_opencv_available, OPENCV_IMPORT_ERROR)),
         ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
         ("torch", (is_torch_available, PYTORCH_IMPORT_ERROR)),
         ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
@@ -358,7 +400,8 @@ BACKENDS_MAPPING = OrderedDict(
         ("k_diffusion", (is_k_diffusion_available, K_DIFFUSION_IMPORT_ERROR)),
         ("wandb", (is_wandb_available, WANDB_IMPORT_ERROR)),
         ("omegaconf", (is_omegaconf_available, OMEGACONF_IMPORT_ERROR)),
-        ("tensorboard", (_tensorboard_available, TENSORBOARD_IMPORT_ERROR)),
+        ("tensorboard", (is_tensorboard_available, TENSORBOARD_IMPORT_ERROR)),
+        ("einops", (is_einops_available, EINOPS_IMPORT_ERROR)),
     ]
 )
 

@@ -208,6 +208,7 @@ class ModelTesterMixin:
     test_mismatched_shapes = True
     test_missing_keys = True
     test_model_compatibility_keys = True
+    test_tie_weights = False
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
@@ -565,15 +566,14 @@ class ModelTesterMixin:
             if self.model_tester.is_training is False:
                 model.eval()
 
-            model_vocab_size = config["vocab_size"]
+            model_vocab_size = config.vocab_size
             # Retrieve the embeddings and clone theme
-
             model_embed = model.resize_token_embeddings(model_vocab_size)
             cloned_embeddings = model_embed.weight.clone()
 
             # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size + 10)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size + 10)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size + 10)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] + 10)
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
@@ -581,7 +581,7 @@ class ModelTesterMixin:
 
             # Check that resizing the token embeddings with a smaller vocab size decreases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size - 15)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size - 15)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size - 15)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] - 15)
 
@@ -666,7 +666,6 @@ class ModelTesterMixin:
         self.assertTrue(len(model.model_name_list) != 0)
 
     def test_pretrained_config_save_load(self):
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return
 
@@ -688,7 +687,6 @@ class ModelTesterMixin:
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return None
 
@@ -711,14 +709,61 @@ class ModelTesterMixin:
             all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
 
             for old_attribute, new_attribute in all_maps.items():
-                old_value = getattr(model, old_attribute)
-                new_value = getattr(model, new_attribute)
+                old_value = getattr(model.config, old_attribute)
+                new_value = getattr(model.config, new_attribute)
 
                 # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
                 if type(new_value) != type(old_value):
                     continue
 
                 self.assertEqual(old_value, new_value)
+
+    def test_tie_weight(self):
+        # test whether id of input_embeding equal id of output_embeding ?
+        if not self.test_tie_weights:
+            return
+
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            if "CausalLM" not in model_class.__name__ and "MaskedLM" not in model_class.__name__:
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            if not model.config.tie_word_embeddings:
+                continue
+
+            if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
+                try:
+                    input_embeddings = model.get_input_embeddings()
+                except NotImplementedError:
+                    continue
+
+                try:
+                    output_embeddings = model.get_output_embeddings()
+                except NotImplementedError:
+                    continue
+
+                if input_embeddings is not None and output_embeddings is not None:
+                    if hasattr(output_embeddings, "weight"):
+                        output_embeddings_weight = output_embeddings.weight
+                    else:
+                        output_embeddings_weight = output_embeddings
+
+                    if hasattr(input_embeddings, "weight"):
+                        input_embeddings_weight = input_embeddings.weight
+                    else:
+                        input_embeddings_weight = input_embeddings
+                    print(
+                        input_embeddings_weight,
+                        output_embeddings_weight,
+                    )
+                    print(
+                        "model name :{},id is{},{}".format(
+                            model_class, id(output_embeddings_weight), id(input_embeddings_weight)
+                        )
+                    )
+                    self.assertEqual(id(output_embeddings_weight), id(input_embeddings_weight))
 
 
 class ModelTesterPretrainedMixin:

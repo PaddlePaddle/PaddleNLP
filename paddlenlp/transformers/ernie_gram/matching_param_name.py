@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import pickle
 import paddle
-import numpy as np
 
 
 def match_embedding_param(convert_parameter_name_dict):

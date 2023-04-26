@@ -46,7 +46,7 @@ msgstr ""
 #: of paddlenlp.ops.einsum.einsum:12
 msgid ""
 "The operands to compute the Einstein sum of. The number of operands "
-"should be the same as the the operands described in input equation."
+"should be the same as the operands described in input equation."
 msgstr ""
 
 #: of paddlenlp.ops.einsum.einsum

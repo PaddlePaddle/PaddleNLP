@@ -124,7 +124,7 @@ class ErnieMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = ERNIE_M_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "ernie_m"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -173,7 +173,6 @@ class ErnieMModel(ErnieMPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ErnieMPooler(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -346,7 +345,6 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -456,7 +454,6 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         super(ErnieMForQuestionAnswering, self).__init__(config)
         self.ernie_m = ErnieMModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -588,7 +585,6 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -688,7 +684,6 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -789,7 +784,6 @@ class UIEM(ErnieMPretrainedModel):
         self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
         self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""

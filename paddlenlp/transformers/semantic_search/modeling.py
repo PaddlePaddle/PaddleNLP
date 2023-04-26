@@ -37,9 +37,8 @@ class ErnieEncoder(ErniePretrainedModel):
         if output_emb_size is not None and output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(config.hidden_size, output_emb_size, weight_attr=weight_attr)
-        self.apply(self.init_weights)
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
@@ -105,9 +104,9 @@ class ErnieDualEncoder(nn.Layer):
 
         # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
         if reinitialize:
-            self.apply(self.init_weights)
+            self.apply(self.init_epsilon_weights)
 
-    def init_weights(self, layer):
+    def init_epsilon_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
@@ -256,9 +255,9 @@ class ErnieCrossEncoder(nn.Layer):
         self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path, num_classes=num_classes)
         # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
         if reinitialize:
-            self.apply(self.init_weights)
+            self.apply(self.init_epsilon_weights)
 
-    def init_weights(self, layer):
+    def init_epsilon_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5

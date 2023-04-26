@@ -15,7 +15,8 @@
 import os
 
 import paddle
-from tokenizer import LlamaTokenizer
+
+from paddlenlp.transformers import AutoTokenizer
 
 
 def parse_arguments():
@@ -32,6 +33,7 @@ def parse_arguments():
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
     return parser.parse_args()
 
 
@@ -46,13 +48,10 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = LlamaTokenizer.from_pretrained(
-            args.model_dir,
-            add_bos_token=False,
-        )
-        self.tokenizer.padding_side = "left"
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
+        self.src_length = args.src_length
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
@@ -73,6 +72,7 @@ class Predictor(object):
             input_text,
             padding=True,
             return_tensors="np",
+            max_length=self.src_length,
             return_attention_mask=True,
             return_position_ids=True,
         )
@@ -109,9 +109,13 @@ if __name__ == "__main__":
     args = parse_arguments()
     paddle.seed(100)
     predictor = Predictor(args)
-    all_texts = ["My name is", "I am"]
+    all_texts = [
+        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+    ]
+
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)
         for text, result in zip(texts, outputs["result"]):
-            print("{} \n {}".format(text, result))
+            print("{} \n\n {}".format(text, result))

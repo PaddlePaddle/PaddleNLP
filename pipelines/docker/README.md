@@ -40,7 +40,7 @@ cpu版本大概等待3分钟左右，gpu版本大概1分钟左右，到这里您
 
 为了方便用户很方便的切换，并部署`Pipelines`的语义索引和问答应用，我们特地提供了`Docker-Compose`的方式，`Docker Compose`的安装请参考[Docker Compose](https://docs.docker.com/compose/)，用户只需要修改`docker-compose.yml`的配置，然后一键启动即可。
 
-下面以语义检索的的例子进行展示：
+下面以语义检索的例子进行展示：
 
 ```
 cd docker

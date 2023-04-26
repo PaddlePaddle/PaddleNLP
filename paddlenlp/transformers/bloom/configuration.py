@@ -39,8 +39,21 @@ def _construct_resource_file_url(model_names: list[str], file_name: str) -> dict
 
 
 BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "bigscience/bloom",
     "bigscience/bloom-560m",
+    "bigscience/bloom-1b1",
+    "bigscience/bloom-1b3",
+    "bigscience/bloom-1b7",
+    "bigscience/bloom-3b",
+    "bigscience/bloom-7b1",
+    "bigscience/bloomz",
+    "bigscience/bloomz-mt",
     "bigscience/bloomz-560m",
+    "bigscience/bloomz-1b1",
+    "bigscience/bloomz-1b3",
+    "bigscience/bloomz-1b7",
+    "bigscience/bloomz-3b",
+    "bigscience/bloomz-7b1",
 ]
 
 BLOOM_PRETRAINED_INIT_CONFIGURATION = _construct_resource_file_url(BLOOM_PRETRAINED_MODEL_ARCHIVE_LIST, "config.json")
@@ -86,7 +99,7 @@ class BloomConfig(PretrainedConfig):
     ```"""
     model_type = "bloom"
     attribute_map: Dict[str, str] = {}  # noqa: F811
-    attribute_map = {"n_layer": "num_hidden_layers", "n_head": "num_attention_heads", "n_embed": "hidden_size"}
+    attribute_map = {"num_attention_heads": "n_head", "n_embed": "hidden_size"}
 
     pretrained_init_configuration = BLOOM_PRETRAINED_INIT_CONFIGURATION
 
@@ -108,19 +121,18 @@ class BloomConfig(PretrainedConfig):
         attention_dropout=0.0,
         attention_softmax_in_fp32=True,
         pretraining_tp=1,  # TP rank used when training with megatron
-        dtype="float16",
         slow_but_exact=False,
-        mp_degree=1,
-        pp_degree=1,
-        mp_rank=0,
         use_recompute=False,
         use_pure_fp16=False,
         **kwargs,
     ):
-        self.vocab_size = vocab_size
-        self.hidden_size = hidden_size
-        self.n_layer = n_layer
+
         self.n_head = n_head
+        self.hidden_size = hidden_size
+
+        super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, pad_token_id=pad_token_id, **kwargs)
+        self.vocab_size = vocab_size
+        self.n_layer = n_layer
         self.masked_softmax_fusion = masked_softmax_fusion
         self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
@@ -133,12 +145,6 @@ class BloomConfig(PretrainedConfig):
 
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
-        self.dtype = dtype
         self.slow_but_exact = slow_but_exact
-        self.mp_degree = mp_degree
-        self.pp_degree = mp_degree
-        self.mp_rank = mp_rank
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
-
-        super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, pad_token_id=pad_token_id, **kwargs)
