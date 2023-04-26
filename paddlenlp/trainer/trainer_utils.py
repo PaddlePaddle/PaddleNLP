@@ -890,7 +890,7 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
     paddle.seed(basic_seed + dataset_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 123 + tp_rank * 10 + pp_rank * 1000
+    local_seed = basic_seed + 59999 + tp_rank * 10 + pp_rank * 1000
     global_seed = basic_seed + dataset_rank
     tracker = get_rng_state_tracker()
     tracker.add("global_seed", global_seed)

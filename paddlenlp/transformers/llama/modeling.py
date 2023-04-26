@@ -126,8 +126,7 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(head_dim)
-
+        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
@@ -746,8 +745,10 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, masked_lm_labels, ignore_index=-100):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-        masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index]
-        loss = paddle.mean(masked_lm_loss)
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = masked_lm_loss.astype("float32")
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index]
+            loss = paddle.mean(masked_lm_loss)
         return loss
 
 

@@ -1105,7 +1105,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 Its data type should be int64 and its shape is [batch_size, sequence_length, vocab_size].
 
             - `disc_logits` (Tensor):
-                The the prediction result of replaced tokens.
+                The prediction result of replaced tokens.
                 Its data type should be float32 and if batch_size>1, its shape is [batch_size, sequence_length],
                 if batch_size=1, its shape is [sequence_length].
 

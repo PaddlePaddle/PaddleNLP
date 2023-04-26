@@ -15,6 +15,7 @@
 import paddle
 from paddle.distributed import fleet
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
@@ -29,6 +30,7 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     return parser.parse_args()
 
 
@@ -72,6 +74,8 @@ class Predictor(object):
             load_state_as_np=True,
             dtype=dtype,
         )
+        if self.args.lora_path is not None:
+            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
 
         self.model.eval()
 
