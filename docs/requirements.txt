@@ -1,6 +1,7 @@
 # Defining the exact version will make sure things don't break
 
 aiohttp==3.8.4
+numpy<1.27.0,>=1.19.5
 jinja2
 sphinx
 sphinx_rtd_theme
