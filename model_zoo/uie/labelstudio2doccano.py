@@ -41,7 +41,9 @@ def append_attrs(data, item, label_id, relation_id, default_relation_type):
                     "id": relation_id,
                     "from_id": mapp[anno["from_id"]],
                     "to_id": mapp[anno["to_id"]],
-                    "type": anno["labels"][0] if len(anno["labels"]) else default_relation_type,
+                    "type": anno["labels"][0]
+                    if len(anno["labels"])
+                    else default_relation_type,
                 }
             )
 
@@ -58,7 +60,7 @@ def convert(dataset, task_type):
             outer_id += 1
             item = {
                 "id": outer_id,
-                "text": data["data"]["text"],
+                "text": data["data"][args.text_field],
                 "entities": [],
                 "relations": [],
             }
@@ -77,7 +79,7 @@ def convert(dataset, task_type):
             results.append(
                 {
                     "id": outer_id,
-                    "text": data["data"]["text"],
+                    "text": data["data"][args.text_field],
                     "label": data["annotations"][0]["result"][0]["value"]["choices"],
                 }
             )
@@ -124,6 +126,12 @@ if __name__ == "__main__":
         type=str,
         default="relation",
         help="The default relation type for missing relation type, defaults to relation.",
+    )
+    parser.add_argument(
+        "--text_field",
+        type=str,
+        default="text",
+        help="The field name representing the text column of data , defaults to text.",
     )
 
     args = parser.parse_args()
