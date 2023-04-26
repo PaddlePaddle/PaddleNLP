@@ -702,8 +702,10 @@ class Trainer:
                         optimizer_was_run = scale_before <= scale_after
                     else:
                         self.optimizer.step()
+
                     if optimizer_was_run:
                         self.lr_scheduler.step()
+
                     self.optimizer.clear_grad()
 
                     self.state.global_step += 1
