@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +21,8 @@ import PIL
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-from ...models import Adapter, AutoencoderKL, MultiAdapter, UNet2DConditionModel
+# from ...loaders import TextualInversionLoaderMixin
+from ...models import AutoencoderKL, MultiAdapter, T2IAdapter, UNet2DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import PIL_INTERPOLATION, logging, randn_tensor, replace_example_docstring
 from ..pipeline_utils import DiffusionPipeline
@@ -42,9 +42,9 @@ EXAMPLE_DOC_STRING = """
         >>> color_palette = color_palette.resize((512, 512), resample=Image.Resampling.NEAREST)
 
         >>> import paddle
-        >>> from ppdiffusers import StableDiffusionAdapterPipeline, Adapter
+        >>> from ppdiffusers import StableDiffusionAdapterPipeline, T2IAdapter
 
-        >>> adapter = Adapter.from_pretrained("RzZ/sd-v1-4-adapter-color")
+        >>> adapter = T2IAdapter.from_pretrained("RzZ/sd-v1-4-adapter-color")
         >>> pipe = StableDiffusionAdapterPipeline.from_pretrained(
         ...     "CompVis/stable-diffusion-v1-4",
         ...     adapter=adapter,
@@ -67,7 +67,7 @@ def preprocess(image):
         image = [image]
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 8, (w, h))
+        w, h = (x - x % 8 for x in (w, h))
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])) for i in image]
         image = [(i[None, ..., None] if i.ndim == 2 else i[None, ...]) for i in image]
         image = np.concatenate(image, axis=0)
@@ -94,7 +94,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Args:
-        adapter ([`Adapter`] or [`MultiAdapter`] or `List[Adapter]`):
+        adapter ([`T2IAdapter`] or [`MultiAdapter`] or `List[T2IAdapter]`):
             Provides additional conditioning to the unet during the denoising process. If you set multiple Adapter as a
             list, the outputs from each Adapter are added together to create one combined additional conditioning.
         adapter_weights (`List[float]`, *optional*, defaults to None):
@@ -127,7 +127,7 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        adapter: Union[Adapter, MultiAdapter, List[Adapter]],
+        adapter: Union[T2IAdapter, MultiAdapter, List[T2IAdapter]],
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -195,8 +195,8 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -212,6 +212,8 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
         if prompt_embeds is None:
+            # if isinstance(self, TextualInversionLoaderMixin):
+            #     prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -256,6 +258,9 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
                 )
             else:
                 uncond_tokens = negative_prompt
+            # if isinstance(self, TextualInversionLoaderMixin):
+            #     uncond_tokens = self.maybe_convert_prompt(uncond_tokens,
+            #         self.tokenizer)
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
                 uncond_tokens, padding="max_length", max_length=max_length, truncation=True, return_tensors="pd"

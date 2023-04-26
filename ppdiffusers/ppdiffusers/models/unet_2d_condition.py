@@ -596,33 +596,35 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         sample = self.conv_in(sample)
 
         # 3. down
+
         is_controlnet = mid_block_additional_residual is not None and down_block_additional_residuals is not None
         is_adapter = mid_block_additional_residual is None and down_block_additional_residuals is not None
 
         down_block_res_samples = (sample,)
+        # For compatibility with 0.14.0
         if self.resnet_pre_temb_non_linearity:
             down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
         else:
             down_nonlinear_temb = emb
-        for idx, downsample_block in enumerate(self.down_blocks):
+        for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 additional_kwargs = {}
-                if is_adapter and idx < len(down_block_additional_residuals):
-                    additional_kwargs["additional_residuals"] = down_block_additional_residuals[idx]
+                if is_adapter and len(down_block_additional_residuals) > 0:
+                    additional_kwargs["additional_residuals"] = down_block_additional_residuals.pop(0)
 
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=down_nonlinear_temb,
+                    temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
                     **additional_kwargs,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
-                if is_adapter and idx < len(down_block_additional_residuals):
-                    sample += down_block_additional_residuals[idx]
+                if is_adapter and len(down_block_additional_residuals) > 0:
+                    sample += down_block_additional_residuals.pop(0)
 
             down_block_res_samples += res_samples
 
@@ -632,16 +634,15 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             for down_block_res_sample, down_block_additional_residual in zip(
                 down_block_res_samples, down_block_additional_residuals
             ):
-                down_block_res_sample += down_block_additional_residual
+                down_block_res_sample = down_block_res_sample + down_block_additional_residual
                 new_down_block_res_samples += (down_block_res_sample,)
-
             down_block_res_samples = new_down_block_res_samples
 
         # 4. mid
         if self.mid_block is not None:
             sample = self.mid_block(
                 sample,
-                down_nonlinear_temb,
+                emb,
                 encoder_hidden_states=encoder_hidden_states,
                 attention_mask=attention_mask,
                 cross_attention_kwargs=cross_attention_kwargs,
@@ -665,7 +666,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=down_nonlinear_temb,
+                    temb=down_nonlinear_temb,  # For compatibility with 0.14.0
                     res_hidden_states_tuple=res_samples,
                     encoder_hidden_states=encoder_hidden_states,
                     cross_attention_kwargs=cross_attention_kwargs,
@@ -675,7 +676,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             else:
                 sample = upsample_block(
                     hidden_states=sample,
-                    temb=down_nonlinear_temb,
+                    temb=down_nonlinear_temb,  # For compatibility with 0.14.0
                     res_hidden_states_tuple=res_samples,
                     upsample_size=upsample_size,
                 )

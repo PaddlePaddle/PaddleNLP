@@ -54,6 +54,7 @@ class TextImagePair(IterableDataset):
         tokenizer=None,
         control_image_processor=None,
         data_format="default",
+        do_image_processing=True,
     ):
         self.size = size
         self.resize_transform = transforms.Resize(int(size), interpolation)
@@ -113,6 +114,7 @@ class TextImagePair(IterableDataset):
         self.buffer_size = buffer_size
         self.shuffle_every_n_samples = shuffle_every_n_samples
         self.data_format = data_format
+        self.do_image_processing = do_image_processing
 
     def sample_loader(self, file_ids, filenames):
         while True:
@@ -149,7 +151,9 @@ class TextImagePair(IterableDataset):
                             else:
                                 control_image = image
                             out = {
-                                "pixel_values": self.image_processing(image).numpy(),
+                                "pixel_values": self.image_processing(image).numpy()
+                                if self.do_image_processing
+                                else image,
                                 "input_ids": self.text_processing(data["caption"])
                                 if self.text_processing
                                 else data["caption"],

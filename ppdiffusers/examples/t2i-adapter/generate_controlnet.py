@@ -25,12 +25,12 @@ from tqdm import tqdm
 
 from paddlenlp.trainer import PdArgumentParser
 from ppdiffusers import (
-    Adapter,
+    ControlNetModel,
     DDIMScheduler,
     EulerAncestralDiscreteScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
-    StableDiffusionAdapterPipeline,
+    StableDiffusionControlNetPipeline,
 )
 
 
@@ -52,7 +52,7 @@ def set_seed(seed: int):
 
 
 def generate_images(
-    adapter_model_name_or_path,
+    controlnet_model_name_or_path,
     sd_model_name_or_path,
     batch_size=16,
     test_dataset=None,
@@ -69,8 +69,10 @@ def generate_images(
     generate_control_image_processor_type=None,
 ):
     paddle.set_device(device)
-    adapter = Adapter.from_pretrained(adapter_model_name_or_path)
-    pipe = StableDiffusionAdapterPipeline.from_pretrained(sd_model_name_or_path, adapter=adapter, safety_checker=None)
+    controlnet = ControlNetModel.from_pretrained(controlnet_model_name_or_path)
+    pipe = StableDiffusionControlNetPipeline.from_pretrained(
+        sd_model_name_or_path, controlnet=controlnet, safety_checker=None
+    )
     pipe.set_progress_bar_config(disable=True)
     beta_start = pipe.scheduler.beta_start
     beta_end = pipe.scheduler.beta_end
@@ -118,7 +120,7 @@ def generate_images(
         i = 0
         for data in tqdm(test_dataset):
             if generate_control_image_processor_type == "canny":
-                data["adapter_cond"] = canny_processor.process_data_load(data["pixel_values"])
+                data["adapter_cond"] = canny_processor.process_data_load(data["adapter_cond"])
             images = pipe(
                 data["input_ids"] if use_text_cond else "",
                 image=data["adapter_cond"],
@@ -167,6 +169,7 @@ class CannyProcessor:
         H, W, C = img.shape
         # TODO: random thresh.
         detected_map = self.apply_canny(img, *self.canny_thresh)
+        detected_map = HWC3(detected_map)
         detected_map = Image.fromarray(detected_map)
         return detected_map
 
@@ -203,7 +206,7 @@ if __name__ == "__main__":
         do_image_processing=False,
     )
     generate_images(
-        adapter_model_name_or_path=generate_args.adapter_model_name_or_path,
+        controlnet_model_name_or_path=generate_args.adapter_model_name_or_path,
         sd_model_name_or_path=generate_args.sd_model_name_or_path,
         batch_size=generate_args.batch_size,
         test_dataset=test_dataset,

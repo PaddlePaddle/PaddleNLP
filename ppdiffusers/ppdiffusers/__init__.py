@@ -53,13 +53,13 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_objects import *  # noqa F403
 else:
     from .models import (
-        Adapter,
         AutoencoderKL,
         ControlNetModel,
         LitEma,
         ModelMixin,
         MultiAdapter,
         PriorTransformer,
+        T2IAdapter,
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,

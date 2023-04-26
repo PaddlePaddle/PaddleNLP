@@ -21,55 +21,57 @@ from .modeling_utils import ModelMixin
 from .resnet import Downsample2D
 
 
-class ResnetBlock(paddle.nn.Layer):
+class BottleneckResnetBlock(paddle.nn.Layer):
     def __init__(self, in_c, mid_c, out_c, down, ksize=3, sk=False, use_conv=True, proj_ksize=1):
         super().__init__()
         ps = ksize // 2
         proj_pad = proj_ksize // 2
         if in_c != mid_c or sk is False:
-            self.in_conv = paddle.nn.Conv2D(
+            self.conv1 = paddle.nn.Conv2D(
                 in_channels=in_c, out_channels=mid_c, kernel_size=proj_ksize, stride=1, padding=proj_pad
             )
         else:
-            self.in_conv = None
+            self.conv1 = None
         if out_c != mid_c:
-            self.out_conv = paddle.nn.Conv2D(
+            self.conv2 = paddle.nn.Conv2D(
                 in_channels=mid_c, out_channels=out_c, kernel_size=proj_ksize, stride=1, padding=proj_pad
             )
         else:
-            self.out_conv = None
+            self.conv2 = None
         self.block1 = paddle.nn.Conv2D(in_channels=mid_c, out_channels=mid_c, kernel_size=3, stride=1, padding=1)
         self.act = paddle.nn.ReLU()
         self.block2 = paddle.nn.Conv2D(in_channels=mid_c, out_channels=mid_c, kernel_size=ksize, stride=1, padding=ps)
         if sk is False:
-            self.skep = paddle.nn.Conv2D(in_channels=in_c, out_channels=mid_c, kernel_size=ksize, stride=1, padding=ps)
+            self.conv_shortcut = paddle.nn.Conv2D(
+                in_channels=in_c, out_channels=mid_c, kernel_size=ksize, stride=1, padding=ps
+            )
         else:
-            self.skep = None
+            self.conv_shortcut = None
         self.down = down
         if self.down is True:
-            self.down_opt = Downsample2D(in_c, use_conv=use_conv)
+            self.downsample = Downsample2D(in_c, use_conv=use_conv)
 
     def forward(self, x):
         if self.down is True:
-            x = self.down_opt(x)
-        if self.in_conv is not None:
-            x = self.in_conv(x)
+            x = self.downsample(x)
+        if self.conv1 is not None:
+            x = self.conv1(x)
         h = self.block1(x)
         h = self.act(h)
         h = self.block2(h)
-        if self.skep is not None:
-            h = h + self.skep(x)
+        if self.conv_shortcut is not None:
+            h = h + self.conv_shortcut(x)
         else:
             h = h + x
-        if self.out_conv is not None:
-            h = self.out_conv(h)
+        if self.conv2 is not None:
+            h = self.conv2(h)
         return h
 
 
-class Adapter(ModelMixin, ConfigMixin):
+class T2IAdapter(ModelMixin, ConfigMixin):
     """
     A simple ResNet-like model that accepts images containing control signals such as keyposes and depth. The model
-    generates multiple feature maps that are used as additional conditioning in`UNet2DConditionModel`. The model's
+    generates multiple feature maps that are used as additional conditioning in [`UNet2DConditionModel`]. The model's
     architecture follows the original implementation of
     [Adapter](https://github.com/TencentARC/T2I-Adapter/blob/686de4681515662c0ac2ffa07bf5dda83af1038a/ldm/modules/encoders/adapter.py#L97)
      and
@@ -90,9 +92,9 @@ class Adapter(ModelMixin, ConfigMixin):
         channels_in (`int`, *optional*, defaults to 3):
             Number of channels of Aapter's input(*control image*). Set this parameter to 1 if you're using gray scale
             image as *control image*.
-        kerenl_size (`int`, *optional*, defaults to 3):
+        kernel_size (`int`, *optional*, defaults to 3):
             Kernel size of conv-2d layers inside ResNet blocks.
-        proj_kerenl_size (`int`, *optional*, defaults to 3):
+        proj_kernel_size (`int`, *optional*, defaults to 3):
             Kernel size of conv-2d projection layers located at the start and end of a downsample block.
         res_block_skip (`bool`, *optional*, defaults to True):
             If set to `True`, ResNet block will using a regular residual connect that add layer's input to its output.
@@ -112,13 +114,13 @@ class Adapter(ModelMixin, ConfigMixin):
         block_mid_channels: Optional[List[int]] = None,
         num_res_blocks: int = 3,
         channels_in: int = 3,
-        kerenl_size: int = 3,
-        proj_kerenl_size: int = 1,
+        kernel_size: int = 3,
+        proj_kernel_size: int = 1,
         res_block_skip: bool = True,
         use_conv: bool = False,
         input_scale_factor: int = 8,
     ):
-        super(Adapter, self).__init__()
+        super(T2IAdapter, self).__init__()
         self.num_downsample_blocks = len(block_out_channels)
         self.unshuffle = paddle.nn.PixelUnshuffle(downscale_factor=input_scale_factor)
         self.num_res_blocks = num_res_blocks
@@ -129,39 +131,39 @@ class Adapter(ModelMixin, ConfigMixin):
             for j in range(num_res_blocks):
                 if i != 0 and j == 0:
                     self.body.append(
-                        ResnetBlock(
+                        BottleneckResnetBlock(
                             block_out_channels[i - 1],
                             block_mid_channels[i],
                             block_mid_channels[i],
                             down=True,
-                            ksize=kerenl_size,
-                            proj_ksize=proj_kerenl_size,
+                            ksize=kernel_size,
+                            proj_ksize=proj_kernel_size,
                             sk=res_block_skip,
                             use_conv=use_conv,
                         )
                     )
                 elif j == num_res_blocks - 1:
                     self.body.append(
-                        ResnetBlock(
+                        BottleneckResnetBlock(
                             block_mid_channels[i],
                             block_mid_channels[i],
                             block_out_channels[i],
                             down=False,
-                            ksize=kerenl_size,
-                            proj_ksize=proj_kerenl_size,
+                            ksize=kernel_size,
+                            proj_ksize=proj_kernel_size,
                             sk=res_block_skip,
                             use_conv=use_conv,
                         )
                     )
                 else:
                     self.body.append(
-                        ResnetBlock(
+                        BottleneckResnetBlock(
                             block_mid_channels[i],
                             block_mid_channels[i],
                             block_mid_channels[i],
                             down=False,
-                            ksize=kerenl_size,
-                            proj_ksize=proj_kerenl_size,
+                            ksize=kernel_size,
+                            proj_ksize=proj_kernel_size,
                             sk=res_block_skip,
                             use_conv=use_conv,
                         )
@@ -179,19 +181,18 @@ class Adapter(ModelMixin, ConfigMixin):
             self.conv_in = paddle.nn.Conv2D(
                 in_channels=channels_in * input_scale_factor**2,
                 out_channels=block_mid_channels[0],
-                kernel_size=proj_kerenl_size,
+                kernel_size=proj_kernel_size,
                 stride=1,
-                padding=proj_kerenl_size // 2,
+                padding=proj_kernel_size // 2,
             )
 
     def forward(self, x: paddle.Tensor) -> List[paddle.Tensor]:
         """
         Args:
-            x (`paddle.Tensor`):
+            x (`torch.Tensor`):
                 (batch, channel, height, width) input images for adapter model, `channel` should equal to
                 `channels_in`.
         """
-        # breakpoint()
         x = self.unshuffle(x)
         features = []
         x = self.conv_in(x)
@@ -212,11 +213,11 @@ class MultiAdapter(ModelMixin):
     implements for all the model (such as downloading or saving, etc.)
 
     Parameters:
-        adapters (`List[Adapter]`, *optional*, defaults to None):
-            A list of `Adapter` model instances.
+        adapters (`List[T2IAdapter]`, *optional*, defaults to None):
+            A list of `T2IAdapter` model instances.
     """
 
-    def __init__(self, adapters: List[Adapter]):
+    def __init__(self, adapters: List[T2IAdapter]):
         super(MultiAdapter, self).__init__()
         self.num_adapter = len(adapters)
         self.adapters = paddle.nn.LayerList(sublayers=adapters)
@@ -224,7 +225,7 @@ class MultiAdapter(ModelMixin):
     def forward(self, xs: paddle.Tensor, adapter_weights: Optional[List[float]] = None) -> List[paddle.Tensor]:
         """
         Args:
-            xs (`paddle.Tensor`):
+            xs (`torch.Tensor`):
                 (batch, channel, height, width) input images for multiple adapter models concated along dimension 1,
                 `channel` should equal to `num_adapter` * "number of channel of image".
             adapter_weights (`List[float]`, *optional*, defaults to None):
@@ -235,14 +236,12 @@ class MultiAdapter(ModelMixin):
             adapter_weights = paddle.to_tensor([1 / self.num_adapter] * self.num_adapter)
         else:
             adapter_weights = paddle.to_tensor(adapter_weights)
-
         if xs.shape[1] % self.num_adapter != 0:
             raise ValueError(
                 f"Expecting multi-adapter's input have number of channel that cab be evenly divisible by num_adapter: {xs.shape[1]} % {self.num_adapter} != 0"
             )
         x_list = paddle.chunk(x=xs, chunks=self.num_adapter, axis=1)
         accume_state = None
-
         for x, w, adapter in zip(x_list, adapter_weights, self.adapters):
             features = adapter(x)
             if accume_state is None:

@@ -109,8 +109,10 @@ class GenerateArguments:
     batch_size: int = field(default=16, metadata={"help": "batch_size"})
     num_inference_steps: int = field(default=50, metadata={"help": "num_inference_steps"})
     save_path: str = field(default="output/adapter/", metadata={"help": "Path to the output file."})
-    guidance_scales: str = field(
-        default_factory=lambda: [3, 4, 5, 6, 7, 8], metadata={"help": "guidance_scales list."}
-    )
+    guidance_scales: str = field(default_factory=lambda: [5, 7, 9], metadata={"help": "guidance_scales list."})
     height: int = field(default=256, metadata={"help": "height."})
     width: int = field(default=256, metadata={"help": "width."})
+    max_generation_limits: int = field(default=1000, metadata={"help": "max generation limits."})
+    use_text_cond: bool = field(default=True, metadata={"help": "Whether or not use text condition"})
+    generate_data_format: str = field(default="img2img", metadata={"help": "Generate data format."})
+    generate_control_image_processor_type: str = field(default="openpose", metadata={"help": "Generate data format."})

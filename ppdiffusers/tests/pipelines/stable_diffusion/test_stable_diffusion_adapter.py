@@ -20,10 +20,10 @@ import numpy as np
 import paddle
 
 from ppdiffusers import (
-    Adapter,
     AutoencoderKL,
     PNDMScheduler,
     StableDiffusionAdapterPipeline,
+    T2IAdapter,
     UNet2DConditionModel,
 )
 from ppdiffusers.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
@@ -32,11 +32,11 @@ from ppdiffusers.utils.import_utils import (
     is_cutlass_fused_multihead_attention_available,
 )
 
-from ...pipeline_params import (
+from ...test_pipelines_common import PipelineTesterMixin
+from ..pipeline_params import (
     TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
     TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
 )
-from ...test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -45,7 +45,7 @@ class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.Test
     batch_params = TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS
 
     def get_dummy_components(self):
-        paddle.Generator().manual_seed(seed=0)
+        paddle.seed(seed=0)
         unet = UNet2DConditionModel(
             block_out_channels=(32, 64),
             layers_per_block=2,
@@ -82,11 +82,11 @@ class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.Test
         text_encoder = CLIPTextModel(text_encoder_config)
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
         paddle.Generator().manual_seed(seed=0)
-        adapter = Adapter(
+        adapter = T2IAdapter(
             block_out_channels=[32, 64],
             channels_in=3,
             num_res_blocks=2,
-            kerenl_size=1,
+            kernel_size=1,
             res_block_skip=True,
             use_conv=False,
             input_scale_factor=vae_scale_factor,
@@ -119,13 +119,12 @@ class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.Test
     def test_stable_diffusion_adapter_default_case(self):
         components = self.get_dummy_components()
         sd_pipe = StableDiffusionAdapterPipeline(**components)
-        sd_pipe = sd_pipe
         sd_pipe.set_progress_bar_config(disable=None)
         inputs = self.get_dummy_inputs()
         image = sd_pipe(**inputs).images
         image_slice = image[(0), -3:, -3:, (-1)]
         assert image.shape == (1, 64, 64, 3)
-        expected_slice = np.array([0.5028, 0.5518, 0.4279, 0.4807, 0.6145, 0.4335, 0.5047, 0.5072, 0.4775])
+        expected_slice = np.array([0.4897, 0.5469, 0.4324, 0.4737, 0.6164, 0.4364, 0.5071, 0.5055, 0.4791])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.005
 
     def test_attention_slicing_forward_pass(self):
@@ -136,7 +135,7 @@ class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.Test
         reason="XFormers attention is only available with CUDA and `xformers` installed",
     )
     def test_xformers_attention_forwardGenerator_pass(self):
-        self._test_xformers_attention_forwardGenerator_pass(expected_max_diff=1e-2)
+        self._test_xformers_attention_forwardGenerator_pass(expected_max_diff=0.002)
 
     def test_inference_batch_single_identical(self):
         self._test_inference_batch_single_identical(expected_max_diff=0.002)
@@ -173,7 +172,7 @@ class StableDiffusionAdapterPipelineSlowTests(unittest.TestCase):
         return inputs
 
     def test_stable_diffusion_segmentation_adapter(self):
-        adapter = Adapter.from_pretrained("RzZ/sd-v1-4-adapter-seg")
+        adapter = T2IAdapter.from_pretrained("RzZ/sd-v1-4-adapter-seg")
         pipe = StableDiffusionAdapterPipeline.from_pretrained(
             "CompVis/stable-diffusion-v1-4", adapter=adapter, safety_checker=None
         )
@@ -188,7 +187,7 @@ class StableDiffusionAdapterPipelineSlowTests(unittest.TestCase):
         assert np.abs(expected_image - image).max() < 0.005
 
     def test_stable_diffusion_keypose_adapter(self):
-        adapter = Adapter.from_pretrained("RzZ/sd-v1-4-adapter-keypose")
+        adapter = T2IAdapter.from_pretrained("RzZ/sd-v1-4-adapter-keypose")
         pipe = StableDiffusionAdapterPipeline.from_pretrained(
             "CompVis/stable-diffusion-v1-4", adapter=adapter, safety_checker=None
         )
@@ -203,7 +202,7 @@ class StableDiffusionAdapterPipelineSlowTests(unittest.TestCase):
         assert np.abs(expected_image - image).max() < 0.005
 
     def test_stable_diffusion_depth_adapter(self):
-        adapter = Adapter.from_pretrained("RzZ/sd-v1-4-adapter-depth")
+        adapter = T2IAdapter.from_pretrained("RzZ/sd-v1-4-adapter-depth")
         pipe = StableDiffusionAdapterPipeline.from_pretrained(
             "CompVis/stable-diffusion-v1-4", adapter=adapter, safety_checker=None
         )

@@ -124,3 +124,6 @@ FETCH_HEAD
 # vscode
 .vscode
 ./ppdiffusers/ppdiffusers/version.py
+
+# temp, will remove before merge
+./ppdiffusers/examples/t2i-adapter/drawer

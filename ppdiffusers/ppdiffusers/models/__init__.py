@@ -18,7 +18,7 @@
 from ..utils.import_utils import is_paddle_available
 
 if is_paddle_available():
-    from .adapter import Adapter, MultiAdapter
+    from .adapter import MultiAdapter, T2IAdapter
     from .autoencoder_kl import AutoencoderKL
     from .controlnet import ControlNetModel
     from .dual_transformer_2d import DualTransformer2DModel
