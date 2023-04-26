@@ -283,8 +283,10 @@ class Trainer:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
         self.do_grad_scaling = False
+        self.enable_autocast_context_manager = False
         if args.fp16 or args.bf16:
             logger.info("Using half precision")
+            self.enable_autocast_context_manager = True
             self.do_grad_scaling = True if args.fp16 else False
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
             # fix for load saved fp16 or bf16 ckpt, decorate model first.
@@ -714,7 +716,11 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
-                        optimizer_was_run = scale_before <= scale_after
+                        optimizer_was_run = not self.scaler._cache_founf_inf
+                        if not optimizer_was_run:
+                            logger.warning(
+                                f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
+                            )
                     else:
                         self.optimizer.step()
 
@@ -1090,7 +1096,7 @@ class Trainer:
         local_rank = self.args.local_rank
         if local_rank != -1:
             rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
-            if not os.path.isfile(os.path.join(checkpoint, rng_file)):
+            if not os.path.isfile(rng_file):
                 logger.info(
                     f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
                     "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
@@ -1297,13 +1303,14 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.args.fp16 or self.args.bf16:
+        if self.enable_autocast_context_manager:
+            black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            if self.args.bf16 and self.args.fp16_opt_level == "O2":
+                black_list.append("c_embedding")
+
             ctx_manager = autocast(
                 True,
-                custom_black_list=[
-                    "reduce_sum",
-                    "c_softmax_with_cross_entropy",
-                ],
+                custom_black_list=black_list,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1470,7 +1477,21 @@ class Trainer:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
+        """
+        set optimizer grouped parameters:
+
+        you can set optimizer_grouped_parameters with whatever argments on whatever parameters to train.
+        """
         self.optimizer_grouped_parameters = optimizer_grouped_parameters
+
+    def disable_autocast_context_manager(self):
+        """
+        For pure fp16 or pure bf16 training, the paddle.amp.autocast is annoy for always cast fp32 to fp16.
+        if you networks cast fp16 to fp32 manually to get higher precision, autocast make it not work, since it cast fp32 to fp16 back.
+
+        """
+        assert self.args.fp16_opt_level == "O2", "disable_autocast_context_manager should only work for pure fp16/bf16"
+        self.enable_autocast_context_manager = False
 
     def _sorted_checkpoints(
         self, output_dir=None, checkpoint_prefix=PREFIX_CHECKPOINT_DIR, use_mtime=False

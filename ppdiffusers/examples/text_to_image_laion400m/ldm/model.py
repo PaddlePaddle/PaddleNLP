@@ -115,15 +115,18 @@ class LatentDiffusionModel(nn.Layer):
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
         )
-        self.eval_scheduler = DDIMScheduler(
-            beta_start=0.00085,
-            beta_end=0.012,
-            beta_schedule="scaled_linear",
-            clip_sample=False,
-            set_alpha_to_one=False,
-            steps_offset=1,
-        )
-        self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
+        self.register_buffer("alphas_cumprod", self.noise_scheduler.alphas_cumprod)
+
+        if model_args.image_logging_steps > 0:
+            self.eval_scheduler = DDIMScheduler(
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+            )
+            self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.init_weights()
         self.use_ema = model_args.use_ema
         if self.use_ema:
@@ -137,6 +140,30 @@ class LatentDiffusionModel(nn.Layer):
                     "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
                     f" correctly and a GPU is available: {e}"
                 )
+
+        # make sure unet text_encoder in train mode, vae in eval mode
+        self.unet.train()
+        self.text_encoder.train()
+        self.vae.eval()
+
+    def add_noise(
+        self,
+        original_samples: paddle.Tensor,
+        noise: paddle.Tensor,
+        timesteps: paddle.Tensor,
+    ) -> paddle.Tensor:
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+        while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+
+        noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
+        return noisy_samples
 
     def init_weights(self):
         # init text_encoder
@@ -180,17 +207,17 @@ class LatentDiffusionModel(nn.Layer):
             self.model_ema(self.unet)
 
     def forward(self, input_ids=None, pixel_values=None, **kwargs):
-        self.train()
-        with paddle.amp.auto_cast(enable=False):
-            with paddle.no_grad():
-                self.vae.eval()
-                latents = self.vae.encode(pixel_values).latent_dist.sample()
-                latents = latents * 0.18215
-                noise = paddle.randn(latents.shape)
-                timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).astype(
-                    "int64"
-                )
-                noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
+        with paddle.no_grad():
+            # TODO add this
+            # with paddle.amp.auto_cast(enable=False):
+            self.vae.eval()
+            latents = self.vae.encode(pixel_values).latent_dist.sample()
+            latents = latents * 0.18215
+            noise = paddle.randn(latents.shape)
+            timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).astype(
+                "int64"
+            )
+            noisy_latents = self.add_noise(latents, noise, timesteps)
 
         encoder_hidden_states = self.text_encoder(input_ids)[0]
         noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample

@@ -139,7 +139,7 @@ def main():
 
     for epoch in range(training_args.num_train_epochs):
         if epoch == training_args.num_train_epochs:
-            logger.info("***** Trainging Done *****")
+            logger.info("***** Training Done *****")
             break
 
         for step, batch in enumerate(train_dataloader):

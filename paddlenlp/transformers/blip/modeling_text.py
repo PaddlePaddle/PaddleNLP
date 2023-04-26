@@ -630,13 +630,6 @@ class BlipTextPretrainedModel(PretrainedModel):
         if isinstance(module, nn.Linear) and module.bias is not None:
             zeros_(module.bias)
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def gradient_checkpointing_enable(self):
         """
         Activates gradient checkpointing for the current model.
@@ -691,8 +684,6 @@ class BlipTextModel(BlipTextPretrainedModel):
         self.embeddings = BlipTextEmbeddings(config)
         self.encoder = BlipTextEncoder(config)
         self.pooler = BlipTextPooler(config) if add_pooling_layer else None
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings

@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
+import tempfile
 import unittest
 
+import numpy as np
 import paddle
 from paddle import Tensor
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import (
     AlbertConfig,
@@ -30,7 +33,7 @@ from paddlenlp.transformers import (
     AlbertPretrainedModel,
 )
 
-from ...testing_utils import slow
+from ...testing_utils import require_package, slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 
@@ -335,6 +338,148 @@ class AlbertModelTest(ModelTesterMixin, unittest.TestCase):
         for model_name in list(AlbertPretrainedModel.pretrained_init_configuration.keys())[:1]:
             model = AlbertModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class AlbertModelCompatibilityTest(unittest.TestCase):
+    model_id = "hf-internal-testing/tiny-random-AlbertModel"
+
+    @require_package("transformers", "torch")
+    def test_albert_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. create input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import AlbertModel
+
+            paddle_model = AlbertModel.from_pretrained(self.model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch model
+            import torch
+            from transformers import AlbertModel
+
+            torch_model = AlbertModel.from_pretrained(self.model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 4. compare results
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_albert_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # 1. forward the torch  model
+            from transformers import AlbertModel
+
+            torch_model = AlbertModel.from_pretrained(self.model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import AlbertModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                AlbertModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_albert_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import AlbertModel
+
+            torch_model = AlbertModel.from_pretrained(self.model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import AlbertModel
+
+            paddle_model = AlbertModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
+            )
+
+    @parameterized.expand(
+        [
+            ("AlbertModel",),
+            # ("AlbertForMaskedLM",),   TODO: need to tie weights
+            # ("AlbertForPretraining",),   TODO: need to tie weights
+            ("AlbertForMultipleChoice",),
+            ("AlbertForQuestionAnswering",),
+            ("AlbertForSequenceClassification",),
+            ("AlbertForTokenClassification",),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_albert_classes_from_local_dir(self, class_name, pytorch_class_name=None):
+        pytorch_class_name = pytorch_class_name or class_name
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, pytorch_class_name)
+            torch_model = torch_model_class.from_pretrained(self.model_id)
+            torch_model.eval()
+
+            if "MultipleChoice" in class_name:
+                # construct input for MultipleChoice Model
+                torch_model.config.num_choices = random.randint(2, 10)
+                input_ids = (
+                    paddle.to_tensor(input_ids)
+                    .unsqueeze(1)
+                    .expand([-1, torch_model.config.num_choices, -1])
+                    .cpu()
+                    .numpy()
+                )
+
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 3. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    atol=1e-3,
+                )
+            )
 
 
 class AlbertModelIntegrationTest(unittest.TestCase):

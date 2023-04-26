@@ -59,6 +59,7 @@ from .import_utils import (
     ENV_VARS_TRUE_VALUES,
     DummyObject,
     OptionalDependencyNotAvailable,
+    is_einops_available,
     is_fastdeploy_available,
     is_inflect_available,
     is_k_diffusion_available,
@@ -111,6 +112,9 @@ logger = get_logger(__name__)
 
 def apply_forward_hook(method):
     return method
+
+
+from .testing_utils import export_to_video
 
 
 def check_min_version(min_version):

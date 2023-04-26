@@ -69,7 +69,7 @@ pip install -r requirements.txt
 ### pip安装
 
 ```shell
-pip install --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install --upgrade ppdiffusers
 ```
 
 ### 手动安装
@@ -118,8 +118,8 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 | hakurei/waifu-diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | waifu-diffusion-v1-2 使用 stable-diffusion-v1-4 权重初始化，并且在**高质量动漫**图像数据集上进行微调后得到的模型。用于微调的数据是 **680k** 文本图像样本，这些样本是通过 **booru 网站** 下载的。| [地址](https://huggingface.co/hakurei/waifu-diffusion) |
 | hakurei/waifu-diffusion-v1-3    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | waifu-diffusion-v1-3 是 waifu-diffusion-v1-2 基础上进一步训练得到的。他们对数据集进行了额外操作：（1）删除下划线；（2）删除括号；（3）用逗号分隔每个booru 标签；（4）随机化标签顺序。| [地址](https://huggingface.co/hakurei/waifu-diffusion) |
 | naclbit/trinart_stable_diffusion_v2_60k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | trinart_stable_diffusion 使用 stable-diffusion-v1-4 权重初始化，在 40k **高分辨率漫画/动漫风格**的图片数据集上微调了 8 个 epoch。V2 版模型使用 **dropouts**、**10k+ 图像**和**新的标记策略**训练了**更长时间**。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
-| naclbit/trinart_stable_diffusion_v2_95k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **95k** 步数的的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
-| naclbit/trinart_stable_diffusion_v2_115k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **115k** 步数的的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
+| naclbit/trinart_stable_diffusion_v2_95k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **95k** 步数的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
+| naclbit/trinart_stable_diffusion_v2_115k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **115k** 步数的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
 | Deltaadams/Hentai-Diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | None| [地址](https://huggingface.co/Deltaadams/Hentai-Diffusion) |
 | ringhyacinth/nail-set-diffuser    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 美甲领域的扩散模型，训练数据使用了 [Weekend](https://weibo.com/u/5982308498)| [地址](https://huggingface.co/ringhyacinth/nail-set-diffuser) |
 | Linaqruf/anything-v3.0    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 该模型可通过输入几个文本提示词就能生成**高质量、高度详细的动漫风格图片**，该模型支持使用 **danbooru 标签文本** 生成图像。| [地址](https://huggingface.co/Linaqruf/anything-v3.0) |
@@ -174,6 +174,36 @@ pipe.enable_xformers_memory_efficient_attention()
 # flash 需要使用 A100、A10、3060、3070、3080、3090 等以上显卡。
 # pipe.enable_xformers_memory_efficient_attention("flash")
 ```
+
+### ToME + ControlNet
+```python
+# 安装develop的ppdiffusers
+# pip install --pre --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+import paddle
+from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
+from ppdiffusers.utils import load_image
+
+controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny")
+pipe = StableDiffusionControlNetPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5", safety_checker=None, controlnet=controlnet, paddle_dtype=paddle.float16
+)
+
+# Apply ToMe with a 50% merging ratio
+pipe.apply_tome(ratio=0.5) # Can also use pipe.unet in place of pipe here
+
+# 我们可以开启 xformers
+# pipe.enable_xformers_memory_efficient_attention()
+generator = paddle.Generator().manual_seed(0)
+prompt = "bird"
+image = load_image(
+    "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/sd_controlnet/bird_canny.png"
+)
+
+image = pipe(prompt, image, generator=generator).images[0]
+
+image.save("bird.png")
+```
+
 ### 文图生成 （Text-to-Image Generation）
 
 ```python

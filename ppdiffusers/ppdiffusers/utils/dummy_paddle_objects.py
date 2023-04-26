@@ -137,6 +137,21 @@ class UNet2DModel(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class UNet3DConditionModel(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class VQModel(metaclass=DummyObject):
     _backends = ["paddle"]
 
@@ -676,6 +691,21 @@ class UniPCMultistepScheduler(metaclass=DummyObject):
 
 
 class VQDiffusionScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class DPMSolverUniDiffuserScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
