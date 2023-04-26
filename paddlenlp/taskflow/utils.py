@@ -79,6 +79,9 @@ def download_file(save_dir, filename, url, md5=None):
     else:
         logger.info("Downloading {} from {}".format(filename, url))
         logger.disable()
+        import pdb
+
+        pdb.set_trace()
         get_path_from_url(url, save_dir, md5)
     logger.enable()
     return fullname

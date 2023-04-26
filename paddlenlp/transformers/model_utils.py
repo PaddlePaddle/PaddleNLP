@@ -20,7 +20,7 @@ import re
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
 import paddle
@@ -75,6 +75,73 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def get_black_list_caster(
+    cast_black_list: list[Union[str, list[str]]]
+) -> Callable[[Union[paddle.Tensor, np.ndarray], str], Union[paddle.Tensor, np.ndarray]]:
+    """init cast black list data, it can be:
+        [ "word_embeddings.weight", ["word_embedding_layer_norm.weight", "float32"], ... ]
+
+        when dtype is "bfloat16", the mapping result will be:
+        {
+            "word_embeddings.weight": None, # do not cast
+            "word_embedding_layer_norm.weight": "float32"
+
+        }
+
+    Args:
+        cast_black_list (list[Union[str, list[str]]]): the configuration of dtype casting black list
+        dtype (str): the dtype of black list
+
+    Returns:
+        Dict[str, str]: the mapping of black list
+    """
+    cast_config = {}
+    for cast_item in cast_black_list:
+        # eg: ["word_embedding_layer_norm.weight", "float32"]
+        if isinstance(cast_item, list) and len(cast_item) == 2:
+            cast_config[cast_item[0]] = cast_item[1]
+
+        # eg: "word_embeddings.weight"
+        else:
+            cast_config[cast_item] = None
+
+    def cast(tensor: Union[paddle.Tensor, np.ndarray], dtype) -> Union[paddle.Tensor, np.ndarray]:
+        """cast numpy or paddle.Tensor
+
+        Args:
+            tensor (Union[paddle.Tensor, np.ndarray]): the tensor data
+            dtype (_type_): the target dtype
+        """
+        if paddle.is_tensor(tensor):
+            if tensor.is_floating_point():
+                if dtype == "uint16":
+                    dtype = "bfloat16"
+
+                tensor = paddle.cast(tensor, dtype)
+        elif isinstance(tensor, np.ndarray):
+            if issubclass(tensor.dtype.type, np.floating):
+                if dtype == "bfloat16":
+                    dtype = np.uint16
+                tensor = tensor.astype(dtype)
+        else:
+            raise ValueError(f"tensor must be one of ndarray or paddle.Tensor, but receive {type(tensor)}")
+
+        return tensor
+
+    def caster(key: str, tensor: Union[paddle.Tensor, np.ndarray], dtype) -> Union[paddle.Tensor, np.ndarray]:
+        if key not in cast_config:
+            tensor = cast(tensor, dtype)
+
+        # cast numpy ndarray dtype by confiugration, eg: ["word_embedding.weight", "bfloat16"]
+        elif cast_config[key] is not None:
+            cast_dtype = cast_config[key]
+            tensor = cast(tensor, cast_dtype)
+
+        return tensor
+
+    return caster
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -960,6 +1027,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         loaded_keys: List[str],
         ignore_mismatched_sizes=False,
         dtype=None,
+        cast_black_list=[],
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1078,6 +1146,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for key in list(state_dict.keys()):
                 state_dict[start_prefix + key] = state_dict.pop(key)
 
+        caster = get_black_list_caster(cast_black_list)
         # convert the dtype of state dict
         if dtype is not None:
             if isinstance(dtype, paddle.dtype):
@@ -1088,10 +1157,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
                 )
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
-                    state_dict[key] = state_dict[key].astype(dtype=dtype)
-                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                    state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                state_dict[key] = caster(key, state_dict[key], dtype)
         else:
             dtype_prefix_len = len("paddle.")
             for k, v in model_to_load.state_dict().items():
@@ -1099,10 +1165,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     dtype = str(v.dtype)[dtype_prefix_len:]
                 if k in state_dict:
                     if paddle.in_dynamic_mode():
-                        if isinstance(state_dict[k], np.ndarray):
-                            state_dict[k] = state_dict[k].astype(dtype)
-                        else:
-                            state_dict[k] = paddle.cast(state_dict[k], dtype)
+                        state_dict[key] = caster(key, state_dict[key], dtype)
                     else:
                         # there are some latent error when case dtype in static-mode, so let's:
                         # 1. convert fluid.*.Tensor -> numpy.ndarray
@@ -1185,6 +1248,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
         dtype = kwargs.pop("dtype", None)
+        cast_black_list = kwargs.pop("cast_black_list", [])
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
@@ -1264,6 +1328,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             loaded_keys=loaded_state_dict_keys,
             ignore_mismatched_sizes=ignore_mismatched_sizes,
             dtype=dtype,
+            cast_black_list=cast_black_list,
         )
 
         if len(unexpected_keys) > 0:
