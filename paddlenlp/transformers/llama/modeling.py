@@ -104,7 +104,9 @@ def scaled_dot_product_attention(
 
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
-
+    print("flash_attention")
+    print(config.use_flash_attention)
+    print(flash_attention)
     if config.use_flash_attention and flash_attention:
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
@@ -138,9 +140,18 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
         attn_weights = attention_mask + attn_weights
-        attn_weights = paddle.maximum(
-            attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
-        )
+
+        # print(query_states.dtype)
+        # print(attn_weights)
+        # print(paddle.to_tensor(float(finfo(query_states.dtype).min)))
+
+
+
+        # attn_weights = paddle.maximum(
+        #     attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
+        # )
+        # print(attn_weights)
+
 
         if config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
@@ -167,7 +178,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
 
     mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
 
-    mask_cond = paddle.arange(mask.shape[-1])
+    mask_cond = paddle.arange(target_length)
     mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
 
     if past_key_values_length > 0:
@@ -577,8 +588,29 @@ class LlamaModel(LlamaPretrainedModel):
                 self.hidden_size,
             )
 
-        self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
-        self.norm = LlamaRMSNorm(config)
+        # self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
+        # self.norm = LlamaRMSNorm(config)
+        # Transformer blocks
+        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.q_weight".format(i)) for i in range(config.num_hidden_layers)]
+        self.transformer_block = FusedLlaMa(
+                                    self.embed_dim,
+                                    self.n_head,
+                                    4 * self.embed_dim,
+                                    activation="gelu",
+                                    num_layers=config.num_hidden_layers,
+                                    ln_scale_attrs=ln_scale_attrs,
+                                    ln_bias_attrs=ln_bias_attrs,
+                                    qkv_weight_attrs=qkv_weight_attrs,
+                                    qkv_bias_attrs=qkv_bias_attrs,
+                                    linear_weight_attrs=linear_weight_attrs,
+                                    linear_bias_attrs=linear_bias_attrs,
+                                    ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+                                    ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+                                    ffn1_weight_attrs=ffn1_weight_attrs,
+                                    ffn1_bias_attrs=ffn1_bias_attrs,
+                                    ffn2_weight_attrs=ffn2_weight_attrs,
+                                    ffn2_bias_attrs=ffn2_bias_attrs
+                                    )
 
         self.gradient_checkpointing = False
 
@@ -728,6 +760,46 @@ class LlamaModel(LlamaPretrainedModel):
             attentions=all_self_attns,
             cross_attentions=None,
         )
+    
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        #print("FuseLlama set_state_dict enter")
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            print(k)
+            print(v)
+            if not k.startswith("llama.layers."):
+                new_state_dict[k] = v
+                continue
+            idx = k.split(".")[2]
+            print(idx)
+            #[TODO] fused q、k、v weight to qkv_weight
+            # fused gate_weight up_weight
+            if k.endswith("self_attn.q_proj.weight"):
+                new_state_dict["fusellama.{}.q_weight".format(idx)] = v
+            elif k.endswith("self_attn.k_proj.weight"):
+                new_state_dict["fusellama.{}.k_weight".format(idx)] = v
+            elif k.endswith("self_attn.v_proj.weight"):
+                new_state_dict["fusellama.{}.v_weight".format(idx)] = v
+            elif k.endswith("self_attn.o_proj.weight"):
+                new_state_dict["fusellama.{}.linear_weight".format(idx)] = v
+            elif k.endswith("mlp.gate_proj.weight"):
+                new_state_dict["fusellama.{}.gate_weight".format(idx)] = v
+            elif k.endswith("mlp.down_proj.weight"):
+                new_state_dict["fusellama.{}.down_weight".format(idx)] = v
+            elif k.endswith("mlp.up_proj.weight"):
+                new_state_dict["fusellama.{}.up_weight".format(idx)] = v
+            elif k.endswith("input_layernorm.weight"):
+                new_state_dict["fusellama.{}.ln_scale".format(idx)] = v
+            elif k.endswith("post_attention_layernorm.weight"):
+                new_state_dict["fusellama.{}.post_ln_scale".format(idx)] = v
+            elif k.endswith("self_attn.rotary_emb.inv_freq"):
+                new_state_dict["fusellama.{}.rotary_emb".format(idx)] = v
+            else:
+                raise ValueError("Unknow weight {}".format(k))
+
+        super().set_state_dict(new_state_dict, False)
+
 
 
 class LlamaPretrainingCriterion(paddle.nn.Layer):
