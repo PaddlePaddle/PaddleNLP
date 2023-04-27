@@ -16,8 +16,7 @@ from __future__ import annotations
 import distutils.util
 import os
 
-import fastdeploy as fd
-import numpy as np
+import paddle
 
 from paddlenlp.transformers import AutoTokenizer
 
@@ -54,6 +53,7 @@ def parse_arguments():
         default=True,
         help="Whether to use fast_tokenizer to accelarate the tokenization.",
     )
+    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
     return parser.parse_args()
 
 
@@ -94,66 +94,51 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.runtime = self.create_fd_runtime(args)
+        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
-        self.max_length = args.max_length
+        self.src_length = args.src_length
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
-        option.set_model_path(model_path, params_path)
-        if args.device == "cpu":
-            option.use_cpu()
-            option.set_cpu_thread_num(args.cpu_threads)
-        else:
-            option.use_gpu(args.device_id)
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        else:
-            option.use_trt_backend()
-            if args.backend == "paddle_tensorrt":
-                option.use_paddle_infer_backend()
-                option.paddle_infer_option.collect_trt_shape = True
-                option.paddle_infer_option.enable_trt = True
-            trt_file = os.path.join(args.model_dir, "model.trt")
-            option.trt_option.set_shape(
-                "input_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
-            )
-            if args.use_fp16:
-                option.trt_option.enable_fp16 = True
-                trt_file = trt_file + ".fp16"
-            option.trt_option.serialize_file = trt_file
-        return fd.Runtime(option)
+        config = paddle.inference.Config(model_path, params_path)
+
+        if args.device == "gpu":
+            # set GPU configs accordingly
+            config.enable_use_gpu(100, 0)
+        elif args.device == "cpu":
+            # set CPU configs accordingly,
+            # such as enable_mkldnn, set_cpu_math_library_num_threads
+            config.disable_gpu()
+        config.disable_glog_info()
+        self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
         inputs = self.tokenizer(
             input_text,
-            return_tensors="np",
             padding=True,
-            max_length="max_length",
-            return_attention_mask=False,
-            return_token_type_ids=False,
+            return_tensors="np",
+            max_length=self.src_length,
+            return_attention_mask=True,
+            return_position_ids=True,
         )
-        input_ids_name = self.runtime.get_input_info(0).name
-        input_map = {
-            input_ids_name: np.array(inputs["input_ids"], dtype="int64"),
-        }
-        return input_map
+        return inputs
 
-    def infer(self, input_map):
-        results = self.runtime.infer(input_map)
+    def infer(self, inputs):
+        input_handles = {}
+        for name in self.predictor.get_input_names():
+            input_handles[name] = self.predictor.get_input_handle(name)
+            input_handles[name].copy_from_cpu(inputs[name])
+
+        self.predictor.run()
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
         return results
 
     def postprocess(self, infer_data):
         result = []
-        for x in infer_data[0].tolist():
-            tokens = self.tokenizer.convert_ids_to_tokens(x)
-            sentence = self.tokenizer.convert_tokens_to_string(tokens)
+        for x in infer_data.tolist():
+            sentence = self.tokenizer.decode(x, skip_special_tokens=True)
             result.append(sentence)
         out_dict = {"result": result}
         return out_dict

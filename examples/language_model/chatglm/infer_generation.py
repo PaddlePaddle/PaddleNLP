@@ -14,7 +14,7 @@
 import distutils.util
 import os
 
-import fastdeploy as fd
+import paddle
 
 from paddlenlp.transformers import ChatGLMTokenizer
 
@@ -61,29 +61,23 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_path)
-        self.runtime = self.create_fd_runtime(args)
+        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
-        self.max_length = args.max_length
-        self.args = args
+        self.src_length = args.src_length
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
         model_path = os.path.join(args.model_path, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_path, args.model_prefix + ".pdiparams")
-        option.set_model_path(model_path, params_path)
-        if args.device == "cpu":
-            option.use_cpu()
-            option.set_cpu_thread_num(args.cpu_threads)
-        else:
-            option.use_gpu(args.device_id)
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        runtime = fd.Runtime(option)
-        return runtime
+        config = paddle.inference.Config(model_path, params_path)
+
+        if args.device == "gpu":
+            # set GPU configs accordingly
+            config.enable_use_gpu(100, 0)
+        elif args.device == "cpu":
+            # set CPU configs accordingly,
+            # such as enable_mkldnn, set_cpu_math_library_num_threads
+            config.disable_gpu()
+        config.disable_glog_info()
+        self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
         inputs = self.tokenizer(
@@ -91,21 +85,29 @@ class Predictor(object):
             return_tensors="np",
             add_special_tokens=True,
             padding="max_length",
-            max_length=self.args.src_length,
+            max_length=self.src_length,
             truncation=True,
             truncation_side="left",
         )
         return inputs
 
-    def infer(self, input_map):
-        results = self.runtime.infer(dict(input_map))
+    def infer(self, inputs):
+        input_handles = {}
+        for name in self.predictor.get_input_names():
+            input_handles[name] = self.predictor.get_input_handle(name)
+            input_handles[name].copy_from_cpu(inputs[name])
+
+        self.predictor.run()
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
         return results
 
     def postprocess(self, infer_data):
         result = []
-        for x in infer_data[0].tolist():
-            res = self.tokenizer.decode(x, skip_special_tokens=True)
-            result.append(res)
+        for x in infer_data.tolist():
+            sentence = self.tokenizer.decode(x, skip_special_tokens=True)
+            result.append(sentence)
         out_dict = {"result": result}
         return out_dict
 
