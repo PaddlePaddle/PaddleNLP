@@ -1257,7 +1257,11 @@ class Trainer:
 
         # Pipeline mode
         if self.args.pipeline_parallel_degree > 1:
+            orig_batch_fn = model.batch_fn if hasattr(model, "batch_fn") else None
             model = fleet.distributed_model(model)
+            if orig_batch_fn:
+                model.batch_fn = orig_batch_fn
+
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
@@ -1455,7 +1459,10 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
+        if hasattr(model, "batch_fn"):
+            inputs = model.batch_fn(inputs)
+        else:
+            inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
 
         # hack _prepare_training, remove additional optimizer or scheduler check
         # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
@@ -2037,28 +2044,31 @@ class Trainer:
         """
         prediction_step function for pipeline parallel mode.
         """
-        has_labels = all(inputs.get(k) is not None for k in self.label_names)
-        inputs = self._prepare_inputs(inputs)
-
-        # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
-        if has_labels:
-            labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
-            if len(labels) == 1:
-                labels = labels[0]
+        if hasattr(model, "batch_fn"):
+            inputs, labels = model.batch_fn(inputs)
+            has_labels = labels is not None
         else:
-            labels = None
+            has_labels = all(inputs.get(k) is not None for k in self.label_names)
+            inputs = self._prepare_inputs(inputs)
+            # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
+            if has_labels:
+                labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
+                if len(labels) == 1:
+                    labels = labels[0]
+            else:
+                labels = None
+            inputs = inputs.pop("input_ids")
 
-        input_ids = inputs.pop("input_ids")
         with paddle.no_grad():
             if has_labels:
                 with self.autocast_smart_context_manager():
-                    loss = model.eval_batch([input_ids, labels], compute_loss=True)
+                    loss = model.eval_batch([inputs, labels], compute_loss=True)
                     # loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
 
-        return (loss, None, None)
+        return (loss, None, labels)
 
     def prediction_step(
         self,
