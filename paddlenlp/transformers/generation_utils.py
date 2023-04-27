@@ -54,7 +54,7 @@ def get_unfinished_flag(
         Tensor: the unfinished flag tensor
     """
     if isinstance(eos_token_id, int):
-        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1] != eos_token_id)
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
     elif isinstance(eos_token_id[0], int):
         eos_token_id_tensor = paddle.to_tensor([eos_token_id])
         is_last_tokens_equal = paddle.all(
@@ -1025,6 +1025,7 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
         while cur_len < max_length:
+
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -1055,6 +1056,7 @@ class GenerationMixin(object):
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
+
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
