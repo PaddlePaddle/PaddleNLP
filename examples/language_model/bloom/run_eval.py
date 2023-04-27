@@ -13,21 +13,234 @@
 # limitations under the License.
 from __future__ import annotations
 
+import argparse
 import json
 import math
+import os
+import random
 import re
 import time
 from pprint import pprint as print
 
 import numpy as np
 import paddle
-from args import get_parser
+from paddle import LazyGuard
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import DataLoader
-from utils import load_model
 
 from paddlenlp.data import Stack, Tuple
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer, BloomForPretraining
+from paddlenlp.transformers.bloom.configuration import BloomConfig
 from paddlenlp.utils.log import logger
+
+
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list")
+    parser.add_argument(
+        "--model_name_or_path",
+        default=None,
+        type=str,
+        required=True,
+        help="Path to pre-trained model or shortcut name selected in the list: ",
+    )
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        help="Path to pre-trained model or shortcut name selected in the list",
+    )
+
+    # Train I/O config
+    parser.add_argument(
+        "--input_dir",
+        default=None,
+        type=str,
+        required=True,
+        help="The input directory where the data will be read from.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        default=None,
+        type=str,
+        required=True,
+        help="The output directory where the training logs and checkpoints will be written.",
+    )
+    parser.add_argument("--split", type=str, default="949,50,1", help="Train/valid/test data split.")
+
+    parser.add_argument(
+        "--global_batch_size",
+        default=None,
+        type=int,
+        help="Global batch size for all training process. None for not check the size is valid. "
+        "If we only use data parallelism, it should be device_num * micro_batch_size.",
+    )
+
+    parser.add_argument(
+        "--local_batch_size",
+        default=None,
+        type=int,
+        help="Global batch size for all training process. None for not check the size is valid. "
+        "If we only use data parallelism, it should be device_num * micro_batch_size.",
+    )
+
+    parser.add_argument(
+        "--micro_batch_size",
+        default=8,
+        type=int,
+        help="Batch size per device for one step training.",
+    )
+
+    # Default training config
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--grad_clip", default=0.0, type=float, help="Grad clip for the parameter.")
+    parser.add_argument("--max_lr", default=1e-4, type=float, help="The initial max learning rate for Adam.")
+    parser.add_argument("--min_lr", default=1e-5, type=float, help="The initial min learning rate for Adam.")
+    parser.add_argument(
+        "--warmup_rate", default=0.01, type=float, help="Linear warmup over warmup_steps for learing rate."
+    )
+
+    # Adam optimizer config
+    parser.add_argument(
+        "--adam_beta1",
+        default=0.9,
+        type=float,
+        help="The beta1 for Adam optimizer. The exponential decay rate for the 1st moment estimates.",
+    )
+    parser.add_argument(
+        "--adam_beta2",
+        default=0.999,
+        type=float,
+        help="The bate2 for Adam optimizer. The exponential decay rate for the 2nd moment estimates.",
+    )
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
+
+    # Training steps config
+    parser.add_argument(
+        "--num_train_epochs",
+        default=1,
+        type=int,
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument(
+        "--max_steps",
+        default=500000,
+        type=int,
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+    )
+    parser.add_argument("--eval_freq", type=int, default=500, help="Evaluate for every X updates steps.")
+    parser.add_argument("--eval_iters", type=int, default=10, help="Evaluate the model use X steps data.")
+    parser.add_argument(
+        "--fuse_transformer",
+        type=strtobool,
+        default=False,
+        help="Whether to use fuse attention and fuse feedforward or not.",
+    )
+
+    # Config for 4D Parallelism
+
+    parser.add_argument(
+        "--sharding_degree", type=int, default=1, help="Sharding degree. Share the parameters to many cards."
+    )
+
+    parser.add_argument("--dp_degree", type=int, default=1, help="Data Parallelism degree.")
+    parser.add_argument(
+        "--mp_degree", type=int, default=1, help="Model Parallelism degree. Spliting the linear layers to many cards."
+    )
+    parser.add_argument(
+        "--pp_degree",
+        type=int,
+        default=1,
+        help="Pipelines Parallelism degree. Spliting the transformer layers to many cards.",
+    )
+    parser.add_argument(
+        "--use_recompute", type=strtobool, nargs="?", const=False, help="Using the recompute to save the memory."
+    )
+
+    parser.add_argument("--lora", type=strtobool, nargs="?", const=False, help="Using LoRA or not.")
+
+    # add sharding stage2/3
+    parser.add_argument(
+        "--sharding_stage",
+        type=int,
+        default=1,
+        help="sharding stage1/2/3. Stage 1: The optimizer states are partitioned across the processes, "
+        "so that each process updates only its partition. Stage 2: The reduced gradients for updating "
+        "the model weights are also partitioned such that each process retains only the gradients "
+        " corresponding to its portion of the optimizer states. Stage 3: The model parameters are "
+        "partitioned across the processes. stage3 will automatically collect and partition them "
+        "during the forward and backward passes.",
+    )
+
+    parser.add_argument(
+        "--sharding_offload", type=strtobool, nargs="?", const=False, help="sharding stage2/3 cpu offload strategy."
+    )
+
+    # Pure FP16 config
+    parser.add_argument(
+        "--use_pure_fp16", type=strtobool, nargs="?", const=False, help="Enable pure fp16 precision training."
+    )
+
+    parser.add_argument(
+        "--scale_loss",
+        type=float,
+        default=32768,
+        help="The value of scale_loss for fp16. This is only used for AMP training.",
+    )
+
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
+    parser.add_argument(
+        "--attention_probs_dropout_prob", type=float, default=0.1, help="The attention probs dropout prob."
+    )
+    parser.add_argument("--to_static", action="store_true", help="Whether use to_static to train.")
+
+    parser.add_argument("--save_total_limit", type=int, default=3, help="Checkpoint save limit for training.")
+
+    # Other config
+    parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization")
+    parser.add_argument(
+        "--check_accuracy", type=strtobool, nargs="?", const=False, help="Check accuracy for training process."
+    )
+    parser.add_argument(
+        "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="select cpu, gpu, xpu devices."
+    )
+    parser.add_argument(
+        "--lr_decay_style",
+        type=str,
+        default="cosine",
+        choices=["cosine", "linear", "none"],
+        help="Learning rate decay style.",
+    )
+    parser.add_argument(
+        "-p",
+        "--profiler_options",
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format "key1=value1;key2=value2;key3=value3".',
+    )
+
+    # only for finetune
+    parser.add_argument(
+        "--task_name",
+        type=str,
+        default="sst-2",
+        choices=["cola", "sst-2", "mrpc", "sts-b", "qqp", "mnli", "qnli", "rte"],
+        help="Task name for finetune.",
+    )
+
+    parser.add_argument(
+        "--dataset_name",
+        default="squad",
+        type=str,
+        help="The name of the dataset to use. Selected in the list: " + "squad",
+    )
+
+    parser.add_argument("--max_seq_length", type=int, default=1024, help="Max sequence length.")
+    parser.add_argument("--max_source_length", type=int, default=512, help="Max sequence length for finetune.")
+    parser.add_argument("--max_target_length", type=int, default=512, help="Max sequence length for finetune.")
+    return parser
 
 
 def get_eval_parser():
@@ -45,9 +258,11 @@ def get_eval_parser():
     parser.add_argument("--overlapping_eval", type=int, default=32, help="Sliding window for overlapping eval.")
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument(
-        "--seq_length", type=int, default=1024, help="Maximum sequence length to process for evaluation."
+        "--seq_length", type=int, default=512, help="Maximum sequence length to process for evaluation."
     )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--tensor_parallel_degree", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--tensor_parallel_rank", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=10, help="logging step for eval")
     return parser
 
 
@@ -244,7 +459,89 @@ def create_eval_dataset(args):
     return val_dataloader
 
 
-@paddle.no_grad()
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
+
+    random.seed(basic_seed + data_world_rank)
+    np.random.seed(basic_seed + data_world_rank)
+    paddle.seed(basic_seed + data_world_rank)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + data_world_rank
+    tracker = get_rng_state_tracker()
+    tracker.add("global_seed", global_seed)
+    tracker.add("local_seed", local_seed)
+
+
+def load_model(args: str, model_class):
+    config: BloomConfig = BloomConfig.from_pretrained(args.model_name_or_path)
+    dtype = config.dtype or "float16"
+    paddle.set_default_dtype(dtype)
+
+    # Detecting last checkpoint.
+    config["enable_fuse_transformer"] = False
+    config["use_cache"] = True
+    config.use_pure_fp16 = False
+
+    # TODO(wj-Mcat): only support `mp_degree`, so world_size is equal to `world_size`
+    world_size = paddle.distributed.get_world_size()
+
+    if world_size == 1:
+        return model_class.from_pretrained(
+            args.model_name_or_path,
+            config=config,
+            load_state_as_np=True,
+            low_cpu_mem_usage=True,
+            dtype=dtype,
+        )
+
+    # start to init distributed env
+    strategy = fleet.DistributedStrategy()
+
+    strategy.hybrid_configs = {
+        "dp_degree": getattr(args, "dp_degree", 1),
+        "mp_degree": world_size,
+        "pp_degree": getattr(args, "pp_degree", 1),
+        "sharding_degree": getattr(args, "sharding_degree", 1),
+    }
+
+    # Set control in tensor parallel
+    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
+
+    fleet.init(is_collective=True, strategy=strategy)
+
+    # Obtain rank message of hybrid parallel
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_rank = hcg.get_model_parallel_rank()
+    dp_rank = hcg.get_data_parallel_rank()
+    sharding_rank = hcg.get_sharding_parallel_rank()
+
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+
+    # Seed control in hybrid parallel
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
+
+    config.mp_degree = world_size
+
+    with LazyGuard():
+        # init the model without initialized parameters
+        model = model_class(config=config)
+
+    weight_file = os.path.join(args.model_name_or_path, f"auto_dist{mp_rank}.pdparams")
+    logger.info(f"start to loading sharding model weight file<{weight_file}>")
+
+    # support shard state_dict
+    if not os.path.exists(weight_file):
+        raise FileNotFoundError(
+            f"sharding model weight file<auto_dist{mp_rank}.pdparams> not found under <{args.model_name_or_path}>"
+        )
+
+    state_dict = paddle.load(weight_file, return_numpy=True)
+    model.set_state_dict(state_dict)
+    return model
+
+
 def do_generation():
     parser = get_eval_parser()
     args = parser.parse_args()
@@ -261,9 +558,8 @@ def do_generation():
 
             tokens, loss_mask = batch[:2]
             labels = batch[-1]
-
-            with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype=model.config.dtype):
-                preds = paddle.cast(model(tokens).detach(), dtype=paddle.float32)
+            with paddle.amp.auto_cast(args.use_pure_fp16):
+                preds = model(tokens).detach()
 
                 if not args.cloze_eval:
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
