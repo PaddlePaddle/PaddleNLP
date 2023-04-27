@@ -716,7 +716,6 @@ class LlamaModel(LlamaPretrainedModel):
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
-
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
@@ -809,6 +808,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
+        self.config = config
         if config.tensor_parallel_degree > 1:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
         else:
@@ -823,7 +823,10 @@ class LlamaLMHead(nn.Layer):
         if self.weight.is_distributed:
             self.weight.split_axis = 1
 
-    def forward(self, hidden_states, tensor_parallel_output=True):
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
