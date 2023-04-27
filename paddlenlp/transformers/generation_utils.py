@@ -1017,6 +1017,7 @@ class GenerationMixin(object):
                 )
 
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         batch_size, cur_len = input_ids.shape
@@ -1082,6 +1083,7 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
@@ -1277,6 +1279,8 @@ class GenerationMixin(object):
         eos_token_id,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
+
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         batch_size = len(beam_scorer._beam_hyps)
