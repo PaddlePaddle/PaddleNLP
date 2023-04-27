@@ -1112,7 +1112,4 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(expected_output_ids, decoded_ids)
 
         decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6, eos_token_id=[1800, 23410])[0].tolist()
-        import pdb
-
-        pdb.set_trace()
         self.assertEqual(expected_output_ids, decoded_ids)
