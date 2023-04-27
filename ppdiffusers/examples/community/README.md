@@ -9,6 +9,7 @@
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
+|Stable Diffusion with High Resolution Fixing| ，使用高分辨率修复功能进行文图生成|[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
 
 
 ## Example usages
@@ -383,3 +384,20 @@ for lora_enabled in [True, False]:
 | lora_disable.png | lora_enable.png |
 |:----------:|:--------------:|
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
+
+### Stable Diffusion with High Resolution Fixing
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。适用于生成高分辨率图像的场景。该自定义Pipeline生成图像期间共包含两个阶段，初始生成图像阶段和高清修复阶段。
+
+```python
+import paddle
+from pipeline_stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
+paddle.seed(5232132133)
+
+pipe = StableDiffusionHiresFixPipeline.from_pretrained("stabilityai/stable-diffusion-2", paddle_dtype=paddle.float16)
+prompt = "1 real girl, long black hair, detailed face, light smile, chinese style, hanfu"
+image = pipe(prompt, guidance_scale=7.5, height=768, width=768,  hr_resize_width=768, hr_resize_height=1024).images[0]
+image.save("image.png")
+
+```
+生成的图片如下所示：
+<center class="half"><img src="https://user-images.githubusercontent.com/35913314/234758319-6df50590-c39c-4618-a438-eb464b1e26a5.png" width=50%></center>
