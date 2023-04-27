@@ -113,7 +113,9 @@ def do_train():
     train_ds, dev_ds = load_dataset("cblue", "CMeEE", splits=["train", "dev"])
 
     model = ElectraForBinaryTokenClassification.from_pretrained(
-        "ernie-health-chinese", num_classes=[len(x) for x in train_ds.label_list]
+        "ernie-health-chinese",
+        num_classes_oth=len(train_ds.label_list[0]),
+        num_classes_sym=len(train_ds.label_list[1]),
     )
     tokenizer = ElectraTokenizer.from_pretrained("ernie-health-chinese")
 
