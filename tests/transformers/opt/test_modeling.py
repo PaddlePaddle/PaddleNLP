@@ -482,10 +482,6 @@ class OPTCompatibilityTest(unittest.TestCase):
 
     @require_package("transformers", "torch")
     def test_model_config_mapping(self):
-        # 1. define the input_ids
-        config = OPTConfig.from_pretrained(OPTCompatibilityTest.test_model_id, from_hf_hub=True)
-        paddle.set_default_dtype(config.dtype)
-
         # 1. create commmon input
         input_ids = np.random.randint(100, 200, [1, 20])
 
