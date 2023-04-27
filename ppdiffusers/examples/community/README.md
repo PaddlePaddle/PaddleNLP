@@ -386,7 +386,7 @@ for lora_enabled in [True, False]:
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
 
 ### Stable Diffusion with High Resolution Fixing
-`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。适用于生成高分辨率图像的场景。该自定义Pipeline生成图像期间共包含两个阶段，初始生成图像阶段和高清修复阶段。
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
 
 ```python
 import paddle
