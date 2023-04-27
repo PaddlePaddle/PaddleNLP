@@ -1026,41 +1026,51 @@ class GenerationUtilsTestCase(unittest.TestCase):
 
         # 1. test single eos_token_id
         eos_token_id = 6
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [True, True])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, True])
 
         eos_token_id = 7
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [False, True])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         # 2. get tokens
         eos_token_id = [6, 7]
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [False, True])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         eos_token_id = [10, 11]
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [True, False])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, False])
 
         # 3. get multi tokens
         eos_token_id = [[6, 7], [9, 10]]
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [False, True])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         eos_token_id = [[6, 7], [10, 11]]
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [False, False])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
         eos_token_id = [[7], [11]]
-        unfinish_flag = paddle.to_tensor([True, True], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.tolist(), [False, False])
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [10, 11]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [10, 12]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
     @slow
     def test_gpt_multi_stop_tokens(self):

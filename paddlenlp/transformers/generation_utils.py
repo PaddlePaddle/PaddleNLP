@@ -59,7 +59,7 @@ def get_unfinished_flag(
         eos_token_id_tensor = paddle.to_tensor([eos_token_id])
         is_last_tokens_equal = paddle.all(
             paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
-        )
+        ).unsqueeze(-1)
         unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
         batch_unfinish_flag = None
