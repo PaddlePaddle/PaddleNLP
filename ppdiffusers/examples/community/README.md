@@ -9,7 +9,7 @@
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
-|Stable Diffusion with High Resolution Fixing| ，使用高分辨率修复功能进行文图生成|[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
+|Stable Diffusion with High Resolution Fixing| ，使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 
 
 ## Example usages
@@ -325,7 +325,7 @@ with paddle.amp.auto_cast(True, level="O2"):
 images[0].save("lpw.png")
 ```
 
-上述代码生成结果如下
+上述代码生成结果如下:
 
 <center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
 
@@ -379,8 +379,8 @@ for lora_enabled in [True, False]:
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
 ```
-生成的图片如下所示：
 
+生成的图片如下所示：
 | lora_disable.png | lora_enable.png |
 |:----------:|:--------------:|
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
@@ -400,4 +400,4 @@ image.save("image.png")
 
 ```
 生成的图片如下所示：
-<center class="half"><img src="https://user-images.githubusercontent.com/35913314/234758319-6df50590-c39c-4618-a438-eb464b1e26a5.png" width=50%></center>
+<center><img src="https://user-images.githubusercontent.com/35913314/234758319-6df50590-c39c-4618-a438-eb464b1e26a5.png" width=50%></center>
