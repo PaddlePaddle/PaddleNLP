@@ -1,0 +1,40 @@
+
+import paddle
+state_dict = paddle.load("./output/model_state.pdparams")
+new_state_dict = {}
+for k, v in state_dict.items():
+    print(k)
+
+
+for i in range(32): 
+    q_proj_weight = state_dict.pop(f'decoder.layers.{i}.self_attn.q_proj.weight')
+    k_proj_weight = state_dict.pop(f'decoder.layers.{i}.self_attn.k_proj.weight')
+    v_proj_weight = state_dict.pop(f'decoder.layers.{i}.self_attn.v_proj.weight')
+
+    q_proj_weight = q_proj_weight.transpose([1,0]).reshape([32,128,4096])
+    k_proj_weight = k_proj_weight.transpose([1,0]).reshape([32,128,4096])
+    v_proj_weight = v_proj_weight.transpose([1,0]).reshape([32,128,4096])
+    
+    
+    concated_qkv_weight = paddle.concat([q_proj_weight,k_proj_weight,v_proj_weight], axis=1).reshape([4096*3,4096]).transpose([1,0])
+    state_dict[f'decoder.layers.{i}.self_attn.qkv_proj.weight'] = concated_qkv_weight
+
+
+    q_proj_bias = state_dict.pop(f'decoder.layers.{i}.self_attn.q_proj.bias')
+    k_proj_bias = state_dict.pop(f'decoder.layers.{i}.self_attn.k_proj.bias')
+    v_proj_bias = state_dict.pop(f'decoder.layers.{i}.self_attn.v_proj.bias')
+
+    q_proj_bias = q_proj_bias.reshape([32,128])
+    k_proj_bias = k_proj_bias.reshape([32,128])
+    v_proj_bias = v_proj_bias.reshape([32,128])
+
+    concated_qkv_bias = paddle.concat([q_proj_bias, k_proj_bias, v_proj_bias], axis=-1).reshape([-1])
+    state_dict[f'decoder.layers.{i}.self_attn.qkv_proj.bias'] = concated_qkv_bias
+
+
+print(" ------------------------------- ")
+paddle.save(state_dict, "fused_qkv.pdparams")
+for k, v in state_dict.items():
+    print(k)
+
+

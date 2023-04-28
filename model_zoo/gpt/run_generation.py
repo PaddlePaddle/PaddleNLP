@@ -14,14 +14,15 @@
 
 import argparse
 import random
-
+import sys
+sys.path.insert(0, "../../")
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTLMHeadModel, GPTTokenizer
+from paddlenlp.transformers import GPTChineseTokenizer, GPTForGreedyGeneration, GPTTokenizer, GPTLMHeadModel
 
 MODEL_CLASSES = {
-    "gpt2": (GPTLMHeadModel, GPTTokenizer),
+    "gpt2": (GPTForGreedyGeneration, GPTTokenizer),
     "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
 }
 
@@ -30,13 +31,13 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         "--model_type",
-        default="gpt2-cn",
+        default="gpt2",
         type=str,
         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_name_or_path",
-        default="gpt-cpm-small-cn-distill",
+        default="./output",
         type=str,
         help="The path or shortcut name of the pre-trained model.",
     )
@@ -113,8 +114,8 @@ def main(args, input_text):
             )
         )
 
-    model = model_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
+    model = model_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     model.eval()
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len, model.config.max_position_embeddings)
@@ -125,19 +126,11 @@ def main(args, input_text):
     else:
         # [1, seq_len]
         input_ids = paddle.to_tensor(input_ids, dtype="int64").unsqueeze(0)
+    print(input_ids)
+    # attention_mask = paddle.ones([len[input_ids]], dtype="int64").unsqueeze(0)
 
-    ids, scores = model.generate(
-        input_ids=input_ids,
-        max_length=args.max_dec_len,
-        min_length=args.min_dec_len,
-        decode_strategy=args.decode_strategy,
-        temperature=args.temperature,
-        top_k=args.top_k,
-        top_p=args.top_p,
-        num_beams=args.num_beams,
-        length_penalty=args.length_penalty,
-        early_stopping=args.early_stopping,
-        num_return_sequences=args.num_return_sequences,
+    ids = model(
+        input_ids=input_ids
     )
 
     generated_sequences = []
@@ -151,12 +144,23 @@ def main(args, input_text):
         generated_sequences.append(sequence)
         print(sequence)
 
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention
+        ],
+    )
+
+    # Save converted static graph model
+    paddle.jit.save(model, "./KL/gpt1")
+
     return generated_sequences
 
 
 def run():
     args = parse_args()
-    input_text = "花间一壶酒，独酌无相亲。举杯邀明月，"
+    input_text = "user: 请判断下面的问题是否需要请求api才能回答，如果是则生成一个api请求。\n北京适合遛娃的地方?\n\nassistant:"
     main(args, input_text)
 
 

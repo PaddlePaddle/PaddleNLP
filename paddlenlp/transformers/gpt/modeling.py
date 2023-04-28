@@ -75,7 +75,6 @@ class MultiHeadAttention(nn.Layer):
         bias_attr=None,
     ):
         super(MultiHeadAttention, self).__init__()
-
         embed_dim = config.hidden_size
         self.embed_dim = config.hidden_size
         self.kdim = kdim if kdim is not None else config.hidden_size
@@ -83,7 +82,8 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
-        self.fuse_attention_qkv = config.fuse_attention_qkv
+
+        self.fuse_attention_qkv = True #config._fuse_prepare_qkv
 
         self.head_dim = embed_dim // self.num_heads
         assert self.head_dim * self.num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -195,8 +195,9 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
+
         # scale dot product attention
-        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
+        product = paddle.matmul(x=q, y=k, transpose_y=True) * (self.head_dim**-0.5)
 
         if attn_mask is not None:
             product = product + attn_mask
@@ -620,7 +621,6 @@ class GPTModel(GPTPretrainedModel):
 
     def __init__(self, config: GPTConfig):
         super(GPTModel, self).__init__(config)
-
         self.pad_token_id = config.pad_token_id
         self.eos_token_id = config.eos_token_id
         self.bos_token_id = config.bos_token_id
@@ -747,42 +747,34 @@ class GPTModel(GPTPretrainedModel):
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
             input_shape = paddle.shape(input_ids)
-            input_ids = input_ids.reshape((-1, input_shape[-1]))
+            # input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
             input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
+        # TODO, use registered buffer
+        length = input_shape[-1]
+        cache_length = 0
+        if cache is not None:
+            cache_length = paddle.shape(attention_mask)[-1]
+            length = length + cache_length
+        else:
+            cache_length = 0
+        causal_mask = self.bias[:, :, cache_length:length, :length]
+        attention_mask = (1.0 - causal_mask) * -1e4
+
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
+                past_length = cache_length
+                # past_length = attention_mask.shape[-1]-1
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
         )
-
-        # TODO, use registered buffer
-        length = input_shape[-1]
-        if cache is not None:
-            cache_length = paddle.shape(cache[0].k)[2]
-            length = length + cache_length
-        else:
-            cache_length = 0
-        causal_mask = self.bias[:, :, cache_length:length, :length]
-
-        if attention_mask is not None:
-            if attention_mask.dtype != paddle.int64:
-                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
-
-        # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
         outputs = self.decoder(
@@ -806,7 +798,7 @@ class GPTModel(GPTPretrainedModel):
 
         self.checkpoints.extend(self.decoder.checkpoints)
 
-        return outputs
+        return outputs, attention_mask
 
 
 class GPTForPretraining(GPTPretrainedModel):
@@ -933,11 +925,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
     """
 
-    def __init__(self, config: GPTConfig, max_predict_len: int = 32):
+    def __init__(self, config: GPTConfig, max_predict_len: int = 256):
         super(GPTForGreedyGeneration, self).__init__(config)
         self.gpt = GPTModel(config)
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
-        self.eol_token_id = config.eol_token_id
+        self.eol_token_id = config.eos_token_id
 
     def model(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -964,7 +956,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
         """
 
-        outputs = self.gpt(
+        outputs, attention_mask = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
         )
         if use_cache:
@@ -974,7 +966,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         logits = paddle.matmul(encoder_outputs, self.gpt.embeddings.word_embeddings.weight, transpose_y=True)
 
         if use_cache:
-            return logits, cached_kvs
+            return logits, cached_kvs, attention_mask
         else:
             return logits
 
@@ -989,14 +981,16 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
             They are numerical representations of tokens that build the output sequence.
         """
-        output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
+
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.float32)  # ( batch_size,
+        attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
+        output, cached_kvs, attention_mask = self.model(input_ids, attention_mask=attention_mask, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
         while cur_len < self.max_predict_len:
-            output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
-
+            output, cached_kvs, attention_mask = self.model(nid, attention_mask=attention_mask, use_cache=True, cache=cached_kvs)
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
             cur_len += 1
@@ -1085,6 +1079,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
+
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,
@@ -1163,8 +1158,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 position_ids = position_ids[:, -1].unsqueeze(-1)
         return {
             "input_ids": input_ids,
-            "position_ids": position_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "use_cache": use_cache,
             "cache": cache,
         }
