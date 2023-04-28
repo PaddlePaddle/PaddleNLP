@@ -343,37 +343,42 @@ import paddle
 from ppdiffusers.utils import image_grid
 from ppdiffusers import DiffusionPipeline
 from webui_stable_diffusion import WebUIStableDiffusionPipeline
+from pathlib import Path
 
 pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
 # 或者
 # pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
 
-# 加载Moxin_10lora权重，当前仅可加载单个lora权重
-pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
+# 自动下载civitai的lora及ti文件（请注意自己的网络。）
+# 介绍网页，程序将自动搜索介绍网页的下载链接
+pipe.download_civitai_lora_file('https://civitai.com/models/15365/hanfu')
+pipe.download_civitai_lora_file('https://civitai.com/models/12597/moxin')
+pipe.download_civitai_ti_file('https://civitai.com/models/1998/autumn-style')
+pipe.download_civitai_ti_file('https://civitai.com/models/21131/daisy-ridley-embedding')
+# 纯下载链接
+pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
 
-# 添加 textual_inversion 权重目录，程序会自动扫描该目录是否存在ti的权重
-# pipe.add_ti_embedding_dir("./")
+print("Supported Lora: " + "、 ".join([p.stem for p in Path(pipe.LORA_DIR).glob("*.safetensors")]))
 
 # 我们需要安装develop版的paddle才可以使用xformers
 # pipe.enable_xformers_memory_efficient_attention()
 scheduler_name = ["ddim", "pndm", "euler", "dpm-multi"]
-for lora_enabled in [True, False]:
-    pipe.set_lora_enabled(lora_enabled)
+for enable_lora in [True, False]:
     images = []
     for sc in scheduler_name:
         # 切换scheduler
         pipe.switch_scheduler(sc)
         # 指定clip_skip
-        clip_skip = 0
+        clip_skip = 1
         # 指定seed
         generator = paddle.Generator().manual_seed(0)
         # guidance_scale
         guidance_scale = 3.5
         prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:Moxin_10:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
         negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
-        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator).images[0]
+        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator, enable_lora=enable_lora).images[0]
         images.append(img)
-    if lora_enabled:
+    if enable_lora:
         image_grid(images, 2, 2).save(f"lora_enable.png")
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
