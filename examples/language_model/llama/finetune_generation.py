@@ -18,11 +18,17 @@ from functools import partial
 
 import paddle
 from data import DataCollatorForSupervisedDataset, convert_example
+from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    TrainingArguments,
+    get_last_checkpoint,
+    set_seed,
+)
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
@@ -53,21 +59,29 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
+    # label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    eval_with_do_generation: bool = field(
+        default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
+    )
 
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    data_args.always_pad_to_max_length = False
+    # data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    # setattr(training_args, "label_smoothing", model_args.label_smoothing)
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     paddle.set_device(training_args.device)
+
+    set_seed(args=training_args)
 
     # Log on each process the small summary:
     logger.warning(
@@ -98,8 +112,14 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
+    model_class = AutoModelForCausalLM
+    if training_args.pipeline_parallel_degree > 1:
+        if model_args.eval_with_do_generation and training_args.do_eval:
+            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+        model_class = LlamaForCausalLMPipe
+
     # Load the pretrained language model.
-    model = AutoModelForCausalLM.from_pretrained(
+    model = model_class.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -110,6 +130,7 @@ def main():
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
     )
+
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
@@ -131,11 +152,17 @@ def main():
     tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
+    if training_args.do_train or training_args.do_eval:
+        train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
-    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func))
-    dev_ds = dev_ds.map(partial(trans_func, is_eval=True))
+    if training_args.do_train:
+        train_ds = train_ds.map(partial(trans_func))
+    if training_args.do_eval:
+        # pipeline_parallel eval is the some as training.
+        is_eval = model_args.eval_with_do_generation
+        dev_ds = dev_ds.map(partial(trans_func, is_eval=is_eval))
+
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
     def compute_metrics_trainer(eval_preds, tokenizer):
@@ -163,11 +190,13 @@ def main():
     trainer = LlamaTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
+        train_dataset=train_ds if training_args.do_train else None,
+        eval_dataset=dev_ds if training_args.do_eval else None,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_func,
-        do_generation=True,
+        compute_metrics=compute_metrics_func
+        if (model_args.eval_with_do_generation and training_args.do_eval)
+        else None,
+        do_generation=model_args.eval_with_do_generation,
         data_collator=collate_fn,
     )
 
