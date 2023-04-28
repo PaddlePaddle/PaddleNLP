@@ -28,6 +28,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import paddle
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
@@ -509,6 +510,12 @@ class PretrainedConfig:
         self.tie_word_embeddings = kwargs.pop(
             "tie_word_embeddings", True
         )  # Whether input and output word embeddings should be tied for all MLM, LM and Seq2Seq models.
+
+        # parameter for model dtype
+        if "torch_dtype" in kwargs:
+            self.dtype = kwargs.pop("torch_dtype")
+        else:
+            self.dtype = kwargs.pop("dtype", paddle.get_default_dtype())
 
         # Parameters for tensor parallel
         self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
