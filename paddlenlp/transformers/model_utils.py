@@ -877,6 +877,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # 0. when it is local file
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
+        elif os.path.isfile(os.path.join(cache_dir, cls.resource_files_names["model_state"])):
+            return os.path.join(cache_dir, cls.resource_files_names["model_state"])
 
         # 1. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:

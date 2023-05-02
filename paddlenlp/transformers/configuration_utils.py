@@ -841,6 +841,8 @@ class PretrainedConfig:
             resolved_config_file = resolve_hf_config_path(
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
             )
+        elif os.path.isfile(os.path.join(cache_dir, CONFIG_NAME)):
+            resolved_config_file = os.path.join(cache_dir, CONFIG_NAME)
         else:
             community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME])
             if url_file_exists(community_url):
