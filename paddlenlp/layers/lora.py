@@ -247,6 +247,7 @@ class LoRAMergedLinear(nn.Linear):
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                 ),
             )
+            # Make sure lora_B is split in column for ColumnParallelLoRAMergedLinear.
             self.lora_B = self.create_parameter(
                 shape=[r, out_features // len(enable_lora) * sum(enable_lora)],
                 dtype=self._dtype,
@@ -277,12 +278,12 @@ class LoRAMergedLinear(nn.Linear):
             if self.r > 0 and any(self.enable_lora):
                 delta_weight = (
                     F.conv1d(
-                        self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_A.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
                 new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
@@ -295,12 +296,12 @@ class LoRAMergedLinear(nn.Linear):
             if self.r > 0 and any(self.enable_lora):
                 delta_weight = (
                     F.conv1d(
-                        self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_A.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
                 new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
@@ -313,18 +314,18 @@ class LoRAMergedLinear(nn.Linear):
             if len(input_a.shape) == 2:
                 delta = (
                     F.conv1d(
-                        input_a.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        input_a.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
             elif len(input_a.shape) == 3:
                 delta = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                 ).transpose([0, 2, 1])
@@ -389,6 +390,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                 ),
             )
+            # Make sure lora_B is split in column the same as ColumnParallelLoRALinear.
             self.lora_B = self.create_parameter(
                 shape=[r, self.output_size_per_partition // len(enable_lora) * sum(enable_lora)],
                 dtype=self._dtype,
@@ -419,12 +421,12 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             if self.r > 0 and any(self.enable_lora):
                 delta_weight = (
                     F.conv1d(
-                        self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_A.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
                 new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
@@ -437,12 +439,12 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             if self.r > 0 and any(self.enable_lora):
                 delta_weight = (
                     F.conv1d(
-                        self.lora_A.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_A.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
                 new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
@@ -458,18 +460,18 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             if len(input_a.shape) == 2:
                 delta_mp = (
                     F.conv1d(
-                        input_a.transpose([1, 0]).unsqueeze(0),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        input_a.T.unsqueeze(0),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
-                    .transpose([1, 0])
+                    .T
                 )
             elif len(input_a.shape) == 3:
                 delta_mp = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
-                        self.lora_B.transpose([1, 0]).unsqueeze(-1),
+                        self.lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                 ).transpose([0, 2, 1])
