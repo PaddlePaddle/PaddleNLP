@@ -44,7 +44,7 @@ class MidasInference:
         elif device == "NPU":
             if config.lite_engine_enabled():
                 config.enable_lite_engine()
-            config.enable_npu()
+            config.enable_custom_device("npu")
         else:
             config.disable_gpu()
             config.set_cpu_math_library_num_threads(4)
