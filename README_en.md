@@ -19,7 +19,7 @@
 
 <h4 align="center"> <a href=#features> Features </a> | <a href=#installation> Installation </a> | <a href=#quick-start> Quick Start </a> | <a href=#api-reference> API Reference </a> | <a href=#community> Community </a>
 
-**PaddleNLP** is a natural language processing development library that is both **easy to use** and **powerful**. It aggregates high-quality pre-trained models in the industry and provides a **plug-and-play** development experience, covering a model library for various NLP scenarios. With practical examples from industry practices, PaddleNLP can meet the needs of developers who require **flexible customization**.
+**PaddleNLP** is a NLP library that is both **easy to use** and **powerful**. It aggregates high-quality pretrained models in the industry and provides a **plug-and-play** development experience, covering a model library for various NLP scenarios. With practical examples from industry practices, PaddleNLP can meet the needs of developers who require **flexible customization**.
 
 ## News 📢
 
