@@ -35,7 +35,7 @@
     * 🔨 NLP Tools: [NLP Pipeline System Pipelines](./pipelines) has been released, supporting the rapid construction of search engines and question-answering systems, and can be extended to support various NLP systems, making it easy, flexible, and efficient to solve NLP tasks like building blocks!
     * 💎 Industrial Applications: A new [text classification full-process application solution](./applications/text_classification) has been added, covering various scenarios such as multi-classification, multi-label, and hierarchical classification, supporting small-sample learning and TrustAI trustworthy computing model training and tuning.
     * 🍭 AIGC: The SOTA model [CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen) for code generation in various programming languages has been added.
-    * 💪 Framework Upgrade: [Automatic Model Compression API](./docs/compression.md) has been released, which automatically cuts and quantizes models, greatly reducing the threshold for using model compression technology. [Small Sample Prompt](./applications/text_classification/multi_class/few-shot) capability has been released, integrating classic algorithms such as PET, P-Tuning, and RGL.
+    * 💪 Framework Upgrade: [Automatic Model Compression API](./docs/compression.md) has been released, which automatically cuts and quantizes models, greatly reducing the threshold for using model compression technology. [Few-shot Prompt](./applications/text_classification/multi_class/few-shot) capability has been released, integrating classic algorithms such as PET, P-Tuning, and RGL.
 
 
 
