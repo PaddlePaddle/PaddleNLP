@@ -72,6 +72,7 @@ TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 LORA_CONFIG_NAME = "lora_config.json"
 PREFIX_CONFIG_NAME = "prefix_config.json"
 LORA_WEIGHT_FILE_NAME = "lora_model_state.pdparams"
+PREFIX_WEIGHT_FILE_NAME = "prefix_model_state.pdparams"
 
 PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
 PADDLE_WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"

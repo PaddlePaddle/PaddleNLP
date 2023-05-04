@@ -82,6 +82,7 @@ from .utils import (
     load_state_dict,
     paddlenlp_load,
     resolve_cache_dir,
+    weight_name_suffix,
 )
 
 __all__ = [
@@ -307,7 +308,6 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 def _find_weight_file_path(
     cache_dir: str,
     model_class: Type[PretrainedModel],
-    config: PretrainedConfig = None,
     resource_uri: Optional[str] = None,
     variant: str | None = None,
 ) -> str | None:
@@ -332,12 +332,12 @@ def _find_weight_file_path(
         return weight_file_path
 
     # 3. find the target weight file name for splited tensor parallel
-    if config and config.tensor_parallel_degree > 1:
-        tensor_parallel_weight_file_path = os.path.join(
-            cache_dir, _add_variant(resource_weight_file_name, f"tp{config.tensor_parallel_rank:0>2d}")
-        )
-        if os.path.isfile(tensor_parallel_weight_file_path):
-            return tensor_parallel_weight_file_path
+    # fix for load hybrid parallel
+    hybrid_parallel_weight_file_path = os.path.join(
+        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
+    )
+    if os.path.isfile(hybrid_parallel_weight_file_path):
+        return hybrid_parallel_weight_file_path
 
     # 4. find the target weight file if there is only one weight file
     weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
@@ -1597,7 +1597,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
             # deal with local files for shard files
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, variant=variant)
 
         # 4. download from community or hf-hub
         else:
@@ -1906,7 +1906,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-        dtype = kwargs.pop("dtype", None)
         variant = kwargs.pop("variant", None)
 
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
@@ -2062,6 +2061,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", True)
 
         # 1. retrieve the model related config
 
@@ -2102,17 +2103,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         state_dict_to_save = state_dict
         config_to_save = copy.deepcopy(model_to_save.config)
-        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
-            config_to_save.tensor_parallel_degree = 1
-            if config_to_save.tensor_parallel_rank != 0:
-                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                return
-        else:
-            if config_to_save.tensor_parallel_degree > 1:
-                WEIGHTS_NAME = _add_variant(PADDLE_WEIGHT_FILE_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
-
-        config_to_save = model_to_save.config
 
         # Save the model
         if state_dict_to_save is None:
@@ -2127,6 +2117,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     WEIGHTS_NAME = _add_variant(
                         PADDLE_WEIGHT_FILE_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
                     )
+                if variant is None:
+                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
+                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
                 state_dict_to_save = self.state_dict()
 
@@ -2182,6 +2175,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHT_FILE_NAME, variant))
             logger.info(f"Model weights saved in {path_to_weights}")
 
+        # Save model
+        if paddle.in_dynamic_mode():
+            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
+            paddle.save(state_dict_to_save, file_name)
+            del model_to_save
         else:
             save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
