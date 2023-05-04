@@ -58,7 +58,9 @@ def main():
 
     if args.train_dataset == "CMeEE":
         model = ElectraForBinaryTokenClassification.from_pretrained(
-            args.params_path, num_classes=NUM_CLASSES[args.train_dataset]
+            args.params_path,
+            num_classes_oth=NUM_CLASSES[args.train_dataset][0],
+            num_classes_sym=NUM_CLASSES[args.train_dataset][1],
         )
     elif args.train_dataset == "CMeIE":
         model = ElectraForSPO.from_pretrained(args.params_path, num_classes=NUM_CLASSES[args.train_dataset])

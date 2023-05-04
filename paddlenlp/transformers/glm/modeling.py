@@ -754,7 +754,10 @@ class GLMForMultipleChoice(GLMPretrainedModel):
         for output, choices, choice_index in zip(F.log_softmax(lm_logits, axis=-1), choice_ids, choice_indices):
             log_probs_single = []
             for choice, choice_target_id in zip(choices, choice_index):
-                log_probs_single.append(output[choice_target_id, choice].sum()[0])
+                log_prob = output[choice_target_id, choice].sum()
+                if len(log_prob.shape) == 0:
+                    log_prob = log_prob.unsqueeze(0)
+                log_probs_single.append(log_prob)
             log_probs.append(paddle.stack(log_probs_single))
         log_probs = paddle.stack(log_probs).squeeze(2)
         loss = None

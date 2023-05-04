@@ -46,6 +46,37 @@ python -u  -m paddle.distributed.fleet.launch \
     --warmup_steps 20
 ```
 
+## 流水线并行
+```shell
+python -u  -m paddle.distributed.launch \
+    --gpus "4,5,6,7"   finetune_generation.py \
+    --model_name_or_path facebook/tiny-random-llama \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 1 \
+    --dataloader_num_workers 1 \
+    --gradient_accumulation_steps 1 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 16 \
+    --tensor_parallel_degree 2 \
+    --pipeline_parallel_degree 2 \
+    --pipeline_parallel_mirco_batch_size 1 \
+    --pipeline_parallel_config "disable_p2p_cache_shape" \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 1 \
+    --disable_tqdm 1 \
+    --eval_steps 100 \
+    --eval_with_do_generation 0 \
+    --fp16 0\
+    --fp16_opt_level O2 \
+    --recompute \
+    --learning_rate 3e-5 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20
+```
+
 <a name="3"></a>
 
 ## 模型预测

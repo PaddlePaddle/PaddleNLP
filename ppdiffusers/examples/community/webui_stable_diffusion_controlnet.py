@@ -16,16 +16,22 @@
 # modified from https://github.com/AUTOMATIC1111/stable-diffusion-webui
 # Here is the AGPL-3.0 license https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/LICENSE.txt
 
+import copy
 import inspect
+import os
+import os.path
 import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import paddle
 import paddle.nn as nn
+import PIL
+import PIL.Image
+from huggingface_hub.file_download import _request_wrapper, hf_raise_for_status
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
-from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
+from ppdiffusers.models import AutoencoderKL, ControlNetModel, UNet2DConditionModel
 from ppdiffusers.pipelines.pipeline_utils import DiffusionPipeline
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
@@ -33,6 +39,7 @@ from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from ppdiffusers.schedulers import KarrasDiffusionSchedulers
 from ppdiffusers.utils import (
+    PIL_INTERPOLATION,
     PPDIFFUSERS_CACHE,
     logging,
     ppdiffusers_url_download,
@@ -41,17 +48,6 @@ from ppdiffusers.utils import (
     smart_load,
     torch_load,
 )
-
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
-
-
-import copy
-import os
-import os.path
-
-from huggingface_hub.file_download import _request_wrapper, hf_raise_for_status
-
-# lark omegaconf
 
 
 def get_civitai_download_url(display_url, url_prefix="https://civitai.com"):
@@ -194,13 +190,14 @@ def load_lora(
     return pipeline
 
 
-class WebUIStableDiffusionPipeline(DiffusionPipeline):
-    r"""
-    Pipeline for text-to-image generation using Stable Diffusion.
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
+
+class WebUIStableDiffusionControlNetPipeline(DiffusionPipeline):
+    r"""
+    Pipeline for text-to-image generation using Stable Diffusion with ControlNet guidance.
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
-
     Args:
         vae ([`AutoencoderKL`]):
             Variational Auto-Encoder (VAE) Model to encode and decode images to and from latent representations.
@@ -212,10 +209,11 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             Tokenizer of class
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
+        controlnet ([`ControlNetModel`]):
+            Provides additional conditioning to the unet during the denoising process.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`]
-            or [`DPMSolverMultistepScheduler`].
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
@@ -225,6 +223,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
     _optional_components = ["safety_checker", "feature_extractor"]
     enable_emphasis = True
     comma_padding_backtrack = 20
+
     LORA_DIR = os.path.join(PPDIFFUSERS_CACHE, "lora")
     TI_DIR = os.path.join(PPDIFFUSERS_CACHE, "textual_inversion")
 
@@ -234,6 +233,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
+        controlnet: ControlNetModel,
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -262,6 +262,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
+            controlnet=controlnet,
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
@@ -450,10 +451,12 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
     def check_inputs(
         self,
         prompt,
+        image,
         height,
         width,
         callback_steps,
         negative_prompt=None,
+        controlnet_conditioning_scale=1.0,
     ):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
@@ -472,6 +475,74 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         if negative_prompt is not None and not isinstance(negative_prompt, str):
             raise ValueError(f"`negative_prompt` has to be of type `str` but is {type(negative_prompt)}")
 
+        # Check `image`
+
+        if isinstance(self.controlnet, ControlNetModel):
+            self.check_image(image, prompt)
+        else:
+            assert False
+
+        # Check `controlnet_conditioning_scale`
+        if isinstance(self.controlnet, ControlNetModel):
+            if not isinstance(controlnet_conditioning_scale, (float, list, tuple)):
+                raise TypeError(
+                    "For single controlnet: `controlnet_conditioning_scale` must be type `float, list(float) or tuple(float)`."
+                )
+
+    def check_image(self, image, prompt):
+        image_is_pil = isinstance(image, PIL.Image.Image)
+        image_is_tensor = isinstance(image, paddle.Tensor)
+        image_is_pil_list = isinstance(image, list) and isinstance(image[0], PIL.Image.Image)
+        image_is_tensor_list = isinstance(image, list) and isinstance(image[0], paddle.Tensor)
+
+        if not image_is_pil and not image_is_tensor and not image_is_pil_list and not image_is_tensor_list:
+            raise TypeError(
+                "image must be one of PIL image, paddle tensor, list of PIL images, or list of paddle tensors"
+            )
+
+        if image_is_pil:
+            image_batch_size = 1
+        elif image_is_tensor:
+            image_batch_size = image.shape[0]
+        elif image_is_pil_list:
+            image_batch_size = len(image)
+        elif image_is_tensor_list:
+            image_batch_size = len(image)
+
+        if prompt is not None and isinstance(prompt, str):
+            prompt_batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            prompt_batch_size = len(prompt)
+
+        if image_batch_size != 1 and image_batch_size != prompt_batch_size:
+            raise ValueError(
+                f"If image batch size is not 1, image batch size must be same as prompt batch size. image batch size: {image_batch_size}, prompt batch size: {prompt_batch_size}"
+            )
+
+    def prepare_image(self, image, width, height, dtype):
+        if not isinstance(image, paddle.Tensor):
+            if isinstance(image, PIL.Image.Image):
+                image = [image]
+
+            if isinstance(image[0], PIL.Image.Image):
+                images = []
+                for image_ in image:
+                    image_ = image_.convert("RGB")
+                    image_ = image_.resize((width, height), resample=PIL_INTERPOLATION["lanczos"])
+                    image_ = np.array(image_)
+                    image_ = image_[None, :]
+                    images.append(image_)
+
+                image = np.concatenate(images, axis=0)
+                image = np.array(image).astype(np.float32) / 255.0
+                image = image.transpose(0, 3, 1, 2)
+                image = paddle.to_tensor(image)
+            elif isinstance(image[0], paddle.Tensor):
+                image = paddle.concat(image, axis=0)
+
+        image = image.cast(dtype)
+        return image
+
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
         if isinstance(generator, list) and len(generator) != batch_size:
@@ -487,10 +558,33 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
+    def _default_height_width(self, height, width, image):
+        while isinstance(image, list):
+            image = image[0]
+
+        if height is None:
+            if isinstance(image, PIL.Image.Image):
+                height = image.height
+            elif isinstance(image, paddle.Tensor):
+                height = image.shape[3]
+
+            height = (height // 8) * 8  # round down to nearest multiple of 8
+
+        if width is None:
+            if isinstance(image, PIL.Image.Image):
+                width = image.width
+            elif isinstance(image, paddle.Tensor):
+                width = image.shape[2]
+
+            width = (width // 8) * 8  # round down to nearest multiple of 8
+
+        return height, width
+
     @paddle.no_grad()
     def __call__(
         self,
         prompt: str = None,
+        image: PIL.Image.Image = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 50,
@@ -505,6 +599,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         clip_skip: int = 1,
+        controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
         enable_lora: bool = True,
     ):
         r"""
@@ -514,6 +609,13 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             prompt (`str`, *optional*):
                 The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
                 instead.
+            image (`paddle.Tensor`, `PIL.Image.Image`):
+                The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
+                the type is specified as `paddle.Tensor`, it is passed to ControlNet as is. `PIL.Image.Image` can
+                also be accepted as an image. The dimensions of the output image defaults to `image`'s dimensions. If
+                height and/or width are passed, `image` is resized according to them. If multiple ControlNets are
+                specified in init, images must be passed as a list such that each element of the list can be correctly
+                batched for input to a single controlnet.
             height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
                 The height in pixels of the generated image.
             width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
@@ -558,6 +660,10 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                 [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
             clip_skip (`int`, *optional*, defaults to 1):
                 CLIP_stop_at_last_layers, if clip_skip <= 1, we will use the last_hidden_state from text_encoder.
+            controlnet_conditioning_scale (`float` or `List[float]`, *optional*, defaults to 1.0):
+                The outputs of the controlnet are multiplied by `controlnet_conditioning_scale` before they are added
+                to the residual in the original unet. If multiple ControlNets are specified in init, you can set the
+                corresponding scale as a list.
         Examples:
 
         Returns:
@@ -571,19 +677,27 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
 
         try:
             # 0. Default height and width to unet
-            height = height or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
-            width = width or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
+            height, width = self._default_height_width(height, width, image)
 
             # 1. Check inputs. Raise error if not correct
             self.check_inputs(
                 prompt,
+                image,
                 height,
                 width,
                 callback_steps,
                 negative_prompt,
+                controlnet_conditioning_scale,
             )
 
             batch_size = 1
+
+            image = self.prepare_image(
+                image=image,
+                width=width,
+                height=height,
+                dtype=self.controlnet.dtype,
+            )
 
             # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
             # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -658,30 +772,61 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                     if do_batch:
+                        encoder_hidden_states = paddle.concat([uncond_tensor, cond_tensor])
+                        down_block_res_samples, mid_block_res_sample = self.controlnet(
+                            latent_model_input,
+                            t,
+                            encoder_hidden_states=encoder_hidden_states,
+                            controlnet_cond=paddle.concat([image, image]),
+                            conditioning_scale=controlnet_conditioning_scale,
+                            return_dict=False,
+                        )
                         noise_pred = self.unet(
                             latent_model_input,
                             t,
-                            encoder_hidden_states=paddle.concat([uncond_tensor, cond_tensor]),
+                            encoder_hidden_states=encoder_hidden_states,
                             cross_attention_kwargs=cross_attention_kwargs,
+                            down_block_additional_residuals=down_block_res_samples,
+                            mid_block_additional_residual=mid_block_res_sample,
                         ).sample
                         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                         noise_pred = noise_pred_uncond + weight * guidance_scale * (
                             noise_pred_text - noise_pred_uncond
                         )
                     else:
+                        down_block_res_samples, mid_block_res_sample = self.controlnet(
+                            latent_model_input,
+                            t,
+                            encoder_hidden_states=cond_tensor,
+                            controlnet_cond=image,
+                            conditioning_scale=controlnet_conditioning_scale,
+                            return_dict=False,
+                        )
                         noise_pred = self.unet(
                             latent_model_input,
                             t,
                             encoder_hidden_states=cond_tensor,
                             cross_attention_kwargs=cross_attention_kwargs,
+                            down_block_additional_residuals=down_block_res_samples,
+                            mid_block_additional_residual=mid_block_res_sample,
                         ).sample
 
                         if do_classifier_free_guidance:
+                            down_block_res_samples, mid_block_res_sample = self.controlnet(
+                                latent_model_input,
+                                t,
+                                encoder_hidden_states=uncond_tensor,
+                                controlnet_cond=image,
+                                conditioning_scale=controlnet_conditioning_scale,
+                                return_dict=False,
+                            )
                             noise_pred_uncond = self.unet(
                                 latent_model_input,
                                 t,
                                 encoder_hidden_states=uncond_tensor,
                                 cross_attention_kwargs=cross_attention_kwargs,
+                                down_block_additional_residuals=down_block_res_samples,
+                                mid_block_additional_residual=mid_block_res_sample,
                             ).sample
                             noise_pred = noise_pred_uncond + weight * guidance_scale * (noise_pred - noise_pred_uncond)
 
@@ -857,7 +1002,7 @@ class FrozenCLIPEmbedderWithCustomWordsBase(nn.Layer):
         Returns the list and the total number of tokens in the prompt.
         """
 
-        if WebUIStableDiffusionPipeline.enable_emphasis:
+        if WebUIStableDiffusionControlNetPipeline.enable_emphasis:
             parsed = parse_prompt_attention(line)
         else:
             parsed = [[line, 1.0]]
@@ -908,10 +1053,11 @@ class FrozenCLIPEmbedderWithCustomWordsBase(nn.Layer):
                 # this is when we are at the end of alloted 75 tokens for the current chunk, and the current token is not a comma. opts.comma_padding_backtrack
                 # is a setting that specifies that if there is a comma nearby, the text after the comma should be moved out of this chunk and into the next.
                 elif (
-                    WebUIStableDiffusionPipeline.comma_padding_backtrack != 0
+                    WebUIStableDiffusionControlNetPipeline.comma_padding_backtrack != 0
                     and len(chunk.tokens) == self.chunk_length
                     and last_comma != -1
-                    and len(chunk.tokens) - last_comma <= WebUIStableDiffusionPipeline.comma_padding_backtrack
+                    and len(chunk.tokens) - last_comma
+                    <= WebUIStableDiffusionControlNetPipeline.comma_padding_backtrack
                 ):
                     break_location = last_comma + 1
 
