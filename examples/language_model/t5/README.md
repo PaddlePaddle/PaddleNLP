@@ -10,6 +10,102 @@
 
 ## 快速开始
 
+### 预训练
+
+本项目致力于t5模型的预训练，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。 并训练发布开源最优的模型参数。
+
+接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
+
+#### 1. 数据准备
+
+数据流是预训练的非常重要的，[预处理文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
+
+在数据ID化步骤中，我们需要配置tokenzer_name，选择t5模型对应的tokenizer；通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
+
+```shell
+python -u  create_pretraining_data.py \
+    --model_name t5-small \
+    --tokenizer_name T5Tokenizer \
+    --input_path baike_sample.jsonl \
+    --split_sentences\
+    --output_prefix baike_sample  \
+    --workers 1 \
+    --log_interval 5
+```
+
+#### 2. 开始训练
+
+**路径配置**
+
+- 主要配置输入输出目录
+- 这里的`vocab_dir`如果没有使用自定义词表的话，请设置为内置的tokenizer，如`t5-small`等。
+- 这里的 `data_dir` 设置多份数据集，用户不使用多份数据集的话，直接`data_dir="./data"`即可。
+
+**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
+
+```shell
+python3 -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "${base_dir}/log_${trainer_id}" \
+    t5_run_pretrain_trainer.py \
+    --model_type "t5" \
+    --model_name_or_path "t5-small" \
+    --tokenizer_name_or_path "${vocab_dir}" \
+    --input_dir "${data_dir}" \
+    --output_dir "${base_dir}" \
+    --split 949,50,1 \
+    --max_seq_len 512 \
+    --binary_head true \
+    --micro_batch_size 64 \
+    --use_amp true \
+    --fp16_opt_level "O1" \
+    --use_recompute false \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 4000000 \
+    --save_steps 100000 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3900000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.01 \
+    --grad_clip 1.0 \
+    --logging_freq 20 \
+    --num_workers 3 \
+    --eval_freq 1000 \
+    --device "gpu"\
+    --share_folder true \
+    --hidden_dropout_prob 0.1 \
+    --attention_probs_dropout_prob 0.1 \
+    --seed 1234 \
+```
+
+其中参数释义如下：
+
+- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹(对于ernie，词表文件名一般命名为vocab.txt)，或者PaddleNLP内置tokenizer的名字。
+- `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
+- `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
+- `output_dir` 指定输出文件。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认`split=949,50,1`, 使用1/1000的数据为test，当样本数太少时，增大测试的样本数目。
+- `max_seq_len` 输入文本序列的长度，默认值`512`。
+- `binary_head` 是否使用SOP(Sentences Order Predicet) loss，默认为 True，使用此loss。如果用户句子语料很短，无法组合成句子对，请设置此参数为`false`。
+- `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
+- `use_amp` 开启混合精度策略。
+- `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
+- `max_lr` 训练学习率。
+- `min_lr` 学习率衰减到最小值后，学习率将一直保持为`min_lr`。
+- `max_steps` 最大训练步数。训练不支持通过`epoch`控制，第一次制造数据index时候，日志会显示数据会被计算的epoch数，请注意查看。
+- `save_steps` 保存模型间隔。默认保存地址格式为`output_dir/model_50000`(5w 步时的权重)。
+- `checkpoint_steps` 模型checkpoint间隔，用于模型断点重启训练。默认地址为`output_dir/model_last`.
+- `weight_decay` 权重衰减参数。
+- `warmup_rate` 学习率warmup参数。
+- `grad_clip` 梯度裁剪范围。
+- `logging_freq` 日志输出间隔。
+- `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
+- `eval_freq` 模型评估间隔。
+- `device` 训练设备，默认为GPU。
+- `share_folder` 多机训练时，如果多机`input_dir`为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。（每次运行，会制作训练的index数据，如果为挂载的统一nfs位置，则一台机器制作数据即可，否则每台机器都需要制作）
+
 ### GLUE任务
 
 ### 执行Fine-tunning
