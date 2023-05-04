@@ -46,6 +46,7 @@ from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..layers.lora import LoRAModel
+from ..prompt import PrefixModelForCausalLM
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -1662,7 +1663,11 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
-        if not isinstance(self.model, PretrainedModel) and not isinstance(self.model, LoRAModel):
+        if (
+            not isinstance(self.model, PretrainedModel)
+            and not isinstance(self.model, LoRAModel)
+            and not isinstance(self.model, PrefixModelForCausalLM)
+        ):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 unwrap_model(self.model).save_pretrained(
                     output_dir,

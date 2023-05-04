@@ -526,7 +526,7 @@ class LoRAConfig:
             "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
         },
     )
-    tensor_parallel_degree: int = field(default=1, metadata={"help": "1 for not use tensor parallel"})
+    tensor_parallel_degree: int = field(default=-1, metadata={"help": "1 for not use tensor parallel"})
     dtype: Optional[str] = field(default=None, metadata={"help": "The data type of tensor"})
 
     @property
@@ -643,7 +643,7 @@ class LoRAModel(nn.Layer):
                 )
 
             # convert parameters to tensor parallel for mp model
-            if lora_config_tensor_parallel_degree == 1 and model.config.tensor_parallel_degree > 1:
+            if lora_config_tensor_parallel_degree <= 1 and model.config.tensor_parallel_degree > 1:
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
 
             # set lora state dict
@@ -691,7 +691,7 @@ class LoRAModel(nn.Layer):
         if self.model.config.tensor_parallel_rank != 0:
             logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
             return
-        self.lora_config.tensor_parallel_degree = 1
+        self.lora_config.tensor_parallel_degree = -1
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
