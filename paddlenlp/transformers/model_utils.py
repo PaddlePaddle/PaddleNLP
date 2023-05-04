@@ -69,6 +69,7 @@ from .utils import (
     fn_args_to_dict,
     is_paddle_support_lazy_init,
     resolve_cache_dir,
+    weight_name_suffix,
 )
 
 __all__ = [
@@ -278,7 +279,6 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 def _find_weight_file_path(
     cache_dir: str,
     model_class: Type[PretrainedModel],
-    config: PretrainedConfig = None,
     resource_uri: Optional[str] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
@@ -302,12 +302,12 @@ def _find_weight_file_path(
         return weight_file_path
 
     # 3. find the target weight file name for splited tensor parallel
-    if config and config.tensor_parallel_degree > 1:
-        tensor_parallel_weight_file_path = os.path.join(
-            cache_dir, _add_variant(resource_weight_file_name, f"tp{config.tensor_parallel_rank:0>2d}")
-        )
-        if os.path.isfile(tensor_parallel_weight_file_path):
-            return tensor_parallel_weight_file_path
+    # fix for load hybrid parallel
+    hybrid_parallel_weight_file_path = os.path.join(
+        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
+    )
+    if os.path.isfile(hybrid_parallel_weight_file_path):
+        return hybrid_parallel_weight_file_path
 
     # 4. find the target weight file if there is only one weight file
     weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
@@ -925,7 +925,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
 
         # 4. download from community or hf-hub
         else:
@@ -1244,6 +1244,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     "don't support conversion from pytorch weight file to paddle weight file "
                     "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                 )
+
         else:
             # 4. loading the state dict
             if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):
@@ -1337,6 +1338,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", True)
 
         # 1. retrieve the model related config
 
@@ -1354,22 +1357,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
             config_to_save.tensor_parallel_degree = 1
+            # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
+            variant = None
             if config_to_save.tensor_parallel_rank != 0:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
         else:
             if config_to_save.tensor_parallel_degree > 1:
-                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
+                if variant is None:
+                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
+                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
             state_dict_to_save = self.state_dict()
 
-        # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
-        config_to_save.save_pretrained(save_dir)
+        if is_main_process:
+            # Attach architecture to the config
+            config_to_save.architectures = [model_to_save.__class__.__name__]
+            config_to_save.save_pretrained(save_dir)
 
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, WEIGHTS_NAME)
+            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
             paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:

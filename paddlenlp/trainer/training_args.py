@@ -438,6 +438,22 @@ class TrainingArguments:
         },
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
+    pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
+    pipeline_parallel_micro_batch_size: int = field(
+        default=1, metadata={"help": ("mirco_batch_size in pipeline parallel mode")}
+    )
+    pipeline_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it."
+                "following config is support:\n"
+                "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
+                "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+            )
+        },
+    )
     recompute: bool = field(
         default=False,
         metadata={
@@ -445,6 +461,7 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
@@ -627,42 +644,96 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1:
+        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
-            assert (
-                world_size % self.tensor_parallel_degree == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree:{self.tensor_parallel_degree}."
-
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+
+            assert (
+                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // tensor_parallel_degree
+                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
+                self.sharding = []
 
-            assert world_size % (sharding_parallel_degree * tensor_parallel_degree) == 0, (
-                "The world size for workers should be divided by sharding_parallel_degree and tensor_parallel_degree, "
-                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree},"
+            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) == 0, (
+                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, and pipeline_parallel_degree, "
+                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, "
+                "pipeline_parallel_degree:{pipeline_parallel_degree}, "
                 " world_size:{world_size}"
             )
-            self.data_parallel_degree = world_size // (sharding_parallel_degree * tensor_parallel_degree)
+            self.data_parallel_degree = world_size // (
+                sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
+            )
 
             if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
                 warnings.warn("`offload` and `stage3` is not supported NOW!")
 
+            if pipeline_parallel_degree > 1:
+                if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
+                    raise ValueError(
+                        "pipeline parallel is not compatible for sharding stage2 or stage3, please using sharding stage1"
+                    )
+
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                 strategy = fleet.DistributedStrategy()
+                if pipeline_parallel_degree > 1:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    for x in pipeline_parallel_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "disable_p2p_cache_shape",
+                                "disable_partial_send_recv",
+                                "enable_delay_scale_loss",
+                            ]:
+                                raise ValueError(
+                                    f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                )
+                    assert (
+                        self.per_device_train_batch_size % self.pipeline_parallel_micro_batch_size == 0
+                    ), "train_batch_size should be multiple of mirco_batch_size."
+                    pp_accumulate_steps = self.per_device_train_batch_size // self.pipeline_parallel_micro_batch_size
+
+                    strategy.pipeline_configs = {
+                        "accumulate_steps": pp_accumulate_steps,
+                        "micro_batch_size": self.pipeline_parallel_micro_batch_size,
+                        "enable_partial_send_recv": False
+                        if "disable_partial_send_recv" in pipeline_parallel_config
+                        else True,
+                        "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
+                        # "delay_scale_loss": True, Fix ME
+                    }
+                    dygraph_pp_configs = {
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False
+                    }
+
+                    if self.do_eval:
+                        assert self.per_device_train_batch_size == self.per_device_eval_batch_size, (
+                            "In pipeline model, the evaluation also shares same setting with training. "
+                            "Please set per_device_eval_batch_size=per_device_train_batch_size."
+                        )
+
+                if tensor_parallel_degree > 1:
+                    strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
+
                 strategy.hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
-                    "pp_degree": 1,
+                    "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "pp_configs": dygraph_pp_configs if pipeline_parallel_degree > 1 else {},
                 }
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
@@ -784,14 +855,22 @@ class TrainingArguments:
             return 0
 
     @property
+    def pipeline_parallel_rank(self):
+        if self.use_hybrid_parallel:
+            hcg = fleet.get_hybrid_communicate_group()
+            rank = hcg.get_stage_id()
+            return max(rank, 0)
+        else:
+            return 0
+
+    @property
     def optimizer_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-            # TODO: support pipeline parallel
-            # if self.pipeline_parallel_degree > 1:
-            #     name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
@@ -805,9 +884,8 @@ class TrainingArguments:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-            # TODO: support pipeline parallel
-            # if self.pipeline_parallel_degree > 1:
-            #     name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
         else:
             return None
@@ -842,6 +920,22 @@ class TrainingArguments:
 
     @property
     def should_save(self):
+        """
+        Whether or not the current process should write to disk, e.g., to save models and checkpoints.
+
+        For model state:
+            work for data parallel, tensor parallel, sharding
+        For optimizer state:
+            work for data parallel, tensor parallel
+            not work for sharding
+        """
+        if self.save_on_each_node:
+            return self.local_process_index == 0
+        else:
+            return self.process_index == 0
+
+    @property
+    def should_save_model_state(self):
         """
         Whether or not the current process should write to disk, e.g., to save models and checkpoints.
 
