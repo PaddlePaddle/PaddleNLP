@@ -1668,6 +1668,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         remove_prefix_from_model = not has_prefix_module and expects_prefix_module
         add_prefix_to_model = has_prefix_module and not expects_prefix_module
 
+        expected_keys_not_prefixed = []
         if remove_prefix_from_model:
             _prefix = f"{prefix}."
             expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(_prefix)]
@@ -1914,7 +1915,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
-        cache_dir = kwargs.pop("cache_dir", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
         dtype = kwargs.pop("dtype", None)
         variant = kwargs.pop("variant", None)
