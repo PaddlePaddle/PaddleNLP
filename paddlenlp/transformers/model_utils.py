@@ -1668,10 +1668,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         remove_prefix_from_model = not has_prefix_module and expects_prefix_module
         add_prefix_to_model = has_prefix_module and not expects_prefix_module
 
-        expected_keys_not_prefixed = []
         if remove_prefix_from_model:
             _prefix = f"{prefix}."
-            expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(_prefix)]
             expected_keys = [s[len(_prefix) :] if s.startswith(_prefix) else s for s in expected_keys]
         elif add_prefix_to_model:
             expected_keys = [".".join([prefix, s]) for s in expected_keys]
@@ -1695,14 +1693,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_to_load = model
         if len(cls.base_model_prefix) > 0 and not hasattr(model, cls.base_model_prefix) and has_prefix_module:
             start_prefix = cls.base_model_prefix + "."
-        if len(cls.base_model_prefix) > 0 and hasattr(model, cls.base_model_prefix) and not has_prefix_module:
-            model_to_load = getattr(model, cls.base_model_prefix)
-            base_model_expected_keys = list(model_to_load.state_dict().keys())
-            if any(key in expected_keys_not_prefixed and key not in base_model_expected_keys for key in loaded_keys):
-                raise ValueError(
-                    "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
-                    "properly saved?"
-                )
 
         def _find_mismatched_keys(
             state_dict,
