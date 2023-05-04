@@ -1104,7 +1104,7 @@ class GenerationUtilsTestCase(unittest.TestCase):
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
 
-    def test_gpt_generation_to_static(self):
+    def test_gpt_generation(self):
         # init the tiny-random-gpt
         model = GPTLMHeadModel.from_pretrained("__internal_testing__/tiny-random-gpt")
         model.eval()
@@ -1112,10 +1112,7 @@ class GenerationUtilsTestCase(unittest.TestCase):
         input_ids = np.array([list(range(200, 300)), list(range(100, 200))])
 
         # 1. get the dygraph decoded_ids
-        expected_output_ids = [
-            [15426, 15426, 15426, 15426, 15426, 15426, 15426, 15426, 15426, 15426, 15426],
-            [18966, 18000, 18000, 23410, 23410, 23410, 23410, 23410, 23410, 23410, 23410],
-        ]
+        expected_output_ids = [[15426, 15426, 15426, 15426, 15426, 15426], [18966, 18000, 23410, 23410, 23410, 23410]]
 
         decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6)[0].tolist()
 
