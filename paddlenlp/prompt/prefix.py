@@ -387,17 +387,15 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         weight_filename = os.path.join(save_directory, prefix_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 
-        # (bs, prefixlen, hidden_dim*layer_num*2)
+        # past_key_values: (prefixlen, hidden_dim*layer_num*2)
         past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([1, -1]))[0].numpy()
-        logger.info("2")
-        logger.info(past_key_values.shape) 
+
         if self.model.config.tensor_parallel_rank == 0:
+            # save prefix config
             self.prefix_config.save_pretrained(save_directory)
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            
+            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree            
             # save past key values
             paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
-            logger.info("3") 
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
