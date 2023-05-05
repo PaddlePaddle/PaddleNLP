@@ -340,6 +340,8 @@ class _BaseAutoModelClass:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
+            cached_standard_config = os.path.join(cache_dir, cls.model_config_file)
+            cached_legacy_config = os.path.join(cache_dir, cls.legacy_model_config_file)
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
@@ -347,8 +349,12 @@ class _BaseAutoModelClass:
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
             )
             try:
-                if url_file_exists(standard_community_url):
+                if os.path.isfile(cached_standard_config):
+                    resolved_vocab_file = cached_standard_config
+                elif url_file_exists(standard_community_url):
                     resolved_vocab_file = get_path_from_url_with_filelock(standard_community_url, cache_dir)
+                elif os.path.isfile(cached_legacy_config):
+                    resolved_vocab_file = cached_legacy_config
                 elif url_file_exists(legacy_community_url):
                     logger.info("Standard config do not exist, loading from legacy config")
                     resolved_vocab_file = get_path_from_url_with_filelock(legacy_community_url, cache_dir)
