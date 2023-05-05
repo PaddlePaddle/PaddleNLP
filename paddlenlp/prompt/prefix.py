@@ -24,7 +24,11 @@ from paddle.distributed import fleet
 
 from ..transformers.model_utils import _add_variant
 from ..utils.distributed import distributed_gather
-from ..utils.env import PREFIX_CONFIG_NAME, PREFIX_WEIGHT_FILE_NAME, PAST_KEY_VALUES_FILE_NAME
+from ..utils.env import (
+    PAST_KEY_VALUES_FILE_NAME,
+    PREFIX_CONFIG_NAME,
+    PREFIX_WEIGHT_FILE_NAME,
+)
 from ..utils.log import logger
 from .prompt_utils import signature
 
@@ -274,9 +278,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         # (bs, prefixlen, hidden_dim*layer_num*2/tensor_parallel_degree)
         if self.config.tensor_parallel_degree > 1:
-            split_past_key_values = past_key_values.split(
-                num_or_sections=self.config.tensor_parallel_degree, axis=2
-            )
+            split_past_key_values = past_key_values.split(num_or_sections=self.config.tensor_parallel_degree, axis=2)
             past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
             num_attention_heads = self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree
         else:
@@ -393,7 +395,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         if self.model.config.tensor_parallel_rank == 0:
             # save prefix config
             self.prefix_config.save_pretrained(save_directory)
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree            
+            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             # save past key values
             paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
 

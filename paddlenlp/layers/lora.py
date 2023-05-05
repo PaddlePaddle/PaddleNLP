@@ -722,6 +722,7 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
