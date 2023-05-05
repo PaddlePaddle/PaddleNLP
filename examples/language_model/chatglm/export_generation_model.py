@@ -55,6 +55,7 @@ def main():
     )
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
+
     model.eval()
     input_spec = [
         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
