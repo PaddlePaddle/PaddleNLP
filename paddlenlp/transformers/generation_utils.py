@@ -1055,6 +1055,7 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
+
             if isinstance(outputs, tuple):
                 logits = outputs[0]
             elif isinstance(outputs, ModelOutput):
@@ -1159,6 +1160,7 @@ class GenerationMixin(object):
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
+
             logits = logits_processors(input_ids, logits)
 
             # sample
@@ -1178,6 +1180,7 @@ class GenerationMixin(object):
             if paddle.get_default_dtype() not in ["float32", "float64"]:
                 probs = probs.astype("float32")
             next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1670,7 +1673,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         forced_bos_token_id (:obj:`int`):
-            The id of the token to to be generated as the first token.
+            The id of the token to be generated as the first token.
     """
 
     def __init__(self, forced_bos_token_id):
@@ -1691,7 +1694,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
     def __init__(self, max_length, forced_eos_token_id):

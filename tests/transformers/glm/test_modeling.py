@@ -192,8 +192,11 @@ class GLMModelTester:
         model = GLMForMultipleChoice(config=config)
         model.eval()
         choice_labels = ids_tensor([self.batch_size, self.num_choices], self.num_choices, dtype="int64")
-        choice_indices = [[x for x in batch] for batch in choice_labels]
-        choice_ids = [[x for x in batch] for batch in ids_tensor(choice_labels.shape, vocab_size=self.vocab_size)]
+        choice_indices = paddle.to_tensor([[x for x in batch] for batch in choice_labels], dtype="int64")
+        choice_ids = paddle.to_tensor(
+            [[x for x in batch] for batch in ids_tensor(choice_labels.shape, vocab_size=self.vocab_size)],
+            dtype="int64",
+        )
 
         result = model(
             input_ids,

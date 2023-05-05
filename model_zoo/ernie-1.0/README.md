@@ -513,7 +513,7 @@ python3 -u  -m paddle.distributed.launch \
         - 对模型结构，配置参数，paddle版本信息进行记录，方便复现环境
     - **下游任务评估**：CLUE Benchmark搜索评估参数效果
         - 使用[批量启动-grid-search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/clue#%E6%89%B9%E9%87%8F%E5%90%AF%E5%8A%A8-grid-search)，可以进行批量搜索任务
-        - 注意，这里使用的是训练中的checkpoint进行评估，可以直接试着 评估待评估的参数为，所在的路径地址，即如 `python grid_seach.py ouput/ernie-base-outdir/model_100000` 之类的checkpoint地址。
+        - 注意，这里使用的是训练中的checkpoint进行评估，可以直接试着 评估待评估的参数为，所在的路径地址，即如 `python grid_seach.py output/ernie-base-outdir/model_100000` 之类的checkpoint地址。
 
 详细介绍请参见[ERNIE 中文预训练介绍](./pretraining_introduction.md)。
 

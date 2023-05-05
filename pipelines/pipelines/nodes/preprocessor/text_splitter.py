@@ -42,6 +42,7 @@ class TextSplitter(BaseComponent):
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
         self._length_function = length_function
+        self._filter = None
 
     @abstractmethod
     def split_text(self, text: str) -> List[str]:
@@ -105,23 +106,56 @@ class TextSplitter(BaseComponent):
             docs.append(doc)
         return docs
 
+    def clean(self, documents: List[dict]):
+        for special_character in self._filter:
+            for doc in documents:
+                doc["content"] = doc["content"].replace(special_character, "")
+        return documents
+
     def run(  # type: ignore
         self,
-        query: str,  # type: ignore
+        documents: Union[dict, List[dict]],
         meta: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None,  # type: ignore
     ):
-        texts = self.split_text(query)
-        result = {"documents": texts}
+        ret = []
+        if type(documents) == dict:  # single document
+            text_splits = self.split_text(documents["content"])
+            for i, txt in enumerate(text_splits):
+                doc = copy.deepcopy(documents)
+                doc["content"] = txt
+
+                if "meta" not in doc.keys() or doc["meta"] is None:
+                    doc["meta"] = {}
+
+                doc["meta"]["_split_id"] = i
+                ret.append(doc)
+
+        elif type(documents) == list:  # list document
+            for document in documents:
+                text_splits = self.split_text(document["content"])
+                for i, txt in enumerate(text_splits):
+                    doc = copy.deepcopy(document)
+                    doc["content"] = txt
+
+                    if "meta" not in doc.keys() or doc["meta"] is None:
+                        doc["meta"] = {}
+
+                    doc["meta"]["_split_id"] = i
+                    ret.append(doc)
+        if self._filter is not None and len(self._filter) > 0:
+            ret = self.clean(ret)
+        result = {"documents": ret}
         return result, "output_1"
 
 
 class CharacterTextSplitter(TextSplitter):
     """Implementation of splitting text that looks at characters."""
 
-    def __init__(self, separator: str = "\n\n", **kwargs: Any):
+    def __init__(self, separator: str = "\n\n", filters: list = [], **kwargs: Any):
         """Create a new TextSplitter."""
         super().__init__(**kwargs)
         self._separator = separator
+        self._filter = filters
 
     def split_text(self, text: str) -> List[str]:
         """Split incoming text and return chunks."""

@@ -94,12 +94,13 @@ def main():
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=10,
+            num_prefix_tokens=64,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
             prefix_projection=True,
             prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
         )
         model = PrefixModelForCausalLM(
             model=model,
@@ -117,6 +118,7 @@ def main():
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
