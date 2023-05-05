@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-import copy
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -23,10 +24,13 @@ from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 IGNORE_INDEX = -100
 
 
-def convert_example(example, tokenizer, data_args, is_eval=False):
-    """
-    Convert an example into necessary features.
-    """
+def convert_example(
+    example,
+    tokenizer,
+    max_source_length,
+    max_target_length,
+    is_train=False,
+):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -49,7 +53,7 @@ def convert_example(example, tokenizer, data_args, is_eval=False):
     source_tokenized = tokenizer(
         input_seq,
         return_tensors="pd",
-        max_length=data_args.src_length,
+        max_length=max_source_length,
         truncation=True,
     )
 
@@ -60,20 +64,13 @@ def convert_example(example, tokenizer, data_args, is_eval=False):
     example_tokenized = tokenizer(
         input_seq + output_seq,
         return_tensors="pd",
-        max_length=data_args.src_length + data_args.tgt_length,
-        padding="max_length" if data_args.always_pad_to_max_length else False,
+        max_length=max_source_length + max_target_length,
         truncation=True,
     )
 
     input_ids = example_tokenized["input_ids"][0]
-    labels = copy.deepcopy(input_ids)
+    labels = deepcopy(input_ids)
     labels[:source_input_ids_len] = IGNORE_INDEX
-
-    if is_eval:
-        return dict(
-            input_ids=source_tokenized["input_ids"][0],
-            labels=labels,
-        )
 
     return dict(
         input_ids=input_ids,
@@ -110,10 +107,6 @@ class DataCollatorForSupervisedDataset(object):
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
         input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
         labels = left_padding(labels, pad_id=IGNORE_INDEX)
-        attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
 
-        return dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=attention_mask,
-        )
+        attention_mask = input_ids.equal(paddle.to_tensor(self.tokenizer.pad_token_id)) * 1e-4
+        return dict(input_ids=input_ids, labels=labels, attention_mask=attention_mask)

@@ -23,7 +23,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import GPTTokenizer, OPTConfig, OPTForCausalLM, OPTModel
-from tests.testing_utils import PaddleNLPModelTest, slow
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -32,7 +32,7 @@ from tests.transformers.test_modeling_common import (
 )
 
 OPT_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/opt-1.3b",
+    "facebook/opt-125m",
 ]
 
 
@@ -49,7 +49,7 @@ class OPTModelTester:
         num_hidden_layers=5,
         num_attention_heads=4,
         intermediate_size=37,
-        hidden_act="gelu",
+        hidden_act="relu",
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
         max_position_embeddings=512,
@@ -94,12 +94,12 @@ class OPTModelTester:
         input_mask = None
         if self.use_input_mask:
             # contruct input_mask filling with 0 and -1e4
-            input_mask_cond = paddle.randn([self.batch_size, self.seq_length])
-            input_mask = paddle.where(
-                input_mask_cond > input_mask_cond.mean(),
-                paddle.zeros_like(input_mask_cond, dtype="int64"),
-                paddle.full(input_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-            )
+            # left padding: [[-1e4, -1e4, -1e4, 0, 0], [-1e4, -1e4, -1e4, 0, 0], ...]
+            input_mask = []
+            for _ in range(self.batch_size):
+                pad_length = random.randint(0, self.seq_length)
+                input_mask.append([0] * (self.seq_length - pad_length) + [1] * pad_length)
+            input_mask = paddle.to_tensor(input_mask, dtype="int64")
 
         sequence_labels = None
         token_labels = None
@@ -200,57 +200,17 @@ class OPTModelTester:
         output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
         if self.parent.return_dict:
             output_from_no_past = output_from_no_past[0]
-        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
+
+        past_key_values_length = paddle.shape(past[0].k)[2]
+        attention_mask = paddle.ones(shape=[next_tokens.shape[0], 1 + past_key_values_length])
+        output_from_past = model(
+            next_tokens, use_cache=True, attention_mask=attention_mask, cache=past, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
         output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx].detach()
         output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
-
-        # test that outputs are equal for slice
-        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
-
-    def create_and_check_opt_model_attention_mask_past(self, config, input_ids, input_mask, *args):
-        model = OPTModel(config)
-        model.eval()
-
-        # create attention mask
-        attn_mask = paddle.zeros(input_ids.shape, dtype="int64")
-        half_seq_length = self.seq_length // 2
-        attn_mask[:, half_seq_length:] = -10000
-
-        # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
-            :2
-        ]
-
-        # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
-
-        # change a random masked slice from input_ids
-        random_seq_idx_to_change = ids_tensor((1,), half_seq_length, dtype="int64").item() + 1
-        random_other_next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64").squeeze(-1)
-        input_ids[:, -random_seq_idx_to_change] = random_other_next_tokens
-
-        # append to next input_ids and attn_mask
-        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
-        attn_mask = paddle.concat(
-            [attn_mask, paddle.ones((attn_mask.shape[0], 1), dtype="int64")],
-            axis=1,
-        )
-
-        # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)
-        if self.parent.return_dict:
-            output_from_no_past = output_from_no_past[0]
-        output_from_past = model(
-            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
-        )[0]
-
-        # select random slice
-        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx]
-        output_from_past_slice = output_from_past[:, 0, random_slice_idx]
 
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
@@ -265,12 +225,7 @@ class OPTModelTester:
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
-        next_mask_cond = paddle.randn((self.batch_size, 3))
-        next_mask = paddle.where(
-            next_mask_cond > next_mask_cond.mean(),
-            paddle.zeros_like(next_mask_cond, dtype="int64"),
-            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-        )
+        next_mask = paddle.ones_like(next_tokens, dtype=paddle.int64)
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -359,12 +314,9 @@ class OPTModelTester:
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size, dtype="int64")
-        next_mask_cond = paddle.randn((self.batch_size, 3))
-        next_mask = paddle.where(
-            next_mask_cond > next_mask_cond.mean(),
-            paddle.zeros_like(next_mask_cond, dtype="int64"),
-            paddle.full(next_mask_cond.shape, fill_value=-1e4, dtype="int64"),
-        )
+
+        # all next mask is ones
+        next_mask = paddle.ones_like(next_tokens, dtype="int64")
 
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -442,10 +394,6 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_opt_model_past(*config_and_inputs)
 
-    def test_opt_model_att_mask_past(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_opt_model_attention_mask_past(*config_and_inputs)
-
     def test_opt_model_past_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_opt_model_past_large_inputs(*config_and_inputs)
@@ -467,7 +415,6 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         model = OPTForCausalLM.from_pretrained("facebook/opt-1.3b")
         model.eval()
         tokenizer = GPTTokenizer.from_pretrained("facebook/opt-1.3b")
-
         tokenizer.padding_side = "left"
 
         # use different length sentences to test batching
@@ -476,16 +423,12 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
             "Today, I",
         ]
 
-        inputs = tokenizer(
-            sentences, return_tensors="pd", padding=True, return_attention_mask=True, return_position_ids=True
-        )
+        inputs = tokenizer(sentences, return_tensors="pd", padding=True)
         input_ids = inputs["input_ids"]
 
         outputs, _ = model.generate(
             input_ids=input_ids,
-            position_ids=inputs["position_ids"],
             decode_strategy="greedy_search",
-            attention_mask=inputs["attention_mask"],
             use_cache=True,
         )
         batch_out_sentence = tokenizer.batch_decode(outputs, skip_special_tokens=True)
@@ -495,25 +438,79 @@ class OPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
             input_ids=inputs_non_padded, use_cache=True, decode_strategy="greedy_search"
         )
         non_padded_sentence = tokenizer.decode(output_non_padded[0], skip_special_tokens=True)
-        print("non_padded_sentence: ", non_padded_sentence)
 
         inputs_padded = tokenizer(sentences[1], return_tensors="pd")["input_ids"]
         output_padded, _ = model.generate(input_ids=inputs_padded, use_cache=True, decode_strategy="greedy_search")
         padded_sentence = tokenizer.decode(output_padded[0], skip_special_tokens=True)
-        print("padded_sentence: ", padded_sentence)
 
         expected_output_sentence = [
             " a rescue and she's the best dog ever. she's a little bitch but she's the best",
             " am going to share with you a few of my favorite recipes.\nI have been cooking for a",
         ]
+
         self.assertListEqual(expected_output_sentence, batch_out_sentence)
         self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
+
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+
+        # generate max 3 tokens
+        max_length = 3
+
+        if config.eos_token_id or config.pad_token_id:
+            config["pad_token_id"] = config["eos_token_id"]
+
+        return config, input_ids, attention_mask, max_length
 
     @slow
     def test_model_from_pretrained(self):
         for model_name in OPT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = OPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class OPTCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-OPTModel"
+
+    @require_package("transformers", "torch")
+    def test_model_config_mapping(self):
+        # 1. create commmon input
+        input_ids = np.random.randint(100, 200, [1, 20])
+
+        # 2. forward the torch model
+        import torch
+        import transformers
+
+        torch_model_class = getattr(transformers, "OPTModel")
+        torch_model = torch_model_class.from_pretrained(OPTCompatibilityTest.test_model_id)
+        torch_model.eval()
+
+        torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+        # 3. forward the paddle model
+        from paddlenlp import transformers
+
+        paddle_model_class = getattr(transformers, "OPTModel")
+        paddle_model = paddle_model_class.from_pretrained(OPTCompatibilityTest.test_model_id, from_hf_hub=True)
+        paddle_model.eval()
+
+        paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
+
+        self.assertTrue(
+            np.allclose(
+                paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                atol=1e-4,
+            )
+        )
 
 
 class OPTModelIntegrationTest(unittest.TestCase):
@@ -543,8 +540,10 @@ class OPTModelIntegrationTest(unittest.TestCase):
     def test_inference_with_attention(self):
         model = OPTModel.from_pretrained("facebook/opt-1.3b")
         model.eval()
+
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[-10000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)
         expected_shape = [1, 11, 2048]
@@ -553,9 +552,9 @@ class OPTModelIntegrationTest(unittest.TestCase):
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [1.79993951, 0.50285941, -0.86480486],
-                    [1.08661187, 0.09854298, -0.98229992],
-                    [1.53367269, -0.67371541, -1.04433393],
+                    [0.15988758, -0.21016182, -0.28532112],
+                    [-0.18293847, -0.35511413, 0.56858277],
+                    [0.39969346, -0.33906624, -0.43125907],
                 ]
             ]
         )
