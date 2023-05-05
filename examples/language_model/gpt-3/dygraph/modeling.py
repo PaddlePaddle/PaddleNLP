@@ -681,7 +681,7 @@ class GPTPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "gpt"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         # no hook
         return
@@ -774,7 +774,6 @@ class GPTModel(GPTPretrainedModel):
             use_recompute=use_recompute,
         )
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
@@ -831,10 +830,6 @@ class GPTForPretraining(GPTPretrainedModel):
     def __init__(self, gpt):
         super(GPTForPretraining, self).__init__()
         self.gpt = gpt
-        self.apply(self.init_weights)
-        # extra_parameters using for sharding stage3 to register extra_parameters
-        # TODO(Baibaifan): add additional extra parameters mode of semi-automatic registration later
-        self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
 
     def forward(
         self,
@@ -906,7 +901,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
-        self.apply(self.init_weights)
 
     def model(
         self,
@@ -965,9 +959,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         # self.gpt = GPTModel(config)  # allow gpt to be config
         self.gpt = gpt
         self.score = nn.Linear(gpt.config["hidden_size"], num_labels, bias_attr=False)
-        self.apply(self.init_weights)
         self.num_classes = num_labels
-        # self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
 
     def forward(
         self,
@@ -1727,7 +1719,6 @@ class GPTLMHeadModel(GPTPretrainedModel):
         #     fuse=False,
         # )
         self.criterion = GPTPretrainingCriterion(pad_token_id=pad_token_id)
-        self.apply(self.init_weights)
 
     def forward(
         self,

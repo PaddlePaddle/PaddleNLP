@@ -36,6 +36,8 @@ try:
 except:
     flash_attention = None
 
+import warnings
+
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -54,27 +56,44 @@ __all__ = [
     "LlamaModel",
     "LlamaPretrainedModel",
     "LlamaForCausalLM",
+    "LlamaPretrainingCriterion",
 ]
 
 
-def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, -np.inf, dtype=x.dtype)
+    mask.stop_gradient = True
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
+
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
-    world_size = 1
+    tensor_parallel_degree = 1
     try:
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
-        world_size = hcg.get_model_parallel_world_size()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
     except:
         is_fleet_init = False
-    if is_fleet_init and world_size > 1:
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=False)
-        if parallel_output:
+
+        if tensor_parallel_output:
             return logits
+
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
     else:
         logits = paddle.matmul(x, y, transpose_y=False)
         return logits
@@ -127,11 +146,18 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.shape}"
             )
+
+        # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
+        # we just make it triangle_upper_mask
+        if attention_mask is None:
+            attention_mask = get_triangle_upper_mask(attn_weights)
+
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -218,16 +244,18 @@ class LlamaRMSNorm(nn.Layer):
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), "float32") / dim))
-        self.register_buffer("inv_freq", inv_freq)
+        dtype = paddle.get_default_dtype()
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
+        self.register_buffer("inv_freq", inv_freq.cast(dtype))
 
-        t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # higher acc using float32
+        t = paddle.arange(max_position_embeddings, dtype="float32")
+        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]
-        self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_cached = emb.cos()[None, :, None, :]  # .astype(dtype)
+        self.sin_cached = emb.sin()[None, :, None, :]  # .astype(dtype)
 
     def forward(self, x, seq_len=None):
         return (
@@ -292,11 +320,14 @@ class LlamaAttention(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
-        assert self.num_heads % config.tensor_parallel_degree == 0
         self.head_dim = self.hidden_size // self.num_heads
+        if config.tensor_parallel_degree > 1:
+            assert (
+                self.num_heads % config.tensor_parallel_degree == 0
+            ), "num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.num_heads = self.num_heads // config.tensor_parallel_degree
             self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
@@ -357,7 +388,6 @@ class LlamaAttention(nn.Layer):
         use_cache: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-
         bsz, q_len, _ = hidden_states.shape
         query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
         key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
@@ -427,7 +457,6 @@ class LlamaDecoderLayer(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -455,11 +484,14 @@ class LlamaDecoderLayer(nn.Layer):
         if use_cache:
             outputs += (present_key_value,)
 
+        # remove empty tuple for pipeline parallel
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
 class LlamaPretrainedModel(PretrainedModel):
-    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
     config_class = LlamaConfig
     base_model_prefix = "llama"
 
@@ -523,6 +555,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
@@ -683,7 +716,6 @@ class LlamaModel(LlamaPretrainedModel):
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
-
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
@@ -702,8 +734,10 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                 )
-
-            hidden_states = layer_outputs[0]
+            if type(layer_outputs) is tuple:
+                hidden_states = layer_outputs[0]
+            else:
+                hidden_states = layer_outputs
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
@@ -736,49 +770,75 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, tensor_parallel_degree=1, tensor_parallel_output=False):
-        super(LlamaPretrainingCriterion, self).__init__()
-        if tensor_parallel_degree > 1 and tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-        else:
-            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+    def __init__(self, config):
 
-    def forward(self, prediction_scores, masked_lm_labels, ignore_index=-100):
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        super(LlamaPretrainingCriterion, self).__init__()
+        self.ignore_index = getattr(config, "ignore_index", -100)
+        self.config = config
+        self.lm_shift_labels = config.lm_shift_labels
+        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+
+        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=self.ignore_index)
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        if self.enable_parallel_cross_entropy:
+            if prediction_scores.shape[-1] == self.config.vocab_size:
+                warnings.warn(
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                )
+                self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        if self.lm_shift_labels:
+            # Shift so that tokens < n predict n
+            prediction_scores = prediction_scores[..., :-1, :]
+            masked_lm_labels = masked_lm_labels[..., 1:]
+
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = masked_lm_loss.astype("float32")
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != ignore_index]
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
+
         return loss
 
 
 class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
-        shard_num = config.tensor_parallel_degree if config.tensor_parallel_degree > 1 else 1
+        self.config = config
+        if config.tensor_parallel_degree > 1:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, config.vocab_size // shard_num],
+            shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
-        self.config = config
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
 
-    def forward(self, hidden_states, parallel_output=False):
-        logits = parallel_matmul(hidden_states, self.weight, parallel_output=parallel_output)
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
-    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
-
     def __init__(self, config):
         super().__init__(config)
-        self.llama = LlamaModel(config)
+        self.config = config
 
+        self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
-        self.criterion = LlamaPretrainingCriterion(
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
-        )
+        self.criterion = LlamaPretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -881,21 +941,18 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]
-        parallel_output = True
-        if hidden_states.stop_gradient:
-            parallel_output = False
-        logits = self.lm_head(
-            hidden_states,
-            parallel_output=parallel_output,
+
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
+
+        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
-            # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels)
+            loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
