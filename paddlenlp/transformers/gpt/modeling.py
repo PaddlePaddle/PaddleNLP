@@ -24,6 +24,7 @@ import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from custom_setup_ops import save_with_output
 
 from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
@@ -762,6 +763,7 @@ class GPTModel(GPTPretrainedModel):
         else:
             cache_length = 0
         causal_mask = self.bias[:, :, cache_length:length, :length]
+        causal_mask = paddle.cast(causal_mask, 'float16')
         attention_mask = (1.0 - causal_mask) * -1e4
 
         if position_ids is None:
@@ -970,7 +972,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         else:
             return logits
 
-    def forward(self, input_ids):
+    def forward(self, input_ids, session_id):
         """
 
         Args:
@@ -982,7 +984,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             They are numerical representations of tokens that build the output sequence.
         """
 
-        attention_mask = paddle.ones_like(input_ids, dtype=paddle.float32)  # ( batch_size,
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.float16)  # ( batch_size,
         attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
         output, cached_kvs, attention_mask = self.model(input_ids, attention_mask=attention_mask, use_cache=True, cache=None)
         src_ids = input_ids
@@ -993,9 +995,14 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             output, cached_kvs, attention_mask = self.model(nid, attention_mask=attention_mask, use_cache=True, cache=cached_kvs)
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
+            print(" ------------- ")
+            batch_idx = paddle.tensor.fill_constant(shape=[1], dtype="int32", value=session_id, force_cpu=True)
+            step_idx_init = paddle.tensor.fill_constant(shape=[1],dtype="int64",value=cur_len,force_cpu=True)
+            outs = save_with_output(nid, batch_idx, step_idx_init, "./outs", -1)
             cur_len += 1
             if paddle.max(nid) == self.eol_token_id:
                 break
+
         return src_ids
 
 

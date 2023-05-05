@@ -127,10 +127,11 @@ def main(args, input_text):
         # [1, seq_len]
         input_ids = paddle.to_tensor(input_ids, dtype="int64").unsqueeze(0)
     print(input_ids)
-    # attention_mask = paddle.ones([len[input_ids]], dtype="int64").unsqueeze(0)
-
+    session_id=paddle.to_tensor(np.array([555], dtype='int32'))
     ids = model(
-        input_ids=input_ids
+        input_ids=input_ids,
+        session_id=session_id
+
     )
 
     generated_sequences = []
@@ -143,23 +144,21 @@ def main(args, input_text):
         sequence = input_text + text
         generated_sequences.append(sequence)
         print(sequence)
-
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention
-        ],
-    )
+    
+    paddle.amp.decorate(model, optimizers=None, level='O2', dtype='float16')
 
     # Save converted static graph model
-    paddle.jit.save(model, "./KL/gpt1")
+    paddle.jit.save(model, "./gpt2", input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[1], dtype="int32"),  # session_id
+        ])
 
     return generated_sequences
 
 
 def run():
     args = parse_args()
+    paddle.disable_static()
     input_text = "user: 请判断下面的问题是否需要请求api才能回答，如果是则生成一个api请求。\n北京适合遛娃的地方?\n\nassistant:"
     main(args, input_text)
 
