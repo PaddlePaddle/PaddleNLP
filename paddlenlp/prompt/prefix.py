@@ -154,7 +154,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         batch_size = input_ids.shape[0]
         kwargs["use_cache"] = True
-        past_key_values = self._get_past_key_values(batch_size, self.postprocess_past_key_value)
+        past_key_values = self._get_past_key_values(batch_size)
 
         if attention_mask is not None:
 
@@ -206,7 +206,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             raise NotImplementedError("Model does not support past_key_values either cache")
         if model_kwargs[key] is None:
             batch_size = model_kwargs["input_ids"].shape[0]
-            past_key_values = self._get_past_key_values(batch_size, self.postprocess_past_key_value)
+            past_key_values = self._get_past_key_values(batch_size)
             model_kwargs[key] = past_key_values
         return model_kwargs
 
@@ -267,7 +267,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             prefix_encoder = nn.Sequential(prefix_embedding, prefix_dropout)
         return prefix_encoder
 
-    def _get_past_key_values(self, batch_size, postprocess_past_key_value=None):
+    def _get_past_key_values(self, batch_size):
 
         # (bs, prefixlen, hidden_dim*layer_num*2)
         past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([batch_size, -1]))
@@ -293,8 +293,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             ]
         )
 
-        if postprocess_past_key_value is not None:
-            past_key_values = postprocess_past_key_value(past_key_values)
+        if self.postprocess_past_key_value is not None:
+            past_key_values = self.postprocess_past_key_value(past_key_values)
 
         return past_key_values
 
