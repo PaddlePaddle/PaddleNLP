@@ -731,8 +731,10 @@ class TrainingArguments:
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
-                    "pp_configs": dygraph_pp_configs if pipeline_parallel_degree > 1 else {},
                 }
+
+                if pipeline_parallel_degree > 1:
+                    strategy.hybrid_configs["pp_configs"] = dygraph_pp_configs
 
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
