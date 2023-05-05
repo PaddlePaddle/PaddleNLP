@@ -99,13 +99,6 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    # # Make sure vocab size can be divisible by tensor parallel degree
-    # if training_args.tensor_parallel_degree > 1 and model.config.vocab_size % training_args.tensor_parallel_degree != 0:
-    #     vocab_size = (model.config.vocab_size // training_args.tensor_parallel_degree + 1) * training_args.tensor_parallel_degree
-    #     num_new_tokens += vocab_size - model.config.vocab_size
-    #     smart_tokenizer_and_embedding_resize(num_new_tokens, tokenizer, model)
-    #     model.config.vocab_size = vocab_size
-
     # Load the pretrained language model.
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
@@ -123,8 +116,6 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
-    tokenizer.pad_token = tokenizer.eos_token
-    # smart_tokenizer_and_embedding_resize(tokenizer, model, dict(pad_token="[PAD]"))
 
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
