@@ -16,7 +16,7 @@
 import unittest
 
 from paddlenlp.transformers import (
-    FnetConfig,
+    FNetConfig,
     FNetForMaskedLM,
     FNetForMultipleChoice,
     FNetForNextSentencePrediction,
@@ -95,7 +95,7 @@ class FnetModelTester:
         return (config, input_ids, token_type_ids, num_classes, num_labels, return_dict)
 
     def get_config(self):
-        return FnetConfig(
+        return FNetConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
             num_hidden_layers=self.num_hidden_layers,

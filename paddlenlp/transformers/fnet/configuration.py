@@ -19,7 +19,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = [
     "FNET_PRETRAINED_INIT_CONFIGURATION",
     "FNET_PRETRAINED_RESOURCE_FILES_MAP",
-    "FnetConfig",
+    "FNetConfig",
 ]
 
 FNET_PRETRAINED_INIT_CONFIGURATION = {
@@ -62,7 +62,7 @@ FNET_PRETRAINED_RESOURCE_FILES_MAP = {
 }
 
 
-class FnetConfig(PretrainedConfig):
+class FNetConfig(PretrainedConfig):
     r"""
     Args:
         vocab_size (int, optional):

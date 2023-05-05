@@ -22,7 +22,7 @@ from ..activations import ACT2FN
 from .configuration import (
     FNET_PRETRAINED_INIT_CONFIGURATION,
     FNET_PRETRAINED_RESOURCE_FILES_MAP,
-    FnetConfig,
+    FNetConfig,
 )
 
 __all__ = [
@@ -39,7 +39,7 @@ __all__ = [
 
 
 class FNetBasicOutput(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
@@ -49,7 +49,7 @@ class FNetBasicOutput(Layer):
 
 
 class FNetOutput(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
@@ -63,7 +63,7 @@ class FNetOutput(Layer):
 
 
 class FNetIntermediate(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         if isinstance(config.hidden_act, str):
@@ -78,7 +78,7 @@ class FNetIntermediate(Layer):
 
 
 class FNetLayer(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.fourier = FNetFourierTransform(config)
         self.intermediate = FNetIntermediate(config)
@@ -94,7 +94,7 @@ class FNetLayer(Layer):
 
 
 class FNetEncoder(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.layers = nn.LayerList([FNetLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
@@ -114,7 +114,7 @@ class FNetEncoder(Layer):
 
 
 class FNetPooler(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
@@ -131,7 +131,7 @@ class FNetPooler(Layer):
 class FNetEmbeddings(Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super(FNetEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
@@ -189,7 +189,7 @@ class FNetBasicFourierTransform(Layer):
 
 
 class FNetFourierTransform(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.fourier_transform = FNetBasicFourierTransform()
         self.output = FNetBasicOutput(config)
@@ -201,7 +201,7 @@ class FNetFourierTransform(Layer):
 
 
 class FNetPredictionHeadTransform(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         if isinstance(config.hidden_act, str):
@@ -218,7 +218,7 @@ class FNetPredictionHeadTransform(Layer):
 
 
 class FNetLMPredictionHead(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.transform = FNetPredictionHeadTransform(config)
         # The output weights are the same as the input embeddings, but there is
@@ -237,7 +237,7 @@ class FNetLMPredictionHead(Layer):
 
 
 class FNetOnlyMLMHead(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.predictions = FNetLMPredictionHead(config)
 
@@ -247,7 +247,7 @@ class FNetOnlyMLMHead(Layer):
 
 
 class FNetOnlyNSPHead(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
@@ -257,7 +257,7 @@ class FNetOnlyNSPHead(Layer):
 
 
 class FNetPreTrainingHeads(Layer):
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__()
         self.predictions = FNetLMPredictionHead(config)
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
@@ -279,7 +279,7 @@ class FNetPretrainedModel(PretrainedModel):
     pretrained_init_configuration = FNET_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = FNET_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "fnet"
-    config_class = FnetConfig
+    config_class = FNetConfig
 
     def _init_weights(self, layer):
         # Initialize the weights.
@@ -316,7 +316,7 @@ class FNetModel(FNetPretrainedModel):
     Ontanon.
     """
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super(FNetModel, self).__init__(config)
         self.initializer_range = config.initializer_range
         self.num_hidden_layers = config.num_hidden_layers
@@ -459,7 +459,7 @@ class FNetForSequenceClassification(FNetPretrainedModel):
 
     """
 
-    def __init__(self, config: FnetConfig, num_classes=2):
+    def __init__(self, config: FNetConfig, num_classes=2):
         super(FNetForSequenceClassification, self).__init__(config)
         self.num_classes = num_classes
         self.fnet = FNetModel(config)
@@ -562,7 +562,7 @@ class FNetForPreTraining(FNetPretrainedModel):
     sentence prediction (classification)` head.
     """
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__(config)
 
         self.fnet = FNetModel(config)
@@ -647,7 +647,7 @@ class FNetForMaskedLM(FNetPretrainedModel):
 
     """
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__(config)
 
         self.fnet = FNetModel(config)
@@ -734,7 +734,7 @@ class FNetForNextSentencePrediction(FNetPretrainedModel):
 
     """
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super().__init__(config)
 
         self.fnet = FNetModel(config)
@@ -787,7 +787,7 @@ class FNetForMultipleChoice(FNetPretrainedModel):
 
     """
 
-    def __init__(self, config: FnetConfig):
+    def __init__(self, config: FNetConfig):
         super(FNetForMultipleChoice, self).__init__(config)
         self.fnet = FNetModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -846,7 +846,7 @@ class FNetForTokenClassification(FNetPretrainedModel):
             The number of classes. Defaults to `2`.
     """
 
-    def __init__(self, config: FnetConfig, num_classes=2):
+    def __init__(self, config: FNetConfig, num_classes=2):
         super(FNetForTokenClassification, self).__init__(config)
         self.fnet = FNetModel(config)
         self.num_classes = num_classes
@@ -895,7 +895,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
 
     """
 
-    def __init__(self, config: FnetConfig, num_labels):
+    def __init__(self, config: FNetConfig, num_labels):
         super(FNetForQuestionAnswering, self).__init__(config)
         self.num_labels = num_labels
         self.fnet = FNetModel(config)
@@ -922,7 +922,6 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
         )
         sequence_output = outputs[0] if not return_dict else outputs["last_hidden_state"]
         logits = self.qa_outputs(sequence_output)
-        print(logits.shape)
         start_logits, end_logits = paddle.split(logits, num_or_sections=2, axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = start_logits.squeeze(axis=-1)
