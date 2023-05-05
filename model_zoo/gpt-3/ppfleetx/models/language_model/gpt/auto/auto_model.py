@@ -481,6 +481,7 @@ class GPTModelAuto(nn.Layer):
         use_recompute=False,
         recompute_granularity="full",
         mesh=None,
+        use_fused_dropout_add=True,
     ):
 
         super(GPTModelAuto, self).__init__()

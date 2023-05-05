@@ -387,7 +387,7 @@ msgstr ""
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:35
 msgid ""
 "Whether to add the special token \"[CLS]\" at the end of sequence as the "
-"begining of the target when running inference to force the model to start"
+"beginning of the target when running inference to force the model to start"
 " generating target sequence. Defaults to False."
 msgstr ""
 

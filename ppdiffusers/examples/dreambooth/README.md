@@ -12,7 +12,7 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-pip install -U ppdiffusers visualdl -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install -U ppdiffusers visualdl
 ```
 
 ### 1.2 Sks Dog 训练教程
@@ -92,7 +92,7 @@ python -u train_dreambooth.py \
 
 
 #### 1.2.3 单机多卡训练
-通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。。
+通过设置`--gpus`，我们可以指定 GPU 为 `0,1,2,3` 卡。
 
 ```bash
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"

@@ -346,10 +346,10 @@ class UniPCMultistepScheduler(SchedulerMixin, ConfigMixin):
         b = paddle.to_tensor(b)
 
         if len(D1s) > 0:
-            D1s = paddle.stack(D1s, axis=1)  # (B, K)
+            D1s = paddle.stack(D1s, axis=1).cast(paddle.float32)  # (B, K)
             # for order 2, we use a simplified version
             if order == 2:
-                rhos_p = paddle.to_tensor([0.5], dtype=x.dtype)
+                rhos_p = paddle.to_tensor([0.5])
             else:
                 rhos_p = paddle.linalg.solve(R[:-1, :-1], b[:-1])
         else:
@@ -460,7 +460,7 @@ class UniPCMultistepScheduler(SchedulerMixin, ConfigMixin):
 
         # for order 1, we use a simplified version
         if order == 1:
-            rhos_c = paddle.to_tensor([0.5], dtype=x.dtype)
+            rhos_c = paddle.to_tensor([0.5])
         else:
             rhos_c = paddle.linalg.solve(R, b)
 

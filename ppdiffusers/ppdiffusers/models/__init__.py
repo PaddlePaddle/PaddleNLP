@@ -15,7 +15,11 @@
 # flake8: noqa
 
 
-from ..utils.import_utils import is_paddle_available
+from ..utils.import_utils import (
+    OptionalDependencyNotAvailable,
+    is_einops_available,
+    is_paddle_available,
+)
 
 if is_paddle_available():
     from .autoencoder_kl import AutoencoderKL
@@ -28,4 +32,13 @@ if is_paddle_available():
     from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel
     from .unet_2d_condition import UNet2DConditionModel
+    from .unet_3d_condition import UNet3DConditionModel
     from .vq_model import VQModel
+
+try:
+    if not (is_paddle_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_einops_objects import *  # noqa F403
+else:
+    from .uvit import UViTModel

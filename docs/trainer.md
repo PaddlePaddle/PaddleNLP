@@ -29,7 +29,7 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
 ```
 2. 设置好用户参数
-    - PdArgumentParser 可以接受多个类似`TrainingArguments`的参数。用户可以自定义所需要的`ModelArguments`, `DataArguments`为为 tuple 传入 PdArgumentParser即可。
+    - PdArgumentParser 可以接受多个类似`TrainingArguments`的参数。用户可以自定义所需要的`ModelArguments`, `DataArguments`为 tuple 传入 PdArgumentParser即可。
     - 这些参数都是通过`python xxx.py --dataset xx --max_seq_length xx`的方式传入。`TrainingArguments`的所有可配置参数见后文。
 ```python
 from dataclasses import dataclass
@@ -184,7 +184,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 ## TrainingArguments 参数介绍
 ```python
   --output_dir
-                        保存模型输出和和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
+                        保存模型输出和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
                         The output directory where the model predictions and
                         checkpoints will be written. (default: None)
@@ -550,7 +550,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         data. (default: False)
 
   --optim
-                        优化器名称，默认为adamw，，(`str`, 可选，默认为 `adamw`)
+                        优化器名称，默认为adamw，(`str`, 可选，默认为 `adamw`)
                         The optimizer to use. (default: adamw)
 
   --report_to

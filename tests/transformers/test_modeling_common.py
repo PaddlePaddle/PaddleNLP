@@ -566,15 +566,14 @@ class ModelTesterMixin:
             if self.model_tester.is_training is False:
                 model.eval()
 
-            model_vocab_size = config["vocab_size"]
+            model_vocab_size = config.vocab_size
             # Retrieve the embeddings and clone theme
-
             model_embed = model.resize_token_embeddings(model_vocab_size)
             cloned_embeddings = model_embed.weight.clone()
 
             # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size + 10)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size + 10)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size + 10)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] + 10)
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
@@ -582,7 +581,7 @@ class ModelTesterMixin:
 
             # Check that resizing the token embeddings with a smaller vocab size decreases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size - 15)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size - 15)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size - 15)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] - 15)
 
@@ -731,13 +730,7 @@ class ModelTesterMixin:
 
             model = self._make_model_instance(config, model_class)
 
-            tie_word_embeddings = (
-                model.tie_word_embeddings
-                if hasattr(model, "tie_word_embeddings")
-                else model.config.get("tie_word_embeddings", False)
-            )
-
-            if not tie_word_embeddings:
+            if not model.config.tie_word_embeddings:
                 continue
 
             if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
@@ -761,7 +754,10 @@ class ModelTesterMixin:
                         input_embeddings_weight = input_embeddings.weight
                     else:
                         input_embeddings_weight = input_embeddings
-
+                    print(
+                        input_embeddings_weight,
+                        output_embeddings_weight,
+                    )
                     print(
                         "model name :{},id is{},{}".format(
                             model_class, id(output_embeddings_weight), id(input_embeddings_weight)

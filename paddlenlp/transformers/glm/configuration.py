@@ -43,7 +43,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "layernorm_epsilon": 1e-5,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": False,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -67,7 +66,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 36,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -90,7 +88,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 48,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -114,7 +111,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "layernorm_epsilon": 1e-5,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": False,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -137,7 +133,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 48,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -211,7 +206,7 @@ class GLMConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "glm"
-    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers", "torch_dtype": "paddle_dtype"}
+    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers", "torch_dtype": "dtype"}
     pretrained_init_configuration = GLM_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -236,7 +231,6 @@ class GLMConfig(PretrainedConfig):
         initializer_range=0.02,
         pool_token="cls",
         layernorm_epsilon=1e-5,
-        paddle_dtype="float32",
         use_scaled_init_for_output_weights=False,
         **kwargs
     ):
@@ -261,6 +255,5 @@ class GLMConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pool_token = pool_token
         self.layernorm_epsilon = layernorm_epsilon
-        self.paddle_dtype = paddle_dtype
         self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights
         self._fast_entry = None

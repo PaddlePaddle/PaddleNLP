@@ -194,10 +194,6 @@ class XLMPretrainedModel(PretrainedModel):
     config_class = XLMConfig
     base_model_prefix = "xlm"
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, nn.Embedding):
@@ -294,7 +290,6 @@ class XLMModel(XLMPretrainedModel):
             paddle.arange(0, config.max_position_embeddings).reshape((1, -1)),
             persistable=False,
         )
-        self.init_weights()
 
     def forward(
         self,
@@ -511,7 +506,6 @@ class XLMWithLMHeadModel(XLMPretrainedModel):
             config,
             embedding_weights=self.xlm.embeddings.weight,
         )
-        self.init_weights()
 
     def forward(
         self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None, cache=None, labels=None
@@ -603,7 +597,6 @@ class XLMForSequenceClassification(XLMPretrainedModel):
         dropout_prob = config.dropout if config.dropout is not None else config.hidden_dropout_prob
         self.dropout = nn.Dropout(dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_classes)
-        self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
         r"""
@@ -669,7 +662,6 @@ class XLMForTokenClassification(XLMPretrainedModel):
         self.xlm = XLMModel(config)  # allow xlm to be config
         self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_classes)
-        self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
         r"""
@@ -732,7 +724,6 @@ class XLMForQuestionAnsweringSimple(XLMPretrainedModel):
         super(XLMForQuestionAnsweringSimple, self).__init__(config)
         self.xlm = XLMModel(config)  # allow xlm to be config
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
         r"""
@@ -808,7 +799,6 @@ class XLMForMultipleChoice(XLMPretrainedModel):
         self.xlm = XLMModel(config)
         self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.init_weights()
 
     def forward(self, input_ids=None, langs=None, attention_mask=None, position_ids=None, lengths=None):
         r"""

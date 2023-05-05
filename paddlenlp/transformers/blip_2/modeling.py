@@ -302,13 +302,6 @@ class Blip2PretrainedModel(PretrainedModel):
     _no_split_modules = ["Blip2Attention", "T5Block", "OPTDecoderLayer"]
     _keep_in_fp32_modules = ["wo"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _init_weights(self, module):
         """Initialize the weights"""
         factor = self.config.initializer_range
@@ -442,8 +435,6 @@ class Blip2VisionModel(Blip2PretrainedModel):
         self.embeddings = Blip2VisionEmbeddings(config)
         self.encoder = Blip2Encoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
-
-        self.init_weights()
 
     def forward(
         self,
@@ -938,8 +929,6 @@ class Blip2QFormerModel(Blip2PretrainedModel):
 
         self.encoder = Blip2QFormerEncoder(config)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -1195,9 +1184,6 @@ class Blip2Model(Blip2PretrainedModel):
             else:
                 raise NotImplementedError
         self.language_model = language_model
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1499,9 +1485,6 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
             else:
                 raise NotImplementedError
         self.language_model = language_model
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
