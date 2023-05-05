@@ -61,6 +61,7 @@ def convert_example(example, tokenizer, data_args, is_eval=False):
         input_seq + output_seq,
         return_tensors="pd",
         max_length=data_args.src_length + data_args.tgt_length,
+        padding="max_length" if data_args.always_pad_to_max_length else False,
         truncation=True,
     )
 

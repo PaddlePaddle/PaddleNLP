@@ -48,7 +48,6 @@ class RoFormerMeanPoolingForSequenceClassification(RoFormerPretrainedModel):
         self.num_classes = num_classes
         self.roformer = roformer
         self.classifier = nn.Linear(self.roformer.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         last_hidden_state = self.roformer(input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)[0]
