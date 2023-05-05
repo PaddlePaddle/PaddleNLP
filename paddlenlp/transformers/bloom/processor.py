@@ -11,18 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import annotations
 
 import inspect
 from abc import ABC
+from collections import OrderedDict
 
 import paddle
 
 
-class LogitsProcessorList(list):
+class LogitsProcessorList:
+    def __init__(self):
+        # use dict to store processors: List object will raise assign error in dynamic to static
+        self.processors = OrderedDict()
+
     def __call__(self, input_ids, logits, **kwargs):
-        for processor in self:
+        for processor in self.processors.values():
             processor_args = inspect.signature(processor.__call__).parameters
             if len(processor_args) > 2:
                 assert all(
@@ -32,6 +36,10 @@ class LogitsProcessorList(list):
             else:
                 logits = processor(input_ids, logits)
         return logits
+
+    def append(self, processor: LogitsProcessor):
+        count = len(self.processors)
+        self.processors[count] = processor
 
 
 class LogitsProcessor(ABC):
@@ -54,7 +62,14 @@ class MinLengthLogitsProcessor(LogitsProcessor):
         eos_token_id (int): The id of the `end-of-sequence` token.
     """
 
-    def __init__(self, min_length, eos_token_id):
+    def __init__(self, min_length: int | paddle.Tensor, eos_token_id: int):
+
+        if isinstance(min_length, int):
+            min_length = paddle.to_tensor(min_length)
+
+        if not isinstance(eos_token_id, int) or eos_token_id < 0:
+            raise ValueError("`eos_token_id` should be a positive integer, but get {}".format(eos_token_id))
+
         self.min_length = min_length
         self.eos_token_id = eos_token_id
 
@@ -74,17 +89,24 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
             <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
     """
 
-    def __init__(self, penalty: float):
-        if not isinstance(penalty, float) or not (penalty > 0):
-            raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
+    def __init__(self, penalty: float | paddle.Tensor):
+        if isinstance(penalty, float):
+            # can not create tensor with bfloat16 dtype: https://github.com/PaddlePaddle/Paddle/issues/53521
+            penalty = paddle.to_tensor(penalty, dtype="float32").astype(paddle.get_default_dtype())
 
         self.penalty = penalty
 
     def __call__(self, input_ids, logits):
+        origin_dtype = logits.dtype
+        if logits.dtype not in [paddle.float32, paddle.float64]:
+            logits = logits.astype(paddle.float32)
+
         score = paddle.index_sample(logits, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
         input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
+
+        outputs = outputs.astype(origin_dtype)
         return outputs
 
 

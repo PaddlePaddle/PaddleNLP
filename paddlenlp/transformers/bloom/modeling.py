@@ -43,6 +43,7 @@ from .processor import (
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
     LogitsProcessorList,
+    MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
 )
 
@@ -1507,9 +1508,8 @@ class BloomForGeneration(BloomPreTrainedModel):
     ):
         processors = LogitsProcessorList()
 
-        # if min_length is not None and eos_token_id is not None and min_length > -1:
-        #     processors.append(
-        #         MinLengthLogitsProcessor(min_length, eos_token_id))
+        if min_length is not None and eos_token_id is not None and min_length > -1:
+            processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
 
         if num_beam_groups > 1 and diversity_rate > 0.0:
             processors.append(
@@ -1778,15 +1778,26 @@ class BloomForGeneration(BloomPreTrainedModel):
 
         return model_kwargs["res"][:, origin_len:], scores
 
-    def forward(self, input_ids=None, **model_kwargs):
+    def forward(
+        self,
+        input_ids: paddle.Tensor,
+        max_dec_len: paddle.Tensor,
+        min_dec_len: paddle.Tensor,
+        temperature: paddle.Tensor,
+        top_k: paddle.Tensor,
+        top_p: paddle.Tensor,
+        repetition_penalty: paddle.Tensor,
+        **model_kwargs
+    ):
 
-        max_length = self.max_length
-        min_length = self.min_length
+        max_length = max_dec_len
+        min_length = min_dec_len
         decode_strategy = self.decode_strategy
-        temperature = self.temperature
-        top_k = self.top_k
-        top_p = self.top_p
-        repetition_penalty = self.repetition_penalty
+        temperature = temperature
+        top_k = top_k
+        top_p = top_p
+        repetition_penalty = repetition_penalty
+
         num_beams = self.num_beams
         num_beam_groups = self.num_beam_groups
         bos_token_id = self.bos_token_id
@@ -1799,13 +1810,13 @@ class BloomForGeneration(BloomPreTrainedModel):
         diversity_rate = self.diversity_rate
         use_cache = self.use_cache
 
-        assert decode_strategy in [
-            "greedy_search",
-            "sampling",
-            "beam_search",
-        ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
-            decode_strategy
-        )
+        # assert decode_strategy in [
+        #     "greedy_search",
+        #     "sampling",
+        #     "beam_search",
+        # ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+        #     decode_strategy
+        # )
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(self.config, "bos_token_id", None)
         eos_token_id = eos_token_id if eos_token_id is not None else getattr(self.config, "eos_token_id", None)
@@ -1846,20 +1857,13 @@ class BloomForGeneration(BloomPreTrainedModel):
 
         model_kwargs["use_cache"] = use_cache
 
-        if self.inference:
-            # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-            min_len = int(input_ids.shape[-1])
-            max_len = int(input_ids.shape[-1])
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
-        else:
-            input_len = input_ids.shape[-1]
-            max_len = max_length + input_len
-            min_len = min_length + input_len
+        input_len = input_ids.shape[-1]
+        max_length += input_len
+        min_length += input_len
 
         logits_processors = self.get_logits_processor(
-            min_length=min_len,
-            max_length=max_len,
+            min_length=min_length,
+            max_length=max_length,
             eos_token_id=eos_token_id,
             forced_bos_token_id=forced_bos_token_id,
             forced_eos_token_id=forced_eos_token_id,
@@ -1878,7 +1882,7 @@ class BloomForGeneration(BloomPreTrainedModel):
             ret = self.sample(
                 input_ids,
                 logits_processors,
-                max_len,
+                max_length,
                 pad_token_id,
                 eos_token_id,
                 top_k,
