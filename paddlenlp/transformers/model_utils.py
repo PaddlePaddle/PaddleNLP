@@ -2117,9 +2117,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     WEIGHTS_NAME = _add_variant(
                         PADDLE_WEIGHT_FILE_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
                     )
-                if variant is None:
-                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
                 state_dict_to_save = self.state_dict()
 
