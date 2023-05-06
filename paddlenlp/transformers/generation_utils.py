@@ -12,20 +12,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import inspect
 from abc import ABC
-from typing import List
+from typing import List, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
 try:
     from paddle.utils import map_structure
 except ImportError:
     from paddle.fluid.layers.utils import map_structure
+
 from paddle.fluid.dygraph.base import in_declarative_mode
 
 from paddlenlp.utils.log import logger
@@ -33,6 +36,43 @@ from paddlenlp.utils.log import logger
 from .model_outputs import ModelOutput
 
 __all__ = ["GenerationMixin"]
+
+
+def get_unfinished_flag(
+    input_ids: Tensor, unfinished_flag: Tensor, eos_token_id: Union[int, list[int], list[list[int]]]
+) -> Tensor:
+    """get unfinished flag for generation step
+
+    Args:
+        input_ids (Tensor): the input_ids
+        eos_token_id (Union[int, list[int], list[list[int]]]): the end os sentence flag, which can be:
+            * single token id, eg: 10
+            * multiple token ids to stop generation, eg: [10, 10]
+            * some more tokens to stop generations, eg: [[10], [20, 20], [30, 30, 30]]
+
+    Returns:
+        Tensor: the unfinished flag tensor
+    """
+    if isinstance(eos_token_id, int):
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+    elif isinstance(eos_token_id[0], int):
+        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
+        is_last_tokens_equal = paddle.all(
+            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+        ).unsqueeze(-1)
+        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
+    else:
+        batch_unfinish_flag = None
+        for batch_eos_token_id in eos_token_id:
+            if batch_unfinish_flag is None:
+                batch_unfinish_flag = ~get_unfinished_flag(input_ids, unfinished_flag, batch_eos_token_id)
+            else:
+                batch_unfinish_flag = paddle.logical_or(
+                    batch_unfinish_flag, ~get_unfinished_flag(input_ids, unfinished_flag, batch_eos_token_id)
+                )
+
+        unfinished_flag = ~batch_unfinish_flag
+    return unfinished_flag
 
 
 class BeamHypotheses:
@@ -727,7 +767,6 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-
         assert decode_strategy in [
             "greedy_search",
             "sampling",
@@ -978,6 +1017,7 @@ class GenerationMixin(object):
                 )
 
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         batch_size, cur_len = input_ids.shape
@@ -985,6 +1025,7 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
         while cur_len < max_length:
+
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -1015,10 +1056,11 @@ class GenerationMixin(object):
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
+
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
@@ -1043,6 +1085,7 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
@@ -1241,6 +1284,8 @@ class GenerationMixin(object):
         eos_token_id,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
+
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         batch_size = len(beam_scorer._beam_hyps)
