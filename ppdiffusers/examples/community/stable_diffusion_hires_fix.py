@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -300,6 +301,7 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
+
             prompt_embeds = paddle.concat([negative_prompt_embeds, prompt_embeds])
 
         return prompt_embeds
@@ -426,7 +428,12 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
             )
 
         if latents is None:
+            # print(randn_tensor(shape, generator=generator, dtype=dtype))
             latents = randn_tensor(shape, generator=generator, dtype=dtype)
+            # next_generator
+            # print(latents)
+            # exit(0)
+            # print(randn_tensor(shape, generator=generator, dtype=dtype))
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
@@ -463,7 +470,8 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         prompt: Union[str, List[str]] = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
-        sample_steps: int = 50,
+        num_inference_steps: int = 40,
+        hires_ratio: Optional[float] = 0.5,
         guidance_scale: float = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
@@ -477,7 +485,7 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        hr_steps: Optional[int] = 30,
+        enable_hr: Optional[bool] = True,
         hr_scale: Optional[float] = 2.0,
         hr_resize_width: Optional[int] = 0,
         hr_resize_height: Optional[int] = 0,
@@ -495,9 +503,12 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
                 The height in pixels of the generated image.
             width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
                 The width in pixels of the generated image.
-            sample_steps (`int`, *optional*, defaults to 50):
-                The number of initial denoising steps. More denoising steps usually lead to a higher quality image at the
-                expense of slower inference.
+            num_inference_steps (`int`, *optional*, defaults to 40):
+                The number of denoising steps, equal to sample_steps and hr_steps. samples_steps means the initial
+                denoising steps, and hr_steps means hires denoising steps. More denoising steps usually lead to a
+                higher quality image at the expense of slower inference.
+            hires_ratio (`float`, *optional*, defaults to 0.5):
+                The step proportion of hires.fix, that means hr_steps = int(num_inference_steps * hires_ratio).
             guidance_scale (`float`, *optional*, defaults to 7.5):
                 Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
                 `guidance_scale` is defined as `w` of equation 2. of [Imagen
@@ -608,10 +619,14 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         )
 
         # 4. Prepare timesteps
+        hr_steps = int(num_inference_steps * hires_ratio)
+        sample_steps = num_inference_steps - hr_steps
         self.scheduler.set_timesteps(sample_steps)
         timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
+        if generator is not None:
+            paddle.Generator().states_["initial_generator"] = copy.deepcopy(paddle.Generator().states_[generator])
         num_channels_latents = self.unet.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
@@ -625,6 +640,7 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
 
         # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+
         # 7. Denoising loop
         print("Step1: Perform denosing on inital sample stage.")
         num_warmup_steps = len(timesteps) - sample_steps * self.scheduler.order
@@ -656,21 +672,22 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
-        # 8. start to perform hires.fix strategy, determine the upscaled width and height
-        enable_hr = True
-        truncate_width = 0
-        truncate_height = 0
-        self.hr_upscale_to_width, self.hr_upscale_to_height = self.get_upscaled_width_and_height(
-            width, height, hr_scale=hr_scale, hr_resize_width=hr_resize_width, hr_resize_height=hr_resize_height
-        )
-        if hr_resize_width != 0 and hr_resize_height != 0:
-            truncate_width = (self.hr_upscale_to_width - hr_resize_width) // self.vae_scale_factor
-            truncate_height = (self.hr_upscale_to_height - hr_resize_height) // self.vae_scale_factor
+        # start to apply hires.fix on initial latents
+        if enable_hr:
+            # 8. determine the upscaled width and height for upscaled images
+            truncate_width = 0
+            truncate_height = 0
+            self.hr_upscale_to_width, self.hr_upscale_to_height = self.get_upscaled_width_and_height(
+                width, height, hr_scale=hr_scale, hr_resize_width=hr_resize_width, hr_resize_height=hr_resize_height
+            )
+            if hr_resize_width != 0 and hr_resize_height != 0:
+                truncate_width = (self.hr_upscale_to_width - hr_resize_width) // self.vae_scale_factor
+                truncate_height = (self.hr_upscale_to_height - hr_resize_height) // self.vae_scale_factor
 
-        # 9. special case: do nothing if upscaling is not nesscessary
-        if self.hr_upscale_to_width == width and self.hr_upscale_to_height == height:
-            enable_hr = False
-            denoising_strength = None
+            # 9. special case: do nothing if upscaling is not nesscessary
+            if self.hr_upscale_to_width == width and self.hr_upscale_to_height == height:
+                enable_hr = False
+                denoising_strength = None
 
         if enable_hr:
             # 10. prepare init latents
@@ -691,10 +708,14 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
                 truncate_height // 2 : latents.shape[2] - (truncate_height + 1) // 2,
                 truncate_width // 2 : latents.shape[3] - (truncate_width + 1) // 2,
             ]
-            noise = randn_tensor(latents.shape, dtype=latents.dtype)
+
+            noise = randn_tensor(latents.shape, dtype=latents.dtype, generator="initial_generator")
             latents = self.scheduler.add_noise(latents, noise, init_timestep)
 
-            # 11. denoising on hires.fix steps
+            # 11. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+            extra_step_kwargs = self.prepare_extra_step_kwargs("initial_generator", eta)
+
+            # 12. denoising on hires.fix steps
             num_warmup_steps = len(timesteps) - hr_steps * self.scheduler.order
             print("Step2: Perform denosing on hires.fix stage.")
             with self.progress_bar(total=hr_steps) as progress_bar:
@@ -725,7 +746,7 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
                         if callback is not None and i % callback_steps == 0:
                             callback(i, t, latents)
 
-        # 12. process latents into images and perform safety checker
+        # 13. process latents into images and perform safety checker
         if output_type == "latent":
             image = latents
             has_nsfw_concept = None
