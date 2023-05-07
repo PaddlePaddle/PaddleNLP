@@ -2061,7 +2061,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
-        variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
 
         # 1. retrieve the model related config
@@ -2094,8 +2093,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
-
         WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
+
+        weights_name = SAFE_WEIGHT_FILE_NAME if safe_serialization else WEIGHTS_NAME
+        weights_name = _add_variant(weights_name, variant)
 
         dtype = get_parameter_dtype(model_to_save)
         # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
@@ -2114,9 +2115,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     return
             else:
                 if config_to_save.tensor_parallel_degree > 1:
-                    WEIGHTS_NAME = _add_variant(
-                        PADDLE_WEIGHT_FILE_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                    )
+                    weights_name = _add_variant(weights_name, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
 
                 state_dict_to_save = self.state_dict()
 
@@ -2129,10 +2128,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # there is not `generation_config` in paddlenlp for CasualLM class
             # if self.can_generate():
             #     model_to_save.generation_config.save_pretrained(save_directory)
-
-        # Shard the model if it is too big.
-        weights_name = SAFE_WEIGHT_FILE_NAME if safe_serialization else WEIGHTS_NAME
-        weights_name = _add_variant(weights_name, variant)
 
         # Save model
         shards, index = shard_checkpoint(
@@ -2168,16 +2163,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))
 
-        if index is None:
-            path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHT_FILE_NAME, variant))
-            logger.info(f"Model weights saved in {path_to_weights}")
-
-        # Save model
-        if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
-            paddle.save(state_dict_to_save, file_name)
-            del model_to_save
-        else:
+        if index is not None:
             save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
             # Save the index as well

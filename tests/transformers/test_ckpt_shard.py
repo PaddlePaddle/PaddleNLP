@@ -205,6 +205,7 @@ class TestCkptShard(unittest.TestCase):
             weights_name = ".".join(SAFE_WEIGHT_FILE_NAME.split(".")[:-1] + ["v2"] + ["safetensors"])
 
             weights_file = os.path.join(tmp_dir, weights_name)
+
             self.assertTrue(os.path.isfile(weights_file))
             self.assertFalse(os.path.isfile(os.path.join(tmp_dir, SAFE_WEIGHT_FILE_NAME)))
 
