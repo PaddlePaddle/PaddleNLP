@@ -1,5 +1,4 @@
 jieba
-urllib3==1.26.15    # fix urllib3 version dependency: https://github.com/psf/requests/issues/6432#issuecomment-1537221990
 colorlog
 colorama
 seqeval
