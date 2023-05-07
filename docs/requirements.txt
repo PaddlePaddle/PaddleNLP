@@ -1,5 +1,6 @@
 # Defining the exact version will make sure things don't break
 
+urllib3==1.26.2    # fix urllib3 version dependency: https://github.com/psf/requests/issues/6432#issuecomment-1537221990
 aiohttp==3.8.4
 numpy<1.27.0,>=1.19.5
 h11<0.13,>=0.11
