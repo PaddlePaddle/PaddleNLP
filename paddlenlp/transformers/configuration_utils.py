@@ -260,6 +260,7 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     Returns:
         str: the downloaded config file
     """
+    print(subfolder, repo_id, CONFIG_NAME, hf_file_exists(repo_id=repo_id, filename=CONFIG_NAME, subfolder=subfolder))
     if hf_file_exists(repo_id=repo_id, filename=CONFIG_NAME, subfolder=subfolder):
         file_name = CONFIG_NAME
     else:
@@ -769,6 +770,7 @@ class PretrainedConfig:
             `Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the configuration object.
 
         """
+        print(kwargs)
         original_kwargs = copy.deepcopy(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
@@ -793,6 +795,7 @@ class PretrainedConfig:
     def _get_config_dict(
         cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        print(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         subfolder = kwargs.pop("subfolder", None)
