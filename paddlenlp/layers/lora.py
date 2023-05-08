@@ -456,7 +456,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         # [batch_size, *, out_features_per_partition]
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            input_a = self.lora_dropout(input) @ self.lora_A
+            input_a = self.lora_dropout(input_mp) @ self.lora_A
             if input_a.dim() == 2:
                 delta_mp = (
                     F.conv1d(
