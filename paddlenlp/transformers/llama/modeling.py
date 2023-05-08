@@ -694,7 +694,7 @@ class LlamaModel(LlamaPretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[2]
+            cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -862,7 +862,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
     ):
         if past_key_values:
-            input_ids = input_ids[:, -1:]
+            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
 
         attention_mask = kwargs.get("attention_mask", None)
 
@@ -895,13 +895,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
-        if not is_encoder_decoder:
-            # update attention mask
-            if "attention_mask" in model_kwargs:
-                attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            model_kwargs["attention_mask"] = paddle.concat(
+                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+            )
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
