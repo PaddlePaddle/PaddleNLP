@@ -372,31 +372,40 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         return prefix_model
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
+
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
-        prefix_weight_name = PREFIX_WEIGHT_FILE_NAME
-        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
-            trainable_state_dict = self.prefix_encoder.state_dict()
-            trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
-        else:
-            trainable_state_dict = self.prefix_encoder.state_dict()
-            if self.model.config.tensor_parallel_degree > 1:
-                prefix_weight_name = _add_variant(
-                    PREFIX_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
-                )
-        weight_filename = os.path.join(save_directory, prefix_weight_name)
-        paddle.save(trainable_state_dict, weight_filename)
 
         # past_key_values: (prefixlen, hidden_dim*layer_num*2)
         past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([1, -1]))[0].numpy()
 
-        if self.model.config.tensor_parallel_rank == 0:
-            # save prefix config
+        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+            trainable_state_dict = self.prefix_encoder.state_dict()
+            trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
+            if not is_main_process:
+                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                return
+            variant = None
+            self.prefix_config.tensor_parallel_degree = -1
+        else:
+            trainable_state_dict = self.prefix_encoder.state_dict()
+            if self.model.config.tensor_parallel_degree > 1:
+                if variant is None:
+                    variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+
+        # save prefix tuning weight
+        prefix_weight_name = _add_variant(PREFIX_WEIGHT_FILE_NAME, variant)
+        weight_filename = os.path.join(save_directory, prefix_weight_name)
+        paddle.save(trainable_state_dict, weight_filename)
+
+        # save prefix config & past key values
+        if is_main_process:
             self.prefix_config.save_pretrained(save_directory)
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            # save past key values
             paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
@@ -433,10 +442,6 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             else:
                 trainable_state_dict[key] = tensor.numpy() if is_dst else None
 
-        if self.model.config.tensor_parallel_rank != 0:
-            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-            return
-        self.prefix_config.tensor_parallel_degree = -1
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, prefix_state_dict):

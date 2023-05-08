@@ -702,10 +702,6 @@ class LoRAModel(nn.Layer):
             else:
                 trainable_state_dict[key] = tensor.numpy() if is_dst else None
 
-        if self.model.config.tensor_parallel_rank != 0:
-            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-            return
-        self.lora_config.tensor_parallel_degree = -1
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
@@ -736,23 +732,35 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
+
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
-        lora_weight_name = LORA_WEIGHT_FILE_NAME
+
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
+            if not is_main_process:
+                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                return
+            variant = None
+            self.lora_config.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
-                lora_weight_name = _add_variant(
-                    LORA_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
-                )
+                if variant is None:
+                    variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+
+        # save lora weight
+        lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, variant)
         weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
-        if self.model.config.tensor_parallel_rank == 0:
+
+        # save lora config
+        if is_main_process:
             self.lora_config.save_pretrained(save_directory)
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
