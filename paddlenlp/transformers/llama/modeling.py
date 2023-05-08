@@ -250,12 +250,12 @@ class LlamaRotaryEmbedding(nn.Layer):
 
         # higher acc using float32
         t = paddle.arange(max_position_embeddings, dtype="float32")
-        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]  # .astype(dtype)
-        self.sin_cached = emb.sin()[None, :, None, :]  # .astype(dtype)
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         return (
