@@ -927,7 +927,7 @@ class GPTPretrainingCriterionHybird(nn.Layer):
             loss_mask = loss_mask.transpose([1, 0])
 
         if mp_size > 1:
-            if paddle.is_compiled_with_cuda() and True:
+            if paddle.is_compiled_with_cuda() or paddle.is_compiled_with_xpu():
                 masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
             else:
                 prediction_scores = ConcatSoftmaxInput.apply(
@@ -1029,6 +1029,7 @@ class GPTForPretrainingPipe(PipelineLayer):
         pp_recompute_interval=1,
         use_flash_attn=False,
         fused_softmax_with_triangular=False,
+        use_fused_dropout_add=True,
     ):
 
         # forward desc
@@ -1097,6 +1098,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                     sequence_parallel=sequence_parallel,
                     do_recompute=i not in no_recompute_layers,
                     use_flash_attn=use_flash_attn,
+                    use_fused_dropout_add=use_fused_dropout_add,
                 )
             )
 
@@ -1570,7 +1572,11 @@ class GPTForGenerationHybrid(nn.Layer):
 def get_triangle_upper_mask(x, mask):
     if mask is not None:
         return mask
-    mask = paddle.full_like(x, -np.inf)
+    if paddle.is_compiled_with_xpu():
+        # xpu does not support set constant to -np.inf
+        mask = paddle.full_like(x, -1e4)
+    else:
+        mask = paddle.full_like(x, -np.inf)
     mask.stop_gradient = True
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
