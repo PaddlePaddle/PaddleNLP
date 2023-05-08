@@ -156,7 +156,7 @@ class TextSimilarityTask(Task):
         "__internal_testing__/tiny-random-bert": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/model_state.pdparams",
-                "a7a54deee08235fc6ae454f5def2d663",
+                "8d8814d589c21bf083fdb35de6c11a57",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/config.json",
