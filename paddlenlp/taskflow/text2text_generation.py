@@ -1,10 +1,26 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
-from .task import Task
+
 from ..transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 from ..utils.log import logger
-from .utils import download_file, static_mode_guard
+from .task import Task
+from .utils import static_mode_guard
 
-class Text2TextGenerationTask(Task):
+
+class ChatGLMTask(Task):
     """
     The text to text generation LLM model to predict the question or chinese  poetry.
     Args:
@@ -17,15 +33,24 @@ class Text2TextGenerationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         # Default to static mode
         self._static_mode = False
+        self._dtype = kwargs.get("dtype", "float16")
+        self.kwargs["generation_task"] = task
+        self._tgt_length =  kwargs.get("tgt_length", 128)
+        # Token max length
+        self._max_length = kwargs.get("max_length", 128)
+        self._top_k = kwargs.get('top_k',1)
+        self._top_p = kwargs.get('top_p',1.0)
+        self._temperature = kwargs.get('temperature',1.0)
+        self.decode_strategy = kwargs.get('decode_strategy','sampling')
+
         self._construct_tokenizer(model)
         if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
         self._construct_input_spec()
-        self.kwargs["generation_task"] = task
-        self.tgt_length= 64
-        self._max_length = kwargs.get("max_length", 128)
+
+        
 
     def _construct_input_spec(self):
         """
@@ -36,17 +61,17 @@ class Text2TextGenerationTask(Task):
             paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attention_mask
             paddle.static.InputSpec(shape=[None, None, None], dtype="int64"),  # position_ids
             # max_length
-            128,
+            self._tgt_length,
             # min_length
             0,
             # decode_strategy
-            "sampling",
+            self.decode_strategy,
             # temperature
-            1.0,
+            self._temperature,
             # top_k
-            1,
+            self._top_k,
             # top_p
-            1.0,
+            self._top_p,
             # repetition_penalty
             1,
             # num_beams
@@ -87,18 +112,18 @@ class Text2TextGenerationTask(Task):
 
         self._tokenizer = tokenizer_instance
 
-
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ChatGLMForConditionalGeneration.from_pretrained(self.model,
-                                                                        load_state_as_np=True,
-                                                                        dtype="float16",)
+        model_instance = ChatGLMForConditionalGeneration.from_pretrained(
+            self.model,
+            load_state_as_np=True,
+            dtype=self._dtype,
+        )
         # Load the model parameter for the predict
         model_instance.eval()
         self._model = model_instance
-
 
     def _batchify(self, data, batch_size):
         """
@@ -114,7 +139,6 @@ class Text2TextGenerationTask(Task):
         if one_batch:
             yield one_batch
 
-
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
         """
         Transform the raw text to the model inputs, two steps involved:
@@ -124,7 +148,6 @@ class Text2TextGenerationTask(Task):
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
-        generation_task = self.kwargs["generation_task"] if "generation_task" in self.kwargs else "question_answering"
         batches = self._batchify(inputs, batch_size)
         examples = []
         for input_text in batches:
@@ -152,7 +175,6 @@ class Text2TextGenerationTask(Task):
         outputs["data_loader"] = examples
         return outputs
 
-
     def _run_model(self, inputs):
         """
         Run the task model from the outputs of the `_tokenize` function.
@@ -161,9 +183,9 @@ class Text2TextGenerationTask(Task):
         if self._static_mode:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
-                    input_ids = batch['input_ids']
-                    attention_mask = batch['attention_mask']
-                    position_ids = batch['position_ids']
+                    input_ids = batch["input_ids"]
+                    attention_mask = batch["attention_mask"]
+                    position_ids = batch["position_ids"]
                     self.input_handles[0].copy_from_cpu(input_ids)
                     self.input_handles[1].copy_from_cpu(attention_mask)
                     self.input_handles[2].copy_from_cpu(position_ids)
@@ -174,9 +196,11 @@ class Text2TextGenerationTask(Task):
             for batch_inputs in inputs["data_loader"]:
                 result = self._model.generate(
                     **batch_inputs,
-                    decode_strategy="sampling",
-                    top_k=1,
-                    max_length=self.tgt_length,
+                    decode_strategy=self.decode_strategy,
+                    top_k=self._top_k,
+                    top_p=self._top_p,
+                    temperature = self._temperature,
+                    max_length=self._tgt_length,
                     bos_token_id=self._tokenizer.bos_token_id,
                     eos_token_id=self._tokenizer.end_token_id,
                     pad_token_id=self._tokenizer.pad_token_id,
@@ -187,7 +211,6 @@ class Text2TextGenerationTask(Task):
 
         inputs["results"] = results
         return inputs
-
 
     def _postprocess(self, inputs):
         """
@@ -207,7 +230,6 @@ class Text2TextGenerationTask(Task):
         out_dict = {"result": result}
         return out_dict
 
-
     def _convert_dygraph_to_static(self):
         """
         Convert the dygraph model to static model.
@@ -223,4 +245,3 @@ class Text2TextGenerationTask(Task):
         static_model = paddle.jit.to_static(self._model.generate, input_spec=self._input_spec)
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
-

@@ -34,6 +34,7 @@ from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
+from .text2text_generation import ChatGLMTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_feature_extraction import TextFeatureExtractionTask
@@ -41,7 +42,6 @@ from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
-from .text2text_generation import Text2TextGenerationTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
@@ -466,8 +466,12 @@ TASKS = {
     "text2text_generation": {
         "models": {
             "THUDM/chatglm-6b": {
-                "task_class": Text2TextGenerationTask,
+                "task_class": ChatGLMTask,
                 "task_flag": "text_generation-THUDM/chatglm-6b",
+            },
+            "__internal_testing__/tiny-random-chatglm": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-tiny-random-chatglm",
             },
         },
         "default": {"model": "THUDM/chatglm-6b"},
