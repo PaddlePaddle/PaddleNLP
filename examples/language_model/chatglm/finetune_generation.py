@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, read_local_dataset
+from data import convert_example, custom_instruction_convert_example, read_local_dataset
 from utils import ChatGLMTrainer
 
 from paddlenlp.data import DataCollatorWithPadding
@@ -36,7 +36,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_path: str = field(default="./data/", metadata={"help": "Path to data"})
+    task_name_or_path: str = field(default="./data/", metadata={"help": "Path to data"})
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
@@ -113,8 +113,8 @@ def main():
     if model_args.lora:
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=4,
-            lora_alpha=8,
+            r=8,
+            lora_alpha=16,
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -126,9 +126,20 @@ def main():
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds = load_dataset(read_local_dataset, path=os.path.join(data_args.task_path, "train.json"), lazy=False)
-    dev_ds = load_dataset(read_local_dataset, path=os.path.join(data_args.task_path, "dev.json"), lazy=False)
-    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
+        os.path.join(data_args.task_name_or_path, "dev.json")
+    ):
+        train_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
+        )
+        dev_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
+        )
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    else:
+        train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     test_ds = dev_ds.map(trans_func)
 

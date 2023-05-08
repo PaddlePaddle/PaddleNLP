@@ -109,29 +109,60 @@ python infer_generation.py --model_dir inference/ --model_prefix bloom
 
 我们提供了对[WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)、[LAMBADA](https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl)两种数据集的评估脚本, 并将数据放置在data 目录下， 使用如下命令启动评估：
 
-1. WikiText数据集评估
-```bash
+> 模型评估脚本相关脚本放置在 [Makefile](./Makefile) 中，可通过执行`make run_eval*`等命令执行对应评估命令。
 
-CUDA_VISIBLE_DEVICES="1" python run_eval.py \
+1. WikiText数据集评估
+
+* 单卡评估
+
+```bash
+make run_eval
+# or
+python run_eval.py \
     --model_type bloom \
     --model_name_or_path "bigscience/bloom-560m" \
-    --tokenizer_name_or_path "bigscience/bloom-560m" \
-    --input_dir "old" \
-    --output_dir "output_glue" \
     --batch_size 8 \
     --eval_path ./data/wikitext-103/wiki.valid.tokens
 ```
 
-2. LAMBADA数据集评估
+* 多卡评估
+
 ```bash
-# 覆盖default.yaml中的eval_path配置字段
+make run_eval_tps
+# or
+python -m paddle.distributed.launch --gpus "3,4,5,6" python run_eval.py \
+    --model_type bloom \
+    --model_name_or_path "bigscience/bloom-560m" \
+    --batch_size 8 \
+    --tensor_parallel_degree 4 \
+    --eval_path ./data/wikitext-103/wiki.valid.tokens
+```
+
+2. LAMBADA数据集评估
+
+```bash
 python run_eval.py \
     --model_type bloom \
     --model_name_or_path "bigscience/bloom-560m" \
-    --tokenizer_name_or_path "bigscience/bloom-560m" \
-    --input_dir "old" \
-    --output_dir "output_glue" \
     --batch_size 8 \
-    --eval_path ./data/./lambada_test.jsonl \
+    --eval_path ./data/lambada_test.jsonl \
     --cloze_eval
+```
+
+3. 176B 模型评估
+
+当前 Bloom（176B）模型权重基于`auto_dist{rank}.pdparams`的命令方式加载，故在此提供以下脚本执行动态图评估脚本：
+
+> 评估不同数据集只需要调整参数`eval_path`。
+
+```bash
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" python run_eval.py \
+    --model_type bloom \
+    --model_name_or_path "/path/to/auto_dist/pdparams" \
+    --batch_size 8 \
+    --dtype "bfloat16" \
+    --tensor_parallel_degree 8 \
+    --eval_path ./data/lambada_test.jsonl \
+    --cloze_eval \
+    --load_autodist
 ```

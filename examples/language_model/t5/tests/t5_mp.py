@@ -19,7 +19,7 @@ import paddle
 
 from paddlenlp.transformers import T5Model
 
-T5Model.init_weights = lambda *_: None
+T5Model._init_weights = lambda *_: None
 
 
 def main():
