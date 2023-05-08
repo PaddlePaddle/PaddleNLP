@@ -12,7 +12,7 @@
 
 ### 预训练
 
-本项目致力于t5模型的预训练，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。 并训练发布开源最优的模型参数。
+本项目致力于t5模型的预训练，从数据下载，数据转化，模型训练，流程开源开放，可复现。
 
 接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
 
@@ -38,13 +38,13 @@ python -u  create_pretraining_data.py \
 **路径配置**
 
 - 主要配置输入输出目录
-- 这里的`vocab_dir`如果没有使用自定义词表的话，请设置为内置的tokenizer，如`t5-small`等。
-- 这里的 `data_dir` 设置多份数据集，用户不使用多份数据集的话，直接`data_dir="./data"`即可。
+- 这里的`tokenizer_name_or_path`请设置为内置的tokenizer，如`t5-small`等。
+- 这里的 `input_dir` 设置输入数据集路径，例如配置`input_dir "./data"`即可。
 
 **启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
 
 ```shell
-python3 -u  -m paddle.distributed.launch \
+python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "./log" \
     t5_run_pretrain_trainer.py \
@@ -54,27 +54,27 @@ python3 -u  -m paddle.distributed.launch \
     --input_dir "${data_dir}" \
     --output_dir "${base_dir}" \
     --split 10,5,1 \
-    --max_seq_len 512 \
-    --per_device_eval_batch_size 8 \
-    --per_device_train_batch_size 16 \
-    --fp16 \
-    --fp16_opt_level "O1" \
-    --use_recompute false \
-    --max_steps 4000000 \
-    --save_steps 100000 \
-    --save_strategy "steps" \
-    --decay_steps 3900000 \
+    --max_seq_length 512 \
+    --max_seq_length_dec 128 \
+    --per_device_train_batch_size 64 \
+    --per_device_eval_batch_size 64 \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 20000 \
+    --save_steps 5000 \
     --weight_decay 0.01 \
-    --warmup_rate 0.01 \
+    --decay_steps 9900 \
+    --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 20 \
-    --dataloader_num_workers 3 \
-    --eval_steps 1000 \
-    --device "gpu"\
-    --share_folder true \
-    --hidden_dropout_prob 0.1 \
-    --attention_probs_dropout_prob 0.1 \
-    --seed 1234 \
+    --logging_steps 10\
+    --dataloader_num_workers 4 \
+    --eval_steps 100 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --do_eval \
+    --seed 1234\
+    --device "gpu"
 ```
 
 其中参数释义如下：
@@ -95,7 +95,6 @@ python3 -u  -m paddle.distributed.launch \
 - `dataloader_num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_steps` 模型评估间隔。
 - `device` 训练设备，默认为GPU。
-- `share_folder` 多机训练时，如果多机`input_dir`为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。（每次运行，会制作训练的index数据，如果为挂载的统一nfs位置，则一台机器制作数据即可，否则每台机器都需要制作）
 
 ### GLUE任务
 
