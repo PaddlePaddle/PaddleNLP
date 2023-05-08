@@ -35,13 +35,13 @@ class ChatGLMTask(Task):
         self._static_mode = False
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
-        self._tgt_length =  kwargs.get("tgt_length", 128)
+        self._tgt_length = kwargs.get("tgt_length", 128)
         # Token max length
         self._max_length = kwargs.get("max_length", 128)
-        self._top_k = kwargs.get('top_k',1)
-        self._top_p = kwargs.get('top_p',1.0)
-        self._temperature = kwargs.get('temperature',1.0)
-        self.decode_strategy = kwargs.get('decode_strategy','sampling')
+        self._top_k = kwargs.get("top_k", 1)
+        self._top_p = kwargs.get("top_p", 1.0)
+        self._temperature = kwargs.get("temperature", 1.0)
+        self.decode_strategy = kwargs.get("decode_strategy", "sampling")
 
         self._construct_tokenizer(model)
         if self._static_mode:
@@ -49,8 +49,6 @@ class ChatGLMTask(Task):
         else:
             self._construct_model(model)
         self._construct_input_spec()
-
-        
 
     def _construct_input_spec(self):
         """
@@ -199,7 +197,7 @@ class ChatGLMTask(Task):
                     decode_strategy=self.decode_strategy,
                     top_k=self._top_k,
                     top_p=self._top_p,
-                    temperature = self._temperature,
+                    temperature=self._temperature,
                     max_length=self._tgt_length,
                     bos_token_id=self._tokenizer.bos_token_id,
                     eos_token_id=self._tokenizer.end_token_id,
