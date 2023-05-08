@@ -51,7 +51,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    do_generation: bool = field(default=True, metadata={"help": "Whether to do generation for evaluation"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def main():
@@ -153,7 +153,7 @@ def main():
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
-    def compute_metrics(eval_preds):
+    def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
@@ -165,7 +165,6 @@ def main():
 
         rouge1_score = rouge1.score(predictions, references)
         rouge2_score = rouge2.score(predictions, references)
-        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
         for pred, ref in zip(predictions, references):
             rougel.add_inst(pred, [ref])
             bleu4.add_inst(pred, [ref])
@@ -174,6 +173,14 @@ def main():
             "rouge2": rouge2_score,
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
+        }
+
+    def compute_metrics(eval_preds):
+
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
+        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        return {
             "accuracy": accuracy,
         }
 
@@ -183,7 +190,7 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_do_generation if model_args.do_generation else compute_metrics,
         data_collator=collate_fn,
         data_args=data_args,
         do_generation=model_args.do_generation,

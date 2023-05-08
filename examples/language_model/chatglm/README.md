@@ -39,7 +39,8 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
---tensor_parallel_degree 4
+--tensor_parallel_degree 4 \
+--do_generation True
 ```
 
 其中参数释义如下：
@@ -63,6 +64,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
+- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
 
 ## BelleGroup/school_math_0.25M
 
@@ -88,8 +90,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --do_train \
 --do_eval \
 --disable_tqdm True \
---metric_for_best_model ppl \
---greater_is_better False \
+--metric_for_best_model accuracy \
 --do_generation False \
 --tensor_parallel_degree 4
 ```
