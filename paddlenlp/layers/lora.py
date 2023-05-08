@@ -311,17 +311,7 @@ class LoRAMergedLinear(nn.Linear):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
-            if input_a.dim() == 2:
-                delta = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif input_a.dim() == 3:
+            if input_a.dim() == 3:
                 delta = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
@@ -457,17 +447,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input_mp) @ self.lora_A
-            if input_a.dim() == 2:
-                delta_mp = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif input_a.dim() == 3:
+            if input_a.dim() == 3:
                 delta_mp = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
