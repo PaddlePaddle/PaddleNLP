@@ -160,7 +160,7 @@ class TextSimilarityTask(Task):
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-bert/config.json",
-                "136a73740ec1002d33eff32146678491",
+                "37e28e2359f330f64fc82beff1967a1e",
             ],
         },
     }
