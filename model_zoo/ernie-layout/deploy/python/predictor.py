@@ -768,7 +768,7 @@ class Predictor(object):
                 invalid_idx.add(idx)
 
         # Save maping between original index in docs and new index(index in valid inputs)
-        idx_map = {j:i for i, j in enumerate(input_idx)}
+        idx_map = {j: i for i, j in enumerate(input_idx)}
 
         inputs = collections.defaultdict(list)
         for data in input_data:
@@ -790,7 +790,7 @@ class Predictor(object):
                 preds[1].extend(output[1].tolist())
         results = self.postprocess(preds)
 
-        # Merge result of invalid docs & valid docs input
+        # Merge results of invalid docs & valid docs input
         merged_results = []
         for i in range(len(docs)):
             if i in invalid_idx:
