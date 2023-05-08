@@ -169,7 +169,7 @@ def run_evaluate(
     for eval_step, batch in enumerate(data_loader):
         loss_return = exe.run(program, feed=batch, fetch_list=eval_fetch)
         if is_last:
-            all_loss.append(float(loss_return[0]))
+            all_loss.append(float(loss_return))
         if eval_step >= iter_steps - 1:
             if not is_last:
                 break
@@ -427,7 +427,7 @@ def do_train(args):
                                 global_step,
                                 epoch,
                                 step,
-                                loss_return[0],
+                                loss_return,
                                 avg_reader_cost,
                                 1.0 / speed,
                                 speed,
@@ -436,7 +436,7 @@ def do_train(args):
                                 lr_return,
                             )
                         )
-                        log_writer.add_scalar("loss", loss_return[0], global_step)
+                        log_writer.add_scalar("loss", loss_return, global_step)
                         log_writer.add_scalar("learning_rate", lr_return, global_step)
                     tic_train = time.time()
                     train_reader_cost = 0.0
@@ -530,7 +530,7 @@ def do_train(args):
                                     global_step,
                                     epoch,
                                     step,
-                                    loss_return[0],
+                                    loss_return,
                                     avg_reader_cost,
                                     1.0 / speed,
                                     speed,
@@ -539,7 +539,7 @@ def do_train(args):
                                     lr_return,
                                 )
                             )
-                            log_writer.add_scalar("loss", loss_return[0], global_step)
+                            log_writer.add_scalar("loss", loss_return, global_step)
                             log_writer.add_scalar("learning_rate", lr_return, global_step)
                         tic_train = time.time()
                         train_reader_cost = 0.0
