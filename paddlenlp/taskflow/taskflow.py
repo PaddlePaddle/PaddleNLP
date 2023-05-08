@@ -41,6 +41,7 @@ from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
+from .text2text_generation import Text2TextGenerationTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
@@ -461,6 +462,15 @@ TASKS = {
             },
         },
         "default": {"model": "unimo-text-1.0-dureader_qg"},
+    },
+    "text2text_generation": {
+        "models": {
+            "THUDM/chatglm-6b": {
+                "task_class": Text2TextGenerationTask,
+                "task_flag": "text_generation-THUDM/chatglm-6b",
+            },
+        },
+        "default": {"model": "THUDM/chatglm-6b"},
     },
     "zero_shot_text_classification": {
         "models": {
