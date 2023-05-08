@@ -726,15 +726,21 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
-                strategy.hybrid_configs = {
+                hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
-                    "pp_configs": dygraph_pp_configs if pipeline_parallel_degree > 1 else {},
                 }
 
+                if pipeline_parallel_degree > 1:
+                    if dygraph_pp_configs["delay_scale_loss"]:
+                        hybrid_configs["pp_configs"] = dygraph_pp_configs
+
+                # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
+                strategy.hybrid_configs = hybrid_configs
                 fleet.init(is_collective=True, strategy=strategy)
+
                 logger.info(strategy)
 
         else:

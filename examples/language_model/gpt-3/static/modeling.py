@@ -676,7 +676,7 @@ class GPTPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "gpt"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         # no hook
         return
@@ -805,7 +805,6 @@ class GPTModel(GPTPretrainedModel):
 
         self.decoder = Decoder(decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size, topo=topo)
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None, time_step=None):
@@ -839,7 +838,6 @@ class GPTForPretraining(GPTPretrainedModel):
     def __init__(self, gpt):
         super(GPTForPretraining, self).__init__()
         self.gpt = gpt
-        self.apply(self.init_weights)
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
         if topo is not None and topo.mp_info.size > 1:
@@ -923,7 +921,6 @@ class GPTForGeneration(GPTPretrainedModel):
     ):
         super(GPTForGeneration, self).__init__()
         self.gpt = gpt
-        self.apply(self.init_weights)
         self.vocab_size = gpt.vocab_size
         self.eos_token_id = eos_id or 7
 

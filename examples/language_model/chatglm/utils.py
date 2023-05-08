@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict
+
+import numpy as np
 import paddle
 
 from paddlenlp.trainer import Trainer
@@ -92,3 +95,11 @@ class ChatGLMTrainer(Trainer):
                 all_labels = None
 
         return (loss, all_preds, all_labels)
+
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
+        if "loss" in logs:
+            logs["ppl"] = np.exp(logs["loss"])
+        if "eval_loss" in logs:
+            logs["eval_ppl"] = np.exp(logs["eval_loss"])
+
+        super(ChatGLMTrainer, self).log(logs, **kwargs)
