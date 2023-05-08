@@ -9,7 +9,7 @@
 
 <a name="1"></a>
 
-## SFT
+## 微调
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \

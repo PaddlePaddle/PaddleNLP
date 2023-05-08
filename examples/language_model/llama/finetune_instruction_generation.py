@@ -34,19 +34,6 @@ class DataArgument:
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
-    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
-    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(
-        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
-    )
-    top_k: int = field(
-        default=0,
-        metadata={
-            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
-        },
-    )
 
 
 @dataclass

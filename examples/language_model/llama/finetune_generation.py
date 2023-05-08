@@ -159,7 +159,7 @@ def main():
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
-        # pipeline_parallel eval is the some as training.
+        # pipeline_parallel eval is the same as training.
         is_test = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
