@@ -715,7 +715,9 @@ class Trainer:
                                         p.bw_storage.scale_(1.0 / self.dp_group.nranks)
                                         paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
 
-                    elif args.recompute and dp_enabled:
+                    # Case 2: Use recompute and dp / sharding stage1,
+                    # manualy collect gradient for dp.
+                    elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
