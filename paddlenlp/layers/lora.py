@@ -91,7 +91,7 @@ class LoRALinear(nn.Linear):
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
             if self.r > 0:
-                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+                new_weight = self.weight - paddle.matmul(self.lora_A, self.lora_B) * self.scaling
                 self.weight.set_value(new_weight)
             self.merged = False
 
@@ -100,14 +100,14 @@ class LoRALinear(nn.Linear):
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
             if self.r > 0:
-                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+                new_weight = self.weight + paddle.matmul(self.lora_A, self.lora_B) * self.scaling
                 self.weight.set_value(new_weight)
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and not self.merged:
-            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            result += paddle.matmul(paddle.matmul(self.lora_dropout(input), self.lora_A), self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):
@@ -167,7 +167,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
             if self.r > 0:
-                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+                new_weight = self.weight - paddle.matmul(self.lora_A, self.lora_B) * self.scaling
                 self.weight.set_value(new_weight)
             self.merged = False
 
@@ -176,7 +176,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
             if self.r > 0:
-                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+                new_weight = self.weight + paddle.matmul(self.lora_A, self.lora_B) * self.scaling
                 self.weight.set_value(new_weight)
             self.merged = True
 
@@ -185,8 +185,8 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
         if self.r > 0 and not self.merged:
-            input_a = self.lora_dropout(input_mp) @ self.lora_A
-            delta_mp = (input_a @ self.lora_B) * self.scaling
+            input_a = paddle.matmul(self.lora_dropout(input_mp), self.lora_A)
+            delta_mp = (paddle.matmul(input_a, self.lora_B)) * self.scaling
             result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
@@ -310,27 +310,14 @@ class LoRAMergedLinear(nn.Linear):
     def forward(self, input: paddle.Tensor):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            input_a = self.lora_dropout(input) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
+            input_a = paddle.matmul(self.lora_dropout(input), self.lora_A)
+            delta = (
+                F.conv1d(
+                    input_a.transpose([0, 2, 1]),
+                    self.lora_B.T.unsqueeze(-1),
+                    groups=sum(self.enable_lora),
                 )
-            elif len(input_a.shape) == 3:
-                delta = (
-                    F.conv1d(
-                        input_a.transpose([0, 2, 1]),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                ).transpose([0, 2, 1])
-            else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+            ).transpose([0, 2, 1])
 
             result += self.zero_pad(delta * self.scaling)
         return result
@@ -456,27 +443,15 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         # [batch_size, *, out_features_per_partition]
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            input_a = self.lora_dropout(input_mp) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta_mp = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
+            input_a = paddle.matmul(self.lora_dropout(input_mp), self.lora_A)
+            delta_mp = (
+                F.conv1d(
+                    input_a.transpose([0, 2, 1]),
+                    self.lora_B.T.unsqueeze(-1),
+                    groups=sum(self.enable_lora),
                 )
-            elif len(input_a.shape) == 3:
-                delta_mp = (
-                    F.conv1d(
-                        input_a.transpose([0, 2, 1]),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                ).transpose([0, 2, 1])
-            else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+            ).transpose([0, 2, 1])
+
             # [batch_size, *, out_features_per_partition]
             result_mp += self.zero_pad(delta_mp * self.scaling)
 
