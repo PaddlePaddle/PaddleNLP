@@ -543,6 +543,28 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # TODO(wj-Mcat): enable all tie-weights later
             # self.tie_weights()
 
+    @classmethod
+    def _from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            dtype (`paddle.dtype`, *optional*):
+                Override the default `paddle.dtype` and load the model under this dtype.
+        """
+        dtype = kwargs.pop("dtype", None)
+
+        if dtype is None:
+            if config.dtype is not None:
+                dtype = config.dtype
+            else:
+                dtype = paddle.get_default_dtype()
+
+        with dtype_guard(dtype):
+            model = cls(config, **kwargs)
+
+        return model
+
     @property
     def base_model(self):
         """
