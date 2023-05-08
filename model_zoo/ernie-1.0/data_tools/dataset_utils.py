@@ -756,7 +756,7 @@ def _build_train_valid_test_datasets(
             #         binary_head=binary_head,
             #         **kwargs,
             #     )
-            if dataset_type == DSET_TYPE_ERNIE:
+            elif dataset_type == DSET_TYPE_ERNIE:
                 from .ernie_dataset import ErnieDataset
 
                 dataset = ErnieDataset(
