@@ -55,8 +55,8 @@ python3 -u  -m paddle.distributed.launch \
     --output_dir "${base_dir}" \
     --split 10,5,1 \
     --max_seq_len 512 \
-	--per_device_eval_batch_size 2 \
-	--per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
+    --per_device_train_batch_size 2 \
     --fp16 \
     --fp16_opt_level "O1" \
     --use_recompute false \
