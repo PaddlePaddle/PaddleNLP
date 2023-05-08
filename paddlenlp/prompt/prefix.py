@@ -24,7 +24,11 @@ from paddle.distributed import fleet
 
 from ..transformers.model_utils import _add_variant
 from ..utils.distributed import distributed_gather
-from ..utils.env import PREFIX_CONFIG_NAME, PREFIX_WEIGHT_FILE_NAME
+from ..utils.env import (
+    PAST_KEY_VALUES_FILE_NAME,
+    PREFIX_CONFIG_NAME,
+    PREFIX_WEIGHT_FILE_NAME,
+)
 from ..utils.log import logger
 from .prompt_utils import signature
 
@@ -268,35 +272,31 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         return prefix_encoder
 
     def _get_past_key_values(self, batch_size):
-        if self.inference:
-            raise NotImplementedError("No support inference mode for PrefixModel")
+
+        # (bs, prefixlen, hidden_dim*layer_num*2)
+        past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([batch_size, -1]))
+
+        # (bs, prefixlen, hidden_dim*layer_num*2/tensor_parallel_degree)
+        if self.config.tensor_parallel_degree > 1:
+            split_past_key_values = past_key_values.split(num_or_sections=self.config.tensor_parallel_degree, axis=2)
+            past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
+            num_attention_heads = self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree
         else:
-            # (bs, prefixlen, hidden_dim*layer_num*2)
-            past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([batch_size, -1]))
+            num_attention_heads = self.prefix_config.num_attention_heads
 
-            # (bs, prefixlen, hidden_dim*layer_num*2/tensor_parallel_degree)
-            if self.config.tensor_parallel_degree > 1:
-                split_past_key_values = past_key_values.split(
-                    num_or_sections=self.config.tensor_parallel_degree, axis=2
-                )
-                past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
-                num_attention_heads = self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree
-            else:
-                num_attention_heads = self.prefix_config.num_attention_heads
+        # (bs, prefixlen, layer_num*2, head_num/tensor_parallel_degree,  head_dim)
+        past_key_values = past_key_values.reshape(
+            [
+                batch_size,
+                self.prefix_config.num_prefix_tokens,
+                self.prefix_config.num_hidden_layers * 2,
+                num_attention_heads,
+                self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
+            ]
+        )
 
-            # (bs, prefixlen, layer_num*2, head_num/tensor_parallel_degree,  head_dim)
-            past_key_values = past_key_values.reshape(
-                [
-                    batch_size,
-                    self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.num_hidden_layers * 2,
-                    num_attention_heads,
-                    self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
-                ]
-            )
-
-            if self.postprocess_past_key_value is not None:
-                past_key_values = self.postprocess_past_key_value(past_key_values)
+        if self.postprocess_past_key_value is not None:
+            past_key_values = self.postprocess_past_key_value(past_key_values)
 
         return past_key_values
 
@@ -333,7 +333,6 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         postprocess_past_key_value=None,
         pad_attention_mask=None,
     ):
-        # TODO(lugimzzz): support load past_key_values in next PR
         # init prefix config & prefix model
         prefix_config = PrefixConfig.from_pretrained(prefix_path)
         # define a new variable to conserve original prefix_config.tensor_parallel_degree value which will update while initializing prefix model
@@ -372,7 +371,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         return prefix_model
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
@@ -390,9 +389,15 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         weight_filename = os.path.join(save_directory, prefix_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 
+        # past_key_values: (prefixlen, hidden_dim*layer_num*2)
+        past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([1, -1]))[0].numpy()
+
         if self.model.config.tensor_parallel_rank == 0:
+            # save prefix config
             self.prefix_config.save_pretrained(save_directory)
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+            # save past key values
+            paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
