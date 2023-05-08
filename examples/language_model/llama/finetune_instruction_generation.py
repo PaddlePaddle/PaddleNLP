@@ -17,41 +17,23 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import DataCollatorForSupervisedDataset, convert_example
-from modeling_pp import LlamaForCausalLMPipe
-from utils import LlamaTrainer, compute_metrics
+from data import DataCollatorForSupervisedDataset, custom_instruction_convert_example
+from utils import LlamaTrainer
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    get_last_checkpoint,
-    set_seed,
-)
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="squad", metadata={"help": "The name of task."})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=142, metadata={"help": "The max length of target text."})
-    min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
-    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
-    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(
-        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
-    )
-    top_k: int = field(
-        default=0,
-        metadata={
-            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
-        },
-    )
+    task_name: str = field(default="school_math_0.25M", metadata={"help": "The name of task."})
+    data_name: str = field(default="bellegroup", metadata={"help": "The name of data."})
+    src_length: int = field(default=608, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
+    min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
 
 
 @dataclass
@@ -59,29 +41,22 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    # label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
+    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    eval_with_do_generation: bool = field(
-        default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
-    )
 
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    data_args.always_pad_to_max_length = False
-    # data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    # setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    setattr(training_args, "label_smoothing", model_args.label_smoothing)
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     paddle.set_device(training_args.device)
-
-    set_seed(args=training_args)
 
     # Log on each process the small summary:
     logger.warning(
@@ -104,22 +79,15 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Set the dtype for loading model
-    dtype = "float32"
+    dtype = None
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model_class = AutoModelForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        if model_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        model_class = LlamaForCausalLMPipe
-
     # Load the pretrained language model.
-    model = model_class.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -129,6 +97,11 @@ def main():
         fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.model_name_or_path,
+        padding_side="left",  # Allow batch inference
     )
 
     if model_args.lora:
@@ -145,58 +118,21 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path,
-        padding_side="left",  # Allow batch inference
-    )
-    tokenizer.pad_token = tokenizer.unk_token
-
     # Load the dataset.
-    if training_args.do_train or training_args.do_eval:
-        train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
-        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
 
-    if training_args.do_train:
-        train_ds = train_ds.map(partial(trans_func))
-    if training_args.do_eval:
-        # pipeline_parallel eval is the same as training.
-        is_test = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
-
+    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = train_ds.map(partial(trans_func))
+    dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
-
-    def compute_metrics_trainer(eval_preds, tokenizer):
-        all_preds = []
-        all_labels = []
-        preds = eval_preds.predictions
-        preds = [x[x != -100] for x in preds]
-        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
-        labels = [x[x != -100] for x in eval_preds.label_ids]
-        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
-
-        all_preds = [pred.strip() for pred in all_preds]
-        all_labels = [label.strip() for label in all_labels]
-        all_preds = [pred.strip("question:") for pred in all_preds]
-        all_labels = [label.strip("question:") for label in all_labels]
-
-        eval_result = compute_metrics(all_preds, all_labels)
-        return eval_result
-
-    compute_metrics_func = partial(
-        compute_metrics_trainer,
-        tokenizer=tokenizer,
-    )
 
     trainer = LlamaTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_ds if training_args.do_train else None,
-        eval_dataset=dev_ds if training_args.do_eval else None,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_func
-        if (model_args.eval_with_do_generation and training_args.do_eval)
-        else None,
-        do_generation=model_args.eval_with_do_generation,
+        do_generation=False,
         data_collator=collate_fn,
     )
 

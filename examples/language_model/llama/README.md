@@ -1,25 +1,13 @@
 # LLaMA inplementation
 
 **目录**
-- [1. 模型下载及权重转换](#1)
-- [2. 微调](#2)
-- [3. 动转静](#3)
-- [4. 模型预测](#4)
-- [5. 模型推理](#5)
+
+- [1. 微调](#2)
+- [2. 动转静](#3)
+- [3. 模型预测](#4)
+- [4. 模型推理](#5)
 
 <a name="1"></a>
-
-## 模型加载：
-
-```python
-from tokenizer import LLaMATokenizer
-from modeling import LLaMAForCausalLM
-
-tokenizer = LLaMATokenizer.from_pretrained("facebook/llama-7b")
-model = LLaMAForCausalLM.from_pretrained("facebook/llama-7b", load_state_as_np=True)
-```
-
-<a name="2"></a>
 
 ## 微调
 
@@ -77,7 +65,34 @@ python -u  -m paddle.distributed.launch \
     --warmup_steps 20
 ```
 
-<a name="3"></a>
+## 指令微调
+
+```shell
+python -u  -m paddle.distributed.fleet.launch \
+    --gpus "0,1,2,3" finetune_instruction_generation.py \
+    --model_name_or_path facebook/llama-7b \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 1 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --tensor_parallel_degree 4 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --recompute \
+    --learning_rate 3e-5 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --gradient_accumulation_steps 32 \
+    --logging_steps 1 \
+    --eval_steps 1000
+```
+
+<a name="2"></a>
 
 ## 模型预测
 
@@ -104,7 +119,7 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
     --merge_tensor_parallel_path  ./checkpoints/llama-merged
 ```
 
-<a name="4"></a>
+<a name="3"></a>
 
 ## 模型导出
 
@@ -114,7 +129,7 @@ python export_generation_model.py \
     --output_path inference/llama
 ```
 
-<a name="5"></a>
+<a name="4"></a>
 
 ## 模型推理
 
