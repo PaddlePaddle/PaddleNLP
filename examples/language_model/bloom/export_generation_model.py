@@ -18,9 +18,14 @@ import os
 
 import paddle
 
-from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    BloomConfig,
+    BloomForCausalLM,
+    BloomForGeneration,
+)
 
-MODEL_CLASSES = {"bloom": (BloomForCausalLM)}
+MODEL_CLASSES = {"bloom": (BloomForCausalLM), "bloom-generation": (BloomForGeneration)}
 
 
 def parse_args():
@@ -35,7 +40,7 @@ def parse_args():
     )
     parser.add_argument(
         "--model_dtype",
-        default="float32",
+        default="float16",
         type=str,
         help="Model dtype selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
@@ -75,42 +80,23 @@ def main():
 
     config = BloomConfig.from_pretrained(args.model_name_or_path)
     config.use_recompute = False
+    config.bos_token_id = tokenizer.bos_token_id
+    config.eos_token_id = tokenizer.eos_token_id
+    config.pad_token_id = tokenizer.pad_token_id
     # Load the model and parameter
     model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
 
     model.eval()
     input_spec = [
         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-        None,
-        None,
-        # max_length
-        args.max_length,
-        # min_length
-        0,
-        # decode_strategy
-        "sampling",
-        # temperature
-        1.0,
-        # top_k
-        1,
-        # top_p
-        1.0,
-        1.0,
-        # repetition_penalty
-        1,
-        # num_beam_groups
-        1,
-        0.0,
-        # early_stopping
-        False,
-        # bos_token_id
-        tokenizer.bos_token_id,
-        # eos_token_id
-        tokenizer.eos_token_id,
-        # pad_token_id
-        tokenizer.pad_token_id,
+        paddle.static.InputSpec(shape=[1], dtype="int64"),  # min_dec_len
+        paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_dec_len
+        paddle.static.InputSpec(shape=[1], dtype="float32"),  # temperature
+        paddle.static.InputSpec(shape=[1], dtype="int64"),  # top_k
+        paddle.static.InputSpec(shape=[1], dtype="float32"),  # top_p
+        paddle.static.InputSpec(shape=[1], dtype="float32"),  # repetition_penalty
     ]
-    model = paddle.jit.to_static(model.generate, input_spec=input_spec)
+    model = paddle.jit.to_static(model, input_spec=input_spec)
 
     # # Save converted static graph model
     paddle.jit.save(model, args.output_path)
