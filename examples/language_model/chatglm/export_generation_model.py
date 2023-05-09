@@ -17,6 +17,7 @@ import os
 
 import paddle
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 
 
@@ -38,6 +39,7 @@ def parse_args():
         help="The output file prefix used to save the exported inference model.",
     )
     parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -51,6 +53,8 @@ def main():
     model = ChatGLMForConditionalGeneration.from_pretrained(
         args.model_name_or_path, load_state_as_np=True, dtype=args.dtype
     )
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
     input_spec = [

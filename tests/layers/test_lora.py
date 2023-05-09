@@ -29,16 +29,16 @@ from paddlenlp.transformers import AutoModel, BertModel
 class TestLoraLayer(unittest.TestCase):
     def test_forward(self):
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
         self.assertFalse(lora_layer.lora_B.stop_gradient)
         self.assertTrue(lora_layer.weight.stop_gradient)
         self.assertFalse(lora_layer.bias.stop_gradient)
-        self.assertEqual(output.shape, [2, 8])
+        self.assertEqual(output.shape, [2, 4, 8])
 
     def test_train_eval(self):
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
         lora_layer.train()
         train_result = lora_layer(x)
@@ -57,7 +57,7 @@ class TestLoraLayer(unittest.TestCase):
             new_lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(new_lora_layer(x), lora_layer(x)))
 
     def test_load_regular_linear(self):
@@ -71,7 +71,7 @@ class TestLoraLayer(unittest.TestCase):
             lora_layer_r4 = LoRALinear(in_features=16, out_features=8, r=4)
             lora_layer_r0.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
@@ -81,16 +81,16 @@ class TestLoRAMergedLayer(unittest.TestCase):
         lora_layer = LoRAMergedLinear(
             in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8, enable_lora=[True, False]
         )
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
         self.assertFalse(lora_layer.lora_B.stop_gradient)
         self.assertTrue(lora_layer.weight.stop_gradient)
         self.assertFalse(lora_layer.bias.stop_gradient)
-        self.assertEqual(output.shape, [2, 8])
+        self.assertEqual(output.shape, [2, 4, 8])
 
     def test_train_eval(self):
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         lora_layer = LoRAMergedLinear(in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False])
         lora_layer.train()
         train_result = lora_layer(x)
@@ -111,7 +111,7 @@ class TestLoRAMergedLayer(unittest.TestCase):
             )
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(new_lora_layer(x), lora_layer(x)))
 
     def test_load_regular_linear(self):
@@ -125,7 +125,7 @@ class TestLoRAMergedLayer(unittest.TestCase):
             lora_layer_r4 = LoRAMergedLinear(in_features=16, out_features=8, r=4)
             lora_layer_r0.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 

@@ -79,3 +79,65 @@ def convert_example(example, tokenizer, data_args, is_test=True):
             "labels": labels,
         }
     return inputs
+
+
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True):
+    instruction = ""
+    input = ""
+    response = ""
+    if "instruction" in example and "output" in example:
+        instruction = example["instruction"]
+        response = example["output"]
+    else:
+        assert False, "instruction and output are not in the input dictionary."
+    if "input" in example["input"]:
+        input = example["input"]
+
+    if "chat" in data_args.task_name_or_path:
+        prompt = instruction + input
+    else:
+        prompt = "Human: " + instruction + input + "\n Assistant: "
+
+    # dataset for evaluation
+    if is_test:
+        inputs = {
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+                "input_ids"
+            ],
+        }
+    # dataset for training
+    else:
+        src_ids = tokenizer(
+            prompt,
+            add_special_tokens=False,
+            max_length=data_args.src_length - 1,
+            truncation=True,
+            truncation_side="left",
+        )["input_ids"]
+        tgt_ids = tokenizer(
+            response,
+            add_special_tokens=False,
+            max_length=data_args.tgt_length - 2,
+            truncation=True,
+            truncation_side="right",
+        )["input_ids"]
+
+        input_ids = tokenizer.build_inputs_with_special_tokens(src_ids, tgt_ids)
+
+        context_length = input_ids.index(tokenizer.bos_token_id)
+        mask_position = context_length - 1
+
+        attention_mask = np.tri(len(input_ids), len(input_ids))
+        attention_mask[:, :context_length] = 1
+        attention_mask = attention_mask[None, :, :]
+        attention_mask = (attention_mask < 0.5).astype("int64")
+
+        labels = [-100] * context_length + input_ids[mask_position + 1 :]
+
+        inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+        }
+    return inputs
