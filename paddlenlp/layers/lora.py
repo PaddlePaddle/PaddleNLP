@@ -320,7 +320,7 @@ class LoRAMergedLinear(nn.Linear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
 
             result += self.zero_pad(delta * self.scaling)
         return result
@@ -456,7 +456,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
             # [batch_size, *, out_features_per_partition]
             result_mp += self.zero_pad(delta_mp * self.scaling)
 
