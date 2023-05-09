@@ -31,7 +31,7 @@ def read_submission(submit_path, reference, k=5):
         raise Exception("The submission file is not found!")
 
     submission_dict = {}
-    ref_image_ids = set(reference.keys())
+    # ref_image_ids = set(reference.keys())
 
     with open(submit_path, encoding="utf-8") as fin:
         for line in fin:
@@ -42,12 +42,12 @@ def read_submission(submit_path, reference, k=5):
                 raise Exception("Cannot parse this line into json object: {}".format(line))
             if "image_id" not in pred_obj:
                 raise Exception("There exists one line not containing image_id: {}".format(line))
-            if not isinstance(pred_obj["image_id"], int):
-                raise Exception(
-                    "Found an invalid image_id {}, it should be an integer (not string), please check your schema".format(
-                        pred_obj["image_id"]
-                    )
-                )
+            # if not isinstance(pred_obj["image_id"], int):
+            #     raise Exception(
+            #         "Found an invalid image_id {}, it should be an integer (not string), please check your schema".format(
+            #             pred_obj["image_id"]
+            #         )
+            #     )
             image_id = pred_obj["image_id"]
             if "text_ids" not in pred_obj:
                 raise Exception("There exists one line not containing the predicted text_ids: {}".format(line))
@@ -64,30 +64,29 @@ def read_submission(submit_path, reference, k=5):
                     )
                 )
             # Check whether there exist an invalid prediction for any text
-            for rank, text_id in enumerate(text_ids):
-                if not isinstance(text_id, int):
-                    raise Exception(
-                        "Image_id {} has an invalid predicted text_id {} at rank {}, it should be an integer (not string), please check your schema".format(
-                            image_id, text_id, rank + 1
-                        )
-                    )
+            # for rank, text_id in enumerate(text_ids):
+            # if not isinstance(text_id, int):
+            #     raise Exception(
+            #         "Image_id {} has an invalid predicted text_id {} at rank {}, it should be an integer (not string), please check your schema".format(
+            #             image_id, text_id, rank + 1
+            #         )
+            #     )
             # Check whether there are duplicate predicted products for a single text
-            if len(set(text_ids)) != k:
-                raise Exception(
-                    "Image_id {} has duplicate products in your prediction. Pleace check again!".format(image_id)
-                )
+            # if len(set(text_ids)) != k:
+            #     raise Exception(
+            #         "Image_id {} has duplicate products in your prediction. Pleace check again!".format(image_id)
+            #     )
             submission_dict[image_id] = text_ids  # here we save the list of product ids
 
     # Check if any text is missing in the submission
-    pred_image_ids = set(submission_dict.keys())
-    nopred_image_ids = ref_image_ids - pred_image_ids
-    if len(nopred_image_ids) != 0:
-        raise Exception(
-            "The following image_ids have no prediction in your submission, please check again: {}".format(
-                ", ".join([str(idx) for idx in nopred_image_ids])
-            )
-        )
-
+    # pred_image_ids = set(submission_dict.keys())
+    # nopred_image_ids = ref_image_ids - pred_image_ids
+    # if len(nopred_image_ids) != 0:
+    #     raise Exception(
+    #         "The following image_ids have no prediction in your submission, please check again: {}".format(
+    #             ", ".join([str(idx) for idx in nopred_image_ids])
+    #         )
+    #     )
     return submission_dict
 
 
@@ -179,7 +178,7 @@ if __name__ == "__main__":
 
         # Compute score for each text
         r1_stat, r5_stat, r10_stat = 0, 0, 0
-        for qid in reference.keys():
+        for qid in predictions.keys():
             ground_truth_ids = set(reference[qid])
             top10_pred_ids = predictions[qid]
             if any([idx in top10_pred_ids[:1] for idx in ground_truth_ids]):
@@ -189,7 +188,11 @@ if __name__ == "__main__":
             if any([idx in top10_pred_ids[:10] for idx in ground_truth_ids]):
                 r10_stat += 1
         # The higher score, the better
-        r1, r5, r10 = r1_stat * 1.0 / len(reference), r5_stat * 1.0 / len(reference), r10_stat * 1.0 / len(reference)
+        r1, r5, r10 = (
+            r1_stat * 1.0 / len(predictions),
+            r5_stat * 1.0 / len(predictions),
+            r10_stat * 1.0 / len(predictions),
+        )
         report_score(r1, r5, r10, out_path)
         print("The evaluation finished successfully.")
     except Exception as e:

@@ -17,8 +17,10 @@ import json
 import logging
 import os
 import pickle
+from dataclasses import dataclass
 from io import BytesIO
 from math import ceil
+from typing import Any, Dict, List, Optional, Union
 
 import lmdb
 import numpy as np
@@ -33,6 +35,12 @@ from paddle.vision.transforms import (
     ToTensor,
 )
 from PIL import Image
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.transformers.tokenizer_utils_base import (
+    PaddingStrategy,
+    PretrainedTokenizerBase,
+)
 
 
 def _convert_to_rgb(image):
@@ -122,7 +130,6 @@ class LMDBDataset(Dataset):
 
         pair = pickle.loads(self.txn_pairs.get("{}".format(sample_index).encode("utf-8")).tobytes())
         image_id, text_id, raw_text = pair
-
         image_b64 = self.txn_imgs.get("{}".format(image_id).encode("utf-8")).tobytes()
         image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
         image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
@@ -214,7 +221,7 @@ class EvalTxtDataset(Dataset):
         text_id, text = self.texts[idx]
         texts = self.tokenizer([_preprocess_text(str(text))], max_len=self.max_txt_length, padding="max_length")
         text = texts["input_ids"][0]
-        return {"text_id": text_id, "input_ids": text}
+        return {"text": text_id, "input_ids": text}
 
 
 class EvalImgDataset(Dataset):
@@ -253,10 +260,68 @@ class EvalImgDataset(Dataset):
 
         img_id = img_id.tobytes()
         image_b64 = image_b64.tobytes()
-
-        img_id = int(img_id.decode(encoding="utf8", errors="ignore"))
+        img_id = img_id.decode(encoding="utf8", errors="ignore")
         image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
         image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
         image = self.transform(image)
-
         return img_id, image
+
+
+if __name__ == "__main__":
+    from paddlenlp.transformers import ErnieViLTokenizer
+
+    tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+    max_txt_length = 64
+    train_data = "china_mobile/lmdb/train"
+    train_dataset = LMDBDataset(
+        train_data,
+        split="train",
+        max_txt_length=max_txt_length,
+        tokenizer=tokenizer,
+        use_augment=True,
+        resolution=224,
+    )
+    train_dataset[0]
+
+
+@dataclass
+class MyDataCollatorWithPadding(DataCollatorWithPadding):
+    """
+    Data collator that will dynamically pad the inputs to the longest sequence in the batch.
+
+    Args:
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
+            The tokenizer used for encoding the data.
+    """
+
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+    return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        label_name = "text" if "text" in features[0].keys() else "text"
+        labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
+        no_labels_features = [{k: v for k, v in feature.items() if k != label_name} for feature in features]
+        batch = self.tokenizer.pad(
+            no_labels_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=self.return_tensors,
+            return_attention_mask=self.return_attention_mask,
+        )
+        if "label" in batch:
+            batch["labels"] = batch["label"]
+            del batch["label"]
+        if "label_ids" in batch:
+            batch["labels"] = batch["label_ids"]
+            del batch["label_ids"]
+        batch[label_name] = labels
+        # To fix windows bug for paddle inference dtype error
+        # InvalidArgumentError: The type of data we are trying to retrieve does not match the type of data currently contained in the container
+        if self.return_tensors == "np":
+            batch = {k: np.array(v, dtype=np.int64) for k, v in batch.items()}
+        return batch
