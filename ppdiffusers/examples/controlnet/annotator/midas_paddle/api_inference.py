@@ -63,6 +63,10 @@ class MidasInference:
                 use_static=False,
                 use_calib_mode=False,
             )
+            min_input_shape = {"image": [1, 3, 224, 224]}
+            max_input_shape = {"image": [1, 3, 1280, 1280]}
+            opt_input_shape = {"image": [1, 3, 384, 384]}
+            config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape, opt_input_shape)
 
         # disable print log when predict
         config.disable_glog_info()
