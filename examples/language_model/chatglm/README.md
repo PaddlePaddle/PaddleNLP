@@ -72,7 +72,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finetune_generation.py \
 --output_dir ./checkpoints/chatglm-6b \
 --per_device_train_batch_size 32 \
---per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
 --gradient_accumulation_steps 1 \
 --model_name_or_path THUDM/chatglm-6b \
 --task_name_or_path school_math_0.25M \
