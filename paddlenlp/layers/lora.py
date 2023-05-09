@@ -311,17 +311,7 @@ class LoRAMergedLinear(nn.Linear):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif len(input_a.shape) == 3:
+            if input_a.dim() == 3:
                 delta = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
@@ -330,7 +320,7 @@ class LoRAMergedLinear(nn.Linear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
 
             result += self.zero_pad(delta * self.scaling)
         return result
@@ -457,17 +447,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input_mp) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta_mp = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif len(input_a.shape) == 3:
+            if input_a.dim() == 3:
                 delta_mp = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
@@ -476,7 +456,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
             # [batch_size, *, out_features_per_partition]
             result_mp += self.zero_pad(delta_mp * self.scaling)
 
