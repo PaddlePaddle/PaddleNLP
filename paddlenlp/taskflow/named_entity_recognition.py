@@ -84,8 +84,11 @@ class NERWordTagTask(WordTagTask):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",
+        "model_config": "config.json",
         "tags": "tags.txt",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
     }
     resource_files_urls = {
         "wordtag": {
@@ -94,12 +97,24 @@ class NERWordTagTask(WordTagTask):
                 "f035cc909a96817573ae33d8028ff6f8",
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
-                "9dcbd5d6f67792b2a2be058799a144ea",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/config.json",
+                "b9f307b3fa03ad98c08ecb5249c15dfa",
             ],
             "tags": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
                 "f33feedd01d478b03bac81be19b48d00",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/vocab.txt",
+                "54aa6e2eeb0478c2d18a2343b008590c",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/special_tokens_map.json",
+                "58104269e4f141a258bdb2ed06aa599f",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tokenizer_config.json",
+                "e3f2756e72e24e3bb298303fb9a171f7",
             ],
         }
     }
