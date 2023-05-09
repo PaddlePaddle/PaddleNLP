@@ -63,7 +63,7 @@ def main():
         input_spec=[
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            None,  # position_ids
             args.tgt_length,  # max length
             # min_length
             0,
