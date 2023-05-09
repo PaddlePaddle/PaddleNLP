@@ -18,6 +18,7 @@ import os
 
 import paddle
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
 
 MODEL_CLASSES = {"bloom": (BloomForCausalLM)}
@@ -59,6 +60,7 @@ def parse_args():
         type=int,
         help="max length of output sentence",
     )
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -77,6 +79,8 @@ def main():
     config.use_recompute = False
     # Load the model and parameter
     model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
     input_spec = [
