@@ -265,7 +265,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             encoder_layer.activation = nn.GELU(approximate=True)
             return encoder_layer
 
-        self.encoder = nn.LayerList(construct_encoder_layer() for _ in range(config.num_hidden_layers))
+        self.encoder = nn.TransformerEncoder(construct_encoder_layer(), config.num_hidden_layers)
         self.pooler = ErnieCtmPooler(config.hidden_size)
 
         self.use_content_summary = config.use_content_summary
@@ -409,14 +409,20 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         )
         embedding_output = self.embedding_hidden_mapping_in(embedding_output)
 
-        all_hidden_states = [] if output_hidden_states else None
         hidden_states = embedding_output
-        for layer in self.encoder:
-            hidden_states = layer(hidden_states, attention_mask)
-            if output_hidden_states:
-                all_hidden_states.append(hidden_states)
 
-        sequence_output = hidden_states
+        encoder_output = self.encoder(
+            hidden_states,
+            src_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        # when `output_attentions` and `output_hidden_states` are False, it wll return tensor object.
+        encoder_output = (encoder_output,) if paddle.is_tensor(encoder_output) else encoder_output
+
+        sequence_output = encoder_output[0]
 
         pooled_output = self.pooler(sequence_output)
         content_output = sequence_output[:, self.content_summary_index] if self.use_content_summary else None
@@ -450,15 +456,14 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 sequence_output,
                 pooled_output,
                 content_output,
-                all_hidden_states,
-            )
+            ) + encoder_output[1:]
 
         return ErnieCtmModelOutput(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
             content_output=content_output,
-            hidden_states=all_hidden_states,
-            attentions=None,
+            hidden_states=encoder_output.hidden_states,
+            attentions=encoder_output.attentions,
         )
 
 
