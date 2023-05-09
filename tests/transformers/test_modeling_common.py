@@ -312,6 +312,8 @@ class ModelTesterMixin:
         pass
 
     def test_attention_outputs(self):
+        if not self.has_attentions:
+            return
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         seq_len = getattr(self.model_tester, "seq_length", None)
         decoder_seq_length = getattr(self.model_tester, "decoder_seq_length", seq_len)
