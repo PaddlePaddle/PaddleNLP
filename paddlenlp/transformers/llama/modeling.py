@@ -164,9 +164,10 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
         attn_weights = attention_mask + attn_weights
-        attn_weights = paddle.maximum(
-            attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
-        )
+        if config.fp16_opt_level is not None:
+            attn_weights = paddle.maximum(
+                attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
+            )
 
         if config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
@@ -636,9 +637,6 @@ class LlamaModel(LlamaPretrainedModel):
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
-        combined_attention_mask = paddle.maximum(
-            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
-        )
         return combined_attention_mask
 
     @paddle.jit.not_to_static
