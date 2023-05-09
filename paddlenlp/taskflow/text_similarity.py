@@ -274,6 +274,7 @@ class TextSimilarityTask(Task):
         if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
+
                     if self._predictor_type == "paddle-inference":
                         input_ids, segment_ids = self._batchify_fn(batch)
                         self.input_handles[0].copy_from_cpu(input_ids)
@@ -282,7 +283,7 @@ class TextSimilarityTask(Task):
                         scores = self.output_handle[0].copy_to_cpu().tolist()
                         results.extend(scores)
                     else:
-                         # onnx mode
+                        # onnx mode
                         input_dict = {}
                         input_ids, segment_ids = self._batchify_fn(batch)
                         input_dict["input_ids"] = input_ids
