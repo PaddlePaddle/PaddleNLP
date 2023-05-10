@@ -18,28 +18,13 @@ import os
 
 import paddle
 
-from paddlenlp.layers import LoRAModel
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
-
-MODEL_CLASSES = {"bloom": (BloomForCausalLM)}
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
-    parser.add_argument(
-        "--model_type",
-        default="bloom",
-        type=str,
-        # required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
-    )
-    parser.add_argument(
-        "--model_dtype",
-        default="float32",
-        type=str,
-        help="Model dtype selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
-    )
     parser.add_argument(
         "--model_name_or_path",
         default="bigscience/bloom-560m",
@@ -61,6 +46,7 @@ def parse_args():
         help="max length of output sentence",
     )
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
     args = parser.parse_args()
     return args
 
@@ -68,17 +54,21 @@ def parse_args():
 def main():
     # most dtype of bloom model weights are float16, expect Bloom(176B) is bfloat16
     args = parse_args()
-    paddle.set_default_dtype(args.model_dtype)
-
-    args.model_type = args.model_type.lower()
-    model_class = MODEL_CLASSES[args.model_type]
-
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-
     config = BloomConfig.from_pretrained(args.model_name_or_path)
     config.use_recompute = False
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        dtype = config.dtype if config.dtype is not None else "float16"
+
     # Load the model and parameter
-    model = model_class.from_pretrained(args.model_name_or_path, config=config, low_cpu_mem_usage=True)
+    model = BloomForCausalLM.from_pretrained(
+        args.model_name_or_path, config=config, low_cpu_mem_usage=True, dtype=dtype
+    )
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
 
