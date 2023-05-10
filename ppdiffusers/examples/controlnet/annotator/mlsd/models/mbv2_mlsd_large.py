@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import paddle
-import utils
+from annotator.mlsd import utils
 
 
 class BlockTypeA(paddle.nn.Layer):

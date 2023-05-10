@@ -13,17 +13,13 @@
 # limitations under the License.
 """Finetuning on classification tasks."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
+import multiprocessing
 import os
 import time
-import logging
 import warnings
-import multiprocessing
 
 # NOTE(paddle-dev): All of these flags should be
 # set before `import paddle`. Otherwise, it would
@@ -35,16 +31,18 @@ import paddle.fluid as fluid  # noqa: E402
 
 if hasattr(paddle, "enable_static"):
     paddle.enable_static()
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy  # noqa: E402
 import paddle.fluid.incubate.fleet.base.role_maker as role_maker  # noqa: E402
-
 import reader_ce as reader_ce  # noqa: E402
-from model.ernie import ErnieConfig  # noqa: E402
 from cross_encoder import create_model, evaluate, predict  # noqa: E402
-from optimization import optimization  # noqa: E402
-from utils.args import print_arguments, check_cuda, prepare_logger  # noqa: E402
-from utils.init import init_pretraining_params, init_checkpoint  # noqa: E402
 from finetune_args import parser  # noqa: E402
+from model.ernie import ErnieConfig  # noqa: E402
+from optimization import optimization  # noqa: E402
+from paddle.fluid.incubate.fleet.collective import (  # noqa: E402
+    DistributedStrategy,
+    fleet,
+)
+from src.utils.args import check_cuda, prepare_logger, print_arguments  # noqa: E402
+from src.utils.init import init_checkpoint, init_pretraining_params  # noqa: E402
 
 warnings.filterwarnings("ignore")
 args = parser.parse_args()

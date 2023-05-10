@@ -54,6 +54,7 @@ from paddlenlp.utils.serialization import load_torch
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
 
+from ..utils import device_guard
 
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
@@ -925,7 +926,9 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
-    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig) -> None:
+    def convert_tensor_parallel(
+        cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
+    ) -> None:
         """the entry of converting config and converting model file
 
         Args:
@@ -933,19 +936,23 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
-        state_dict = paddle.load(weight_file, return_numpy=True)
+        if state_dict is None:
+            state_dict = paddle.load(weight_file, return_numpy=True)
 
-        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
 
         for name, action in name_action_mappings.items():
             if name not in state_dict:
-                logger.warning(f"key<{name}> not in the model state weight file.")
+                if not ignore_error:
+                    logger.warning(f"key<{name}> not in the model state weight file.")
                 continue
             tensor = state_dict.pop(name)
-            state_dict[name] = action(tensor)
+            new_tensor = action(tensor)
+            with device_guard("cpu"):
+                state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
 
         return state_dict
 
@@ -1002,7 +1009,7 @@ class ConversionMixin:
         raise NotImplementedError
 
     @staticmethod
-    def _resolve_prefix_keys(state_keys_base, state_keys_real):
+    def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False):
         # state_keys_map base to real
         state_keys_map = {}
 
@@ -1015,7 +1022,8 @@ class ConversionMixin:
                     state_keys_map[key] = x
                     break
             if key not in state_keys_map:
-                logger.error(f"could not find name {key} in loaded state dict!")
+                if not ignore_error:
+                    logger.error(f"could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 

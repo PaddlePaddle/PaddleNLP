@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict
+
+import numpy as np
 import paddle
 
 from paddlenlp.trainer import Trainer
@@ -54,8 +57,19 @@ class ChatGLMTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys=None,
     ):
-        if not self.do_generation or prediction_loss_only:
+        if prediction_loss_only:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
+        elif not self.do_generation:
+            loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
+            lm_logits = logits[0]
+            all_preds = []
+            all_labels = []
+            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
+                all_preds.append(p[l != -100])
+                all_labels.append(l[l != -100])
+
+            return (loss, all_preds, all_labels)
+
         loss = None
 
         n_token_id = self.tokenizer.convert_tokens_to_ids("<n>")
@@ -92,3 +106,11 @@ class ChatGLMTrainer(Trainer):
                 all_labels = None
 
         return (loss, all_preds, all_labels)
+
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
+        if "loss" in logs:
+            logs["ppl"] = np.exp(logs["loss"])
+        if "eval_loss" in logs:
+            logs["eval_ppl"] = np.exp(logs["eval_loss"])
+
+        super(ChatGLMTrainer, self).log(logs, **kwargs)

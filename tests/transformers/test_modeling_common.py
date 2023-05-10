@@ -785,6 +785,13 @@ class ModelTesterPretrainedMixin:
         model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
         self.assertIsNotNone(model)
 
+    def test_model_from_config_paddle_hub(self):
+        if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
+            return
+        config = self.base_model_class.config_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        model = self.base_model_class._from_config(config)
+        self.assertIsNotNone(model)
+
     @slow
     def test_model_from_pretrained_with_cache_dir(self):
         for model_name in list(self.base_model_class.pretrained_init_configuration)[:1]:

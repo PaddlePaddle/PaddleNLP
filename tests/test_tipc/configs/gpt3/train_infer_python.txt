@@ -2,7 +2,7 @@
 model_name:gpt3
 python:python3.7
 gpu_list:0|0,1
-null:null
+--device:gpu
 --use_pure_fp16:null
 --max_steps:null
 null:null

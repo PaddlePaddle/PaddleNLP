@@ -205,7 +205,7 @@ class Predictor(object):
             config.enable_xpu()
         elif device == "npu":
             # set NPU configs accordingly
-            config.enable_npu()
+            config.enable_custom_device("npu")
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
