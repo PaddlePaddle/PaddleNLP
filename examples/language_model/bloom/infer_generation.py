@@ -94,7 +94,6 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
         self.src_length = args.src_length
 
@@ -117,7 +116,7 @@ class Predictor(object):
             input_text,
             padding=True,
             return_tensors="np",
-            max_length=self.src_length,
+            max_length=self.max_length,
             return_attention_mask=True,
             return_position_ids=True,
         )
