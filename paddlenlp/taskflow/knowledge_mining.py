@@ -156,21 +156,24 @@ class WordTagTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",
+        "model_config": "config.json",
         "termtree_schema": "termtree_type.csv",
         "termtree_data": "termtree_data",
         "tags": "tags.txt",
         "spo_config": "spo_config.pkl",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
     }
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.4/model_state.pdparams",
-                "f035cc909a96817573ae33d8028ff6f8",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.5/model_state.pdparams",
+                "c7c9cef72f73ee22c70c26ef11393025",
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
-                "9dcbd5d6f67792b2a2be058799a144ea",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/config.json",
+                "b9f307b3fa03ad98c08ecb5249c15dfa",
             ],
             "termtree_schema": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
@@ -187,6 +190,18 @@ class WordTagTask(Task):
             "spo_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/spo_config.pkl",
                 "07a0b8d0422198d8c4c0f70e68963275",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/vocab.txt",
+                "54aa6e2eeb0478c2d18a2343b008590c",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/special_tokens_map.json",
+                "58104269e4f141a258bdb2ed06aa599f",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tokenizer_config.json",
+                "e3f2756e72e24e3bb298303fb9a171f7",
             ],
         }
     }
@@ -438,7 +453,7 @@ class WordTagTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
+        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(self._task_path)
         self._tokenizer = tokenizer_instance
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
@@ -509,22 +524,37 @@ class NPTagTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",
+        "model_config": "config.json",
         "name_category_map": "name_category_map.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
     }
     resource_files_urls = {
         "nptag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag_v1.1/model_state.pdparams",
-                "956031b4024a9e965096d9fb78f8c1f0",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag_v1.2/model_state.pdparams",
+                "34923c4d06acf936f52e1fa376b13748",
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_config.json",
-                "17c9e5216abfc9bd94c7586574a3cbc4",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/config.json",
+                "895f0eba0819da56db709d00109c984e",
             ],
             "name_category_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/name_category_map.json",
                 "c60810205993d307d919a26a3b96786f",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/vocab.txt",
+                "54aa6e2eeb0478c2d18a2343b008590c",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/special_tokens_map.json",
+                "58104269e4f141a258bdb2ed06aa599f",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/tokenizer_config.json",
+                "e3f2756e72e24e3bb298303fb9a171f7",
             ],
         }
     }
@@ -638,7 +668,7 @@ class NPTagTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
+        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(self._task_path)
         self._tokenizer = tokenizer_instance
 
     def _preprocess(self, inputs):
