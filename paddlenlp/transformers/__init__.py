@@ -73,6 +73,7 @@ from .blip.image_processing import *
 from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .convbert.configuration import *
 from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
