@@ -1220,6 +1220,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return_unused_kwargs=True,
                 force_download=force_download,
                 from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
                 **kwargs,
             )
 
