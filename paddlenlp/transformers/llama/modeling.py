@@ -164,10 +164,10 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
         attn_weights = attention_mask + attn_weights
-        if config.fp16_opt_level is not None:
-            attn_weights = paddle.maximum(
-                attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
-            )
+
+        attn_weights = paddle.maximum(
+            attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
+        )
 
         if config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
