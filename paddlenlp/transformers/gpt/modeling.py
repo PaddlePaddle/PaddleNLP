@@ -829,7 +829,15 @@ class GPTForPretraining(GPTPretrainedModel):
         return self.lm_head.decoder
 
     def forward(
-        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+        use_cache=False,
+        cache=None,
+        labels=None,
+        loss_mask=None,
     ):
         r"""
 
@@ -878,10 +886,19 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs = outputs
         logits = self.lm_head(encoder_outputs)
 
-        if use_cache:
-            return logits, cached_kvs
+        if labels is None:
+            if use_cache:
+                return logits, cached_kvs
+            else:
+                return logits
         else:
-            return logits
+            loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+            masked_lm_loss = loss_func(logits, labels.unsqueeze(2))
+
+            loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
+            return loss
 
 
 class GPTPretrainingCriterion(paddle.nn.Layer):

@@ -47,13 +47,11 @@ class GPTDataset(paddle.io.Dataset):
 
         if local_rank == 0:
             try:
-                import ppfleetx.data.data_tools.cpp.fast_index_map_helpers
+                pass
             except Exception:
                 start_time = time.time()
                 print("> compiling dataset index builder ...")
-                from ppfleetx.data.data_tools.cpp.compile import compile_helper
 
-                compile_helper()
                 print(
                     ">>> done with dataset index builder. Compilation time: {:.3f} "
                     "seconds".format(time.time() - start_time),
@@ -65,8 +63,8 @@ class GPTDataset(paddle.io.Dataset):
         if device_world_size > 1 and local_rank != 0:
             while True:
                 try:
-                    import ppfleetx.data.data_tools.cpp.fast_index_map_helpers  # noqa: F401, F811
 
+                    pass
                     break
                 except Exception:
                     print("> wait for helpers to be compiled!")
@@ -321,11 +319,9 @@ def construct_samples_and_shuffle_data(
             assert doc_idx.dtype == np.int32
             assert sizes.dtype == np.int32
 
-            from ppfleetx.data.data_tools.cpp import fast_index_map_helpers
+            from tool_helpers import helpers
 
-            sample_idx = fast_index_map_helpers.build_sample_idx(
-                sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch
-            )
+            sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch)
             # sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
             #                                num_epochs, tokens_per_epoch)
 
