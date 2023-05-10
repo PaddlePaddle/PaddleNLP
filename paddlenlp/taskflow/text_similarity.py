@@ -168,6 +168,7 @@ class TextSimilarityTask(Task):
     def __init__(self, task, model, batch_size=1, max_length=384, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
+        self._check_predictor_type()
         if not self.from_hf_hub:
             self._check_task_files()
         if self._static_mode:
@@ -273,12 +274,22 @@ class TextSimilarityTask(Task):
         if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
-                    input_ids, segment_ids = self._batchify_fn(batch)
-                    self.input_handles[0].copy_from_cpu(input_ids)
-                    self.input_handles[1].copy_from_cpu(segment_ids)
-                    self.predictor.run()
-                    scores = self.output_handle[0].copy_to_cpu().tolist()
-                    results.extend(scores)
+
+                    if self._predictor_type == "paddle-inference":
+                        input_ids, segment_ids = self._batchify_fn(batch)
+                        self.input_handles[0].copy_from_cpu(input_ids)
+                        self.input_handles[1].copy_from_cpu(segment_ids)
+                        self.predictor.run()
+                        scores = self.output_handle[0].copy_to_cpu().tolist()
+                        results.extend(scores)
+                    else:
+                        # onnx mode
+                        input_dict = {}
+                        input_ids, segment_ids = self._batchify_fn(batch)
+                        input_dict["input_ids"] = input_ids
+                        input_dict["token_type_ids"] = segment_ids
+                        scores = self.predictor.run(None, input_dict)[0].tolist()
+                        results.extend(scores)
         else:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
