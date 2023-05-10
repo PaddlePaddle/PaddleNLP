@@ -875,6 +875,10 @@ class Trainer:
                     num_steps=num_steps,
                 )
             )
+            tokens_per_steps = self.args.max_seq_length * total_train_batch_size
+            logs["tokens_per_sec_per_card"] = round(
+                tokens_per_steps * logs["interval_steps_per_second"] / self.args.world_size, 1
+            )
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step

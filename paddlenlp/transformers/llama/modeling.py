@@ -228,6 +228,8 @@ class LlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
+        # return paddle.nn.functional.layer_norm(hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon)
+
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -321,6 +323,7 @@ class LlamaAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.head_dim = self.hidden_size // self.num_heads
+        self.max_position_embeddings = config.max_position_embeddings
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -376,7 +379,7 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim)
+        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
         self.config = config
 
     def forward(

@@ -35,9 +35,10 @@ from paddlenlp.transformers import (
     GPTChineseTokenizer,
     GPTConfig,
     GPTForPretraining,
-    GPTPretrainingCriterion,
     GPTTokenizer,
     LinearAnnealingWithWarmupDecay,
+    LlamaConfig,
+    LlamaForCausalLM,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -46,18 +47,22 @@ MODEL_CLASSES = {
     "gpt": (
         GPTConfig,
         GPTForPretraining,
-        GPTPretrainingCriterion,
         GPTTokenizer,
     ),
     "gpt-cn": (
         GPTConfig,
         GPTForPretraining,
-        GPTPretrainingCriterion,
         GPTChineseTokenizer,
+    ),
+    "llama": (
+        LlamaConfig,
+        LlamaForCausalLM,
+        GPTTokenizer,
     ),
 }
 
 from dataset import GPTDataset, get_train_valid_test_split_
+from modeling_llama_pp import LlamaForCausalLMPipe
 
 
 def add_start_docstrings(*docstr):
@@ -129,6 +134,10 @@ class ModelArguments:
     )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+    use_flash_attention: bool = field(
+        default=False,
+        metadata={"help": "use_flash_attention"},
     )
     continue_training: bool = field(
         default=False,
@@ -216,8 +225,8 @@ def create_pretrained_dataset(
         return {
             "input_ids": out[0],
             # "token_type_ids": out[1],
-            "attention_mask": out[2],
-            "loss_mask": out[3],
+            # "attention_mask": out[2],
+            # "loss_mask": out[3],
             "labels": out[4],
         }
 
@@ -367,18 +376,40 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
+    config_class, model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
     # pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+    tokenizer = tokenizer_class.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
 
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+    config.vocab_size = max(config.vocab_size, (tokenizer.vocab_size // 128 + 1) * 128)
+    config.lm_shift_labels = False
+    config.use_flash_attention = model_args.use_flash_attention
+    config.use_recompute = training_args.recompute
+    config.num_attention_heads = max(config.num_attention_heads, 8)
+    training_args.max_seq_length = data_args.max_seq_length
+
+    # Set the dtype for loading model
+    dtype = "float32"
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
+        model_class = LlamaForCausalLMPipe
 
     if model_args.continue_training:
-        model = model_class.from_pretrained(model_args.model_name_or_path, config=config)
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            dtype=dtype,
+        )
     else:
-        model = model_class._from_config(config)
+        model = model_class._from_config(config, dtype=dtype)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -393,7 +424,6 @@ def main():
     )
 
     data_file = get_train_data_file(data_args)
-    tokenizer = tokenizer_class.from_pretrained(model_args.tokenizer_name_or_path)
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args, training_args, data_file, tokenizer

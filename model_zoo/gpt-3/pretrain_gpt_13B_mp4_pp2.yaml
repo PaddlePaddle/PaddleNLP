@@ -17,8 +17,9 @@ Model:
   max_position_embeddings: 4096
   type_vocab_size: 16
   initializer_range: 0.02
-  use_recompute: True
-  recompute_granularity: 'core_attn'
+  use_recompute: False
+  use_flash_attn: True
+  recompute_granularity: ''
   no_recompute_layers:
   virtual_pp_degree: 1
   sequence_parallel: False

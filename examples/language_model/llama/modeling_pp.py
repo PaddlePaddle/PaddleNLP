@@ -132,7 +132,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config,
         # num_partitions=1,
         # topology=None,
-        use_recompute=True,
+        use_recompute=None,
         # fused_linear=False,
         # fuse_attn_qkv=False,
         # scale_qk_by_layer_num=True,
@@ -145,6 +145,8 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # fused_softmax_with_triangular=False,
     ):
         self.config = config
+        if use_recompute is None:
+            use_recompute = self.config.use_recompute
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
