@@ -439,9 +439,7 @@ class TrainingArguments:
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
     pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
-    pipeline_parallel_micro_batch_size: int = field(
-        default=1, metadata={"help": ("mirco_batch_size in pipeline parallel mode")}
-    )
+
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -453,6 +451,10 @@ class TrainingArguments:
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
             )
         },
+    )
+    use_main_grad: Optional[int] = field(
+        default=0,
+        metadata={},
     )
     recompute: bool = field(
         default=False,
@@ -699,22 +701,18 @@ class TrainingArguments:
                                 raise ValueError(
                                     f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
-                    assert (
-                        self.per_device_train_batch_size % self.pipeline_parallel_micro_batch_size == 0
-                    ), "train_batch_size should be multiple of mirco_batch_size."
-                    pp_accumulate_steps = self.per_device_train_batch_size // self.pipeline_parallel_micro_batch_size
 
                     strategy.pipeline_configs = {
-                        "accumulate_steps": pp_accumulate_steps,
-                        "micro_batch_size": self.pipeline_parallel_micro_batch_size,
-                        "enable_partial_send_recv": False
-                        if "disable_partial_send_recv" in pipeline_parallel_config
-                        else True,
+                        "accumulate_steps": self.gradient_accumulation_steps,
+                        "micro_batch_size": self.per_device_train_batch_size,
+                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
+                    logger.info(f"PP configs:{strategy.pipeline_configs}, use_main_grad:{self.use_main_grad}")
                     dygraph_pp_configs = {
-                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
@@ -734,8 +732,8 @@ class TrainingArguments:
                 }
 
                 if pipeline_parallel_degree > 1:
-                    if dygraph_pp_configs["delay_scale_loss"]:
-                        hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs

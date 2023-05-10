@@ -38,6 +38,7 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import mix_precision_utils
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -299,6 +300,8 @@ class Trainer:
 
             if self.args.pipeline_parallel_degree > 1:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+                if self.args.use_main_grad:
+                    mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
@@ -721,18 +724,13 @@ class Trainer:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
-                    if args.pipeline_parallel_degree > 1:
-                        real_accumulate_steps = args.gradient_accumulation_steps
-                        if hasattr(model, "_delay_scale_loss"):
-                            if model._delay_scale_loss:
-                                real_accumulate_steps *= model.accumulate_steps
-
+                    if args.pipeline_parallel_degree > 1 and getattr(model, "_delay_scale_loss", False):
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / real_accumulate_steps)
+                                p.main_grad = p.main_grad.scale(1.0 / model.accumulate_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / real_accumulate_steps)
+                                p.grad = p.grad.scale(1.0 / model.accumulate_steps)
 
                     # Optimizer step
                     optimizer_was_run = True
@@ -1258,14 +1256,18 @@ class Trainer:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
-        # Pipeline mode
+        # Pipeline model
         if self.args.pipeline_parallel_degree > 1:
+            if self.args.use_main_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
             orig_batch_fn = model.batch_fn if hasattr(model, "batch_fn") else None
             model = fleet.distributed_model(model)
             if orig_batch_fn:
                 model.batch_fn = orig_batch_fn
 
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
+            if self.args.use_main_grad:
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
         # None pipeline mode (may be handle pure tensor parallel model ?)
@@ -1462,21 +1464,32 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        if hasattr(model, "batch_fn"):
-            inputs = model.batch_fn(inputs)
-        else:
-            inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
+        model.micro_batch_size = self.args.per_device_train_batch_size  # hack Pipeline-layers
+        model.accumulate_steps = self.args.gradient_accumulation_steps
 
+        self.pp_data_buffer.append(inputs)
+        # logger.info(f'appending buffer:{len(self.pp_data_buffer)}')
+        if len(self.pp_data_buffer) != self.args.gradient_accumulation_steps:
+            return paddle.zeros([])
+        # inputs = DefaultDataCollator()(self.pp_data_buffer)
+        inputs = {
+            k: paddle.concat([d[k] for d in self.pp_data_buffer], 0)
+            if isinstance(self.pp_data_buffer[0][k], paddle.Tensor)
+            else self.pp_data_buffer[0][k]
+            for k in self.pp_data_buffer[0].keys()
+        }
+        # logger.info({k: v.shape for k, v in inputs.items() if k != 'ignored_index'})
+        logger.info(f"fwd pipe: micro-bsz:{model.micro_batch_size} acc-steps:{model.accumulate_steps}")
+        inputs = model.batch_fn(inputs)
         # hack _prepare_training, remove additional optimizer or scheduler check
         # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
+
         def _prepare_training(self, data):
             from paddle import framework
 
             # reset the virtual pp rank for each run
             self.set_virtual_pipeline_rank(0)
-
             assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
-
             if self.is_pipeline_first_stage(ignore_virtual=True) or self.is_pipeline_last_stage(ignore_virtual=True):
                 assert data is not None, "For the first and the last stage, the data must be set."
             else:
@@ -1492,9 +1505,8 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
-        if self.args.gradient_accumulation_steps > 1:
-            loss = loss / self.args.gradient_accumulation_steps
-
+        self.pp_data_buffer = []
+        # self.return_value = loss
         return loss.detach()
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
