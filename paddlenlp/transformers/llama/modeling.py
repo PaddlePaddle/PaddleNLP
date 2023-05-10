@@ -164,8 +164,9 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
         attn_weights = attention_mask + attn_weights
+
         attn_weights = paddle.maximum(
-            attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
+            attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
         )
 
         if config.fp16_opt_level is not None:
@@ -250,12 +251,12 @@ class LlamaRotaryEmbedding(nn.Layer):
 
         # higher acc using float32
         t = paddle.arange(max_position_embeddings, dtype="float32")
-        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]  # .astype(dtype)
-        self.sin_cached = emb.sin()[None, :, None, :]  # .astype(dtype)
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         return (
@@ -636,9 +637,6 @@ class LlamaModel(LlamaPretrainedModel):
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
-        combined_attention_mask = paddle.maximum(
-            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
-        )
         return combined_attention_mask
 
     @paddle.jit.not_to_static
@@ -694,7 +692,7 @@ class LlamaModel(LlamaPretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[2]
+            cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -862,7 +860,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
     ):
         if past_key_values:
-            input_ids = input_ids[:, -1:]
+            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
 
         attention_mask = kwargs.get("attention_mask", None)
 
@@ -895,13 +893,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
-        if not is_encoder_decoder:
-            # update attention mask
-            if "attention_mask" in model_kwargs:
-                attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            model_kwargs["attention_mask"] = paddle.concat(
+                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+            )
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
