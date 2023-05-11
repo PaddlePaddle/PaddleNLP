@@ -310,9 +310,6 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         steps = int(denoising_steps / min(denoising_strength, 0.999))
         self.scheduler.set_timesteps(steps)
         timesteps = self.scheduler.timesteps[steps - denoising_steps :]
-        assert (
-            len(timesteps) == denoising_steps
-        ), f"The length of timesteps is not equal to denoising_steps {denoising_steps}"
 
         return timesteps, denoising_steps
 
@@ -428,12 +425,7 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
             )
 
         if latents is None:
-            # print(randn_tensor(shape, generator=generator, dtype=dtype))
             latents = randn_tensor(shape, generator=generator, dtype=dtype)
-            # next_generator
-            # print(latents)
-            # exit(0)
-            # print(randn_tensor(shape, generator=generator, dtype=dtype))
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
@@ -619,8 +611,13 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         )
 
         # 4. Prepare timesteps
-        hr_steps = int(num_inference_steps * hires_ratio)
-        sample_steps = num_inference_steps - hr_steps
+        if enable_hr:
+            hr_steps = int(num_inference_steps * hires_ratio)
+            sample_steps = num_inference_steps - hr_steps
+        else:
+            hr_steps = 0
+            sample_steps = num_inference_steps
+
         self.scheduler.set_timesteps(sample_steps)
         timesteps = self.scheduler.timesteps
 
@@ -646,7 +643,6 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         # 7. Denoising loop
-        print("Step1: Perform denosing on inital sample stage.")
         num_warmup_steps = len(timesteps) - sample_steps * self.scheduler.order
         with self.progress_bar(total=sample_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -721,7 +717,6 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
 
             # 12. denoising on hires.fix steps
             num_warmup_steps = len(timesteps) - hr_steps * self.scheduler.order
-            print("Step2: Perform denosing on hires.fix stage.")
             with self.progress_bar(total=hr_steps) as progress_bar:
                 for i, t in enumerate(timesteps):
                     # expand the latents if we are doing classifier free guidance

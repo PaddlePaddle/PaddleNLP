@@ -390,14 +390,18 @@ for lora_enabled in [True, False]:
 
 ```python
 import paddle
-from pipeline_stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
-paddle.seed(5232132133)
+from stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
+from ppdiffusers import EulerAncestralDiscreteScheduler
 
 pipe = StableDiffusionHiresFixPipeline.from_pretrained("stabilityai/stable-diffusion-2", paddle_dtype=paddle.float16)
+pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+
+generator = paddle.Generator().manual_seed(5232132133)
 prompt = "1 real girl, long black hair, detailed face, light smile, chinese style, hanfu"
-image = pipe(prompt, guidance_scale=7.5, height=768, width=768,  hr_resize_width=768, hr_resize_height=1024).images[0]
-image.save("image.png")
+image = pipe(prompt, guidance_scale=7.5, height=768, width=768, generator=generator, num_inference_steps=40, hires_ratio=0.5, hr_resize_width=768, hr_resize_height=1024, enable_hr=True).images[0]
+
+image.show()
 
 ```
 生成的图片如下所示：
-<center><img src="https://user-images.githubusercontent.com/35913314/234758319-6df50590-c39c-4618-a438-eb464b1e26a5.png" width=50%></center>
+<center><img src="https://github.com/PaddlePaddle/PaddleNLP/assets/35913314/1c96a219-0b5e-4e1a-b244-0c8cc7cb41f9" width=40%></center>
