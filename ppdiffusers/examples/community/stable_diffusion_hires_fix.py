@@ -625,8 +625,12 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
         timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
-        if generator is not None:
+        if generator is None:
+            generator_state = paddle.get_cuda_rng_state()
+            paddle.Generator().states_["initial_generator"] = copy.deepcopy(generator_state)
+        else:
             paddle.Generator().states_["initial_generator"] = copy.deepcopy(paddle.Generator().states_[generator])
+
         num_channels_latents = self.unet.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
