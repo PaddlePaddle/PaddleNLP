@@ -192,6 +192,8 @@ sudo docker-compose up -d
 uvicorn examples.image_text_retrieval.server:app --reload --port 8866 --host '0.0.0.0'
 ```
 
+**加载自己训练的模型** ernie_vil2.0使用的是taskflow，如果需要加载自己训练的模型,把原来Taskflow(一般在~/.paddlenlp/taskflow目录里面)对应路径的模型删除，然后传入参数的时候指定task_path即可。
+
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
 

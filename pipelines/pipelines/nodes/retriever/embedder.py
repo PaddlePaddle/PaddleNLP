@@ -45,6 +45,7 @@ class MultiModalEmbedder:
         batch_size: int = 16,
         embed_meta_fields: List[str] = ["name"],
         progress_bar: bool = True,
+        **kwargs,
     ):
         """
         Init the Retriever and all its models from a local or remote model checkpoint.
@@ -69,6 +70,7 @@ class MultiModalEmbedder:
         self.batch_size = batch_size
         self.progress_bar = progress_bar
         self.embed_meta_fields = embed_meta_fields
+        self.kwargs = kwargs
 
         feature_extractors_params = {
             content_type: {"max_length": 256, **(feature_extractors_params or {}).get(content_type, {})}
@@ -78,7 +80,13 @@ class MultiModalEmbedder:
         self.models = {}  # replace str with ContentTypes starting from Python3.8
         for content_type, embedding_model in embedding_models.items():
             if content_type in ["text", "image"]:
-                self.models[content_type] = Taskflow("feature_extraction", model=embedding_model)
+                if "task_path" in self.kwargs:
+                    self._task_path = self.kwargs["task_path"]
+                    self.models[content_type] = Taskflow(
+                        "feature_extraction", model=embedding_model, task_path=self._task_path
+                    )
+                else:
+                    self.models[content_type] = Taskflow("feature_extraction", model=embedding_model)
             else:
                 raise ValueError(f"{content_type} is not a supported content.")
 

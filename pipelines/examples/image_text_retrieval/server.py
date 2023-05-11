@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import json
+import os
 import shutil
 import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
-from utils import (
+from examples.image_text_retrieval.data_utils import (
     FILE_UPLOAD_PATH,
     PIPELINE_YAML_PATH,
     QUERY_PIPELINE_NAME,
@@ -30,6 +30,7 @@ from utils import (
     port,
     query_embedding_model,
 )
+from fastapi import FastAPI, File, Form, UploadFile
 
 from pipelines.document_stores import MilvusDocumentStore
 from pipelines.nodes import MultiModalRetriever
@@ -37,8 +38,7 @@ from pipelines.pipelines.base import Pipeline
 from pipelines.schema import Document
 
 app = FastAPI()
-
-PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_PIPELINE_NAME)
+_task_path = "checkpoints/checkpoint-370"
 document_store = MilvusDocumentStore(
     host=host,
     index=index_name,
@@ -46,12 +46,24 @@ document_store = MilvusDocumentStore(
     index_param={"M": 16, "efConstruction": 50},
     index_type="HNSW",
 )
-retriever_mm = MultiModalRetriever(
-    document_store=document_store,
-    query_embedding_model=query_embedding_model,
-    query_type="image",
-    document_embedding_models={"text": document_embedding_model},
-)
+if os.path.exists(_task_path):
+    retriever_mm = MultiModalRetriever(
+        document_store=document_store,
+        query_embedding_model=query_embedding_model,
+        query_type="image",
+        document_embedding_models={"text": document_embedding_model},
+        task_path=_task_path,
+    )
+else:
+    retriever_mm = MultiModalRetriever(
+        document_store=document_store,
+        query_embedding_model=query_embedding_model,
+        query_type="image",
+        document_embedding_models={"text": document_embedding_model},
+    )
+
+
+PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_PIPELINE_NAME)
 
 
 @app.get("/")

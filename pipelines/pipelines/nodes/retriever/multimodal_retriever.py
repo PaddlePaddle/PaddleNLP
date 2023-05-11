@@ -41,6 +41,7 @@ class MultiModalRetriever(BaseRetriever):
         similarity_function: str = "dot_product",
         progress_bar: bool = True,
         scale_score: bool = True,
+        **kwargs
     ):
         """
         Retriever that uses a multiple encoder to jointly retrieve among a database consisting of different
@@ -76,6 +77,7 @@ class MultiModalRetriever(BaseRetriever):
         self.top_k = top_k
         self.scale_score = scale_score
         self.query_type = query_type
+        self.kwargs = kwargs
 
         self.document_embedder = MultiModalEmbedder(
             embedding_models=document_embedding_models,
@@ -83,6 +85,7 @@ class MultiModalRetriever(BaseRetriever):
             batch_size=batch_size,
             embed_meta_fields=embed_meta_fields,
             progress_bar=progress_bar,
+            **self.kwargs,
         )
 
         # # Try to reuse the same embedder for queries if there is overlap
@@ -95,6 +98,7 @@ class MultiModalRetriever(BaseRetriever):
                 batch_size=batch_size,
                 embed_meta_fields=embed_meta_fields,
                 progress_bar=progress_bar,
+                **self.kwargs,
             )
 
         self.document_store = document_store
