@@ -180,8 +180,14 @@ python utils/offline_ann_mm.py --index_name wukong_test \
 
 ## 4. 服务化部署
 
-服务化部署采用FASTAPI的方式，并提供了增删查改的功能，以Milvus示例：
+服务化部署采用FASTAPI的方式，并提供了增删查改的功能，以Milvus示例，首先启动[Milvus](https://milvus.io/docs/install_standalone-docker.md)的向量检索服务：
 
+```
+wget https://github.com/milvus-io/milvus/releases/download/v2.2.8/milvus-standalone-docker-compose.yml -O docker-compose.yml
+sudo docker-compose up -d
+```
+
+服务启动后，修改相应的Milvus的配置，然后启动FastAPI服务：
 ```
 uvicorn examples.image_text_retrieval.server:app --reload --port 8866 --host '0.0.0.0'
 ```
