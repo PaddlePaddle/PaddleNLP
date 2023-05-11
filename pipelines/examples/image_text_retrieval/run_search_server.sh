@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# unset http_proxy && unset https_proxy
+# # 指定语义检索系统的Yaml配置文件
+# export CUDA_VISIBLE_DEVICES=0
+# export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_retrieval.yaml
+# # 使用端口号 8891 启动模型服务
+# python rest_api/application.py 8891
+
 unset http_proxy && unset https_proxy
 # 指定语义检索系统的Yaml配置文件
 export CUDA_VISIBLE_DEVICES=0
-export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_retrieval.yaml
+# export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_retrieval.yaml
 # 使用端口号 8891 启动模型服务
-python rest_api/application.py 8891
+# python rest_api/application.py 8891
+export PYTHONPATH=/wugaosheng/PaddleNLP/pipelines:$PYTHONPATH
+uvicorn examples.image_text_retrieval.server:app --reload --port 8866 --host '0.0.0.0'

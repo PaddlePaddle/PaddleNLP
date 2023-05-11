@@ -485,7 +485,7 @@ class Milvus2DocumentStore(KeywordDocumentStore):
         search_result: QueryResult = self.collection.search(
             data=[query_emb.tolist()],
             anns_field=self.embedding_field,
-            output_fields=[self.name_field, self.content_field, "doc_id"],
+            output_fields=[self.name_field, self.content_field, self.doc_id_field],
             param={"metric_type": self.metric_type, **self.search_param},
             limit=top_k,
         )
