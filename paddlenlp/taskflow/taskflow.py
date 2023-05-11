@@ -726,6 +726,7 @@ support_argument_list = [
     "uie-x-base",
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
+    "THUDM/chatglm-6b",
 ]
 
 
