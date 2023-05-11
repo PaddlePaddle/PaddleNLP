@@ -427,7 +427,7 @@ def do_train(args):
                                 global_step,
                                 epoch,
                                 step,
-                                loss_return[0],
+                                loss_return,
                                 avg_reader_cost,
                                 1.0 / speed,
                                 speed,
@@ -436,7 +436,7 @@ def do_train(args):
                                 lr_return,
                             )
                         )
-                        log_writer.add_scalar("loss", loss_return[0], global_step)
+                        log_writer.add_scalar("loss", loss_return, global_step)
                         log_writer.add_scalar("learning_rate", lr_return, global_step)
                     tic_train = time.time()
                     train_reader_cost = 0.0
@@ -530,7 +530,7 @@ def do_train(args):
                                     global_step,
                                     epoch,
                                     step,
-                                    loss_return[0],
+                                    loss_return,
                                     avg_reader_cost,
                                     1.0 / speed,
                                     speed,
@@ -539,7 +539,7 @@ def do_train(args):
                                     lr_return,
                                 )
                             )
-                            log_writer.add_scalar("loss", loss_return[0], global_step)
+                            log_writer.add_scalar("loss", loss_return, global_step)
                             log_writer.add_scalar("learning_rate", lr_return, global_step)
                         tic_train = time.time()
                         train_reader_cost = 0.0

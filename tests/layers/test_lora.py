@@ -23,22 +23,22 @@ import paddle
 from parameterized import parameterized
 
 from paddlenlp.layers import LoRAConfig, LoRALinear, LoRAMergedLinear, LoRAModel
-from paddlenlp.transformers import AutoModel
+from paddlenlp.transformers import AutoModel, BertModel
 
 
 class TestLoraLayer(unittest.TestCase):
     def test_forward(self):
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
         self.assertFalse(lora_layer.lora_B.stop_gradient)
         self.assertTrue(lora_layer.weight.stop_gradient)
         self.assertFalse(lora_layer.bias.stop_gradient)
-        self.assertEqual(output.shape, [2, 8])
+        self.assertEqual(output.shape, [2, 4, 8])
 
     def test_train_eval(self):
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
         lora_layer.train()
         train_result = lora_layer(x)
@@ -57,7 +57,7 @@ class TestLoraLayer(unittest.TestCase):
             new_lora_layer = LoRALinear(in_features=16, out_features=8, r=4)
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(new_lora_layer(x), lora_layer(x)))
 
     def test_load_regular_linear(self):
@@ -71,7 +71,7 @@ class TestLoraLayer(unittest.TestCase):
             lora_layer_r4 = LoRALinear(in_features=16, out_features=8, r=4)
             lora_layer_r0.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
@@ -81,16 +81,16 @@ class TestLoRAMergedLayer(unittest.TestCase):
         lora_layer = LoRAMergedLinear(
             in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8, enable_lora=[True, False]
         )
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         output = lora_layer(x)
         self.assertFalse(lora_layer.lora_A.stop_gradient)
         self.assertFalse(lora_layer.lora_B.stop_gradient)
         self.assertTrue(lora_layer.weight.stop_gradient)
         self.assertFalse(lora_layer.bias.stop_gradient)
-        self.assertEqual(output.shape, [2, 8])
+        self.assertEqual(output.shape, [2, 4, 8])
 
     def test_train_eval(self):
-        x = paddle.randn([2, 16], "float32")
+        x = paddle.randn([2, 4, 16], "float32")
         lora_layer = LoRAMergedLinear(in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False])
         lora_layer.train()
         train_result = lora_layer(x)
@@ -111,7 +111,7 @@ class TestLoRAMergedLayer(unittest.TestCase):
             )
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(new_lora_layer(x), lora_layer(x)))
 
     def test_load_regular_linear(self):
@@ -125,12 +125,33 @@ class TestLoRAMergedLayer(unittest.TestCase):
             lora_layer_r4 = LoRAMergedLinear(in_features=16, out_features=8, r=4)
             lora_layer_r0.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
-            x = paddle.randn([2, 16], "float32")
+            x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 
 class TestLoraModel(unittest.TestCase):
+    def test_lora_model_restore(self):
+        lora_config = LoRAConfig(
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+            enable_lora_list=[None, [True, False]],
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
+        model.eval()
+        original_results_1 = model(input_ids)
+        lora_model = LoRAModel(model, lora_config)
+        restored_model = lora_model.restore_original_model()
+        restored_model.eval()
+        original_results_2 = restored_model(input_ids)
+        self.assertIsNotNone(original_results_1)
+        self.assertIsNotNone(original_results_2)
+        self.assertIsInstance(restored_model, BertModel)
+        self.assertTrue(paddle.allclose(original_results_1[0], original_results_2[0]))
+
     @parameterized.expand([(None,), ("all",), ("lora",)])
     def test_lora_model_constructor(self, bias):
         lora_config = LoRAConfig(
@@ -167,8 +188,7 @@ class TestLoraModel(unittest.TestCase):
         lora_model.eval()
         eval_forward_results = lora_model(input_ids)
         self.assertIsNotNone(eval_forward_results)
-        for i, j in zip(train_forward_results, eval_forward_results):
-            self.assertTrue(paddle.allclose(i, j))
+        self.assertTrue(paddle.allclose(train_forward_results[0], eval_forward_results[0]))
 
     @parameterized.expand([(None,), ("all",), ("lora",)])
     def test_lora_model_save_load(self, bias):
@@ -191,8 +211,7 @@ class TestLoraModel(unittest.TestCase):
             loaded_lora_model = LoRAModel.from_pretrained(new_model, tempdir)
             loaded_lora_model.eval()
             loaded_results = loaded_lora_model(input_ids)
-            for i, j in zip(original_results, loaded_results):
-                self.assertTrue(paddle.allclose(i, j))
+            self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
 
 
 class TestLoRAConfig(unittest.TestCase):

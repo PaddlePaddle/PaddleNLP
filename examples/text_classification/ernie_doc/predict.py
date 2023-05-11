@@ -39,7 +39,7 @@ parser.add_argument("--memory_length", type=int, default=128, help="Length of th
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"],
                     help="Select cpu, gpu devices to train model.")
 parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
-                    help="The file path you would like to save the model ouputs on test dataset.")
+                    help="The file path you would like to save the model outputs on test dataset.")
 parser.add_argument("--static_mode", default=False, type=bool,
                     help="Whether you would like to perform predicting by static model or dynamic model.")
 parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,

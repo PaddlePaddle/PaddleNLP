@@ -116,7 +116,7 @@
 
 （2）采用文献的 query,title,keywords 三个字段内容，构造无标签数据集，进行无监督召回训练SimCSE；
 
-（3）使用文献的的query, title, keywords，构造带正标签的数据集，不包含负标签样本，基于 In-batch Negatives 策略进行训练；
+（3）使用文献的query, title, keywords，构造带正标签的数据集，不包含负标签样本，基于 In-batch Negatives 策略进行训练；
 
 （4）在排序阶段，使用点击（作为正样本）和展现未点击（作为负样本）数据构造排序阶段的训练集，进行精排训练。
 

@@ -488,6 +488,8 @@ class UIETask(Task):
             "__internal_testing__/tiny-random-uie-x",
         ]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
+        elif "sentencepiece_model_file" in self.resource_files_names.keys():
+            del self.resource_files_names["sentencepiece_model_file"]
 
         # TODO: temporary solution to support HF Hub due to lack of AutoModel
         # change this logic to use AutoConfig when available
@@ -508,9 +510,6 @@ class UIETask(Task):
                 with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
                     self._init_class = json.load(f)["architectures"].pop()
 
-        if self._init_class not in ["UIEX", "UIEM"]:
-            if "sentencepiece_model_file" in self.resource_files_names.keys():
-                del self.resource_files_names["sentencepiece_model_file"]
         self._is_en = True if model in ["uie-base-en"] or self._schema_lang == "en" else False
 
         if self._init_class in ["UIEX"]:

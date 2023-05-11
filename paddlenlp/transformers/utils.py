@@ -309,3 +309,42 @@ class ContextManagers:
 
     def __exit__(self, *args, **kwargs):
         self.stack.__exit__(*args, **kwargs)
+
+
+def use_hybrid_parallel():
+    try:
+        from paddle.distributed import fleet
+
+        hcg = fleet.get_hybrid_communicate_group()
+        return hcg
+    except:
+        return None
+
+
+def optimizer_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        if hcg.get_sharding_parallel_world_size() > 1:
+            name.append(f"shard{hcg.get_sharding_parallel_rank():0>2d}")
+
+        return "_".join(name)
+    else:
+        return None
+
+
+def weight_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        return "_".join(name)
+    else:
+        return None

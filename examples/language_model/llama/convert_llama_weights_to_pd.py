@@ -79,6 +79,8 @@ def write_model(model_path, input_base_path, model_size):
     n_heads_per_shard = n_heads // num_shards
     dim = params["dim"]
     dims_per_head = dim // n_heads
+    base = 10000.0
+    inv_freq = 1.0 / (base ** (paddle.arange(0, dims_per_head, 2) / dims_per_head))
 
     # permute for sliced rotary
     def permute(w):
@@ -171,6 +173,7 @@ def write_model(model_path, input_base_path, model_size):
                 [loaded[i][f"layers.{layer_i}.feed_forward.w3.weight"] for i in range(num_shards)], axis=0
             )
 
+        state_dict[f"llama.layers.{layer_i}.self_attn.rotary_emb.inv_freq"] = inv_freq
         all_state_dict.update(state_dict)
 
     filename = "model_state.pdparams"

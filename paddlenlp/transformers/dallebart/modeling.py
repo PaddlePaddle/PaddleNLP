@@ -96,7 +96,7 @@ class DalleBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = DALLEBART_PRETRAINED_RESOURCE_FILES_MAP
     config_class = DalleBartConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding, DalleBartLearnedPositionalEmbedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -171,13 +171,13 @@ class DalleBartEncoderLayer(nn.Layer):
 
     def __init__(self, config: DalleBartConfig):
         super().__init__()
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.encoder_attention_heads > 0
-        ), "Expected encoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected encoder_attention_heads to be greater than 0, " "but received {}".format(
             config.encoder_attention_heads
         )
-        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.encoder_ffn_dim
         )
 
@@ -234,7 +234,6 @@ class DalleBartEncoder(DalleBartPretrainedModel):
         self.final_ln = nn.LayerNorm(config.d_model)
         self.embedding_dropout = nn.Dropout(config.dropout)
         self.text_pad_token_id = config.text_pad_token_id
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None, **kwargs):
         """
@@ -282,13 +281,13 @@ class DalleBartDecoderLayer(nn.Layer):
     def __init__(self, config: DalleBartConfig):
         super().__init__()
 
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.decoder_attention_heads > 0
-        ), "Expected decoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected decoder_attention_heads to be greater than 0, " "but received {}".format(
             config.decoder_attention_heads
         )
-        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.decoder_ffn_dim
         )
 
@@ -374,7 +373,6 @@ class DalleBartDecoder(DalleBartPretrainedModel):
         self.layernorm_embedding = nn.LayerNorm(config.d_model)
         self.dropout = nn.Dropout(config.dropout)
         self.final_ln = nn.LayerNorm(config.d_model)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -463,7 +461,6 @@ class DalleBartModel(DalleBartPretrainedModel):
         self.encoder = DalleBartEncoder(config)
 
         self.decoder = DalleBartDecoder(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.encoder.embed_tokens
@@ -609,7 +606,6 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             self.register_buffer(
                 "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
             )
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.dallebart.get_encoder()

@@ -21,6 +21,13 @@ deploy-version:
 install:
 	pip install -r requirements.txt
 
+
+.PHONY: test
+test: unit-test
+
+unit-test:
+	PYTHONPATH=$(shell pwd) pytest tests
+
 .PHONY: version
 version:
 	@newVersion=$$(awk -F. '{print $$1"."$$2"."$$3+1}' < VERSION) \
