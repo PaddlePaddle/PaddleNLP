@@ -136,11 +136,9 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.model = model
         self.forward_keys = signature(self.model.forward)
         self.config = model.config
-        if self.prefix_config.dtype:
-            self.dtype = self.prefix_config.dtype
-        else:
-            self.dtype = paddle.get_default_dtype()
-        with dtype_guard(self.dtype):
+        if self.prefix_config.dtype is None:
+            self.prefix_config.dtype = paddle.get_default_dtype()
+        with dtype_guard(self.prefix_config.dtype):
             self.prefix_encoder = self._create_prefix_encoder()
             self.prefix_dropout = nn.Dropout(p=prefix_config.prefix_dropout)
         self.prefix_tokens = paddle.arange(self.prefix_config.num_prefix_tokens, dtype="int64")

@@ -599,11 +599,9 @@ class LoRAModel(nn.Layer):
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
-        if self.lora_config.dtype:
-            self.dtype = self.lora_config.dtype
-        else:
-            self.dtype = paddle.get_default_dtype()
-        with dtype_guard(self.dtype):
+        if self.lora_config.dtype is None:
+            self.lora_config.dtype = paddle.get_default_dtype()
+        with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
