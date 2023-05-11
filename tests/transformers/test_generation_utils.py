@@ -297,6 +297,8 @@ class GenerationTesterMixin:
             input_ids_clone = input_ids.repeat_interleave(num_return_sequences, axis=0)
 
         with paddle.no_grad():
+            logits_warper = LogitsProcessorList()
+            logits_warper.append(TopKLogitsWarper(top_k=1, min_tokens_to_keep=1))
             output_sample = model.sample(
                 input_ids_clone,
                 attention_mask=attention_mask_clone,
@@ -304,7 +306,7 @@ class GenerationTesterMixin:
                 logits_processors=logits_processors,
                 pad_token_id=getattr(model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
-                top_k=1,
+                logits_warper=logits_warper,
                 **process_kwargs,
                 **kwargs,
             )
@@ -431,55 +433,59 @@ class GenerationTesterMixin:
             "top_k": 5,
         }
 
-        if model.config.is_encoder_decoder:
+        if self.is_encoder_decoder:
             max_length = 4
+
         logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-            input_ids.shape[-1],
-            eos_token_id=model.config.eos_token_id,
-            forced_bos_token_id=model.config.forced_bos_token_id,
-            forced_eos_token_id=model.config.forced_eos_token_id,
+            eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
+            forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
+            forced_eos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None),
             max_length=max_length,
+            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
         )
 
         kwargs = {}
         model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
+
         output_generate = model.generate(
             input_ids,
-            do_sample=False,
-            num_beams=1,
             max_length=max_length,
+            decode_strategy="contrastive_search",
             **logits_process_kwargs,
             **model_kwargs,
             **contrastive_search_kwargs,
         )
 
-        if model.config.is_encoder_decoder:
+        if self.is_encoder_decoder:
             encoder_outputs, input_ids, attention_mask = self._get_encoder_outputs(
                 model,
                 input_ids,
                 attention_mask,
             )
-            kwargs["encoder_outputs"] = encoder_outputs
+            kwargs["encoder_output"] = encoder_outputs
 
         with paddle.no_grad():
             model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
-            stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])
+            stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=max_length + input_ids.shape[-1])])
             output_contrastive = model.contrastive_search(
-                input_ids,
+                input_ids=input_ids,
                 stopping_criteria=stopping_criteria,
-                logits_processor=logits_processor,
+                logits_processors=logits_processor,
+                eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config["pad_token_id"],
                 **kwargs,
                 **model_kwargs,
                 **contrastive_search_kwargs,
             )
+
         return output_contrastive, output_generate
 
     def test_contrastive_generate(self):
 
         # check `generate()` and `contrastive_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
-
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+
             paddle.seed(124)
             # NOTE: contrastive search only works with cache on at the moment.
             if not hasattr(config, "use_cache"):
@@ -487,13 +493,13 @@ class GenerationTesterMixin:
             config.use_cache = True
             config.is_decoder = True
 
-            # test old generation output for backwards compatibility
             model = self._make_model_instance(config, model_class)
-            model = model.eval()
+            model.eval()
+
             output_contrastive, output_generate = self._contrastive_generate(
                 model=model, input_ids=input_ids, attention_mask=attention_mask, max_length=max_length
             )
-            self.assertListEqual(output_contrastive.tolist(), output_generate.tolist())
+            self.assertListEqual(output_contrastive[0].tolist(), output_generate[0].tolist())
 
     def test_greedy_generate(self):
         # check `generate()` and `greedy_search()` are equal

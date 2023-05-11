@@ -50,6 +50,7 @@ from paddlenlp.generation.logits_process import (
 from paddlenlp.generation.stopping_criteria import (
     MaxLengthCriteria,
     StoppingCriteriaList,
+    validate_stopping_criteria,
 )
 
 
@@ -763,6 +764,7 @@ class GenerationMixin(object):
                 # Directly use model.contrastive_search()
 
                 from paddlenlp.generation.stopping_criteria import StoppingCriteriaList, MaxLengthCriteria
+                [Note:] If you directly use model.contrastive_search, max_length = max_length + input_ids.shape[-1]
                 stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=30)])
 
                 # Generate the sequence by using "greedy_search" strategy
@@ -992,12 +994,12 @@ class GenerationMixin(object):
                 )
             logits_warper = self.get_logits_warper(temperature=temperature)
             return self.greedy_search(
-                input_ids,
-                logits_processors,
-                logits_warper,
-                stopping_criteria,
-                pad_token_id,
-                eos_token_id,
+                input_ids=input_ids,
+                logits_processors=logits_processors,
+                logits_warper=logits_warper,
+                stopping_criteria=stopping_criteria,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
                 **model_kwargs,
             )
 
@@ -1009,14 +1011,14 @@ class GenerationMixin(object):
                 )
             logits_warper = self.get_logits_warper(temperature=temperature)
             return self.contrastive_search(
-                input_ids,
-                top_k,
-                penalty_alpha,
-                logits_processors,
-                logits_warper,
-                stopping_criteria,
-                pad_token_id,
-                eos_token_id,
+                input_ids=input_ids,
+                top_k=top_k,
+                penalty_alpha=penalty_alpha,
+                logits_processors=logits_processors,
+                logits_warper=logits_warper,
+                stopping_criteria=stopping_criteria,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
                 **model_kwargs,
             )
 
@@ -1030,22 +1032,22 @@ class GenerationMixin(object):
 
             if is_tracing:
                 return self.sample_d2s(
-                    input_ids,
-                    logits_processors,
-                    logits_warper,
-                    stopping_criteria,
-                    pad_token_id,
-                    eos_token_id,
+                    input_ids=input_ids,
+                    logits_processors=logits_processors,
+                    logits_warper=logits_warper,
+                    stopping_criteria=stopping_criteria,
+                    pad_token_id=pad_token_id,
+                    eos_token_id=eos_token_id,
                     **model_kwargs,
                 )
             else:
                 return self.sample(
-                    input_ids,
-                    logits_processors,
-                    logits_warper,
-                    stopping_criteria,
-                    pad_token_id,
-                    eos_token_id,
+                    input_ids=input_ids,
+                    logits_processors=logits_processors,
+                    logits_warper=logits_warper,
+                    stopping_criteria=stopping_criteria,
+                    pad_token_id=pad_token_id,
+                    eos_token_id=eos_token_id,
                     **model_kwargs,
                 )
 
@@ -1119,6 +1121,7 @@ class GenerationMixin(object):
         logits_processors: Optional[LogitsProcessorList] = None,
         logits_warper: Optional[LogitsProcessorList] = None,
         stopping_criteria: Optional[StoppingCriteriaList] = None,
+        max_length: Optional[int] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
         **model_kwargs
@@ -1126,6 +1129,9 @@ class GenerationMixin(object):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+
+        if max_length is not None:
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
@@ -1193,13 +1199,18 @@ class GenerationMixin(object):
         logits_processors: Optional[LogitsProcessorList] = None,
         logits_warper: Optional[LogitsProcessorList] = None,
         stopping_criteria: Optional[StoppingCriteriaList] = None,
+        max_length: Optional[int] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
+
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+
+        if max_length is not None:
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
@@ -1274,6 +1285,7 @@ class GenerationMixin(object):
             top_k_probs, top_k_ids = paddle.topk(next_probs, k=top_k, axis=-1)
 
             if self.config.is_encoder_decoder:
+                print(model_kwargs["cache"])
                 new_key_values = ()
                 for layer in model_kwargs["cache"]:
                     even = 0
@@ -1445,6 +1457,7 @@ class GenerationMixin(object):
         logits_processors: Optional[LogitsProcessorList] = None,
         logits_warper: Optional[LogitsProcessorList] = None,
         stopping_criteria: Optional[StoppingCriteriaList] = None,
+        max_length: Optional[int] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
         **model_kwargs
@@ -1452,6 +1465,8 @@ class GenerationMixin(object):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
@@ -1522,12 +1537,18 @@ class GenerationMixin(object):
         logits_processors: Optional[LogitsProcessorList] = None,
         logits_warper: Optional[LogitsProcessorList] = None,
         stopping_criteria: Optional[StoppingCriteriaList] = None,
+        max_length: Optional[int] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+
+        if max_length is not None:
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
