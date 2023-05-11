@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import sys
@@ -39,11 +38,8 @@ from paddlenlp.transformers import (
     LinearDecayWithWarmup,
 )
 from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import TimeCostAverage
-
-FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
     "bert": (BertModel, BertForPretraining, BertPretrainingCriterion, BertTokenizer),
@@ -104,6 +100,12 @@ def parse_args():
         default=1000000,
         type=int,
         help="Set total number of training steps to perform. ",
+    )
+    parser.add_argument(
+        "--preprocessing_num_workers",
+        type=int,
+        default=0,
+        help="The number of processes to use for the preprocessing.",
     )
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 
@@ -195,7 +197,7 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args, w
         dataset=train_data,
         batch_sampler=train_batch_sampler,
         collate_fn=_collate_data,
-        num_workers=0,
+        num_workers=args.preprocessing_num_workers,
         worker_init_fn=worker_init,
         return_list=True,
     )
