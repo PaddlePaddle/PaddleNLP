@@ -178,6 +178,14 @@ python utils/offline_ann_mm.py --index_name wukong_test \
 
 如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 
+## 4. 服务化部署
+
+服务化部署采用FASTAPI的方式，并提供了增删查改的功能，以Milvus示例：
+
+```
+uvicorn examples.image_text_retrieval.server:app --reload --port 8866 --host '0.0.0.0'
+```
+
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
 
