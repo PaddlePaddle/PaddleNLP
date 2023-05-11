@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
-
 import logging
 import warnings
-import numpy as np
+from typing import Any, Dict, Generator, List, Optional, Union
 
+import numpy as np
 from tqdm import tqdm
 
 try:
-    from pymilvus import FieldSchema, CollectionSchema, Collection, connections, utility
+    from pymilvus import Collection, CollectionSchema, FieldSchema, connections, utility
     from pymilvus.client.abstract import QueryResult
     from pymilvus.client.types import DataType
 except (ImportError, ModuleNotFoundError) as ie:
@@ -29,17 +28,15 @@ except (ImportError, ModuleNotFoundError) as ie:
 
     _optional_component_not_installed(__name__, "milvus2", ie)
 
-from pipelines.schema import Document
-from pipelines.document_stores.sql import SQLDocumentStore
+from pipelines.document_stores import KeywordDocumentStore
 from pipelines.document_stores.base import get_batches_from_generator
-
-if TYPE_CHECKING:
-    from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.schema import Document
 
 logger = logging.getLogger(__name__)
 
 
-class Milvus2DocumentStore(SQLDocumentStore):
+class Milvus2DocumentStore(KeywordDocumentStore):
     """
     you can now run a query using vector similarity and filter for some meta data at the same time!
     (See https://milvus.io/docs/v2.0.x/comparison.md for more details)
@@ -65,7 +62,6 @@ class Milvus2DocumentStore(SQLDocumentStore):
 
     def __init__(
         self,
-        sql_url: str = "sqlite:///milvus_document_store.db",
         host: str = "localhost",
         port: str = "19530",
         connection_pool: str = "SingletonThread",
@@ -79,6 +75,9 @@ class Milvus2DocumentStore(SQLDocumentStore):
         search_param: Optional[Dict[str, Any]] = None,
         return_embedding: bool = False,
         embedding_field: str = "embedding",
+        name_field: str = "name",
+        content_field: str = "content",
+        doc_id_field: str = "doc_id",
         id_field: str = "id",
         custom_fields: Optional[List[Any]] = None,
         progress_bar: bool = True,
@@ -88,9 +87,6 @@ class Milvus2DocumentStore(SQLDocumentStore):
         recreate_index: bool = False,
     ):
         """
-        :param sql_url: SQL connection URL for storing document texts and metadata. It defaults to a local, file based SQLite DB. For large scale
-                        deployment, Postgres is recommended. If using MySQL then same server can also be used for
-                        Milvus metadata. For more details see https://milvus.io/docs/v1.1.0/data_manage.md.
         :param milvus_url: Milvus server connection URL for storing and processing vectors.
                            Protocol, host and port will automatically be inferred from the URL.
                            See https://milvus.io/docs/v2.0.x/install_standalone-docker.md for instructions to start a Milvus instance.
@@ -138,13 +134,8 @@ class Milvus2DocumentStore(SQLDocumentStore):
             be recreated.
         """
 
-        super().__init__(
-            url=sql_url, index=index, duplicate_documents=duplicate_documents, isolation_level=isolation_level
-        )
-
         # save init parameters to enable export of component config as YAML
         self.set_config(
-            sql_url=sql_url,
             host=host,
             port=port,
             index=index,
@@ -191,13 +182,18 @@ class Milvus2DocumentStore(SQLDocumentStore):
         self.index = index
         self.embedding_field = embedding_field
         self.id_field = id_field
+        self.name_field = name_field
         self.custom_fields = custom_fields
+        self.content_field = content_field
+        self.doc_id_field = doc_id_field
+        self.text_max_len = 2048
 
         self.collection = self._create_collection_and_index(
             self.index, consistency_level, recreate_index=recreate_index
         )
 
         self.return_embedding = return_embedding
+        self.duplicate_documents = duplicate_documents
         self.progress_bar = progress_bar
 
     def _create_collection_and_index(
@@ -221,6 +217,9 @@ class Milvus2DocumentStore(SQLDocumentStore):
                 FieldSchema(
                     name=self.id_field, dtype=DataType.INT64, is_primary=True, auto_id=True, description="primary id"
                 ),
+                FieldSchema(name=self.doc_id_field, dtype=DataType.VARCHAR, max_length=self.text_max_len),
+                FieldSchema(name=self.name_field, dtype=DataType.VARCHAR, max_length=self.text_max_len),
+                FieldSchema(name=self.content_field, dtype=DataType.VARCHAR, max_length=self.text_max_len),
                 FieldSchema(
                     name=self.embedding_field,
                     dtype=DataType.FLOAT_VECTOR,
@@ -258,6 +257,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
     def write_documents(
         self,
         documents: Union[List[dict], List[Document]],
+        retriever: Optional[BaseRetriever] = None,
         index: Optional[str] = None,
         batch_size: int = 10_000,
         duplicate_documents: Optional[str] = None,
@@ -299,53 +299,76 @@ class Milvus2DocumentStore(SQLDocumentStore):
             Document.from_dict(d, field_map=field_map) if isinstance(d, dict) else d for d in documents
         ]
         document_objects = self._handle_duplicate_documents(document_objects, duplicate_documents)
-        add_vectors = False if document_objects[0].embedding is None else True
-
+        # add_vectors = False if document_objects[0].embedding is None else True
+        rng = np.random.default_rng(seed=19530)
         batched_documents = get_batches_from_generator(document_objects, batch_size)
         with tqdm(total=len(document_objects), disable=not self.progress_bar) as progress_bar:
-            mutation_result: Any = None
 
             for document_batch in batched_documents:
-                if add_vectors:
-                    doc_ids = []
-                    embeddings = []
-                    for doc in document_batch:
-                        doc_ids.append(doc.id)
-                        if isinstance(doc.embedding, np.ndarray):
-                            if self.cosine:
-                                embedding = doc.embedding / np.linalg.norm(doc.embedding)
-                                embeddings.append(embedding.tolist())
-                            else:
-                                embeddings.append(doc.embedding.tolist())
-                        elif isinstance(doc.embedding, list):
-                            if self.cosine:
-                                embedding = np.array(doc.embedding)
-                                embedding /= np.linalg.norm(embedding)
-                                embeddings.append(embedding.tolist())
-                            else:
-                                embeddings.append(doc.embedding)
+                doc_ids = []
+                doc_names = []
+                doc_contents = []
+
+                embeddings = []
+                processed_documents = []
+                for doc in document_batch:
+                    _doc = doc.to_dict()
+                    if "meta" in _doc.keys():
+                        for k, v in _doc["meta"].items():
+                            _doc[k] = v
+
+                    doc_ids.append(_doc["id"])
+                    doc_names.append(_doc["name"])
+                    doc_contents.append(_doc["content"])
+
+                    if isinstance(doc.embedding, np.ndarray):
+                        if self.cosine:
+                            embedding = doc.embedding / np.linalg.norm(doc.embedding)
+                            embeddings.append(embedding.tolist())
                         else:
-                            raise AttributeError(
-                                f"Format of supplied document embedding {type(doc.embedding)} is not "
-                                f"supported. Please use list or numpy.ndarray"
-                            )
-                    if duplicate_documents == "overwrite":
-                        existing_docs = super().get_documents_by_id(ids=doc_ids, index=index)
-                        self._delete_vector_ids_from_milvus(documents=existing_docs, index=index)
+                            embeddings.append(doc.embedding.tolist())
+                    elif isinstance(doc.embedding, list):
+                        if self.cosine:
+                            embedding = np.array(doc.embedding)
+                            embedding /= np.linalg.norm(embedding)
+                            embeddings.append(embedding.tolist())
+                        else:
+                            embeddings.append(doc.embedding)
+                    else:
+                        # raise AttributeError(
+                        #     f"Format of supplied document embedding {type(doc.embedding)} is not "
+                        #     f"supported. Please use list or numpy.ndarray"
+                        # )
+                        if retriever is not None:
+                            embedding = retriever.embed_documents([doc])
+                            embeddings.append(embedding.reshape(-1).tolist())
+                        else:
+                            random_embeds = rng.random((self.embedding_dim))
+                            embeddings.append(random_embeds.tolist())
 
-                    mutation_result = self.collection.insert([embeddings])
+                # if duplicate_documents == "overwrite":
+                #     existing_docs = self.get_documents_by_id(ids=doc_ids, index=index)
+                #     self._delete_vector_ids_from_milvus(documents=existing_docs, index=index, id_field=self.doc_id_field)
+                processed_documents = [doc_ids, doc_names, doc_contents, embeddings]
 
-                docs_to_write_in_sql = []
+                self.collection.insert(processed_documents)
 
-                for idx, doc in enumerate(document_batch):
-                    meta = doc.meta
-                    if add_vectors and mutation_result is not None:
-                        meta["vector_id"] = str(mutation_result.primary_keys[idx])
-                    docs_to_write_in_sql.append(doc)
-
-                super().write_documents(docs_to_write_in_sql, index=index, duplicate_documents=duplicate_documents)
-                progress_bar.update(batch_size)
+            progress_bar.update(batch_size)
         progress_bar.close()
+
+    def get_document_count(
+        self,
+        filters: Optional[Dict[str, Union[Dict, List, str, int, float, bool]]] = None,
+        index: Optional[str] = None,
+        only_documents_without_embedding: bool = False,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> int:
+        """
+        Return the number of documents in the document store.
+        """
+        index = index or self.index
+        # unstable
+        return self.collection.num_entities
 
     def update_embeddings(
         self,
@@ -354,6 +377,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
         batch_size: int = 10_000,
         update_existing_embeddings: bool = True,
         filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        headers: Optional[Dict[str, str]] = None,
     ):
         """
         Updates the embeddings in the document store using the encoding model specified in the retriever.
@@ -379,33 +403,44 @@ class Milvus2DocumentStore(SQLDocumentStore):
 
         logger.info(f"Updating embeddings for {document_count} docs...")
 
-        result = self._query(
-            index=index,
-            vector_ids=None,
-            batch_size=batch_size,
-            filters=filters,
-            only_documents_without_embedding=not update_existing_embeddings,
-        )
-        batched_documents = get_batches_from_generator(result, batch_size)
+        # batched_documents = get_batches_from_generator(result, batch_size)
         with tqdm(
             total=document_count, disable=not self.progress_bar, position=0, unit=" docs", desc="Updating Embedding"
         ) as progress_bar:
-            for document_batch in batched_documents:
-                self._delete_vector_ids_from_milvus(documents=document_batch, index=index)
+            # for document_batch in batched_documents:
+            for i in range(0, document_count, batch_size):
+                document_batch = self.collection.query(
+                    expr="id > 0",
+                    offset=i,
+                    limit=batch_size,
+                    output_fields=[self.name_field, self.content_field, self.doc_id_field],
+                )
+                documents = []
+                for doc in document_batch:
+                    doc_dict = {
+                        "id": doc["doc_id"],
+                        "vector_id": doc["id"],
+                        "content": doc["content"],
+                        "meta": {"name": doc["name"]},
+                    }
+                    document = Document.from_dict(doc_dict)
+                    documents.append(document)
 
-                embeddings = retriever.embed_documents(document_batch)  # type: ignore
+                self._delete_vector_ids_from_milvus(documents=documents, index=index)
+
+                embeddings = retriever.embed_documents(documents)  # type: ignore
                 if self.cosine:
                     embeddings = [embedding / np.linalg.norm(embedding) for embedding in embeddings]
                 embeddings_list = [embedding.tolist() for embedding in embeddings]
                 assert len(document_batch) == len(embeddings_list)
 
-                mutation_result = self.collection.insert([embeddings_list])
+                doc_ids = [doc["doc_id"] for doc in document_batch]
+                doc_contents = [doc["content"] for doc in document_batch]
+                doc_names = [doc["name"] for doc in document_batch]
+                processed_documents = [doc_ids, doc_names, doc_contents, embeddings_list]
 
-                vector_id_map = {}
-                for vector_id, doc in zip(mutation_result.primary_keys, document_batch):
-                    vector_id_map[doc.id] = str(vector_id)
+                self.collection.insert(processed_documents)
 
-                self.update_vector_ids(vector_id_map, index=index)
                 progress_bar.set_description_str("Documents Processed")
                 progress_bar.update(batch_size)
 
@@ -450,27 +485,25 @@ class Milvus2DocumentStore(SQLDocumentStore):
         search_result: QueryResult = self.collection.search(
             data=[query_emb.tolist()],
             anns_field=self.embedding_field,
+            output_fields=[self.name_field, self.content_field, "doc_id"],
             param={"metric_type": self.metric_type, **self.search_param},
             limit=top_k,
         )
-
-        vector_ids_for_query = []
-        scores_for_vector_ids: Dict[str, float] = {}
-        for vector_id, distance in zip(search_result[0].ids, search_result[0].distances):
-            vector_ids_for_query.append(str(vector_id))
-            scores_for_vector_ids[str(vector_id)] = distance
-
-        documents = self.get_documents_by_vector_ids(vector_ids_for_query, index=index)
-
-        if return_embedding:
-            self._populate_embeddings_to_docs(index=index, docs=documents)
-
-        for doc in documents:
-            score = scores_for_vector_ids[doc.meta["vector_id"]]
-            if scale_score:
-                score = self.scale_to_unit_interval(score, self.similarity)
-            doc.score = score
-
+        documents = []
+        for hits in search_result:
+            for hit in hits:
+                score = hit.distance
+                if scale_score:
+                    score = self.scale_to_unit_interval(score, self.similarity)
+                doc_dict = {
+                    "id": hit.entity.doc_id,
+                    "vector_id": hit.id,
+                    "content": hit.entity.content,
+                    "meta": {"name": hit.entity.name},
+                }
+                document = Document.from_dict(doc_dict)
+                document.score = score
+                documents.append(document)
         return documents
 
     def delete_documents(
@@ -507,7 +540,6 @@ class Milvus2DocumentStore(SQLDocumentStore):
             self.collection = self._create_collection_and_index(self.index, recreate_index=True)
 
         index = index or self.index
-        super().delete_documents(index=index, filters=filters, ids=ids)
 
     def delete_index(self, index: str):
         """
@@ -626,10 +658,26 @@ class Milvus2DocumentStore(SQLDocumentStore):
             raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
-        documents = super().get_documents_by_id(ids=ids, index=index, batch_size=batch_size)
         if self.return_embedding:
-            self._populate_embeddings_to_docs(index=index, docs=documents)
-
+            output_fields = [self.embedding_field, self.name_field, self.content_field, self.doc_id_field]
+        else:
+            output_fields = [self.name_field, self.content_field, self.doc_id_field]
+        search_result: QueryResult = self.collection.query(
+            expr=f'{self.id_field} in [ {",".join(ids)} ]', output_fields=output_fields
+        )
+        # if self.return_embedding:
+        #     self._populate_embeddings_to_docs(index=index, docs=documents)
+        documents = []
+        for result in search_result:
+            # Milvus==>document: id ==>vector id, doc_id ==>id
+            doc_dict = {
+                "id": result["doc_id"],
+                "vector_id": result["id"],
+                "content": result["content"],
+                "meta": {"name": result["name"]},
+            }
+            document = Document.from_dict(doc_dict)
+            documents.append(document)
         return documents
 
     def _populate_embeddings_to_docs(self, docs: List[Document], index: Optional[str] = None):
@@ -660,7 +708,11 @@ class Milvus2DocumentStore(SQLDocumentStore):
             doc.embedding = np.array(result["embedding"], "float32")
 
     def _delete_vector_ids_from_milvus(
-        self, documents: Optional[List[Document]] = None, ids: Optional[List[str]] = None, index: Optional[str] = None
+        self,
+        id_field: str = "id",
+        documents: Optional[List[Document]] = None,
+        ids: Optional[List[str]] = None,
+        index: Optional[str] = None,
     ):
         index = index or self.index
         if ids is None:
@@ -670,11 +722,8 @@ class Milvus2DocumentStore(SQLDocumentStore):
             for doc in documents:
                 if "vector_id" in doc.meta:
                     ids.append(str(doc.meta["vector_id"]))
-        else:
-            docs = super().get_documents_by_id(ids=ids, index=index)
-            ids = [doc.meta["vector_id"] for doc in docs if "vector_id" in doc.meta]
 
-        expr = f"{self.id_field} in [{','.join(ids)}]"
+        expr = f"{id_field} in [{','.join(ids)}]"
 
         self.collection.delete(expr)
 
