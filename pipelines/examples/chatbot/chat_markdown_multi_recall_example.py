@@ -14,15 +14,16 @@
 
 import argparse
 import glob
-import time
 
-from pipelines.document_stores import FAISSDocumentStore
+from pipelines.document_stores import ElasticsearchDocumentStore
 from pipelines.nodes import (
+    BM25Retriever,
     CharacterTextSplitter,
     ChatGLMBot,
     DensePassageRetriever,
     ErnieBot,
     ErnieRanker,
+    JoinDocuments,
     MarkdownConverter,
     PromptTemplate,
     TruncatedConversationHistory,
@@ -47,16 +48,19 @@ parser.add_argument('--embed_title', default=False, type=bool, help="The title t
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
+parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
 args = parser.parse_args()
 # yapf: enable
 
 
 def chat_markdown_tutorial():
-    document_store = FAISSDocumentStore(
+    document_store = ElasticsearchDocumentStore(
+        host=args.host,
+        port=args.port,
+        username="",
+        password="",
         embedding_dim=args.embedding_dim,
-        duplicate_documents="skip",
-        return_embedding=True,
-        faiss_index_factory_str="Flat",
+        index=args.index_name,
     )
     use_gpu = True if args.device == "gpu" else False
     retriever = DensePassageRetriever(
@@ -71,6 +75,7 @@ def chat_markdown_tutorial():
         use_gpu=use_gpu,
         embed_title=args.embed_title,
     )
+    bm_retriever = BM25Retriever(document_store=document_store)
 
     # Indexing Markdowns
     markdown_converter = MarkdownConverter()
@@ -81,7 +86,6 @@ def chat_markdown_tutorial():
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    # files = glob.glob(args.file_paths + "/*.md")
     files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
     indexing_pipeline.run(file_paths=files)
 
@@ -90,18 +94,21 @@ def chat_markdown_tutorial():
     ernie_bot = ChatGLMBot()
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
-    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
+    query_pipeline.add_node(component=retriever, name="DenseRetriever", inputs=["Query"])
+    query_pipeline.add_node(component=bm_retriever, name="BMRetriever", inputs=["Query"])
+    query_pipeline.add_node(
+        component=JoinDocuments(join_mode="reciprocal_rank_fusion"),
+        name="JoinResults",
+        inputs=["BMRetriever", "DenseRetriever"],
+    )
+    query_pipeline.add_node(component=ranker, name="Ranker", inputs=["JoinResults"])
     query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
     query_pipeline.add_node(
         component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
     )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
-    start_time = time.time()
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
-    end_time = time.time()
-    print("Time cost for query markdown conversion:", end_time - start_time)
+    query = "Aistudio 教育版有哪些特性？"
+    prediction = query_pipeline.run(query=query, params={"DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 5}})
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 

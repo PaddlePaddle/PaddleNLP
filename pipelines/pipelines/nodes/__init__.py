@@ -31,6 +31,7 @@ from pipelines.nodes.file_converter import (
     PDFToTextOCRConverter,
     TextConverter,
 )
+from pipelines.nodes.llm import ChatGLMBot
 from pipelines.nodes.llm.ernie_bot import ErnieBot
 from pipelines.nodes.llm.history import TruncatedConversationHistory
 from pipelines.nodes.llm.prompt_template import PromptTemplate
