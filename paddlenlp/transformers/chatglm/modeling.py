@@ -250,7 +250,7 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids)
 
-        if use_cache and cache is not None:
+        if cache is not None:
             cache_k, cache_v = cache[0], cache[1]
             # [s + c, b, n, h/n]
             k_layer = paddle.concat([cache_k, k_layer], axis=0)

@@ -9,6 +9,7 @@
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
+|Stable Diffusion with High Resolution Fixing| ，使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 
 
 ## Example usages
@@ -324,7 +325,7 @@ with paddle.amp.auto_cast(True, level="O2"):
 images[0].save("lpw.png")
 ```
 
-上述代码生成结果如下
+上述代码生成结果如下:
 
 <center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
 
@@ -383,8 +384,29 @@ for enable_lora in [True, False]:
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
 ```
-生成的图片如下所示：
 
+生成的图片如下所示：
 | lora_disable.png | lora_enable.png |
 |:----------:|:--------------:|
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
+
+### Stable Diffusion with High Resolution Fixing
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+
+```python
+import paddle
+from stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
+from ppdiffusers import EulerAncestralDiscreteScheduler
+
+pipe = StableDiffusionHiresFixPipeline.from_pretrained("stabilityai/stable-diffusion-2", paddle_dtype=paddle.float16)
+pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+
+generator = paddle.Generator().manual_seed(5232132133)
+prompt = "1 real girl, long black hair, detailed face, light smile, chinese style, hanfu"
+image = pipe(prompt, guidance_scale=7.5, height=768, width=768, generator=generator, num_inference_steps=40, hires_ratio=0.5, hr_resize_width=768, hr_resize_height=1024, enable_hr=True).images[0]
+
+image.show()
+
+```
+生成的图片如下所示：
+<center><img src="https://github.com/PaddlePaddle/PaddleNLP/assets/35913314/1c96a219-0b5e-4e1a-b244-0c8cc7cb41f9" width=40%></center>
