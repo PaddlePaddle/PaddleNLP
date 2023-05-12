@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Dict, List, Optional
-
-import re
 import logging
+import re
 from pathlib import Path
+from typing import Callable, Dict, List, Optional
 
 from pipelines.nodes.file_converter import (
     BaseConverter,
     DocxToTextConverter,
+    ImageToTextConverter,
+    MarkdownConverter,
     PDFToTextConverter,
     TextConverter,
-    ImageToTextConverter,
-    MarkdownConverter
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,7 @@ def convert_files_to_dicts(
     :param encoding: character encoding to use when converting pdf documents.
     """
     file_paths = [p for p in Path(dir_path).glob("**/*")]
-    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", ".jpg",'.md']
+    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", ".jpg", ".md"]
     suffix2converter: Dict[str, BaseConverter] = {}
 
     suffix2paths: Dict[str, List[Path]] = {}
