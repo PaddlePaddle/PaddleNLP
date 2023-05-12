@@ -144,7 +144,7 @@ class Predictor(object):
             elif args.device == "xpu":
                 config.enable_xpu()
             elif args.device == "npu":
-                config.enable_npu()
+                config.enable_custom_device("npu")
             else:
                 # CPU
                 config.disable_gpu()
