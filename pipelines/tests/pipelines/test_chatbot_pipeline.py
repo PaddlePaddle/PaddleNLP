@@ -21,8 +21,9 @@ from pipelines.pipelines import Pipeline
 
 
 class TestChatPipeline(unittest.TestCase):
-    def setUp(self):
-        self.eb = ErnieBot("your_access_token")
+    @patch("requests.request")
+    def setUp(self, mock_request):
+        self.eb = ErnieBot(api_key="api_key", secret_key="secret_key")
 
     def request_side_effect(*args, **kwargs):
         data = json.loads(kwargs["data"])
