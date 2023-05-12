@@ -19,7 +19,6 @@ import time
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import (
     CharacterTextSplitter,
-    ChatGLMBot,
     DensePassageRetriever,
     ErnieBot,
     ErnieRanker,
@@ -81,13 +80,11 @@ def chat_markdown_tutorial():
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    # files = glob.glob(args.file_paths + "/*.md")
     files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
     ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
-    ernie_bot = ChatGLMBot()
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
