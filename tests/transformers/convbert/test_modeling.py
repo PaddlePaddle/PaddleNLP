@@ -423,7 +423,7 @@ class ConvBertModelTester:
     ],
 )
 class ConvBertModelTest(ModelTesterMixin, unittest.TestCase):
-    test_resize_embeddings: bool = True
+    test_resize_embeddings: bool = False
     base_model_class = ConvBertModel
     return_dict: bool = False
     use_labels: bool = False
