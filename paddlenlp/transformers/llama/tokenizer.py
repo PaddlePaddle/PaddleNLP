@@ -39,6 +39,14 @@ class LlamaTokenizer(PretrainedTokenizer):
         },
     }
 
+    pretrained_init_configuration = {
+        "facebook/tiny-random-llama": {},
+        "facebook/llama-7b": {},
+        "facebook/llama-13b": {},
+        "facebook/llama-30b": {},
+        "facebook/llama-65b": {},
+    }
+
     def __init__(
         self,
         vocab_file,
